@@ -94,6 +94,16 @@ function migrate(db: Database.Database) {
   db.exec("CREATE INDEX IF NOT EXISTS idx_events_tx_hash ON events(tx_hash)");
   db.exec("CREATE INDEX IF NOT EXISTS idx_events_source ON events(source)");
 
+  // Waitlist table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS waitlist (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      email TEXT NOT NULL UNIQUE,
+      role TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+
   // Ensure demo API key exists (needed for middleware ingest to work)
   db.prepare(`
     INSERT OR IGNORE INTO api_keys (id, key_hash, key_prefix, name, email)

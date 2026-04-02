@@ -2,7 +2,8 @@
 
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { ArrowRight, DollarSign, Zap, Users, TrendingUp } from "lucide-react";
+import { DollarSign, Zap, Users, TrendingUp } from "lucide-react";
+import { WaitlistForm } from "./waitlist-form";
 
 const STATS = [
   { value: "195+", label: "x402 Services" },
@@ -175,26 +176,28 @@ export function Hero() {
           Blockchain-verified. Built for every x402 service provider.
         </motion.p>
 
-        {/* CTAs */}
+        {/* Waitlist CTA */}
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.3, ease: [0.25, 0.1, 0.25, 1] }}
-          className="mt-8 flex items-center justify-center gap-3"
+          className="mt-8"
         >
-          <Link
-            href="/pulse/dashboard"
-            className="group inline-flex items-center gap-2 h-11 px-6 rounded-lg bg-foreground text-background text-[13px] font-medium hover:bg-foreground/90 transition-colors duration-300"
-          >
-            Open Pulse Dashboard
-            <ArrowRight className="w-3.5 h-3.5 transition-transform duration-300 group-hover:translate-x-0.5" />
-          </Link>
-          <Link
-            href="/pulse/dashboard/setup"
-            className="inline-flex items-center h-11 px-6 rounded-lg border border-black/[0.08] text-[13px] font-medium text-secondary hover:text-primary hover:border-black/[0.15] transition-all duration-300"
-          >
-            View Setup Guide
-          </Link>
+          <WaitlistForm />
+          <div className="mt-4 flex items-center justify-center gap-5">
+            <Link
+              href="/pulse/dashboard"
+              className="text-[12px] font-medium text-tertiary hover:text-primary transition-colors duration-300"
+            >
+              View live dashboard →
+            </Link>
+            <Link
+              href="/pulse/dashboard/setup"
+              className="text-[12px] font-medium text-tertiary hover:text-primary transition-colors duration-300"
+            >
+              Setup guide →
+            </Link>
+          </div>
         </motion.div>
 
         {/* Live dashboard preview — the "holy shit" factor */}
