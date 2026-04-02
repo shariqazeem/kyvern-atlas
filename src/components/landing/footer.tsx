@@ -1,29 +1,73 @@
 import Link from "next/link";
 
+const LINKS = {
+  Product: [
+    { label: "Pulse", href: "/pulse" },
+    { label: "Dashboard", href: "/pulse/dashboard" },
+    { label: "Setup Guide", href: "/pulse/dashboard/setup" },
+    { label: "Pricing", href: "/pulse#pricing" },
+  ],
+  Company: [
+    { label: "About", href: "#" },
+    { label: "Blog", href: "#" },
+  ],
+  Ecosystem: [
+    { label: "x402 Protocol", href: "https://x402.org" },
+    { label: "x402 Foundation", href: "https://x402.org" },
+    { label: "Base", href: "https://base.org" },
+  ],
+};
+
 export function Footer() {
   return (
-    <footer className="border-t border-border py-12 px-6">
-      <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-2.5">
-          <div className="w-6 h-6 rounded-md bg-primary flex items-center justify-center">
-            <span className="text-primary-foreground text-[10px] font-bold">K</span>
+    <footer className="border-t border-black/[0.04] py-16 lg:py-20 px-6">
+      <div className="max-w-5xl mx-auto">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-10 lg:gap-16">
+          {/* Brand */}
+          <div className="col-span-2 md:col-span-1">
+            <div className="flex items-center gap-2.5 mb-4">
+              <div className="w-6 h-6 rounded-md bg-foreground flex items-center justify-center">
+                <span className="text-background text-[10px] font-bold">K</span>
+              </div>
+              <span className="text-[13px] font-semibold tracking-tight">KyvernLabs</span>
+            </div>
+            <p className="text-[13px] text-quaternary leading-relaxed">
+              The infrastructure company
+              <br />
+              for the x402 economy.
+            </p>
           </div>
-          <span className="text-sm font-semibold tracking-tight">KyvernLabs</span>
+
+          {/* Link columns */}
+          {Object.entries(LINKS).map(([category, links]) => (
+            <div key={category}>
+              <p className="text-[11px] uppercase tracking-[0.15em] font-medium text-quaternary mb-4">
+                {category}
+              </p>
+              <div className="space-y-2.5">
+                {links.map((link) => (
+                  <Link
+                    key={link.label}
+                    href={link.href}
+                    className="block text-[13px] text-tertiary hover:text-primary transition-colors duration-300"
+                  >
+                    {link.label}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
 
-        <div className="flex items-center gap-6 text-sm text-muted-foreground">
-          <Link href="/pulse/dashboard" className="hover:text-foreground transition-colors">
-            Pulse
-          </Link>
-          <Link href="/pulse/dashboard/setup" className="hover:text-foreground transition-colors">
-            Docs
-          </Link>
+        <div className="mt-16 pt-8 border-t border-black/[0.04] flex flex-col sm:flex-row items-center justify-between gap-4">
+          <p className="text-[12px] text-quaternary">
+            &copy; {new Date().getFullYear()} KyvernLabs. All rights reserved.
+          </p>
+          <p className="text-[12px] text-quaternary">
+            Built by{" "}
+            <span className="text-tertiary font-medium">@shariqshkt</span>
+          </p>
         </div>
-
-        <p className="text-xs text-muted-foreground">
-          Built by{" "}
-          <span className="font-medium text-foreground">@shariqshkt</span>
-        </p>
       </div>
     </footer>
   );

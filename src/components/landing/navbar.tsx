@@ -2,38 +2,47 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
+import { ArrowRight } from "lucide-react";
 
 export function Navbar() {
   return (
     <motion.nav
-      initial={{ opacity: 0, y: -10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, ease: [0.25, 0.1, 0.25, 1] }}
-      className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-border/50"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.8, ease: [0.25, 0.1, 0.25, 1] }}
+      className="fixed top-0 left-0 right-0 z-50"
     >
-      <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center">
-            <span className="text-primary-foreground text-xs font-bold">K</span>
-          </div>
-          <span className="text-sm font-semibold tracking-tight">KyvernLabs</span>
-        </Link>
-
-        <div className="flex items-center gap-8">
-          <div className="hidden sm:flex items-center gap-6 text-sm text-muted-foreground">
-            <a href="#products" className="hover:text-foreground transition-colors ease-premium">
-              Products
-            </a>
-            <a href="#developers" className="hover:text-foreground transition-colors ease-premium">
-              Developers
-            </a>
-          </div>
-          <Link
-            href="/pulse/dashboard"
-            className="inline-flex items-center justify-center h-8 px-4 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 ease-premium transition-opacity"
-          >
-            Open Pulse
+      <div className="mx-auto max-w-7xl px-6 lg:px-10">
+        <div className="flex items-center justify-between h-16 border-b border-black/[0.04]">
+          <Link href="/" className="flex items-center gap-2.5">
+            <div className="w-6 h-6 rounded-md bg-foreground flex items-center justify-center">
+              <span className="text-background text-[10px] font-bold tracking-tight">K</span>
+            </div>
+            <span className="text-[13px] font-semibold tracking-tight text-primary">
+              KyvernLabs
+            </span>
           </Link>
+
+          <div className="flex items-center gap-8">
+            <div className="hidden sm:flex items-center gap-7">
+              {["Products", "Developers", "Docs"].map((item) => (
+                <a
+                  key={item}
+                  href={`#${item.toLowerCase()}`}
+                  className="text-[13px] text-tertiary hover:text-primary transition-colors duration-300"
+                >
+                  {item}
+                </a>
+              ))}
+            </div>
+            <Link
+              href="/pulse/dashboard"
+              className="group inline-flex items-center gap-1.5 h-8 px-3.5 rounded-md bg-foreground text-background text-[12px] font-medium hover:bg-foreground/90 transition-colors duration-300"
+            >
+              Open Pulse
+              <ArrowRight className="w-3 h-3 transition-transform duration-300 group-hover:translate-x-0.5" />
+            </Link>
+          </div>
         </div>
       </div>
     </motion.nav>

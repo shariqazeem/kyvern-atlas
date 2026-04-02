@@ -1,71 +1,85 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { AlertCircle, BarChart3, Users, DollarSign } from "lucide-react";
 
-const PAIN_POINTS = [
-  {
-    icon: BarChart3,
-    title: "No revenue visibility",
-    desc: "You don't know how much you're making per endpoint, per day, per customer.",
-  },
-  {
-    icon: Users,
-    title: "No customer insights",
-    desc: "Which agents are your top payers? Are they increasing or decreasing usage?",
-  },
-  {
-    icon: DollarSign,
-    title: "No pricing intelligence",
-    desc: "Are you charging too much? Too little? How do you compare to competitors?",
-  },
+const WITHOUT = [
+  "No revenue visibility across endpoints",
+  "No idea which agents pay the most",
+  "No pricing benchmarks vs competitors",
+  "No alerts on revenue changes",
+];
+
+const WITH_PULSE = [
+  "Real-time revenue per endpoint, per day, per agent",
+  "Customer analytics with wallet-level detail",
+  "Pricing intelligence across the x402 ecosystem",
+  "Instant alerts on spikes, drops, and anomalies",
 ];
 
 export function ProblemSection() {
   return (
-    <section className="py-20 px-6 bg-muted/30">
+    <section className="py-28 lg:py-36 px-6">
       <div className="max-w-5xl mx-auto">
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 16 }}
           whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
+          viewport={{ once: true, margin: "-100px" }}
           transition={{ duration: 0.6, ease: [0.25, 0.1, 0.25, 1] }}
-          className="text-center mb-12"
+          className="text-center mb-16"
         >
-          <div className="inline-flex items-center gap-2 text-sm text-muted-foreground mb-4">
-            <AlertCircle className="w-4 h-4" />
+          <p className="text-[12px] uppercase tracking-[0.15em] font-medium text-quaternary mb-4">
             The problem
-          </div>
-          <h2 className="text-3xl font-semibold tracking-tight">
-            90+ x402 services. Zero business intelligence.
-          </h2>
-          <p className="mt-3 text-muted-foreground max-w-xl mx-auto">
-            The x402 ecosystem has $10M+ in volume and 35M+ transactions. But every
-            service provider is flying blind.
           </p>
+          <h2 className="text-[clamp(1.75rem,4vw,2.75rem)] font-semibold tracking-[-0.03em] leading-[1.1]">
+            195+ x402 services.
+            <br />
+            <span className="text-tertiary">Zero business intelligence.</span>
+          </h2>
         </motion.div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          {PAIN_POINTS.map((point, i) => (
-            <motion.div
-              key={point.title}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{
-                duration: 0.5,
-                delay: i * 0.1,
-                ease: [0.25, 0.1, 0.25, 1],
-              }}
-              className="bg-white rounded-lg border border-border p-6 shadow-premium"
-            >
-              <point.icon className="w-5 h-5 text-muted-foreground mb-3" />
-              <h3 className="text-sm font-semibold mb-1">{point.title}</h3>
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                {point.desc}
-              </p>
-            </motion.div>
-          ))}
+        {/* Comparison — inspired by x402.org old way vs new way */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 lg:gap-6">
+          {/* Without */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-80px" }}
+            transition={{ duration: 0.5, ease: [0.25, 0.1, 0.25, 1] }}
+            className="rounded-xl border border-black/[0.06] bg-white p-7 lg:p-8"
+          >
+            <p className="text-[11px] uppercase tracking-[0.15em] font-medium text-quaternary mb-6">
+              Without Pulse
+            </p>
+            <div className="space-y-4">
+              {WITHOUT.map((item, i) => (
+                <div key={i} className="flex items-start gap-3">
+                  <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-black/[0.12] shrink-0" />
+                  <p className="text-[14px] text-tertiary leading-relaxed">{item}</p>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+
+          {/* With Pulse */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-80px" }}
+            transition={{ duration: 0.5, delay: 0.1, ease: [0.25, 0.1, 0.25, 1] }}
+            className="rounded-xl border border-pulse/20 bg-gradient-to-b from-pulse-50/50 to-white p-7 lg:p-8"
+          >
+            <p className="text-[11px] uppercase tracking-[0.15em] font-medium text-pulse-600 mb-6">
+              With Pulse
+            </p>
+            <div className="space-y-4">
+              {WITH_PULSE.map((item, i) => (
+                <div key={i} className="flex items-start gap-3">
+                  <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-pulse shrink-0" />
+                  <p className="text-[14px] text-primary leading-relaxed">{item}</p>
+                </div>
+              ))}
+            </div>
+          </motion.div>
         </div>
       </div>
     </section>

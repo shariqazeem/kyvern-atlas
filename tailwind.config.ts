@@ -73,6 +73,9 @@ const config: Config = {
         sans: ["var(--font-inter)"],
         mono: ["var(--font-mono)"],
       },
+      backgroundImage: {
+        "gradient-radial": "radial-gradient(var(--tw-gradient-stops))",
+      },
       keyframes: {
         "fade-in": {
           from: { opacity: "0", transform: "translateY(10px)" },
