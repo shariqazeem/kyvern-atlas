@@ -58,7 +58,7 @@ export function RecentTransactions({ limit = 10 }: RecentTransactionsProps) {
         <ArrowUpRight className="w-4 h-4 text-muted-foreground" />
       </div>
       <div className="space-y-0">
-        <div className="grid grid-cols-6 gap-3 text-xs text-muted-foreground font-medium pb-2 border-b border-border">
+        <div className="grid grid-cols-6 gap-3 text-[11px] text-quaternary font-medium pb-2 border-b border-black/[0.04]">
           <span>Time</span>
           <span>Endpoint</span>
           <span className="text-right">Amount</span>
@@ -71,8 +71,9 @@ export function RecentTransactions({ limit = 10 }: RecentTransactionsProps) {
             key={tx.id}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
+            whileHover={{ backgroundColor: "rgba(0,0,0,0.015)", x: 2 }}
             transition={{ duration: 0.3, delay: 0.6 + i * 0.03 }}
-            className="grid grid-cols-6 gap-3 py-2 text-sm border-b border-border/50 last:border-0 hover:bg-muted/30 transition-colors -mx-2 px-2 rounded"
+            className="grid grid-cols-6 gap-3 py-2.5 text-sm border-b border-black/[0.03] last:border-0 -mx-2 px-2 rounded-md cursor-default"
           >
             <span className="text-xs text-muted-foreground">
               {format(parseISO(tx.timestamp), "HH:mm:ss")}
