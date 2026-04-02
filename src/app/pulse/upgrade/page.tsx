@@ -11,46 +11,54 @@ import {
   ExternalLink,
   Shield,
   ArrowRight,
+  Copy,
+  Wallet,
 } from "lucide-react";
 import { getExplorerTxUrl, truncateTxHash } from "@/lib/utils";
-import { PaymentToast } from "@/components/dashboard/payment-toast";
+
+const PAYTO = "0x55c3aBb091D1a43C3872718b3b8B3AE8c20B592E";
+const AMOUNT = "49";
+const NETWORK_NAME = "Base Sepolia";
+const USDC_CONTRACT = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
 
 export default function UpgradePage() {
+  const [step, setStep] = useState<"pay" | "verify" | "done">("pay");
+  const [txHash, setTxHash] = useState("");
   const [loading, setLoading] = useState(false);
+  const [copied, setCopied] = useState<string | null>(null);
   const [result, setResult] = useState<{
-    success: boolean;
-    tx_hash?: string;
-    network?: string;
+    subscription_id?: string;
     expires_at?: string;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [showToast, setShowToast] = useState(false);
 
-  async function handleUpgrade() {
+  function copyToClipboard(text: string, label: string) {
+    navigator.clipboard.writeText(text);
+    setCopied(label);
+    setTimeout(() => setCopied(null), 2000);
+  }
+
+  async function verifyPayment() {
+    if (!txHash.startsWith("0x") || txHash.length < 10) {
+      setError("Enter a valid transaction hash");
+      return;
+    }
+
     setLoading(true);
     setError(null);
-    setResult(null);
 
     try {
-      // Use the demo-call pattern — call the upgrade endpoint via x402
-      const res = await fetch("/api/x402/demo-call", {
+      const res = await fetch("/api/x402/verify-upgrade", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ _upgrade: true }),
+        body: JSON.stringify({ tx_hash: txHash }),
       });
-
       const data = await res.json();
       if (data.success) {
-        setResult({
-          success: true,
-          tx_hash: data.settlement?.tx_hash,
-          network: data.settlement?.network,
-          expires_at: data.data?.expires_at,
-        });
-        setShowToast(true);
-        setTimeout(() => setShowToast(false), 10000);
+        setResult(data);
+        setStep("done");
       } else {
-        setError(data.error || "Payment failed. Please try again.");
+        setError(data.error || "Verification failed");
       }
     } catch (err) {
       setError(String(err));
@@ -87,7 +95,7 @@ export default function UpgradePage() {
           >
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-pulse/20 bg-pulse-50 text-[11px] tracking-wide font-medium text-pulse-600 mb-6">
               <Shield className="w-3 h-3" />
-              Paid with x402 — USDC on Base
+              Pay with USDC on {NETWORK_NAME}
             </div>
             <h1 className="text-[clamp(2rem,5vw,3rem)] font-semibold leading-[1.08] tracking-[-0.04em]">
               Upgrade to{" "}
@@ -98,7 +106,7 @@ export default function UpgradePage() {
             <p className="mt-4 text-[15px] text-secondary leading-relaxed">
               Full analytics, unlimited endpoints, smart alerts.
               <br />
-              Pay with USDC — the same way your agents pay you.
+              Pay with your own wallet — no intermediaries.
             </p>
           </motion.div>
 
@@ -111,12 +119,12 @@ export default function UpgradePage() {
           >
             <div className="flex items-baseline gap-1 mb-1">
               <span className="text-[36px] font-semibold tracking-[-0.03em] font-mono-numbers">
-                $49
+                ${AMOUNT}
               </span>
               <span className="text-white/40 text-[14px]">/month</span>
             </div>
             <p className="text-[13px] text-white/50 mb-6">
-              USDC on Base • 30-day access • Cancel anytime
+              USDC on {NETWORK_NAME} • 30-day access • Cancel anytime
             </p>
 
             <ul className="space-y-2.5 mb-8">
@@ -128,25 +136,157 @@ export default function UpgradePage() {
               ))}
             </ul>
 
-            {result?.success ? (
-              <div className="space-y-3">
+            {/* Step 1: Payment instructions */}
+            {step === "pay" && (
+              <div className="space-y-4">
+                <div className="bg-white/[0.06] rounded-lg p-4 space-y-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Wallet className="w-4 h-4 text-white/60" />
+                    <span className="text-[13px] font-medium text-white/80">
+                      Send from your wallet
+                    </span>
+                  </div>
+
+                  {/* Amount */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-[12px] text-white/50">Amount</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[13px] font-mono font-medium">{AMOUNT} USDC</span>
+                      <button
+                        onClick={() => copyToClipboard(AMOUNT, "amount")}
+                        className="p-1 rounded hover:bg-white/10 transition-colors"
+                      >
+                        {copied === "amount" ? (
+                          <Check className="w-3 h-3 text-emerald-400" />
+                        ) : (
+                          <Copy className="w-3 h-3 text-white/40" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* To address */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-[12px] text-white/50">To</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[12px] font-mono text-white/80">{PAYTO.slice(0, 10)}...{PAYTO.slice(-6)}</span>
+                      <button
+                        onClick={() => copyToClipboard(PAYTO, "address")}
+                        className="p-1 rounded hover:bg-white/10 transition-colors"
+                      >
+                        {copied === "address" ? (
+                          <Check className="w-3 h-3 text-emerald-400" />
+                        ) : (
+                          <Copy className="w-3 h-3 text-white/40" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Network */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-[12px] text-white/50">Network</span>
+                    <span className="text-[12px] font-medium text-blue-300">{NETWORK_NAME}</span>
+                  </div>
+
+                  {/* Token */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-[12px] text-white/50">Token (USDC)</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-mono text-white/60">{USDC_CONTRACT.slice(0, 8)}...{USDC_CONTRACT.slice(-6)}</span>
+                      <button
+                        onClick={() => copyToClipboard(USDC_CONTRACT, "token")}
+                        className="p-1 rounded hover:bg-white/10 transition-colors"
+                      >
+                        {copied === "token" ? (
+                          <Check className="w-3 h-3 text-emerald-400" />
+                        ) : (
+                          <Copy className="w-3 h-3 text-white/40" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setStep("verify")}
+                  className="w-full inline-flex items-center justify-center gap-2 h-11 rounded-lg bg-white text-foreground text-[13px] font-medium hover:bg-white/90 transition-colors duration-300"
+                >
+                  <Zap className="w-4 h-4" />
+                  I&apos;ve sent the payment
+                </button>
+              </div>
+            )}
+
+            {/* Step 2: Paste tx hash */}
+            {step === "verify" && (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-[12px] text-white/50 mb-2">
+                    Paste your transaction hash
+                  </label>
+                  <input
+                    type="text"
+                    value={txHash}
+                    onChange={(e) => setTxHash(e.target.value)}
+                    placeholder="0x..."
+                    className="w-full h-10 px-3 rounded-lg bg-white/[0.08] border border-white/[0.1] text-[13px] font-mono text-white placeholder:text-white/30 focus:outline-none focus:border-white/30"
+                  />
+                </div>
+
+                <button
+                  onClick={verifyPayment}
+                  disabled={loading || !txHash}
+                  className="w-full inline-flex items-center justify-center gap-2 h-11 rounded-lg bg-white text-foreground text-[13px] font-medium hover:bg-white/90 disabled:opacity-50 transition-colors duration-300"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Verifying...
+                    </>
+                  ) : (
+                    <>
+                      <Shield className="w-4 h-4" />
+                      Verify &amp; Activate Pro
+                    </>
+                  )}
+                </button>
+
+                <button
+                  onClick={() => setStep("pay")}
+                  className="w-full text-[12px] text-white/40 hover:text-white/60 transition-colors"
+                >
+                  ← Back to payment details
+                </button>
+
+                {error && (
+                  <p className="text-[12px] text-red-300 bg-red-900/20 rounded-lg p-2.5">
+                    {error}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Step 3: Done */}
+            {step === "done" && (
+              <div className="space-y-4">
                 <div className="flex items-center gap-2 text-emerald-400">
                   <Check className="w-5 h-5" />
                   <span className="text-[14px] font-semibold">Pro activated</span>
                 </div>
-                {result.expires_at && (
+                {result?.expires_at && (
                   <p className="text-[12px] text-white/50">
                     Active until {new Date(result.expires_at).toLocaleDateString()}
                   </p>
                 )}
-                {result.tx_hash && (
+                {txHash && (
                   <a
-                    href={getExplorerTxUrl(result.tx_hash, result.network)}
+                    href={getExplorerTxUrl(txHash, "eip155:84532")}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1 text-[12px] font-mono text-pulse-300 hover:underline"
                   >
-                    {truncateTxHash(result.tx_hash)}
+                    {truncateTxHash(txHash)}
                     <ExternalLink className="w-2.5 h-2.5" />
                   </a>
                 )}
@@ -158,30 +298,6 @@ export default function UpgradePage() {
                   <ArrowRight className="w-3.5 h-3.5" />
                 </a>
               </div>
-            ) : (
-              <button
-                onClick={handleUpgrade}
-                disabled={loading}
-                className="w-full inline-flex items-center justify-center gap-2 h-11 rounded-lg bg-white text-foreground text-[13px] font-medium hover:bg-white/90 disabled:opacity-50 transition-colors duration-300"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Processing payment...
-                  </>
-                ) : (
-                  <>
-                    <Zap className="w-4 h-4" />
-                    Pay $49 USDC — Upgrade Now
-                  </>
-                )}
-              </button>
-            )}
-
-            {error && (
-              <p className="mt-3 text-[12px] text-red-300 bg-red-900/20 rounded-lg p-2.5">
-                {error}
-              </p>
             )}
           </motion.div>
 
@@ -191,7 +307,7 @@ export default function UpgradePage() {
             transition={{ delay: 0.4 }}
             className="mt-6 text-center text-[12px] text-quaternary"
           >
-            Payment settles on Base Sepolia via x402 protocol.
+            Send USDC on {NETWORK_NAME} from MetaMask, Coinbase Wallet, or any wallet.
             <br />
             First 50 waitlist members get 3 months free.
           </motion.p>
@@ -199,14 +315,6 @@ export default function UpgradePage() {
       </section>
 
       <Footer />
-
-      <PaymentToast
-        visible={showToast}
-        txHash={result?.tx_hash}
-        network={result?.network}
-        amount={49}
-        onDismiss={() => setShowToast(false)}
-      />
     </div>
   );
 }
