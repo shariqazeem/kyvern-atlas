@@ -104,6 +104,23 @@ function migrate(db: Database.Database) {
     );
   `);
 
+  // Subscriptions table — x402-native billing
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS subscriptions (
+      id TEXT PRIMARY KEY,
+      wallet_address TEXT NOT NULL,
+      plan TEXT NOT NULL DEFAULT 'pro',
+      tx_hash TEXT NOT NULL,
+      network TEXT,
+      amount_usd REAL NOT NULL,
+      started_at TEXT NOT NULL DEFAULT (datetime('now')),
+      expires_at TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'active'
+    );
+    CREATE INDEX IF NOT EXISTS idx_subs_wallet ON subscriptions(wallet_address);
+    CREATE INDEX IF NOT EXISTS idx_subs_status ON subscriptions(status);
+  `);
+
   // Ensure demo API key exists (needed for middleware ingest to work)
   db.prepare(`
     INSERT OR IGNORE INTO api_keys (id, key_hash, key_prefix, name, email)

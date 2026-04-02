@@ -9,6 +9,7 @@ import {
   Users,
   ArrowLeftRight,
   Code2,
+  Sparkles,
   Activity,
 } from "lucide-react";
 
@@ -18,6 +19,7 @@ const NAV_ITEMS = [
   { href: "/pulse/dashboard/endpoints", label: "Endpoints", icon: Globe },
   { href: "/pulse/dashboard/customers", label: "Customers", icon: Users },
   { href: "/pulse/dashboard/setup", label: "Setup", icon: Code2 },
+  { href: "/pulse/upgrade", label: "Upgrade to Pro", icon: Sparkles },
 ];
 
 export function Sidebar() {

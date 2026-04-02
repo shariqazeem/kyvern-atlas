@@ -78,7 +78,8 @@ const PRICING = [
       "CSV export + tax reports",
       "Priority support",
     ],
-    cta: "Start Free Trial",
+    cta: "Upgrade to Pro — $49 USDC",
+    href: "/pulse/upgrade",
     highlight: true,
   },
   {
@@ -419,7 +420,7 @@ export default function PulseLanding() {
                   plan.highlight ? "text-white/60" : "text-tertiary"
                 )}>{plan.desc}</p>
                 <Link
-                  href="/pulse/dashboard"
+                  href={(plan as { href?: string }).href || "/pulse/dashboard"}
                   className={cn(
                     "w-full inline-flex items-center justify-center h-10 rounded-lg text-[13px] font-medium transition-all duration-300",
                     plan.highlight

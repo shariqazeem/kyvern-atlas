@@ -14,6 +14,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json().catch(() => ({}));
+    const isUpgrade = body._upgrade === true;
     const symbol = body.symbol || "ETH";
 
     // Set up x402 client with test wallet
@@ -22,11 +23,15 @@ export async function POST(req: NextRequest) {
     client.register("eip155:*", new ExactEvmScheme(signer));
     const fetchWithPayment = wrapFetchWithPayment(fetch, client);
 
-    // Call our own x402 endpoint
+    // Call either the upgrade or demo price endpoint
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
-    const targetUrl = `${baseUrl}/api/x402/price?symbol=${encodeURIComponent(symbol)}`;
+    const targetUrl = isUpgrade
+      ? `${baseUrl}/api/x402/upgrade-pro`
+      : `${baseUrl}/api/x402/price?symbol=${encodeURIComponent(symbol)}`;
 
-    const response = await fetchWithPayment(targetUrl);
+    const response = await fetchWithPayment(targetUrl, {
+      method: isUpgrade ? "POST" : "GET",
+    });
 
     if (!response.ok) {
       const errorText = await response.text();
