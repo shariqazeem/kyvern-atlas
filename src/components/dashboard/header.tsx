@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Activity } from "lucide-react";
 import { TimeRangeSelector } from "./time-range-selector";
 import { MobileNav } from "./mobile-nav";
+import { ConnectWallet } from "@/components/connect-wallet";
 import { usePulseStats } from "@/hooks/use-pulse-stats";
 import { useDashboardStore } from "@/hooks/use-dashboard-store";
 
@@ -54,7 +55,11 @@ export function DashboardHeader() {
             )}
           </div>
         </div>
-        <TimeRangeSelector />
+        <div className="flex items-center gap-3">
+          <TimeRangeSelector />
+          <div className="h-5 w-px bg-black/[0.06] hidden sm:block" />
+          <ConnectWallet />
+        </div>
       </div>
     </header>
   );

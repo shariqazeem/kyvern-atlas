@@ -4,6 +4,8 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { Navbar } from "@/components/landing/navbar";
 import { Footer } from "@/components/landing/footer";
+import { ConnectWallet } from "@/components/connect-wallet";
+import { useSubscription } from "@/hooks/use-subscription";
 import {
   Zap,
   Check,
@@ -13,6 +15,7 @@ import {
   ArrowRight,
   Copy,
   Wallet,
+  Sparkles,
 } from "lucide-react";
 import { getExplorerTxUrl, truncateTxHash } from "@/lib/utils";
 
@@ -22,6 +25,7 @@ const NETWORK_NAME = "Base Sepolia";
 const USDC_CONTRACT = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
 
 export default function UpgradePage() {
+  const { isPro, expiresAt, isConnected } = useSubscription();
   const [step, setStep] = useState<"pay" | "verify" | "done">("pay");
   const [txHash, setTxHash] = useState("");
   const [loading, setLoading] = useState(false);
@@ -109,6 +113,46 @@ export default function UpgradePage() {
               Pay with your own wallet — no intermediaries.
             </p>
           </motion.div>
+
+          {/* Already Pro */}
+          {isPro && (
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="rounded-xl border border-emerald-200 bg-emerald-50 p-6 text-center mb-6"
+            >
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <Sparkles className="w-5 h-5 text-emerald-600" />
+                <span className="text-[15px] font-semibold text-emerald-800">You&apos;re on Pulse Pro</span>
+              </div>
+              {expiresAt && (
+                <p className="text-[13px] text-emerald-600">
+                  Active until {new Date(expiresAt).toLocaleDateString()}
+                </p>
+              )}
+              <a
+                href="/pulse/dashboard"
+                className="inline-flex items-center gap-2 mt-4 h-10 px-5 rounded-lg bg-emerald-600 text-white text-[13px] font-medium hover:bg-emerald-700 transition-colors"
+              >
+                Open Dashboard
+                <ArrowRight className="w-3.5 h-3.5" />
+              </a>
+            </motion.div>
+          )}
+
+          {/* Connect wallet prompt */}
+          {!isConnected && !isPro && (
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="rounded-xl border border-black/[0.06] bg-[#FAFAFA] p-5 text-center mb-6"
+            >
+              <p className="text-[13px] text-secondary mb-3">
+                Connect your wallet to check Pro status and pay
+              </p>
+              <ConnectWallet />
+            </motion.div>
+          )}
 
           {/* Pricing card */}
           <motion.div

@@ -9,6 +9,8 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@coinbase/wallet-sdk": "^4.3.7",
+    "@tanstack/react-query": "^5.96.1",
     "@x402/core": "^2.8.0",
     "@x402/evm": "^2.8.0",
     "@x402/fetch": "^2.8.0",
@@ -20,12 +22,14 @@
     "lucide-react": "^1.7.0",
     "nanoid": "^5.1.7",
     "next": "14.2.35",
+    "porto": "^0.2.37",
     "react": "^18",
     "react-dom": "^18",
     "recharts": "^3.8.1",
     "tailwind-merge": "^3.5.0",
     "tailwindcss-animate": "^1.0.7",
     "viem": "^2.47.6",
+    "wagmi": "^3.6.0",
     "zod": "^4.3.6",
     "zustand": "^5.0.12"
   },
