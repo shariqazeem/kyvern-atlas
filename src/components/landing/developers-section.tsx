@@ -48,7 +48,7 @@ function CodeBlock() {
             <span className="text-gray-400">{"  "}</span>
             <span className="text-orange-300">apiKey</span>
             <span className="text-gray-400">{": "}</span>
-            <span className="text-emerald-400">{"'kv_...'"}</span>
+            <span className="text-emerald-400">{"'kv_live_your_key'"}</span>
             {"\n"}
             <span className="text-gray-400">{"})"}</span>
           </code>
@@ -78,12 +78,15 @@ export function DevelopersSection() {
               <span className="text-tertiary">Full revenue visibility.</span>
             </h2>
             <p className="mt-5 text-[15px] text-secondary leading-relaxed max-w-md">
-              Wrap your x402 handler with{" "}
+              <code className="text-[13px] font-mono bg-black/[0.04] px-1.5 py-0.5 rounded">
+                npm install @kyvernlabs/pulse
+              </code>{" "}
+              → wrap your handler with{" "}
               <code className="text-[13px] font-mono bg-black/[0.04] px-1.5 py-0.5 rounded">
                 withPulse()
               </code>
-              . Every payment is captured automatically — payer address, amount,
-              blockchain tx hash, latency.
+              . Every payment captured: payer wallet, USDC amount,
+              blockchain tx hash. Your data only — SIWE-secured.
             </p>
             <div className="mt-8 flex items-center gap-3">
               <Link

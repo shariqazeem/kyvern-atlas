@@ -15,7 +15,7 @@ const PRODUCTS = [
   {
     name: "Pulse",
     tagline: "Revenue intelligence for x402",
-    desc: "Real-time analytics for your x402 endpoints. Track revenue, customers, performance — with one-line middleware integration.",
+    desc: "Connect wallet → get kv_live_ API key → wrap your endpoint with withPulse(). SIWE auth, multi-tenant, on-chain verified. Free to $10 revenue, then Pro at $49 USDC/mo.",
     icon: Activity,
     status: "live" as const,
     href: "/pulse/dashboard",
