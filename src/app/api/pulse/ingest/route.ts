@@ -3,6 +3,7 @@ import { nanoid } from "nanoid";
 import { z } from "zod";
 import { getDb } from "@/lib/db";
 import { authenticateIngestRequest } from "@/lib/auth";
+import { checkUsageLimit } from "@/lib/tier";
 
 const IngestSchema = z.object({
   endpoint: z.string().min(1),
@@ -26,6 +27,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: auth.error }, { status: 401 });
     }
     const keyRow = { id: auth.apiKeyId };
+
+    // Tier enforcement — check usage limits
+    const usage = checkUsageLimit(keyRow.id);
+    if (!usage.allowed) {
+      return NextResponse.json({
+        error: "Daily limit reached. Upgrade to Pro for unlimited.",
+        events_used: usage.events_used,
+        events_limit: usage.events_limit,
+        revenue_used: usage.revenue_used,
+        revenue_limit: usage.revenue_limit,
+        tier: usage.tier,
+      }, { status: 429 });
+    }
 
     const db = getDb();
     const body = await request.json();

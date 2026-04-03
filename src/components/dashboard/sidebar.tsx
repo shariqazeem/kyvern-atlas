@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -38,6 +39,56 @@ const NAV_GROUPS = [
     ],
   },
 ];
+
+function UsageMeter() {
+  const [usage, setUsage] = useState<{
+    events_used: number;
+    events_limit: number;
+    revenue_used: number;
+    revenue_limit: number;
+    tier: string;
+  } | null>(null);
+
+  useEffect(() => {
+    fetch("/api/pulse/usage", { credentials: "include" })
+      .then((r) => r.ok ? r.json() : null)
+      .then(setUsage)
+      .catch(() => {});
+  }, []);
+
+  if (!usage || usage.tier === "pro") return null;
+
+  const eventPct = Math.min(100, (usage.events_used / usage.events_limit) * 100);
+  const revPct = Math.min(100, (usage.revenue_used / usage.revenue_limit) * 100);
+  const pct = Math.max(eventPct, revPct);
+  const isNearLimit = pct > 80;
+
+  return (
+    <div className="px-4 py-3 border-t border-black/[0.04]">
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-[10px] font-medium text-quaternary uppercase tracking-wider">Usage today</span>
+        <span className="text-[10px] text-quaternary">{usage.events_used.toLocaleString()} / {usage.events_limit.toLocaleString()}</span>
+      </div>
+      <div className="h-1.5 bg-[#F0F0F0] rounded-full overflow-hidden">
+        <div
+          className={cn(
+            "h-full rounded-full transition-all duration-500",
+            isNearLimit ? "bg-amber-500" : "bg-pulse"
+          )}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <p className="text-[10px] text-quaternary mt-1">
+        ${usage.revenue_used.toFixed(2)} / ${usage.revenue_limit.toFixed(2)} revenue
+      </p>
+      {isNearLimit && (
+        <Link href="/pulse/upgrade" className="text-[10px] font-medium text-pulse hover:underline mt-1 inline-block">
+          Upgrade for unlimited →
+        </Link>
+      )}
+    </div>
+  );
+}
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -86,6 +137,7 @@ export function Sidebar() {
           </div>
         ))}
       </nav>
+      <UsageMeter />
     </aside>
   );
 }

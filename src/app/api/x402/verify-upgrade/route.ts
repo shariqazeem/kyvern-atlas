@@ -95,6 +95,9 @@ export async function POST(req: NextRequest) {
       expiresAt.toISOString()
     );
 
+    // Update api_keys tier to 'pro'
+    db.prepare("UPDATE api_keys SET tier = 'pro' WHERE wallet_address = ?").run(payerAddress);
+
     return NextResponse.json({
       success: true,
       subscription_id: subId,

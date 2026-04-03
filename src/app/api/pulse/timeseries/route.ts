@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 import { authenticateSession } from "@/lib/auth";
+import { getTierForApiKey, getRetentionDays } from "@/lib/tier";
 
 interface TimeseriesRow {
   timestamp: string;
@@ -17,7 +18,16 @@ export async function GET(request: NextRequest) {
     const apiKeyId = auth.apiKeyId;
 
     const db = getDb();
-    const range = request.nextUrl.searchParams.get("range") || "30d";
+    let range = request.nextUrl.searchParams.get("range") || "30d";
+
+    // Tier enforcement — free users capped to 7-day history
+    const tier = getTierForApiKey(apiKeyId);
+    const maxDays = getRetentionDays(tier);
+    let truncated = false;
+    if (range === "30d" && maxDays < 30) {
+      range = "7d";
+      truncated = true;
+    }
 
     const now = new Date();
     let start: Date;
@@ -55,7 +65,7 @@ export async function GET(request: NextRequest) {
       ORDER BY timestamp ASC
     `).all(apiKeyId, start.toISOString()) as TimeseriesRow[];
 
-    return NextResponse.json({ data: rows, granularity });
+    return NextResponse.json({ data: rows, granularity, truncated });
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 });
   }
