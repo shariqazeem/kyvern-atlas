@@ -1,8 +1,11 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Copy, Check, Terminal, Package, Code2 } from "lucide-react";
+import { Copy, Check, Terminal, Package, Code2, Bot, Cpu } from "lucide-react";
 import { useState } from "react";
+import { useAuth } from "@/hooks/use-auth";
+
+const ease = [0.25, 0.1, 0.25, 1] as const;
 
 function CopyBlock({ code }: { code: string }) {
   const [copied, setCopied] = useState(false);
@@ -15,17 +18,17 @@ function CopyBlock({ code }: { code: string }) {
 
   return (
     <div className="relative group">
-      <pre className="bg-gray-950 text-gray-100 rounded-lg p-4 text-sm font-mono overflow-x-auto">
+      <pre className="bg-[#09090B] text-gray-100 rounded-xl p-4 text-[13px] font-mono overflow-x-auto leading-relaxed">
         <code>{code}</code>
       </pre>
       <button
         onClick={copy}
-        className="absolute top-3 right-3 p-1.5 rounded-md bg-gray-800 hover:bg-gray-700 transition-colors opacity-0 group-hover:opacity-100"
+        className="absolute top-3 right-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white/[0.06] hover:bg-white/[0.1] text-[10px] font-medium text-white/40 hover:text-white/70 transition-all duration-200 opacity-0 group-hover:opacity-100"
       >
         {copied ? (
-          <Check className="w-3.5 h-3.5 text-emerald-400" />
+          <><Check className="w-3 h-3 text-emerald-400" /> Copied</>
         ) : (
-          <Copy className="w-3.5 h-3.5 text-gray-400" />
+          <><Copy className="w-3 h-3" /> Copy</>
         )}
       </button>
     </div>
@@ -33,102 +36,279 @@ function CopyBlock({ code }: { code: string }) {
 }
 
 export default function SetupPage() {
+  const { apiKeyPrefix, isAuthenticated } = useAuth();
+  const displayKey = isAuthenticated && apiKeyPrefix ? apiKeyPrefix + "..." : "kv_live_your_key_here";
+
   return (
-    <div className="max-w-2xl space-y-8">
+    <div className="max-w-2xl space-y-10">
       <motion.div
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: [0.25, 0.1, 0.25, 1] }}
+        transition={{ duration: 0.5, ease }}
       >
-        <h1 className="text-lg font-semibold tracking-tight">Setup</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          Integrate Pulse into your x402 endpoint in under 2 minutes
+        <h1 className="text-[18px] font-bold tracking-tight">Setup Guide</h1>
+        <p className="text-[13px] text-tertiary mt-1">
+          Integrate Pulse into your x402 endpoint in under 2 minutes.
+          Three ways: middleware, MCP server, or direct API.
         </p>
       </motion.div>
 
-      {/* Step 1 */}
-      <motion.div
-        initial={{ opacity: 0, y: 15 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.1, ease: [0.25, 0.1, 0.25, 1] }}
-        className="space-y-3"
-      >
-        <div className="flex items-center gap-3">
-          <div className="w-7 h-7 rounded-full bg-pulse text-white flex items-center justify-center text-xs font-bold">
-            1
-          </div>
-          <h2 className="text-sm font-semibold">Install the middleware</h2>
-        </div>
-        <CopyBlock code="npm install @kyvernlabs/pulse @x402/core @x402/next @x402/evm" />
-      </motion.div>
+      {/* Section: Middleware Integration */}
+      <div className="space-y-6">
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.05, ease }}
+          className="flex items-center gap-2"
+        >
+          <Code2 className="w-4 h-4 text-pulse" />
+          <h2 className="text-[15px] font-semibold tracking-tight">Middleware Integration</h2>
+          <span className="text-[10px] font-medium text-quaternary bg-[#F0F0F0] px-2 py-0.5 rounded uppercase tracking-wider">Recommended</span>
+        </motion.div>
 
-      {/* Step 2 */}
-      <motion.div
-        initial={{ opacity: 0, y: 15 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
-        className="space-y-3"
-      >
-        <div className="flex items-center gap-3">
-          <div className="w-7 h-7 rounded-full bg-pulse text-white flex items-center justify-center text-xs font-bold">
-            2
+        {/* Step 1 */}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.1, ease }}
+          className="space-y-3"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-6 h-6 rounded-full bg-foreground text-background flex items-center justify-center text-[11px] font-bold">1</div>
+            <h3 className="text-[13px] font-semibold">Install</h3>
           </div>
-          <h2 className="text-sm font-semibold">Wrap your x402 handler</h2>
-        </div>
-        <CopyBlock
-          code={`import { withX402 } from '@x402/next'
+          <CopyBlock code="npm install @kyvernlabs/pulse @x402/core @x402/next @x402/evm" />
+        </motion.div>
+
+        {/* Step 2 */}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.15, ease }}
+          className="space-y-3"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-6 h-6 rounded-full bg-foreground text-background flex items-center justify-center text-[11px] font-bold">2</div>
+            <h3 className="text-[13px] font-semibold">Wrap your handler</h3>
+          </div>
+          <CopyBlock
+            code={`import { withX402 } from '@x402/next'
 import { withPulse } from '@kyvernlabs/pulse'
-import { getResourceServer, getPayToAddress, getNetwork } from './x402-server'
 
-async function handler(req) {
-  // Your business logic — runs AFTER payment settles
-  return NextResponse.json({ data: 'premium content' })
-}
-
-// Layer 1: x402 payment gate
+// Your x402 handler — Pulse captures every payment
 const x402Handler = withX402(handler, {
   accepts: { scheme: 'exact', price: '$0.01',
-             network: getNetwork(), payTo: getPayToAddress() }
-}, getResourceServer())
+             network: 'eip155:8453', payTo: '0x...' }
+}, server)
 
-// Layer 2: Pulse analytics — captures every payment
+// One line — that's the entire integration
 export const GET = withPulse(x402Handler, {
-  apiKey: 'kv_your_api_key_here'
+  apiKey: '${displayKey}'
 })`}
-        />
-      </motion.div>
+          />
+        </motion.div>
 
-      {/* Step 3 */}
-      <motion.div
-        initial={{ opacity: 0, y: 15 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.3, ease: [0.25, 0.1, 0.25, 1] }}
-        className="space-y-3"
-      >
-        <div className="flex items-center gap-3">
-          <div className="w-7 h-7 rounded-full bg-pulse text-white flex items-center justify-center text-xs font-bold">
-            3
+        {/* Step 3 */}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.2, ease }}
+          className="space-y-3"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-6 h-6 rounded-full bg-foreground text-background flex items-center justify-center text-[11px] font-bold">3</div>
+            <h3 className="text-[13px] font-semibold">See your revenue</h3>
           </div>
-          <h2 className="text-sm font-semibold">View your analytics</h2>
-        </div>
-        <p className="text-sm text-muted-foreground">
-          Every x402 payment that flows through your endpoint is now tracked. Head to
-          the{" "}
-          <a href="/pulse/dashboard" className="text-pulse hover:underline font-medium">
-            dashboard
-          </a>{" "}
-          to see revenue, customers, and performance in real time.
-        </p>
-      </motion.div>
+          <p className="text-[13px] text-secondary leading-relaxed">
+            Every x402 payment is now captured with blockchain tx hash. Head to the{" "}
+            <a href="/pulse/dashboard" className="text-pulse hover:underline font-medium">dashboard</a>{" "}
+            to see revenue, customers, and performance in real time.
+          </p>
+        </motion.div>
+      </div>
+
+      {/* Divider */}
+      <div className="border-t border-black/[0.04]" />
+
+      {/* Section: MCP Server */}
+      <div className="space-y-6">
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5, ease }}
+          className="flex items-center gap-2"
+        >
+          <Bot className="w-4 h-4 text-pulse" />
+          <h2 className="text-[15px] font-semibold tracking-tight">MCP Server — for AI Agents</h2>
+          <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-pulse-50 text-pulse-600 uppercase tracking-wider">New</span>
+        </motion.div>
+
+        <motion.p
+          initial={{ opacity: 0, y: 12 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5, delay: 0.05, ease }}
+          className="text-[13px] text-secondary leading-relaxed"
+        >
+          Let AI agents (Claude, GPT, Cursor) query your x402 analytics directly.
+          The MCP server exposes your Pulse data as tools any LLM can call.
+        </motion.p>
+
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5, delay: 0.1, ease }}
+          className="space-y-3"
+        >
+          <h3 className="text-[13px] font-semibold">Install globally</h3>
+          <CopyBlock code="npm install -g @kyvernlabs/mcp" />
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5, delay: 0.15, ease }}
+          className="space-y-3"
+        >
+          <h3 className="text-[13px] font-semibold">Add to Claude Desktop</h3>
+          <p className="text-[12px] text-tertiary mb-2">
+            Add this to your <code className="text-[11px] font-mono bg-[#F0F0F0] px-1.5 py-0.5 rounded">claude_desktop_config.json</code>:
+          </p>
+          <CopyBlock
+            code={`{
+  "mcpServers": {
+    "kyvernlabs-pulse": {
+      "command": "npx",
+      "args": ["@kyvernlabs/mcp"],
+      "env": {
+        "KYVERNLABS_API_KEY": "${displayKey}"
+      }
+    }
+  }
+}`}
+          />
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5, delay: 0.2, ease }}
+          className="space-y-3"
+        >
+          <h3 className="text-[13px] font-semibold">Available tools</h3>
+          <div className="rounded-xl border border-black/[0.06] overflow-hidden">
+            <table className="w-full text-[12px]">
+              <thead>
+                <tr className="border-b border-black/[0.04] bg-[#FAFAFA]">
+                  <th className="text-left px-4 py-2.5 font-medium text-quaternary uppercase tracking-wider text-[10px]">Tool</th>
+                  <th className="text-left px-4 py-2.5 font-medium text-quaternary uppercase tracking-wider text-[10px]">Description</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  { tool: "pulse_get_stats", desc: "Revenue, calls, customers with deltas" },
+                  { tool: "pulse_get_endpoints", desc: "Per-endpoint revenue and latency" },
+                  { tool: "pulse_get_customers", desc: "Top paying agent wallets" },
+                  { tool: "pulse_get_transactions", desc: "Recent payments with tx hashes" },
+                  { tool: "pulse_get_timeseries", desc: "Revenue over time for charting" },
+                  { tool: "pulse_ingest_event", desc: "Record an x402 payment event" },
+                ].map((t) => (
+                  <tr key={t.tool} className="border-b border-black/[0.03] last:border-0">
+                    <td className="px-4 py-2.5 font-mono text-pulse font-medium">{t.tool}</td>
+                    <td className="px-4 py-2.5 text-secondary">{t.desc}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5, delay: 0.25, ease }}
+          className="rounded-xl bg-[#FAFAFA] border border-black/[0.04] p-4"
+        >
+          <h3 className="text-[13px] font-semibold mb-2">Example prompts</h3>
+          <div className="space-y-1.5">
+            {[
+              "What's my x402 revenue this week?",
+              "Which endpoints are making the most money?",
+              "Show me my top 5 paying agents",
+              "How many verified payments did I get today?",
+            ].map((p) => (
+              <p key={p} className="text-[12px] text-tertiary font-mono">&ldquo;{p}&rdquo;</p>
+            ))}
+          </div>
+        </motion.div>
+      </div>
+
+      {/* Divider */}
+      <div className="border-t border-black/[0.04]" />
+
+      {/* Section: Direct API */}
+      <div className="space-y-6">
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5, ease }}
+          className="flex items-center gap-2"
+        >
+          <Cpu className="w-4 h-4 text-pulse" />
+          <h2 className="text-[15px] font-semibold tracking-tight">Direct API</h2>
+        </motion.div>
+
+        <motion.p
+          initial={{ opacity: 0, y: 12 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5, delay: 0.05, ease }}
+          className="text-[13px] text-secondary leading-relaxed"
+        >
+          Send events directly to the Pulse ingest API from any language or framework.
+        </motion.p>
+
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5, delay: 0.1, ease }}
+        >
+          <CopyBlock
+            code={`curl -X POST https://kyvernlabs.com/api/pulse/ingest \\
+  -H "Content-Type: application/json" \\
+  -H "X-API-Key: ${displayKey}" \\
+  -d '{
+    "endpoint": "/api/your-service",
+    "amount_usd": 0.01,
+    "payer_address": "0x...",
+    "tx_hash": "0x...",
+    "network": "eip155:8453",
+    "status": "success"
+  }'`}
+          />
+        </motion.div>
+      </div>
+
+      {/* Divider */}
+      <div className="border-t border-black/[0.04]" />
 
       {/* What gets tracked */}
       <motion.div
-        initial={{ opacity: 0, y: 15 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
-        className="bg-white rounded-lg border border-border p-5 shadow-premium space-y-4"
+        initial={{ opacity: 0, y: 12 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.5, ease }}
+        className="rounded-xl border border-black/[0.06] bg-white p-6 space-y-4"
+        style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.02)" }}
       >
-        <h3 className="text-sm font-semibold">What Pulse tracks per transaction</h3>
+        <h3 className="text-[14px] font-semibold">What Pulse tracks per transaction</h3>
         <div className="grid grid-cols-2 gap-3">
           {[
             { icon: Terminal, label: "Endpoint path", desc: "Which API was called" },
@@ -138,29 +318,64 @@ export const GET = withPulse(x402Handler, {
             { icon: Package, label: "Tx hash", desc: "Blockchain transaction proof" },
             { icon: Code2, label: "Network", desc: "Which chain (Base, Ethereum, etc.)" },
           ].map((item, i) => (
-            <div key={i} className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
-              <item.icon className="w-4 h-4 text-muted-foreground mt-0.5" />
+            <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-[#FAFAFA]">
+              <item.icon className="w-4 h-4 text-quaternary mt-0.5" />
               <div>
-                <p className="text-sm font-medium">{item.label}</p>
-                <p className="text-xs text-muted-foreground">{item.desc}</p>
+                <p className="text-[13px] font-medium">{item.label}</p>
+                <p className="text-[11px] text-quaternary">{item.desc}</p>
               </div>
             </div>
           ))}
         </div>
       </motion.div>
 
-      {/* API Key */}
+      {/* Your API Key */}
       <motion.div
-        initial={{ opacity: 0, y: 15 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.5, ease: [0.25, 0.1, 0.25, 1] }}
-        className="bg-pulse-50 border border-pulse-200 rounded-lg p-5 space-y-2"
+        initial={{ opacity: 0, y: 12 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.5, ease }}
+        className="rounded-xl bg-pulse-50 border border-pulse-200 p-5 space-y-2"
       >
-        <h3 className="text-sm font-semibold text-pulse-700">Your API Key</h3>
-        <p className="text-xs text-pulse-600">
-          Use this key in your middleware configuration. Keep it secret.
+        <h3 className="text-[14px] font-semibold text-pulse-700">Your API Key</h3>
+        <p className="text-[12px] text-pulse-600">
+          {isAuthenticated
+            ? "This is your key. Use it in the middleware, MCP config, or API calls."
+            : "Connect your wallet to get your kv_live_ API key."}
         </p>
-        <CopyBlock code="kv_demo_test_key" />
+        <CopyBlock code={displayKey} />
+        {isAuthenticated && (
+          <p className="text-[11px] text-pulse-500">
+            Full key available on your{" "}
+            <a href="/pulse/dashboard/keys" className="underline">API Keys page</a>.
+          </p>
+        )}
+      </motion.div>
+
+      {/* npm links */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.5, ease }}
+        className="flex flex-wrap items-center gap-3 pb-4"
+      >
+        {[
+          { label: "@kyvernlabs/pulse", href: "https://www.npmjs.com/package/@kyvernlabs/pulse" },
+          { label: "@kyvernlabs/mcp", href: "https://www.npmjs.com/package/@kyvernlabs/mcp" },
+          { label: "GitHub", href: "https://github.com/shariqazeem/kyvernlabs" },
+        ].map((link) => (
+          <a
+            key={link.label}
+            href={link.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-[12px] font-medium text-tertiary hover:text-primary transition-colors px-3 py-1.5 rounded-lg border border-black/[0.06] hover:border-black/[0.12]"
+          >
+            <Package className="w-3 h-3" />
+            {link.label}
+          </a>
+        ))}
       </motion.div>
     </div>
   );
