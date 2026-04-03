@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 
 const LINKS = {
   Product: [
@@ -26,9 +27,7 @@ export function Footer() {
           {/* Brand */}
           <div className="col-span-2 md:col-span-1">
             <div className="flex items-center gap-2.5 mb-4">
-              <div className="w-6 h-6 rounded-md bg-foreground flex items-center justify-center">
-                <span className="text-background text-[10px] font-bold">K</span>
-              </div>
+              <Image src="/og-image.jpg" alt="KyvernLabs" width={24} height={24} className="rounded-md" />
               <span className="text-[13px] font-semibold tracking-tight">KyvernLabs</span>
             </div>
             <p className="text-[13px] text-quaternary leading-relaxed">

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 
@@ -15,9 +16,7 @@ export function Navbar() {
       <div className="mx-auto max-w-7xl px-6 lg:px-10">
         <div className="flex items-center justify-between h-16 border-b border-black/[0.04]">
           <Link href="/" className="flex items-center gap-2.5">
-            <div className="w-6 h-6 rounded-md bg-foreground flex items-center justify-center">
-              <span className="text-background text-[10px] font-bold tracking-tight">K</span>
-            </div>
+            <Image src="/og-image.jpg" alt="KyvernLabs" width={24} height={24} className="rounded-md" />
             <span className="text-[13px] font-semibold tracking-tight text-primary">
               KyvernLabs
             </span>

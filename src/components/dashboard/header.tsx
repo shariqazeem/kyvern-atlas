@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { Activity, Sparkles } from "lucide-react";
 import { TimeRangeSelector } from "./time-range-selector";
 import { MobileNav } from "./mobile-nav";
@@ -29,9 +30,7 @@ export function DashboardHeader() {
         <div className="flex items-center gap-4 md:gap-6">
           <MobileNav />
           <Link href="/" className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-md bg-foreground flex items-center justify-center">
-              <span className="text-background text-[10px] font-bold">K</span>
-            </div>
+            <Image src="/og-image.jpg" alt="KyvernLabs" width={24} height={24} className="rounded-md" />
             <span className="text-[13px] font-semibold tracking-tight hidden sm:inline">KyvernLabs</span>
           </Link>
           <div className="h-5 w-px bg-black/[0.06] hidden sm:block" />
