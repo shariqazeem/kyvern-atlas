@@ -20,21 +20,23 @@ function TerminalChaos() {
   ];
 
   return (
-    <div className="bg-[#09090B] rounded-2xl overflow-hidden h-full" style={{ boxShadow: "0 0 0 1px rgba(255,255,255,0.04)" }}>
-      <div className="flex items-center gap-1.5 px-5 py-3 border-b border-white/[0.04]">
+    <div className="bg-[#000000] rounded-2xl overflow-hidden h-full relative" style={{ boxShadow: "0 0 0 1px rgba(255,255,255,0.08), 0 24px 48px rgba(0,0,0,0.4)" }}>
+      {/* Intense but subtle chaos glow */}
+      <div className="absolute -top-[100px] -left-[100px] w-[300px] h-[300px] bg-red-500/10 blur-[80px] pointer-events-none" />
+      <div className="relative flex items-center gap-1.5 px-5 py-3 border-b border-white/[0.06] bg-white/[0.02]">
         <div className="w-2.5 h-2.5 rounded-full bg-red-500/50" />
         <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/50" />
         <div className="w-2.5 h-2.5 rounded-full bg-green-500/50" />
         <span className="ml-3 text-[10px] text-white/15 font-mono">your-server — ssh</span>
       </div>
-      <div className="p-5 space-y-1.5">
+      <div className="relative p-6 space-y-2">
         {lines.map((line, i) => (
           <motion.p
             key={i}
-            initial={{ opacity: 0, x: -8 }}
-            whileInView={{ opacity: 1, x: 0 }}
+            initial={{ opacity: 0, y: 4 }}
+            whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            transition={{ duration: 0.3, delay: 0.4 + i * 0.08, ease }}
+            transition={{ duration: 0.4, delay: 0.3 + i * 0.08, ease }}
             className={`text-[12px] font-mono leading-relaxed ${line.cls}`}
           >
             {line.text}
@@ -43,7 +45,7 @@ function TerminalChaos() {
         <motion.span
           animate={{ opacity: [1, 0] }}
           transition={{ duration: 0.8, repeat: Infinity }}
-          className="inline-block w-2 h-4 bg-white/30 mt-2"
+          className="inline-block w-2 h-4 bg-white/40 mt-3"
         />
       </div>
     </div>
@@ -52,8 +54,10 @@ function TerminalChaos() {
 
 function PulseDashboardMini() {
   return (
-    <div className="bg-white rounded-2xl border border-black/[0.06] overflow-hidden h-full" style={{ boxShadow: "0 4px 20px rgba(0,0,0,0.04)" }}>
-      <div className="flex items-center gap-1.5 px-5 py-3 border-b border-black/[0.03] bg-[#FAFAFA]">
+    <div className="bg-white rounded-2xl border border-black/[0.06] overflow-hidden h-full relative" style={{ boxShadow: "0 24px 48px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.02)" }}>
+      {/* Positive Pulse aura */}
+      <div className="absolute top-[20%] right-[10%] w-[250px] h-[250px] bg-pulse/5 blur-[60px] pointer-events-none rounded-full" />
+      <div className="relative flex items-center gap-1.5 px-5 py-3 border-b border-black/[0.03] bg-[#FAFAFA]/80 backdrop-blur-md z-10">
         <div className="w-2.5 h-2.5 rounded-full bg-black/[0.06]" />
         <div className="w-2.5 h-2.5 rounded-full bg-black/[0.06]" />
         <div className="w-2.5 h-2.5 rounded-full bg-black/[0.06]" />
@@ -135,11 +139,11 @@ export function ProblemSection() {
     <section className="py-32 lg:py-40 px-6">
       <div className="max-w-5xl mx-auto">
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-120px" }}
-          transition={{ duration: 0.7, ease }}
-          className="text-center mb-20"
+          transition={{ duration: 0.8, ease }}
+          className="text-center mb-24"
         >
           <p className="text-[12px] uppercase tracking-[0.2em] font-medium text-quaternary mb-5">
             The problem
@@ -158,30 +162,36 @@ export function ProblemSection() {
         {/* Before / After labels */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <motion.div
-            initial={{ opacity: 0, x: -24 }}
-            whileInView={{ opacity: 1, x: 0 }}
+            initial={{ opacity: 0, y: 40 }}
+            whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: "-80px" }}
-            transition={{ duration: 0.7, ease }}
+            transition={{ duration: 0.9, ease }}
           >
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-2 h-2 rounded-full bg-red-500/50" />
-              <span className="text-[11px] uppercase tracking-[0.15em] font-semibold text-red-500/70">
-                Before — Without Pulse
+            <div className="flex items-center gap-2.5 mb-5 pl-2">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-40" />
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500" />
+              </span>
+              <span className="text-[12px] uppercase tracking-[0.2em] font-bold text-red-500/80">
+                Before
               </span>
             </div>
             <TerminalChaos />
           </motion.div>
 
           <motion.div
-            initial={{ opacity: 0, x: 24 }}
-            whileInView={{ opacity: 1, x: 0 }}
+            initial={{ opacity: 0, y: 40 }}
+            whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: "-80px" }}
-            transition={{ duration: 0.7, delay: 0.15, ease }}
+            transition={{ duration: 0.9, delay: 0.2, ease }}
           >
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-2 h-2 rounded-full bg-emerald-500" />
-              <span className="text-[11px] uppercase tracking-[0.15em] font-semibold text-emerald-600">
-                After — With Pulse
+            <div className="flex items-center gap-2.5 mb-5 pl-2">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60" />
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
+              </span>
+              <span className="text-[12px] uppercase tracking-[0.2em] font-bold text-emerald-600">
+                After
               </span>
             </div>
             <PulseDashboardMini />

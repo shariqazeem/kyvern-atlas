@@ -7,14 +7,10 @@ import { ArrowRight, Copy, Check, Package } from "lucide-react";
 
 const ease = [0.25, 0.1, 0.25, 1] as const;
 
-const CODE = `import { withPulse } from '@kyvernlabs/pulse'
-import { withX402 } from '@x402/next'
+const CODE = `import { withPulse } from '@kyvernlabs/pulse';
+import { withX402 } from '@x402/next';
 
-// Every payment → your Pulse dashboard. On-chain verified.
-export const GET = withPulse(
-  withX402(handler, config, server),
-  { apiKey: 'kv_live_your_key' }
-)`;
+export const GET = withPulse(withX402(async () => { ... }));`;
 
 function CodeBlock() {
   const [copied, setCopied] = useState(false);
@@ -61,6 +57,7 @@ function CodeBlock() {
               <span className="text-gray-300">{" } "}</span>
               <span className="text-purple-400">from</span>
               <span className="text-emerald-400">{" '@kyvernlabs/pulse'"}</span>
+              <span className="text-gray-400">{";"}</span>
               {"\n"}
               <span className="text-purple-400">import</span>
               <span className="text-gray-300">{" { "}</span>
@@ -68,24 +65,20 @@ function CodeBlock() {
               <span className="text-gray-300">{" } "}</span>
               <span className="text-purple-400">from</span>
               <span className="text-emerald-400">{" '@x402/next'"}</span>
+              <span className="text-gray-400">{";"}</span>
               {"\n\n"}
-              <span className="text-gray-500">{"// Every payment → your Pulse dashboard. On-chain verified."}</span>
-              {"\n"}
               <span className="text-purple-400">export const</span>
               <span className="text-gray-300">{" GET = "}</span>
               <span className="text-blue-400">withPulse</span>
               <span className="text-gray-400">{"("}</span>
-              {"\n  "}
               <span className="text-blue-400">withX402</span>
-              <span className="text-gray-400">{"(handler, config, server),"}</span>
-              {"\n  "}
-              <span className="text-gray-400">{"{ "}</span>
-              <span className="text-orange-300">apiKey</span>
-              <span className="text-gray-400">{": "}</span>
-              <span className="text-emerald-400">{"'kv_live_your_key'"}</span>
-              <span className="text-gray-400">{" }"}</span>
-              {"\n"}
-              <span className="text-gray-400">{")"}</span>
+              <span className="text-gray-400">{"("}</span>
+              <span className="text-purple-400">async</span>
+              <span className="text-gray-400">{" () "}</span>
+              <span className="text-blue-400">{"=>"}</span>
+              <span className="text-gray-400">{" { "}</span>
+              <span className="text-gray-500">{"..."}</span>
+              <span className="text-gray-400">{" }));"}</span>
             </code>
           </pre>
         </div>

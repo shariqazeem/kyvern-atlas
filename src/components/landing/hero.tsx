@@ -2,7 +2,8 @@
 
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { DollarSign, Zap, Users, TrendingUp, Wallet, ArrowRight } from "lucide-react";
+import { DollarSign, Zap, Users, TrendingUp, Wallet, ArrowRight, Terminal, X } from "lucide-react";
+import { useState } from "react";
 import { WaitlistForm } from "./waitlist-form";
 
 const ease = [0.25, 0.1, 0.25, 1] as const;
@@ -41,7 +42,7 @@ function DashboardPreview() {
       initial={{ opacity: 0, y: 50, scale: 0.97 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 1.4, delay: 0.7, ease }}
-      className="relative mt-20 lg:mt-24 mx-auto max-w-[960px]"
+      className="relative mt-20 lg:mt-24 mx-auto max-w-[1024px]"
     >
       {/* Outer glow */}
       <div className="absolute -inset-px rounded-2xl bg-gradient-to-b from-pulse/[0.12] via-transparent to-transparent" />
@@ -144,6 +145,8 @@ function DashboardPreview() {
 }
 
 export function Hero() {
+  const [isVideoOpen, setIsVideoOpen] = useState(false);
+
   return (
     <section className="relative pt-28 pb-12 lg:pt-36 lg:pb-16 px-6 overflow-hidden">
       <AmbientBackground />
@@ -161,7 +164,7 @@ export function Hero() {
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
             </span>
-            Pulse v2 &middot; Live &middot; SIWE + kv_live_ keys &middot; First 50 get Pro free
+            Pulse v2 &middot; Live &middot; SIWE + kv_live_ keys &middot; First 50 get Pro free for 3 months
           </div>
         </motion.div>
 
@@ -172,7 +175,7 @@ export function Hero() {
           transition={{ duration: 0.9, delay: 0.1, ease }}
           className="text-center text-[clamp(2.75rem,7vw,5.5rem)] font-bold leading-[0.92] tracking-[-0.05em]"
         >
-          The business layer
+          The missing business layer
           <br />
           <span className="bg-gradient-to-r from-blue-600 via-pulse to-indigo-500 bg-clip-text text-transparent">
             for x402
@@ -203,15 +206,16 @@ export function Hero() {
             style={{ boxShadow: "0 1px 2px rgba(0,0,0,0.1), 0 4px 12px rgba(0,0,0,0.08)" }}
           >
             <Wallet className="w-4 h-4" />
-            Connect Wallet & Get Your Key
+            Connect Wallet & Get Your kv_live_ Key
             <ArrowRight className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-0.5" />
           </Link>
-          <Link
-            href="/pulse"
-            className="inline-flex items-center gap-2 h-12 px-7 rounded-xl border border-black/[0.08] text-[14px] font-medium text-secondary hover:text-primary hover:border-black/[0.16] transition-all duration-300"
+          <button
+            onClick={() => setIsVideoOpen(true)}
+            className="group inline-flex items-center gap-2 h-12 px-7 rounded-xl border border-black/[0.08] text-[14px] font-medium text-secondary hover:text-primary hover:border-black/[0.16] transition-all duration-300 bg-white"
           >
-            See how Pulse works
-          </Link>
+            <Terminal className="w-4 h-4 text-secondary group-hover:text-primary transition-colors" />
+            See the integration live
+          </button>
         </motion.div>
 
         {/* Waitlist below CTAs */}
@@ -275,6 +279,79 @@ export function Hero() {
           </div>
         </motion.div>
       </div>
+
+      {/* Live Integration Demo Modal */}
+      {isVideoOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setIsVideoOpen(false)}
+          />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            className="relative w-full max-w-3xl bg-[#09090B] rounded-2xl overflow-hidden shadow-2xl z-10 border border-white/[0.08]"
+          >
+            <button
+              onClick={() => setIsVideoOpen(false)}
+              className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-white/10 text-white/70 hover:text-white hover:bg-white/20 transition-colors z-20"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            {/* Terminal header */}
+            <div className="flex items-center gap-1.5 px-5 py-3 border-b border-white/[0.06]">
+              <div className="w-2.5 h-2.5 rounded-full bg-red-500/50" />
+              <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/50" />
+              <div className="w-2.5 h-2.5 rounded-full bg-green-500/50" />
+              <span className="ml-3 text-[11px] text-white/20 font-mono">Integration Demo — Live</span>
+            </div>
+
+            {/* Animated steps */}
+            <div className="p-6 space-y-1 font-mono text-[13px] leading-[1.8]">
+              {[
+                { delay: 0.3, text: "$ npm install @kyvernlabs/pulse", cls: "text-white/70" },
+                { delay: 1.0, text: "added 1 package in 0.8s", cls: "text-emerald-400/70" },
+                { delay: 1.8, text: "", cls: "" },
+                { delay: 2.0, text: "// route.ts — wrap your x402 handler", cls: "text-gray-500" },
+                { delay: 2.5, text: "import { withPulse } from '@kyvernlabs/pulse'", cls: "text-purple-300" },
+                { delay: 3.0, text: "import { withX402 } from '@x402/next'", cls: "text-purple-300" },
+                { delay: 3.5, text: "", cls: "" },
+                { delay: 3.8, text: "export const GET = withPulse(", cls: "text-blue-300" },
+                { delay: 4.2, text: "  withX402(handler, config, server),", cls: "text-gray-400" },
+                { delay: 4.6, text: "  { apiKey: 'kv_live_a8Bx...' }", cls: "text-emerald-300" },
+                { delay: 5.0, text: ")", cls: "text-blue-300" },
+                { delay: 5.5, text: "", cls: "" },
+                { delay: 5.8, text: "$ curl https://your-api.com/endpoint", cls: "text-white/70" },
+                { delay: 6.5, text: "→ 402 Payment Required", cls: "text-yellow-400/80" },
+                { delay: 7.2, text: "→ Agent pays $0.01 USDC on Base...", cls: "text-yellow-400/80" },
+                { delay: 8.0, text: "→ 200 OK • tx: 0x39fee...ddc05e", cls: "text-emerald-400" },
+                { delay: 8.8, text: "", cls: "" },
+                { delay: 9.0, text: "✓ Payment captured in Pulse dashboard", cls: "text-emerald-400 font-semibold" },
+                { delay: 9.5, text: "✓ Payer: 0x914b...f33F • $0.01 • Verified on BaseScan", cls: "text-emerald-400/80" },
+              ].map((line, i) => (
+                <motion.p
+                  key={i}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: line.delay, duration: 0.3 }}
+                  className={line.cls || "h-4"}
+                >
+                  {line.text}
+                </motion.p>
+              ))}
+              <motion.span
+                initial={{ opacity: 0 }}
+                animate={{ opacity: [0, 1, 0] }}
+                transition={{ delay: 10, duration: 0.8, repeat: Infinity }}
+                className="inline-block w-2 h-4 bg-white/40 mt-2"
+              />
+            </div>
+          </motion.div>
+        </div>
+      )}
     </section>
   );
 }

@@ -1,133 +1,88 @@
 "use client";
 
 import { motion } from "framer-motion";
-import Link from "next/link";
-import {
-  Activity,
-  Shield,
-  GitBranch,
-  Store,
-  ArrowRight,
-} from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Wallet, Key, Terminal, LineChart } from "lucide-react";
 
-const PRODUCTS = [
+const STEPS = [
   {
-    name: "Pulse",
-    tagline: "Revenue intelligence for x402",
-    desc: "Connect wallet → get kv_live_ API key → wrap your endpoint with withPulse(). SIWE auth, multi-tenant, on-chain verified. Free to $10 revenue, then Pro at $49 USDC/mo.",
-    icon: Activity,
-    status: "live" as const,
-    href: "/pulse/dashboard",
+    title: "Connect Wallet & SIWE",
+    desc: "Sign in with Ethereum. Your wallet owns the namespace, the data, and the USDC.",
+    icon: Wallet,
   },
   {
-    name: "Vault",
-    tagline: "Smart contract wallets",
-    desc: "Per-agent budgets, spending limits, and automated treasury management for x402 payments.",
-    icon: Shield,
-    status: "coming" as const,
-    href: "#",
+    title: "Get your kv_live_ key",
+    desc: "Generate your API key instantly in the dashboard. No credit card required.",
+    icon: Key,
   },
   {
-    name: "Router",
-    tagline: "Smart x402 routing",
-    desc: "Route requests to the cheapest, fastest, or most reliable x402 service automatically.",
-    icon: GitBranch,
-    status: "coming" as const,
-    href: "#",
+    title: "One-line integration",
+    desc: "npm install @kyvernlabs/pulse and wrap your handlers. Your logic stays untouched.",
+    icon: Terminal,
   },
   {
-    name: "Marketplace",
-    tagline: "Launch x402 APIs",
-    desc: "Create, price, and distribute x402 endpoints in minutes. The Shopify of agent APIs.",
-    icon: Store,
-    status: "coming" as const,
-    href: "#",
+    title: "See your revenue instantly",
+    desc: "Watch live USDC flowing from agentic consumers directly into your wallet.",
+    icon: LineChart,
   },
 ];
 
 export function ProductsSection() {
   return (
-    <section id="products" className="py-28 lg:py-36 px-6 bg-[#FAFAFA]">
-      <div className="max-w-5xl mx-auto">
+    <section id="how-it-works" className="py-28 lg:py-40 px-6 bg-white relative overflow-hidden">
+      {/* Decorative subtle background elements */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-4xl h-px bg-gradient-to-r from-transparent via-black/[0.04] to-transparent" />
+      
+      <div className="max-w-6xl mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-100px" }}
           transition={{ duration: 0.6, ease: [0.25, 0.1, 0.25, 1] }}
-          className="text-center mb-16"
+          className="text-center mb-24 lg:mb-32"
         >
           <p className="text-[12px] uppercase tracking-[0.15em] font-medium text-quaternary mb-4">
-            Products
+            How It Works
           </p>
           <h2 className="text-[clamp(1.75rem,4vw,2.75rem)] font-semibold tracking-[-0.03em] leading-[1.1]">
-            The full x402 business stack
+            From zero to real business in 47 seconds
           </h2>
           <p className="mt-4 text-[15px] text-tertiary max-w-lg mx-auto">
-            Everything to run a profitable x402 service. Starting with Pulse.
+            Stop guessing who is paying you. Integrate Pulse and see every transaction, authenticated and verified on-chain.
           </p>
         </motion.div>
 
-        {/* Bento grid — Pulse large, others smaller */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {PRODUCTS.map((product, i) => (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-12 relative">
+          {/* Connector line for desktop */}
+          <div className="hidden lg:block absolute top-[40px] left-[12%] right-[12%] h-px bg-gradient-to-r from-transparent via-black/[0.08] to-transparent z-0" />
+          
+          {STEPS.map((step, i) => (
             <motion.div
-              key={product.name}
-              initial={{ opacity: 0, y: 20 }}
+              key={step.title}
+              initial={{ opacity: 0, y: 24 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: "-60px" }}
+              whileHover={{ y: -8, transition: { duration: 0.3, ease: "easeOut" } }}
               transition={{
-                duration: 0.5,
-                delay: i * 0.06,
+                duration: 0.7,
+                delay: i * 0.12,
                 ease: [0.25, 0.1, 0.25, 1],
               }}
-              className={cn(
-                "group rounded-xl border p-7 lg:p-8 transition-all duration-300",
-                product.status === "live"
-                  ? "border-black/[0.08] bg-white hover:border-black/[0.15] hover:shadow-premium-lg md:col-span-2"
-                  : "border-black/[0.04] bg-white/60 opacity-70 hover:opacity-80"
-              )}
+              className="relative z-10 flex flex-col items-center text-center group cursor-default"
             >
-              <div className="flex items-start justify-between mb-5">
-                <div className="flex items-center gap-3.5">
-                  <div
-                    className={cn(
-                      "w-10 h-10 rounded-lg flex items-center justify-center",
-                      product.status === "live"
-                        ? "bg-foreground text-background"
-                        : "bg-black/[0.04] text-quaternary"
-                    )}
-                  >
-                    <product.icon className="w-[18px] h-[18px]" />
-                  </div>
-                  <div>
-                    <h3 className="text-[15px] font-semibold tracking-tight">{product.name}</h3>
-                    <p className="text-[12px] text-tertiary">{product.tagline}</p>
-                  </div>
-                </div>
-                {product.status === "live" ? (
-                  <span className="inline-flex items-center gap-1.5 text-[10px] font-medium px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-600 uppercase tracking-wider">
-                    <span className="w-1 h-1 rounded-full bg-emerald-500" />
-                    Live
-                  </span>
-                ) : (
-                  <span className="text-[10px] font-medium px-2.5 py-1 rounded-full bg-black/[0.03] text-quaternary uppercase tracking-wider">
-                    Soon
-                  </span>
-                )}
+              {/* Drop shadow glow effect on hover */}
+              <div className="absolute top-[32px] left-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-24 bg-pulse/0 group-hover:bg-pulse/5 rounded-full blur-xl transition-colors duration-500 pointer-events-none" />
+              
+              <div className="w-[80px] h-[80px] rounded-[1.25rem] bg-white border border-black/[0.05] flex items-center justify-center mb-6 shadow-premium transition-all duration-500 overflow-hidden relative">
+                <div className="absolute inset-0 bg-gradient-to-br from-transparent to-black/[0.01] opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                <step.icon className="w-[28px] h-[28px] text-primary group-hover:text-pulse group-hover:scale-110 transition-all duration-500" strokeWidth={1.5} />
               </div>
-              <p className="text-[14px] text-secondary leading-relaxed max-w-xl">
-                {product.desc}
+              
+              <h3 className="text-[17px] font-semibold tracking-tight mb-3 text-primary">
+                {step.title}
+              </h3>
+              <p className="text-[14px] text-secondary leading-relaxed max-w-[260px]">
+                {step.desc}
               </p>
-              {product.status === "live" && (
-                <Link
-                  href={product.href}
-                  className="group/link inline-flex items-center gap-1.5 mt-6 text-[13px] font-medium text-primary hover:text-pulse transition-colors duration-300"
-                >
-                  Open Dashboard
-                  <ArrowRight className="w-3.5 h-3.5 transition-transform duration-300 group-hover/link:translate-x-0.5" />
-                </Link>
-              )}
             </motion.div>
           ))}
         </div>
