@@ -1,0 +1,65 @@
+# KyvernLabs — The Business Layer for the x402 Economy
+
+> Revenue analytics, wallet-native auth, and on-chain verification for x402 service providers.
+
+KyvernLabs builds business infrastructure for the x402 protocol — the internet-native payment standard backed by Coinbase, Cloudflare, Stripe, Google, Visa, Solana, and more under the Linux Foundation.
+
+## Pulse — Revenue Intelligence for x402
+
+Pulse is the first analytics platform built specifically for x402 service providers. It captures every payment that flows through your x402 endpoint and gives you a real-time dashboard with blockchain-verified data.
+
+### How it works
+
+1. Connect your wallet (SIWE authentication)
+2. Get your `kv_live_` API key automatically
+3. Install the middleware: `npm install @kyvernlabs/pulse`
+4. Wrap your x402 handler: `withPulse(withX402(handler, config, server), { apiKey: 'kv_live_...' })`
+5. Every payment is captured: payer wallet, USDC amount, blockchain tx hash, latency
+
+### API Endpoints
+
+All endpoints require authentication via `X-API-Key` header with your `kv_live_` key.
+
+- `POST /api/pulse/ingest` — Record an x402 payment event
+  - Body: `{ endpoint, amount_usd, payer_address, latency_ms?, status?, tx_hash?, network? }`
+- `GET /api/pulse/stats?range=7d` — Revenue, calls, customers, avg price with deltas
+- `GET /api/pulse/endpoints` — Per-endpoint breakdown (calls, revenue, latency, error rate)
+- `GET /api/pulse/customers?limit=20` — Top paying agent wallets
+- `GET /api/pulse/recent?limit=20` — Recent transactions with tx hashes
+- `GET /api/pulse/timeseries?range=7d` — Revenue over time data
+
+### MCP Server
+
+For AI agent integration, use the MCP server:
+
+```json
+{
+  "mcpServers": {
+    "kyvernlabs-pulse": {
+      "command": "npx",
+      "args": ["@kyvernlabs/mcp"],
+      "env": { "KYVERNLABS_API_KEY": "kv_live_..." }
+    }
+  }
+}
+```
+
+Available tools: `pulse_get_stats`, `pulse_get_endpoints`, `pulse_get_customers`, `pulse_get_transactions`, `pulse_get_timeseries`, `pulse_ingest_event`.
+
+### Pricing
+
+- Free: 1,000 events/day or $10 revenue (whichever first), 7-day retention, 1 API key
+- Pro ($49 USDC/month): Unlimited events, 90-day retention, 10 API keys, alerts, CSV export
+- Enterprise: Custom
+
+### Links
+
+- Website: https://kyvernlabs.com
+- Pulse: https://kyvernlabs.com/pulse
+- Dashboard: https://kyvernlabs.com/pulse/dashboard
+- Setup Guide: https://kyvernlabs.com/pulse/dashboard/setup
+- npm: https://www.npmjs.com/package/@kyvernlabs/pulse
+- MCP: https://www.npmjs.com/package/@kyvernlabs/mcp
+- GitHub: https://github.com/shariqazeem/kyvernlabs
+- x402 Protocol: https://x402.org
+- x402 Foundation: https://x402.org (Linux Foundation)

@@ -1,0 +1,146 @@
+# KyvernLabs — Complete Technical Reference
+
+## What is KyvernLabs?
+
+KyvernLabs is the business infrastructure layer for the x402 economy. The x402 protocol (HTTP 402 Payment Required) enables machine-to-machine micropayments over HTTP. It is backed by the x402 Foundation under the Linux Foundation, with founding members including Coinbase, Cloudflare, Stripe, Google, Visa, Mastercard, Amazon, Microsoft, Solana Foundation, Shopify, and more.
+
+There are 195+ x402 services processing $600M+ annualized volume and 119M+ transactions. KyvernLabs provides the analytics and business tools these services need to operate profitably.
+
+## Product: Pulse
+
+### Architecture
+
+```
+Agent/Client → HTTP Request → x402 Endpoint (your API)
+                                    ↓
+                        withPulse() middleware wraps withX402()
+                              ↓                    ↓
+                     Decodes payment headers    x402 verify + settle
+                              ↓
+                     POST /api/pulse/ingest (fire-and-forget)
+                              ↓
+                     SQLite DB → Dashboard (kyvernlabs.com/pulse/dashboard)
+```
+
+### Middleware Integration
+
+```typescript
+import { withPulse } from '@kyvernlabs/pulse'
+import { withX402 } from '@x402/next'
+import { x402ResourceServer, HTTPFacilitatorClient } from '@x402/core/server'
+import { ExactEvmScheme } from '@x402/evm/exact/server'
+
+// Set up x402
+const facilitator = new HTTPFacilitatorClient({ url: 'https://x402.org/facilitator' })
+const server = new x402ResourceServer(facilitator)
+server.register('eip155:84532', new ExactEvmScheme())
+
+// Your handler
+async function handler(req) {
+  return NextResponse.json({ data: 'premium content' })
+}
+
+// Layer 1: x402 payment gate
+const x402Handler = withX402(handler, {
+  accepts: {
+    scheme: 'exact',
+    price: '$0.01',
+    network: 'eip155:84532',
+    payTo: '0xYOUR_WALLET'
+  }
+}, server)
+
+// Layer 2: Pulse analytics captures every payment
+export const GET = withPulse(x402Handler, {
+  apiKey: 'kv_live_your_key_here'
+})
+```
+
+### x402 Payment Flow
+
+1. Client sends HTTP request to your endpoint
+2. Server responds with 402 + `PAYMENT-REQUIRED` header (base64 JSON with price, network, payTo)
+3. Client signs USDC payment via EIP-3009 TransferWithAuthorization
+4. Client retries with `PAYMENT-SIGNATURE` header (base64 JSON with signed payment)
+5. Server sends to facilitator for verification
+6. Facilitator settles on-chain (Base, Ethereum, Solana, Polygon)
+7. Server responds with 200 + `PAYMENT-RESPONSE` header (tx hash, payer, network)
+
+### What Pulse Captures Per Transaction
+
+| Field | Source |
+|-------|--------|
+| endpoint | Request URL pathname |
+| amount_usd | PAYMENT-SIGNATURE → accepted.amount (converted from atomic units) |
+| payer_address | PAYMENT-RESPONSE → payer |
+| tx_hash | PAYMENT-RESPONSE → transaction |
+| network | PAYMENT-SIGNATURE → accepted.network (CAIP-2 format, e.g., eip155:84532) |
+| asset | PAYMENT-SIGNATURE → accepted.asset (token contract address) |
+| scheme | PAYMENT-SIGNATURE → accepted.scheme (exact or upto) |
+| latency_ms | Measured by middleware (start to response) |
+| status | success if settlement succeeded, error otherwise |
+| source | "middleware" for real x402 payments, "seed" for demo data |
+
+### Authentication
+
+- **Dashboard**: SIWE (Sign-In With Ethereum) — wallet signs a message, server verifies, issues httpOnly session cookie. Wallet address = identity.
+- **Middleware/API**: `X-API-Key` header with `kv_live_` prefixed key. Key is SHA-256 hashed in database.
+- **MCP Server**: API key passed via environment variable `KYVERNLABS_API_KEY`.
+
+### API Reference
+
+Base URL: `https://kyvernlabs.com/api`
+
+#### POST /api/pulse/ingest
+Record an x402 payment event.
+- Headers: `X-API-Key: kv_live_...`
+- Body: `{ endpoint: string, amount_usd: number, payer_address: string, latency_ms?: number, status?: "success"|"error"|"timeout", tx_hash?: string, network?: string, asset?: string, scheme?: string }`
+- Returns: `{ success: true, event_id: string, source: "middleware"|"seed" }`
+- Deduplicates by tx_hash.
+- Returns 429 if free tier limit exceeded.
+
+#### GET /api/pulse/stats?range=7d
+Aggregated analytics.
+- Headers: Session cookie (dashboard) or will return 401
+- Query: range = "24h" | "7d" | "30d"
+- Returns: `{ revenue, calls, customers, avg_price, deltas: { revenue_pct, calls_pct, customers_pct, avg_price_pct }, has_real_data, source_breakdown }`
+
+#### GET /api/pulse/endpoints
+Per-endpoint breakdown.
+- Returns: `{ endpoints: [{ path, label, calls, revenue, avg_latency, error_rate, last_called }] }`
+
+#### GET /api/pulse/customers?limit=20
+Top paying agents.
+- Returns: `{ customers: [{ address, total_spent, call_count, first_seen, last_seen, top_endpoint }] }`
+
+#### GET /api/pulse/recent?limit=20
+Recent transactions.
+- Returns: `{ transactions: [{ id, timestamp, endpoint, amount_usd, payer_address, latency_ms, status, network, asset, tx_hash, scheme, source }] }`
+
+#### GET /api/pulse/timeseries?range=7d
+Revenue over time.
+- Returns: `{ data: [{ timestamp, revenue, calls }], granularity: "hour"|"day", truncated: boolean }`
+- Free tier truncated to 7 days max.
+
+### Tier Limits
+
+Free: 1,000 events/day OR $10 revenue captured (whichever first), 7-day data retention, 1 API key.
+Pro ($49 USDC/month on Base): Unlimited events, 90-day retention, 10 API keys, CSV export, alerts.
+Enterprise: Custom.
+
+### Supported Networks
+
+- Base Sepolia (testnet): eip155:84532
+- Base (mainnet): eip155:8453
+- Ethereum: eip155:1
+- Polygon: eip155:137
+
+### Tech Stack
+
+- Next.js 14, TypeScript, Tailwind CSS, Framer Motion
+- SQLite via better-sqlite3 (WAL mode)
+- wagmi for wallet connection
+- SIWE for authentication
+- @x402/core, @x402/next, @x402/evm, @x402/fetch for x402 protocol
+- viem for Ethereum interactions
+- Deployed on Ubuntu with nginx + PM2 + Let's Encrypt SSL
