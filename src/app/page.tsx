@@ -4,6 +4,7 @@ import { ProblemSection } from "@/components/landing/problem-section";
 import { SocialProof } from "@/components/landing/social-proof";
 import { ProductsSection } from "@/components/landing/products-section";
 import { DevelopersSection } from "@/components/landing/developers-section";
+import { FinalCTA } from "@/components/landing/final-cta";
 import { Footer } from "@/components/landing/footer";
 
 export default function Home() {
@@ -13,8 +14,9 @@ export default function Home() {
       <Hero />
       <ProblemSection />
       <SocialProof />
-      <ProductsSection />
       <DevelopersSection />
+      <ProductsSection />
+      <FinalCTA />
       <Footer />
     </div>
   );

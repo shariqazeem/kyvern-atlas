@@ -2,41 +2,49 @@
 
 import { motion } from "framer-motion";
 
+const ease = [0.25, 0.1, 0.25, 1] as const;
+
 function TerminalChaos() {
   const lines = [
-    { text: "$ curl -s /api/analytics | jq", cls: "text-gray-500" },
-    { text: 'error: no analytics endpoint found', cls: "text-red-400" },
-    { text: "$ grep 'payment' server.log | wc -l", cls: "text-gray-500" },
-    { text: "47291", cls: "text-gray-300" },
-    { text: "$ # who paid? how much? which endpoint?", cls: "text-gray-600" },
-    { text: "$ # ¯\\_(ツ)_/¯", cls: "text-gray-600" },
-    { text: '$ echo "total revenue this month?"', cls: "text-gray-500" },
-    { text: "# manually parse 47k log lines...", cls: "text-gray-600" },
-    { text: "$ awk '{sum+=$5} END {print sum}'", cls: "text-gray-500" },
+    { text: "$ curl -s /api/analytics", cls: "text-gray-400" },
+    { text: 'error: endpoint not found', cls: "text-red-400" },
+    { text: "$ grep 'payment' server.log | wc -l", cls: "text-gray-400" },
+    { text: "47,291", cls: "text-gray-300" },
+    { text: "$ # Who paid? How much? Which endpoint?", cls: "text-gray-600" },
+    { text: "$ # No idea ¯\\_(ツ)_/¯", cls: "text-gray-600" },
+    { text: '$ echo "total revenue?"', cls: "text-gray-400" },
+    { text: "# manually parse 47k lines...", cls: "text-gray-600" },
+    { text: "$ awk '{sum+=$5} END {print sum}'", cls: "text-gray-400" },
     { text: "ERROR: field 5 not found", cls: "text-red-400" },
+    { text: "$ # give up", cls: "text-gray-700" },
   ];
 
   return (
-    <div className="bg-[#0A0A0A] rounded-xl border border-white/[0.06] overflow-hidden h-full">
-      <div className="flex items-center gap-1.5 px-4 py-2.5 border-b border-white/[0.06]">
-        <div className="w-2 h-2 rounded-full bg-red-400/60" />
-        <div className="w-2 h-2 rounded-full bg-yellow-400/60" />
-        <div className="w-2 h-2 rounded-full bg-green-400/60" />
-        <span className="ml-3 text-[10px] text-white/20 font-mono">your-server — ssh</span>
+    <div className="bg-[#09090B] rounded-2xl overflow-hidden h-full" style={{ boxShadow: "0 0 0 1px rgba(255,255,255,0.04)" }}>
+      <div className="flex items-center gap-1.5 px-5 py-3 border-b border-white/[0.04]">
+        <div className="w-2.5 h-2.5 rounded-full bg-red-500/50" />
+        <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/50" />
+        <div className="w-2.5 h-2.5 rounded-full bg-green-500/50" />
+        <span className="ml-3 text-[10px] text-white/15 font-mono">your-server — ssh</span>
       </div>
-      <div className="p-4 space-y-1">
+      <div className="p-5 space-y-1.5">
         {lines.map((line, i) => (
           <motion.p
             key={i}
-            initial={{ opacity: 0, x: -5 }}
+            initial={{ opacity: 0, x: -8 }}
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}
-            transition={{ duration: 0.3, delay: 0.3 + i * 0.08 }}
-            className={`text-[11px] font-mono leading-relaxed ${line.cls}`}
+            transition={{ duration: 0.3, delay: 0.4 + i * 0.08, ease }}
+            className={`text-[12px] font-mono leading-relaxed ${line.cls}`}
           >
             {line.text}
           </motion.p>
         ))}
+        <motion.span
+          animate={{ opacity: [1, 0] }}
+          transition={{ duration: 0.8, repeat: Infinity }}
+          className="inline-block w-2 h-4 bg-white/30 mt-2"
+        />
       </div>
     </div>
   );
@@ -44,79 +52,76 @@ function TerminalChaos() {
 
 function PulseDashboardMini() {
   return (
-    <div className="bg-white rounded-xl border border-black/[0.06] overflow-hidden h-full shadow-premium-lg">
-      <div className="flex items-center gap-1.5 px-4 py-2.5 border-b border-black/[0.04] bg-[#FAFAFA]">
-        <div className="w-2 h-2 rounded-full bg-black/[0.06]" />
-        <div className="w-2 h-2 rounded-full bg-black/[0.06]" />
-        <div className="w-2 h-2 rounded-full bg-black/[0.06]" />
+    <div className="bg-white rounded-2xl border border-black/[0.06] overflow-hidden h-full" style={{ boxShadow: "0 4px 20px rgba(0,0,0,0.04)" }}>
+      <div className="flex items-center gap-1.5 px-5 py-3 border-b border-black/[0.03] bg-[#FAFAFA]">
+        <div className="w-2.5 h-2.5 rounded-full bg-black/[0.06]" />
+        <div className="w-2.5 h-2.5 rounded-full bg-black/[0.06]" />
+        <div className="w-2.5 h-2.5 rounded-full bg-black/[0.06]" />
         <span className="ml-3 text-[10px] text-quaternary font-mono">Pulse Dashboard</span>
-        <span className="ml-auto relative flex h-1.5 w-1.5">
+        <span className="ml-auto relative flex h-2 w-2">
           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-          <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
         </span>
       </div>
-      <div className="p-4 space-y-3">
-        {/* Mini stat cards */}
-        <div className="grid grid-cols-2 gap-2">
+      <div className="p-5 space-y-4">
+        <div className="grid grid-cols-2 gap-3">
           {[
             { label: "Revenue", value: "$12,847", delta: "+23%" },
             { label: "API Calls", value: "8,492", delta: "+13%" },
           ].map((card) => (
             <motion.div
               key={card.label}
-              initial={{ opacity: 0, scale: 0.95 }}
+              initial={{ opacity: 0, scale: 0.96 }}
               whileInView={{ opacity: 1, scale: 1 }}
               viewport={{ once: true }}
-              transition={{ duration: 0.4, delay: 0.6 }}
-              className="bg-[#FAFAFA] rounded-lg p-2.5"
+              transition={{ duration: 0.5, delay: 0.8 }}
+              className="bg-[#FAFAFA] rounded-xl p-3"
             >
-              <p className="text-[9px] text-quaternary font-medium">{card.label}</p>
-              <div className="flex items-baseline gap-1.5 mt-0.5">
-                <span className="text-[14px] font-semibold font-mono tracking-tight">{card.value}</span>
-                <span className="text-[9px] font-medium text-emerald-600">{card.delta}</span>
+              <p className="text-[9px] text-quaternary font-medium uppercase tracking-wider">{card.label}</p>
+              <div className="flex items-baseline gap-2 mt-1">
+                <span className="text-[16px] font-bold font-mono tracking-tight">{card.value}</span>
+                <span className="text-[9px] font-semibold text-emerald-600">{card.delta}</span>
               </div>
             </motion.div>
           ))}
         </div>
 
-        {/* Mini chart */}
         <motion.div
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
-          transition={{ duration: 0.5, delay: 0.8 }}
-          className="bg-[#FAFAFA] rounded-lg p-2.5"
+          transition={{ duration: 0.6, delay: 1 }}
+          className="bg-[#FAFAFA] rounded-xl p-3"
         >
-          <svg viewBox="0 0 200 40" className="w-full h-auto">
+          <svg viewBox="0 0 240 45" className="w-full h-auto">
             <defs>
-              <linearGradient id="miniChartGrad" x1="0" y1="0" x2="0" y2="1">
+              <linearGradient id="miniGrad" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.15" />
                 <stop offset="100%" stopColor="#3b82f6" stopOpacity="0" />
               </linearGradient>
             </defs>
-            <path d="M0,30 C20,28 40,20 60,22 C80,24 100,15 120,12 C140,9 160,10 180,6 L200,3" fill="none" stroke="#3b82f6" strokeWidth="1.5" />
-            <path d="M0,30 C20,28 40,20 60,22 C80,24 100,15 120,12 C140,9 160,10 180,6 L200,3 L200,40 L0,40 Z" fill="url(#miniChartGrad)" />
+            <path d="M0,32 C24,30 48,22 72,24 C96,26 120,16 144,13 C168,10 192,12 216,7 L240,4" fill="none" stroke="#3b82f6" strokeWidth="1.5" />
+            <path d="M0,32 C24,30 48,22 72,24 C96,26 120,16 144,13 C168,10 192,12 216,7 L240,4 L240,45 L0,45 Z" fill="url(#miniGrad)" />
           </svg>
         </motion.div>
 
-        {/* Mini transactions */}
         {[
-          { ep: "/api/search", amt: "$0.15", status: "Verified" },
-          { ep: "/api/summarize", amt: "$0.25", status: "Verified" },
-          { ep: "/api/weather", amt: "$0.05", status: "Verified" },
+          { ep: "/api/search", amt: "$0.15", badge: "Verified" },
+          { ep: "/api/summarize", amt: "$0.25", badge: "Verified" },
+          { ep: "/api/weather", amt: "$0.05", badge: "Verified" },
         ].map((tx, i) => (
           <motion.div
             key={i}
-            initial={{ opacity: 0, x: 5 }}
+            initial={{ opacity: 0, x: 6 }}
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}
-            transition={{ duration: 0.3, delay: 1 + i * 0.1 }}
-            className="flex items-center justify-between py-1 border-b border-black/[0.03] last:border-0"
+            transition={{ duration: 0.3, delay: 1.2 + i * 0.1, ease }}
+            className="flex items-center justify-between py-1.5 border-b border-black/[0.02] last:border-0"
           >
             <span className="text-[10px] font-mono text-secondary">{tx.ep}</span>
-            <span className="text-[10px] font-mono font-medium">{tx.amt}</span>
-            <span className="text-[8px] font-medium px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-600">
-              {tx.status}
+            <span className="text-[10px] font-mono font-semibold">{tx.amt}</span>
+            <span className="text-[8px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-600 uppercase tracking-wider">
+              {tx.badge}
             </span>
           </motion.div>
         ))}
@@ -127,52 +132,58 @@ function PulseDashboardMini() {
 
 export function ProblemSection() {
   return (
-    <section className="py-28 lg:py-36 px-6">
+    <section className="py-32 lg:py-40 px-6">
       <div className="max-w-5xl mx-auto">
         <motion.div
-          initial={{ opacity: 0, y: 16 }}
+          initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-100px" }}
-          transition={{ duration: 0.6, ease: [0.25, 0.1, 0.25, 1] }}
-          className="text-center mb-16"
+          viewport={{ once: true, margin: "-120px" }}
+          transition={{ duration: 0.7, ease }}
+          className="text-center mb-20"
         >
-          <p className="text-[12px] uppercase tracking-[0.15em] font-medium text-quaternary mb-4">
+          <p className="text-[12px] uppercase tracking-[0.2em] font-medium text-quaternary mb-5">
             The problem
           </p>
-          <h2 className="text-[clamp(1.75rem,4vw,2.75rem)] font-semibold tracking-[-0.03em] leading-[1.1]">
+          <h2 className="text-[clamp(2rem,4.5vw,3.25rem)] font-bold tracking-[-0.04em] leading-[0.95]">
             195+ x402 services.
             <br />
             <span className="text-tertiary">Zero revenue visibility.</span>
           </h2>
-          <p className="mt-4 text-[15px] text-tertiary max-w-lg mx-auto leading-relaxed">
-            The x402 ecosystem processes $600M+ in volume. Every service provider
+          <p className="mt-5 text-[16px] text-tertiary max-w-lg mx-auto leading-relaxed">
+            $600M+ flows through the x402 economy. Every service provider
             is flying blind on revenue, customers, and pricing.
           </p>
         </motion.div>
 
-        {/* Side-by-side comparison */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        {/* Before / After labels */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <motion.div
-            initial={{ opacity: 0, x: -20 }}
+            initial={{ opacity: 0, x: -24 }}
             whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true, margin: "-60px" }}
-            transition={{ duration: 0.6, ease: [0.25, 0.1, 0.25, 1] }}
+            viewport={{ once: true, margin: "-80px" }}
+            transition={{ duration: 0.7, ease }}
           >
-            <p className="text-[11px] uppercase tracking-[0.15em] font-medium text-quaternary mb-3 text-center lg:text-left">
-              Without Pulse
-            </p>
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-2 h-2 rounded-full bg-red-500/50" />
+              <span className="text-[11px] uppercase tracking-[0.15em] font-semibold text-red-500/70">
+                Before — Without Pulse
+              </span>
+            </div>
             <TerminalChaos />
           </motion.div>
 
           <motion.div
-            initial={{ opacity: 0, x: 20 }}
+            initial={{ opacity: 0, x: 24 }}
             whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true, margin: "-60px" }}
-            transition={{ duration: 0.6, delay: 0.15, ease: [0.25, 0.1, 0.25, 1] }}
+            viewport={{ once: true, margin: "-80px" }}
+            transition={{ duration: 0.7, delay: 0.15, ease }}
           >
-            <p className="text-[11px] uppercase tracking-[0.15em] font-medium text-pulse-600 mb-3 text-center lg:text-left">
-              With Pulse
-            </p>
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-2 h-2 rounded-full bg-emerald-500" />
+              <span className="text-[11px] uppercase tracking-[0.15em] font-semibold text-emerald-600">
+                After — With Pulse
+              </span>
+            </div>
             <PulseDashboardMini />
           </motion.div>
         </div>
