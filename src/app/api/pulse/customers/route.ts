@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
-
-const DEMO_API_KEY_ID = "demo_key_001";
+import { authenticateSession } from "@/lib/auth";
 
 interface CustomerRow {
   address: string;
@@ -14,6 +13,11 @@ interface CustomerRow {
 
 export async function GET(request: NextRequest) {
   try {
+    const auth = authenticateSession(request);
+    if ("error" in auth) {
+      return NextResponse.json({ error: auth.error }, { status: 401 });
+    }
+
     const db = getDb();
     const limit = parseInt(request.nextUrl.searchParams.get("limit") || "20", 10);
 
@@ -34,7 +38,7 @@ export async function GET(request: NextRequest) {
       GROUP BY payer_address
       ORDER BY total_spent DESC
       LIMIT ?
-    `).all(DEMO_API_KEY_ID, limit) as CustomerRow[];
+    `).all(auth.apiKeyId, limit) as CustomerRow[];
 
     return NextResponse.json({ customers: rows });
   } catch (error) {

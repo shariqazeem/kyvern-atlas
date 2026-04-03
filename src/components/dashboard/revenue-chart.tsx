@@ -69,7 +69,24 @@ export function RevenueChart() {
   }
 
   if (data.data.length === 0) {
-    return null;
+    return (
+      <div className="bg-white rounded-xl border border-black/[0.06] p-5 shadow-premium">
+        <h3 className="text-[12px] font-medium text-quaternary mb-4">Revenue Over Time</h3>
+        <div className="h-[200px] flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-10 h-10 rounded-xl bg-[#FAFAFA] flex items-center justify-center mx-auto mb-3">
+              <svg viewBox="0 0 20 20" className="w-5 h-5 text-quaternary">
+                <path d="M2 15 L5 10 L9 12 L14 5 L18 8" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.4" />
+              </svg>
+            </div>
+            <p className="text-[12px] text-tertiary">Revenue data appears after your first event</p>
+            <a href="/pulse/dashboard/setup" className="text-[11px] text-pulse hover:underline mt-1 inline-block">
+              View setup guide →
+            </a>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (

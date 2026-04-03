@@ -1,9 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
+import { authenticateSession } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
-
-const DEMO_API_KEY_ID = "demo_key_001";
 
 interface EndpointRow {
   path: string;
@@ -15,10 +14,14 @@ interface EndpointRow {
   last_called: string;
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const db = getDb();
+    const auth = authenticateSession(request);
+    if ("error" in auth) {
+      return NextResponse.json({ error: auth.error }, { status: 401 });
+    }
 
+    const db = getDb();
     const rows = db.prepare(`
       SELECT
         e.endpoint as path,
@@ -33,7 +36,7 @@ export async function GET() {
       WHERE e.api_key_id = ?
       GROUP BY e.endpoint
       ORDER BY revenue DESC
-    `).all(DEMO_API_KEY_ID) as EndpointRow[];
+    `).all(auth.apiKeyId) as EndpointRow[];
 
     return NextResponse.json({ endpoints: rows });
   } catch (error) {

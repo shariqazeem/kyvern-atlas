@@ -9,7 +9,7 @@ import type {
 const BASE = "/api/pulse";
 
 async function fetchJSON<T>(url: string): Promise<T> {
-  const res = await fetch(url);
+  const res = await fetch(url, { credentials: "include" });
   if (!res.ok) throw new Error(`API error: ${res.status}`);
   return res.json();
 }

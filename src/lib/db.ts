@@ -121,7 +121,40 @@ function migrate(db: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_subs_status ON subscriptions(status);
   `);
 
-  // Ensure demo API key exists (needed for middleware ingest to work)
+  // Accounts table — wallet = identity
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS accounts (
+      id TEXT PRIMARY KEY,
+      wallet_address TEXT NOT NULL UNIQUE,
+      onboarding_completed INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_accounts_wallet ON accounts(wallet_address);
+  `);
+
+  // Sessions table — SIWE authenticated sessions
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS sessions (
+      token TEXT PRIMARY KEY,
+      wallet_address TEXT NOT NULL,
+      expires_at TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_sessions_wallet ON sessions(wallet_address);
+  `);
+
+  // Add wallet_address and tier to api_keys if not present
+  const akCols = db.pragma("table_info(api_keys)") as Array<{ name: string }>;
+  const akColNames = new Set(akCols.map((c) => c.name));
+  if (!akColNames.has("wallet_address")) {
+    db.exec("ALTER TABLE api_keys ADD COLUMN wallet_address TEXT");
+  }
+  if (!akColNames.has("tier")) {
+    db.exec("ALTER TABLE api_keys ADD COLUMN tier TEXT DEFAULT 'free'");
+  }
+  db.exec("CREATE INDEX IF NOT EXISTS idx_api_keys_wallet ON api_keys(wallet_address)");
+
+  // Ensure demo API key exists (needed for middleware ingest + demo endpoint)
   db.prepare(`
     INSERT OR IGNORE INTO api_keys (id, key_hash, key_prefix, name, email)
     VALUES ('demo_key_001', 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', 'kv_demo_', 'Pulse Demo', 'demo@kyvernlabs.com')

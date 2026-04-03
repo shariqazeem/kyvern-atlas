@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
-
-const DEMO_API_KEY_ID = "demo_key_001";
+import { authenticateSession } from "@/lib/auth";
 
 function getDateRange(range: string): { start: string; prevStart: string; end: string } {
   const now = new Date();
@@ -45,6 +44,12 @@ function pctChange(curr: number, prev: number): number {
 
 export async function GET(request: NextRequest) {
   try {
+    const auth = authenticateSession(request);
+    if ("error" in auth) {
+      return NextResponse.json({ error: auth.error }, { status: 401 });
+    }
+    const apiKeyId = auth.apiKeyId;
+
     const db = getDb();
     const range = request.nextUrl.searchParams.get("range") || "30d";
     const { start, prevStart, end } = getDateRange(range);
@@ -58,8 +63,8 @@ export async function GET(request: NextRequest) {
       WHERE api_key_id = ? AND timestamp >= ? AND timestamp <= ?
     `;
 
-    const current = db.prepare(query).get(DEMO_API_KEY_ID, start, end) as AggRow;
-    const previous = db.prepare(query).get(DEMO_API_KEY_ID, prevStart, start) as AggRow;
+    const current = db.prepare(query).get(apiKeyId, start, end) as AggRow;
+    const previous = db.prepare(query).get(apiKeyId, prevStart, start) as AggRow;
 
     const avgPrice = current.calls > 0 ? current.revenue / current.calls : 0;
     const prevAvgPrice = previous.calls > 0 ? previous.revenue / previous.calls : 0;
@@ -68,7 +73,7 @@ export async function GET(request: NextRequest) {
       SELECT COALESCE(source, 'seed') as source, COUNT(*) as count
       FROM events WHERE api_key_id = ?
       GROUP BY source
-    `).all(DEMO_API_KEY_ID) as Array<{ source: string; count: number }>;
+    `).all(apiKeyId) as Array<{ source: string; count: number }>;
 
     return NextResponse.json({
       revenue: Math.round(current.revenue * 100) / 100,

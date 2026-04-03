@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
-
-const DEMO_API_KEY_ID = "demo_key_001";
+import { authenticateSession } from "@/lib/auth";
 
 interface TimeseriesRow {
   timestamp: string;
@@ -11,6 +10,12 @@ interface TimeseriesRow {
 
 export async function GET(request: NextRequest) {
   try {
+    const auth = authenticateSession(request);
+    if ("error" in auth) {
+      return NextResponse.json({ error: auth.error }, { status: 401 });
+    }
+    const apiKeyId = auth.apiKeyId;
+
     const db = getDb();
     const range = request.nextUrl.searchParams.get("range") || "30d";
 
@@ -48,7 +53,7 @@ export async function GET(request: NextRequest) {
       WHERE api_key_id = ? AND timestamp >= ?
       GROUP BY ${groupExpr}
       ORDER BY timestamp ASC
-    `).all(DEMO_API_KEY_ID, start.toISOString()) as TimeseriesRow[];
+    `).all(apiKeyId, start.toISOString()) as TimeseriesRow[];
 
     return NextResponse.json({ data: rows, granularity });
   } catch (error) {

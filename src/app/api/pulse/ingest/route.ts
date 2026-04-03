@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { getDb } from "@/lib/db";
+import { authenticateIngestRequest } from "@/lib/auth";
 
 const IngestSchema = z.object({
   endpoint: z.string().min(1),
@@ -20,21 +21,13 @@ const IngestSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
-    const apiKey = request.headers.get("x-api-key");
-    if (!apiKey) {
-      return NextResponse.json({ error: "Missing X-API-Key header" }, { status: 401 });
+    const auth = authenticateIngestRequest(request);
+    if ("error" in auth) {
+      return NextResponse.json({ error: auth.error }, { status: 401 });
     }
+    const keyRow = { id: auth.apiKeyId };
 
     const db = getDb();
-
-    const keyRow = db.prepare(
-      "SELECT id FROM api_keys WHERE key_prefix = ? OR id = ?"
-    ).get(apiKey.slice(0, 8), apiKey) as { id: string } | undefined;
-
-    if (!keyRow) {
-      return NextResponse.json({ error: "Invalid API key" }, { status: 401 });
-    }
-
     const body = await request.json();
     const parsed = IngestSchema.parse(body);
 

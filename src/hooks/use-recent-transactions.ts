@@ -9,7 +9,7 @@ export function useRecentTransactions(limit = 20, pollIntervalMs = 5000) {
 
   const fetchData = useCallback(async () => {
     try {
-      const res = await fetch(`/api/pulse/recent?limit=${limit}`);
+      const res = await fetch(`/api/pulse/recent?limit=${limit}`, { credentials: "include" });
       if (res.ok) {
         const json = await res.json();
         setData(json.transactions);

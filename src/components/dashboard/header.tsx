@@ -2,17 +2,13 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Activity } from "lucide-react";
+import { Activity, Sparkles } from "lucide-react";
 import { TimeRangeSelector } from "./time-range-selector";
 import { MobileNav } from "./mobile-nav";
-import { ConnectWallet } from "@/components/connect-wallet";
-import { usePulseStats } from "@/hooks/use-pulse-stats";
-import { useDashboardStore } from "@/hooks/use-dashboard-store";
+import { useAuth } from "@/hooks/use-auth";
 
 export function DashboardHeader() {
-  const { timeRange } = useDashboardStore();
-  const { data } = usePulseStats(timeRange);
-  const isLive = data?.has_real_data ?? false;
+  const { isAuthenticated, plan, wallet, signOut } = useAuth();
   const [recentCount, setRecentCount] = useState<number | null>(null);
 
   useEffect(() => {
@@ -42,23 +38,43 @@ export function DashboardHeader() {
           <div className="hidden sm:flex items-center gap-2 text-[13px]">
             <Activity className="w-3.5 h-3.5 text-pulse" />
             <span className="font-medium text-primary">Pulse</span>
-            {isLive && (
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+            {plan === "pro" && (
+              <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-pulse-50 text-pulse-600">
+                <Sparkles className="w-2.5 h-2.5" />
+                PRO
               </span>
             )}
             {recentCount !== null && recentCount > 0 && (
-              <span className="text-[11px] text-quaternary font-medium ml-1">
-                {recentCount} payment{recentCount !== 1 ? "s" : ""} in last hour
-              </span>
+              <>
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                </span>
+                <span className="text-[11px] text-quaternary font-medium">
+                  {recentCount} in last hour
+                </span>
+              </>
             )}
           </div>
         </div>
         <div className="flex items-center gap-3">
           <TimeRangeSelector />
-          <div className="h-5 w-px bg-black/[0.06] hidden sm:block" />
-          <ConnectWallet />
+          {isAuthenticated && wallet && (
+            <>
+              <div className="h-5 w-px bg-black/[0.06] hidden sm:block" />
+              <div className="hidden sm:flex items-center gap-2">
+                <span className="text-[11px] font-mono text-tertiary">
+                  {wallet.slice(0, 6)}...{wallet.slice(-4)}
+                </span>
+                <button
+                  onClick={signOut}
+                  className="text-[11px] text-quaternary hover:text-primary transition-colors"
+                >
+                  Sign out
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </header>
