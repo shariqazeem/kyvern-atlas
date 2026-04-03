@@ -11,45 +11,44 @@ import {
   Activity,
   BarChart3,
   Users,
-  Zap,
-  Bell,
+  Shield,
   Code2,
   Check,
-  DollarSign,
-  TrendingUp,
+  Key,
+  Wallet,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const FEATURES = [
   {
+    icon: Wallet,
+    title: "Wallet-Native Auth",
+    desc: "SIWE (Sign-In With Ethereum) — no emails, no passwords. Your wallet is your identity. Cryptographically verified.",
+  },
+  {
+    icon: Key,
+    title: "Auto API Keys",
+    desc: "Connect wallet → get your kv_live_ API key instantly. SHA-256 hashed, shown once. Like Stripe's sk_live_ pattern.",
+  },
+  {
     icon: BarChart3,
     title: "Revenue Dashboard",
-    desc: "Real-time revenue, calls, and trends across all your x402 endpoints. See exactly what you're earning.",
+    desc: "Real-time revenue, calls, latency, error rates per endpoint. Your data only — multi-tenant isolation.",
   },
   {
     icon: Users,
     title: "Customer Analytics",
-    desc: "Which agents pay the most? How often? Which endpoints do they prefer? Know your customers by wallet.",
+    desc: "See which agent wallets pay you the most, which endpoints they use, first/last seen. On-chain verified.",
   },
   {
-    icon: Zap,
-    title: "Performance Monitoring",
-    desc: "Track latency, error rates, and uptime per endpoint. Catch issues before your agents do.",
+    icon: Shield,
+    title: "On-Chain Verification",
+    desc: "Every payment tracked with blockchain tx hash. Click through to BaseScan. Not analytics — proof.",
   },
   {
     icon: Code2,
-    title: "One-Line Integration",
-    desc: "Wrap your handler with withPulse() — analytics flows immediately. Zero config. Non-blocking.",
-  },
-  {
-    icon: Bell,
-    title: "Smart Alerts",
-    desc: "Revenue spike? Drop? New whale agent? Get notified instantly. Never miss a business signal.",
-  },
-  {
-    icon: Activity,
-    title: "Blockchain Verified",
-    desc: "Every payment tracked with on-chain tx hash. Click through to block explorer. Real, not demo.",
+    title: "One-Line Middleware",
+    desc: "npm install @kyvernlabs/pulse → wrap your handler with withPulse(). Non-blocking, fire-and-forget.",
   },
 ];
 
@@ -58,25 +57,33 @@ const PRICING = [
     name: "Free",
     price: "$0",
     period: "forever",
-    desc: "For side projects and exploration",
-    features: ["1 endpoint", "7-day history", "Basic dashboard", "100 events/day"],
-    cta: "Get Started Free",
+    desc: "Start building. No credit card.",
+    features: [
+      "1,000 events/day or $10 revenue",
+      "7-day data retention",
+      "1 API key",
+      "Full dashboard",
+      "On-chain verification",
+      "Setup guide + onboarding",
+    ],
+    cta: "Connect Wallet & Start",
+    href: "/pulse/dashboard",
     highlight: false,
   },
   {
     name: "Pro",
     price: "$49",
-    period: "/month",
-    desc: "For serious x402 service providers",
+    period: "/month USDC",
+    desc: "For serious x402 providers",
     features: [
-      "Unlimited endpoints",
-      "90-day history",
-      "Full analytics suite",
       "Unlimited events",
+      "90-day data retention",
+      "Up to 10 API keys",
       "Pricing benchmarks",
-      "Webhooks + email alerts",
+      "Webhooks + smart alerts",
       "CSV export + tax reports",
       "Priority support",
+      "Pay with x402 (USDC on Base)",
     ],
     cta: "Upgrade to Pro — $49 USDC",
     href: "/pulse/upgrade",
@@ -86,82 +93,20 @@ const PRICING = [
     name: "Enterprise",
     price: "Custom",
     period: "",
-    desc: "For high-volume x402 infrastructure",
+    desc: "High-volume x402 infrastructure",
     features: [
       "Everything in Pro",
-      "Unlimited history",
+      "Unlimited retention",
       "Custom integrations",
       "Public API access",
       "Dedicated support",
       "SLA guarantee",
-      "Volume discounts",
     ],
     cta: "Contact Us",
+    href: "#",
     highlight: false,
   },
 ];
-
-function MiniDashboardPreview() {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.8, delay: 0.5, ease: [0.25, 0.1, 0.25, 1] }}
-      className="relative mt-14 mx-auto max-w-3xl"
-    >
-      <div className="absolute -inset-3 bg-gradient-to-b from-pulse-100/50 via-pulse-50/20 to-transparent rounded-2xl blur-xl" />
-      <div className="relative rounded-xl border border-black/[0.08] bg-white shadow-premium-xl overflow-hidden">
-        {/* Browser bar */}
-        <div className="flex items-center gap-2 px-4 py-2 border-b border-black/[0.04] bg-[#FAFAFA]">
-          <div className="flex items-center gap-1.5">
-            <div className="w-2 h-2 rounded-full bg-black/[0.07]" />
-            <div className="w-2 h-2 rounded-full bg-black/[0.07]" />
-            <div className="w-2 h-2 rounded-full bg-black/[0.07]" />
-          </div>
-          <div className="flex-1 flex justify-center">
-            <div className="flex items-center gap-1.5 px-3 py-0.5 rounded-md bg-white border border-black/[0.05] text-[10px] text-quaternary font-mono">
-              <span className="w-2 h-2 rounded-full bg-emerald-500" />
-              kyvernlabs.com/pulse/dashboard
-            </div>
-          </div>
-        </div>
-        {/* Content */}
-        <div className="p-4 bg-[#F8F8FA]">
-          <div className="grid grid-cols-4 gap-2 mb-3">
-            {[
-              { icon: DollarSign, label: "Revenue", val: "$12,847", d: "+23%" },
-              { icon: Zap, label: "Calls", val: "8,492", d: "+13%" },
-              { icon: Users, label: "Agents", val: "47", d: "+5" },
-              { icon: TrendingUp, label: "Avg", val: "$1.51", d: "-2%" },
-            ].map((c) => (
-              <div key={c.label} className="bg-white rounded-lg border border-black/[0.04] p-2.5">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-[9px] text-quaternary font-medium">{c.label}</span>
-                  <c.icon className="w-2.5 h-2.5 text-quaternary" />
-                </div>
-                <p className="text-[13px] font-semibold font-mono tracking-tight">{c.val}</p>
-                <span className="text-[9px] font-medium text-emerald-600">{c.d}</span>
-              </div>
-            ))}
-          </div>
-          {/* Chart */}
-          <div className="bg-white rounded-lg border border-black/[0.04] p-3">
-            <svg viewBox="0 0 500 80" className="w-full h-auto">
-              <defs>
-                <linearGradient id="pulseChartG" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.12" />
-                  <stop offset="100%" stopColor="#3b82f6" stopOpacity="0" />
-                </linearGradient>
-              </defs>
-              <path d="M0,60 C40,55 70,40 100,42 C130,44 160,30 200,25 C240,20 280,35 320,22 C360,10 400,15 440,8 L500,3" fill="none" stroke="#3b82f6" strokeWidth="1.5" />
-              <path d="M0,60 C40,55 70,40 100,42 C130,44 160,30 200,25 C240,20 280,35 320,22 C360,10 400,15 440,8 L500,3 L500,80 L0,80 Z" fill="url(#pulseChartG)" />
-            </svg>
-          </div>
-        </div>
-      </div>
-    </motion.div>
-  );
-}
 
 export default function PulseLanding() {
   return (
@@ -181,7 +126,7 @@ export default function PulseLanding() {
             className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-pulse/20 bg-pulse-50 text-[11px] tracking-wide font-medium text-pulse-600 mb-8"
           >
             <Activity className="w-3 h-3" />
-            Pulse by KyvernLabs
+            Pulse v2 — Wallet-native, SIWE-secured, Pro-gated
           </motion.div>
 
           <motion.h1
@@ -204,8 +149,8 @@ export default function PulseLanding() {
             transition={{ duration: 0.7, delay: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
             className="mt-5 text-[16px] leading-[1.65] text-secondary max-w-lg mx-auto"
           >
-            See every payment, every customer, every trend.
-            One line of code. Blockchain-verified. Real-time.
+            Connect wallet. Get your API key. Wrap your endpoint.
+            See every payment — blockchain-verified, real-time, yours only.
           </motion.p>
 
           <motion.div
@@ -218,28 +163,78 @@ export default function PulseLanding() {
               href="/pulse/dashboard"
               className="group inline-flex items-center gap-2 h-11 px-6 rounded-lg bg-foreground text-background text-[13px] font-medium hover:bg-foreground/90 transition-colors duration-300"
             >
-              View Live Dashboard
+              <Wallet className="w-4 h-4" />
+              Connect Wallet & Get Your Key
               <ArrowRight className="w-3.5 h-3.5 transition-transform duration-300 group-hover:translate-x-0.5" />
-            </Link>
-            <Link
-              href="/pulse/dashboard/setup"
-              className="inline-flex items-center h-11 px-6 rounded-lg border border-black/[0.08] text-[13px] font-medium text-secondary hover:text-primary hover:border-black/[0.15] transition-all duration-300"
-            >
-              Setup in 47 seconds
             </Link>
           </motion.div>
 
-          <MiniDashboardPreview />
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.5 }}
+            className="mt-4 text-[12px] text-quaternary"
+          >
+            Free tier included. No email required. 12 seconds to your first API key.
+          </motion.p>
         </div>
       </section>
 
-      {/* Integration code — the "aha" moment */}
-      <section className="py-24 lg:py-32 px-6">
-        <div className="max-w-3xl mx-auto">
+      {/* How it works — 4 step visual */}
+      <section className="py-24 lg:py-28 px-6">
+        <div className="max-w-4xl mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: "-80px" }}
+            transition={{ duration: 0.6, ease: [0.25, 0.1, 0.25, 1] }}
+            className="text-center mb-14"
+          >
+            <p className="text-[12px] uppercase tracking-[0.15em] font-medium text-quaternary mb-4">
+              How it works
+            </p>
+            <h2 className="text-[clamp(1.5rem,3.5vw,2.25rem)] font-semibold tracking-[-0.03em] leading-[1.15]">
+              From zero to revenue dashboard in{" "}
+              <span className="text-pulse">47 seconds</span>
+            </h2>
+          </motion.div>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {[
+              { step: "1", title: "Connect Wallet", desc: "SIWE sign-in. Your wallet is your account.", icon: Wallet },
+              { step: "2", title: "Get API Key", desc: "kv_live_ key auto-generated. Shown once.", icon: Key },
+              { step: "3", title: "Wrap Endpoint", desc: "npm install + one line of code.", icon: Code2 },
+              { step: "4", title: "See Revenue", desc: "Real-time, on-chain verified, yours only.", icon: BarChart3 },
+            ].map((item, i) => (
+              <motion.div
+                key={item.step}
+                initial={{ opacity: 0, y: 16 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: i * 0.08, ease: [0.25, 0.1, 0.25, 1] }}
+                className="text-center p-5 rounded-xl border border-black/[0.06] bg-white hover:border-black/[0.12] hover:shadow-premium-lg transition-all duration-300"
+              >
+                <div className="w-10 h-10 rounded-xl bg-[#FAFAFA] flex items-center justify-center mx-auto mb-3">
+                  <item.icon className="w-[18px] h-[18px] text-secondary" />
+                </div>
+                <div className="text-[10px] font-bold text-pulse uppercase tracking-wider mb-1">
+                  Step {item.step}
+                </div>
+                <h3 className="text-[14px] font-semibold tracking-tight mb-1">{item.title}</h3>
+                <p className="text-[12px] text-tertiary">{item.desc}</p>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Code block */}
+      <section className="py-20 lg:py-24 px-6 bg-[#FAFAFA]">
+        <div className="max-w-3xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-60px" }}
             transition={{ duration: 0.6, ease: [0.25, 0.1, 0.25, 1] }}
             className="text-center mb-10"
           >
@@ -247,16 +242,15 @@ export default function PulseLanding() {
               Integration
             </p>
             <h2 className="text-[clamp(1.5rem,3.5vw,2.25rem)] font-semibold tracking-[-0.03em] leading-[1.15]">
-              Add Pulse to your endpoint in{" "}
-              <span className="text-pulse">one line</span>
+              One line. That&apos;s the integration.
             </h2>
           </motion.div>
 
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-60px" }}
-            transition={{ duration: 0.6, delay: 0.1, ease: [0.25, 0.1, 0.25, 1] }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, delay: 0.1 }}
             className="bg-[#0A0A0A] rounded-xl border border-white/[0.06] overflow-hidden shadow-premium-xl"
           >
             <div className="flex items-center gap-1.5 px-4 py-2.5 border-b border-white/[0.06]">
@@ -270,19 +264,19 @@ export default function PulseLanding() {
                 <code>
                   <span className="text-purple-400">import</span>
                   <span className="text-gray-300">{" { "}</span>
-                  <span className="text-blue-400">withX402</span>
-                  <span className="text-gray-300">{" } "}</span>
-                  <span className="text-purple-400">from</span>
-                  <span className="text-emerald-400">{" '@x402/next'"}</span>
-                  {"\n"}
-                  <span className="text-purple-400">import</span>
-                  <span className="text-gray-300">{" { "}</span>
                   <span className="text-blue-400">withPulse</span>
                   <span className="text-gray-300">{" } "}</span>
                   <span className="text-purple-400">from</span>
                   <span className="text-emerald-400">{" '@kyvernlabs/pulse'"}</span>
+                  {"\n"}
+                  <span className="text-purple-400">import</span>
+                  <span className="text-gray-300">{" { "}</span>
+                  <span className="text-blue-400">withX402</span>
+                  <span className="text-gray-300">{" } "}</span>
+                  <span className="text-purple-400">from</span>
+                  <span className="text-emerald-400">{" '@x402/next'"}</span>
                   {"\n\n"}
-                  <span className="text-gray-500">{"// That's it. Every payment → your Pulse dashboard."}</span>
+                  <span className="text-gray-500">{"// Every payment → your dashboard. Blockchain-verified."}</span>
                   {"\n"}
                   <span className="text-purple-400">export const</span>
                   <span className="text-gray-300">{" GET = "}</span>
@@ -295,7 +289,7 @@ export default function PulseLanding() {
                   <span className="text-gray-400">{"{ "}</span>
                   <span className="text-orange-300">apiKey</span>
                   <span className="text-gray-400">{": "}</span>
-                  <span className="text-emerald-400">{"'kv_...'"}</span>
+                  <span className="text-emerald-400">{"'kv_live_your_key_here'"}</span>
                   <span className="text-gray-400">{" }"}</span>
                   {"\n"}
                   <span className="text-gray-400">{")"}</span>
@@ -303,21 +297,14 @@ export default function PulseLanding() {
               </pre>
             </div>
           </motion.div>
-
-          <motion.p
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5, delay: 0.3 }}
-            className="mt-4 text-center text-[12px] text-quaternary"
-          >
-            Works with Next.js, Express, Hono — any x402-compatible framework
-          </motion.p>
+          <p className="mt-4 text-center text-[12px] text-quaternary">
+            Works with Next.js, Express, Hono. Your real key auto-populates in the dashboard setup guide.
+          </p>
         </div>
       </section>
 
       {/* Features */}
-      <section className="py-24 lg:py-32 px-6 bg-[#FAFAFA]">
+      <section className="py-24 lg:py-28 px-6">
         <div className="max-w-5xl mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 16 }}
@@ -330,7 +317,7 @@ export default function PulseLanding() {
               Features
             </p>
             <h2 className="text-[clamp(1.5rem,3.5vw,2.25rem)] font-semibold tracking-[-0.03em] leading-[1.15]">
-              Everything to run a profitable x402 service
+              Built for x402. Not retrofitted.
             </h2>
           </motion.div>
 
@@ -341,20 +328,14 @@ export default function PulseLanding() {
                 initial={{ opacity: 0, y: 16 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-40px" }}
-                transition={{
-                  duration: 0.5,
-                  delay: i * 0.05,
-                  ease: [0.25, 0.1, 0.25, 1],
-                }}
+                transition={{ duration: 0.5, delay: i * 0.05, ease: [0.25, 0.1, 0.25, 1] }}
                 className="bg-white rounded-xl border border-black/[0.06] p-6 hover:border-black/[0.12] hover:shadow-premium-lg transition-all duration-300"
               >
                 <div className="w-9 h-9 rounded-lg bg-[#FAFAFA] flex items-center justify-center mb-4">
                   <feature.icon className="w-[18px] h-[18px] text-secondary" />
                 </div>
                 <h3 className="text-[14px] font-semibold tracking-tight mb-1.5">{feature.title}</h3>
-                <p className="text-[13px] text-tertiary leading-relaxed">
-                  {feature.desc}
-                </p>
+                <p className="text-[13px] text-tertiary leading-relaxed">{feature.desc}</p>
               </motion.div>
             ))}
           </div>
@@ -364,7 +345,7 @@ export default function PulseLanding() {
       <SocialProof />
 
       {/* Pricing */}
-      <section id="pricing" className="py-24 lg:py-32 px-6">
+      <section id="pricing" className="py-24 lg:py-28 px-6 bg-[#FAFAFA]">
         <div className="max-w-4xl mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 16 }}
@@ -377,8 +358,11 @@ export default function PulseLanding() {
               Pricing
             </p>
             <h2 className="text-[clamp(1.5rem,3.5vw,2.25rem)] font-semibold tracking-[-0.03em] leading-[1.15]">
-              Simple, transparent, scales with you
+              Start free. Pay with x402 when you grow.
             </h2>
+            <p className="mt-3 text-[14px] text-tertiary">
+              Pro is paid with USDC on Base — the same way your agents pay you.
+            </p>
           </motion.div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -388,11 +372,7 @@ export default function PulseLanding() {
                 initial={{ opacity: 0, y: 16 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-40px" }}
-                transition={{
-                  duration: 0.5,
-                  delay: i * 0.06,
-                  ease: [0.25, 0.1, 0.25, 1],
-                }}
+                transition={{ duration: 0.5, delay: i * 0.06, ease: [0.25, 0.1, 0.25, 1] }}
                 className={cn(
                   "rounded-xl border p-6 lg:p-7 transition-all duration-300",
                   plan.highlight
@@ -403,24 +383,20 @@ export default function PulseLanding() {
                 <p className={cn(
                   "text-[11px] uppercase tracking-[0.15em] font-medium mb-4",
                   plan.highlight ? "text-white/50" : "text-quaternary"
-                )}>
-                  {plan.name}
-                </p>
+                )}>{plan.name}</p>
                 <div className="flex items-baseline gap-1 mb-1">
                   <span className="text-[32px] font-semibold tracking-[-0.03em] font-mono-numbers">
                     {plan.price}
                   </span>
-                  <span className={cn(
-                    "text-[13px]",
-                    plan.highlight ? "text-white/40" : "text-quaternary"
-                  )}>{plan.period}</span>
+                  <span className={cn("text-[13px]", plan.highlight ? "text-white/40" : "text-quaternary")}>
+                    {plan.period}
+                  </span>
                 </div>
-                <p className={cn(
-                  "text-[13px] mb-6",
-                  plan.highlight ? "text-white/60" : "text-tertiary"
-                )}>{plan.desc}</p>
+                <p className={cn("text-[13px] mb-6", plan.highlight ? "text-white/60" : "text-tertiary")}>
+                  {plan.desc}
+                </p>
                 <Link
-                  href={(plan as { href?: string }).href || "/pulse/dashboard"}
+                  href={plan.href}
                   className={cn(
                     "w-full inline-flex items-center justify-center h-10 rounded-lg text-[13px] font-medium transition-all duration-300",
                     plan.highlight
@@ -436,10 +412,7 @@ export default function PulseLanding() {
                       "flex items-center gap-2.5 text-[13px]",
                       plan.highlight ? "text-white/70" : "text-secondary"
                     )}>
-                      <Check className={cn(
-                        "w-3.5 h-3.5 shrink-0",
-                        plan.highlight ? "text-white/50" : "text-pulse"
-                      )} />
+                      <Check className={cn("w-3.5 h-3.5 shrink-0", plan.highlight ? "text-white/50" : "text-pulse")} />
                       {feature}
                     </li>
                   ))}
@@ -451,7 +424,7 @@ export default function PulseLanding() {
       </section>
 
       {/* Bottom CTA */}
-      <section className="py-24 lg:py-32 px-6 bg-[#FAFAFA]">
+      <section className="py-24 lg:py-28 px-6">
         <div className="max-w-lg mx-auto text-center">
           <motion.div
             initial={{ opacity: 0, y: 16 }}
@@ -463,7 +436,7 @@ export default function PulseLanding() {
               Ready to see your x402 revenue?
             </h2>
             <p className="text-[15px] text-tertiary mb-8">
-              Join the first x402 service providers who actually know what they&apos;re earning.
+              Connect your wallet. Get your key. See every payment.
             </p>
             <WaitlistForm />
           </motion.div>

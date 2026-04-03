@@ -172,8 +172,8 @@ export function Hero() {
           transition={{ duration: 0.7, delay: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
           className="mt-5 text-center text-[17px] leading-[1.6] text-secondary max-w-xl mx-auto"
         >
-          One line of code. Real-time revenue.
-          Blockchain-verified. Built for every x402 service provider.
+          Connect wallet. Get your API key. See every x402 payment —
+          blockchain-verified, real-time, multi-tenant. Free to start.
         </motion.p>
 
         {/* Waitlist CTA */}
@@ -189,7 +189,7 @@ export function Hero() {
               href="/pulse/dashboard"
               className="text-[12px] font-medium text-tertiary hover:text-primary transition-colors duration-300"
             >
-              View live dashboard →
+              Connect wallet & get your key →
             </Link>
             <Link
               href="/pulse/dashboard/setup"

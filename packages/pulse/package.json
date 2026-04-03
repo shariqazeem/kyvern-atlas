@@ -1,0 +1,27 @@
+{
+  "name": "@kyvernlabs/pulse",
+  "version": "0.1.0",
+  "description": "x402 analytics middleware — capture every payment, see every customer, blockchain-verified",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": ["x402", "analytics", "middleware", "payments", "blockchain", "USDC", "Base"],
+  "author": "KyvernLabs <hello@kyvernlabs.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/shariqazeem/kyvernlabs"
+  },
+  "homepage": "https://kyvernlabs.com/pulse",
+  "peerDependencies": {
+    "next": ">=14"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "@types/node": "^20.0.0"
+  }
+}

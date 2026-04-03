@@ -40,3 +40,7 @@ next-env.d.ts
 *.db-journal
 *.db-shm
 *.db-wal
+
+# packages build artifacts
+packages/*/node_modules
+packages/*/dist
