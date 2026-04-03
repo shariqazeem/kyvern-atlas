@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/use-auth";
 interface ApiKeyInfo {
   id: string;
   key_prefix: string;
+  key_full: string | null;
   name: string;
   tier: string;
   created_at: string;
@@ -117,7 +118,9 @@ export default function KeysPage() {
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-2">
                       <Key className="w-3.5 h-3.5 text-quaternary" />
-                      <code className="text-[12px] font-mono text-primary">{key.key_prefix}...</code>
+                      <code className="text-[12px] font-mono text-primary">
+                        {key.key_full || `${key.key_prefix}...`}
+                      </code>
                     </div>
                   </td>
                   <td className="px-5 py-3 text-[13px] text-secondary">{key.name}</td>
@@ -129,11 +132,11 @@ export default function KeysPage() {
                   </td>
                   <td className="px-5 py-3 text-right">
                     <button
-                      onClick={() => copyToClipboard(key.key_prefix, key.id)}
-                      className="inline-flex items-center gap-1 text-[11px] font-medium text-tertiary hover:text-primary transition-colors"
+                      onClick={() => copyToClipboard(key.key_full || key.key_prefix, key.id)}
+                      className="inline-flex items-center gap-1 text-[11px] font-medium text-pulse hover:text-pulse-600 transition-colors"
                     >
                       {copied === key.id ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
-                      {copied === key.id ? "Copied" : "Copy prefix"}
+                      {copied === key.id ? "Copied!" : "Copy key"}
                     </button>
                   </td>
                 </tr>

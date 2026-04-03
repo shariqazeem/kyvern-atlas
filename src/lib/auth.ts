@@ -63,8 +63,8 @@ export function createAccount(walletAddress: string): {
     );
 
     db.prepare(
-      "INSERT INTO api_keys (id, key_hash, key_prefix, name, wallet_address, tier) VALUES (?, ?, ?, ?, ?, 'free')"
-    ).run(keyId, keyHash, keyPrefix, "Default", wallet);
+      "INSERT INTO api_keys (id, key_hash, key_prefix, name, wallet_address, tier, key_full) VALUES (?, ?, ?, ?, ?, 'free', ?)"
+    ).run(keyId, keyHash, keyPrefix, "Default", wallet, fullKey);
   });
 
   createTx();

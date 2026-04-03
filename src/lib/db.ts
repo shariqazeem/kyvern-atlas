@@ -152,6 +152,9 @@ function migrate(db: Database.Database) {
   if (!akColNames.has("tier")) {
     db.exec("ALTER TABLE api_keys ADD COLUMN tier TEXT DEFAULT 'free'");
   }
+  if (!akColNames.has("key_full")) {
+    db.exec("ALTER TABLE api_keys ADD COLUMN key_full TEXT");
+  }
   db.exec("CREATE INDEX IF NOT EXISTS idx_api_keys_wallet ON api_keys(wallet_address)");
 
   // Ensure demo API key exists (needed for middleware ingest + demo endpoint)

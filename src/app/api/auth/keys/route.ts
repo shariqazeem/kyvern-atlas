@@ -10,10 +10,11 @@ export async function GET(req: NextRequest) {
 
   const db = getDb();
   const keys = db.prepare(
-    "SELECT id, key_prefix, name, tier, created_at, last_used_at FROM api_keys WHERE wallet_address = ? ORDER BY created_at DESC"
+    "SELECT id, key_prefix, key_full, name, tier, created_at, last_used_at FROM api_keys WHERE wallet_address = ? ORDER BY created_at DESC"
   ).all(auth.wallet) as Array<{
     id: string;
     key_prefix: string;
+    key_full: string | null;
     name: string;
     tier: string;
     created_at: string;
