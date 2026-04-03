@@ -24,13 +24,17 @@ export function Navbar() {
 
           <div className="flex items-center gap-8">
             <div className="hidden sm:flex items-center gap-7">
-              {["Products", "Developers", "Docs"].map((item) => (
+              {[
+                { label: "Products", href: "#products" },
+                { label: "Developers", href: "#developers" },
+                { label: "Services", href: "/services" },
+              ].map((item) => (
                 <a
-                  key={item}
-                  href={`#${item.toLowerCase()}`}
+                  key={item.label}
+                  href={item.href}
                   className="text-[13px] text-tertiary hover:text-primary transition-colors duration-300"
                 >
-                  {item}
+                  {item.label}
                 </a>
               ))}
             </div>

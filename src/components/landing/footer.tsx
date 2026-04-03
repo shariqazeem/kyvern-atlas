@@ -5,6 +5,7 @@ const LINKS = {
   Product: [
     { label: "Pulse", href: "/pulse" },
     { label: "Dashboard", href: "/pulse/dashboard" },
+    { label: "x402 Services", href: "/services" },
     { label: "Setup Guide", href: "/pulse/dashboard/setup" },
     { label: "Pricing", href: "/pulse#pricing" },
   ],

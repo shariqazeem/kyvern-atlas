@@ -28,7 +28,7 @@ const STEPS = [
 
 export function ProductsSection() {
   return (
-    <section id="how-it-works" className="py-28 lg:py-40 px-6 bg-white relative overflow-hidden">
+    <section id="products" className="py-28 lg:py-40 px-6 bg-white relative overflow-hidden">
       {/* Decorative subtle background elements */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-4xl h-px bg-gradient-to-r from-transparent via-black/[0.04] to-transparent" />
       
