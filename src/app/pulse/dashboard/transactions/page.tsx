@@ -10,6 +10,7 @@ import {
   getNetworkName,
 } from "@/lib/utils";
 import { ExternalLink, Check } from "lucide-react";
+import { ExportButton } from "@/components/dashboard/export-button";
 import { format, parseISO } from "date-fns";
 
 export default function TransactionsPage() {
@@ -35,11 +36,14 @@ export default function TransactionsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-lg font-semibold tracking-tight">Transactions</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          Individual x402 payment events with blockchain verification
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-lg font-semibold tracking-tight">Transactions</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Individual x402 payment events with blockchain verification
+          </p>
+        </div>
+        <ExportButton type="transactions" />
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

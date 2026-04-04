@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { useEndpoints } from "@/hooks/use-endpoints";
 import { formatCurrency } from "@/lib/utils";
 import { Globe } from "lucide-react";
+import { ExportButton } from "@/components/dashboard/export-button";
 
 export default function EndpointsPage() {
   const { data, loading } = useEndpoints();
@@ -29,10 +30,15 @@ export default function EndpointsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-lg font-semibold tracking-tight">Endpoints</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          Performance breakdown for each x402 endpoint
-        </p>
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-lg font-semibold tracking-tight">Endpoints</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              Performance breakdown for each x402 endpoint
+            </p>
+          </div>
+          <ExportButton type="endpoints" />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

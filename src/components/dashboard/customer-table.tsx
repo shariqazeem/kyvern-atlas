@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import { useCustomers } from "@/hooks/use-customers";
 import { formatCurrency, truncateAddress } from "@/lib/utils";
-import { Users } from "lucide-react";
+import { ExportButton } from "./export-button";
 
 interface CustomerTableProps {
   limit?: number;
@@ -35,7 +35,7 @@ export function CustomerTable({ limit }: CustomerTableProps) {
     >
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-medium text-muted-foreground">Top Customers</h3>
-        <Users className="w-4 h-4 text-muted-foreground" />
+        <ExportButton type="customers" compact />
       </div>
       <div className="space-y-0">
         <div className="grid grid-cols-4 gap-4 text-xs text-muted-foreground font-medium pb-2 border-b border-border">

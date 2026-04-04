@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import { useEndpoints } from "@/hooks/use-endpoints";
 import { formatCurrency } from "@/lib/utils";
-import { Globe } from "lucide-react";
+import { ExportButton } from "./export-button";
 
 interface EndpointTableProps {
   limit?: number;
@@ -35,7 +35,7 @@ export function EndpointTable({ limit }: EndpointTableProps) {
     >
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-medium text-muted-foreground">Top Endpoints</h3>
-        <Globe className="w-4 h-4 text-muted-foreground" />
+        <ExportButton type="endpoints" compact />
       </div>
       <div className="space-y-0">
         <div className="grid grid-cols-4 gap-4 text-xs text-muted-foreground font-medium pb-2 border-b border-border">

@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { useCustomers } from "@/hooks/use-customers";
 import { formatCurrency, truncateAddress } from "@/lib/utils";
 import { Users, Copy } from "lucide-react";
+import { ExportButton } from "@/components/dashboard/export-button";
 import { useState } from "react";
 import { format, parseISO } from "date-fns";
 
@@ -37,10 +38,15 @@ export default function CustomersPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-lg font-semibold tracking-tight">Customers</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          Agent addresses paying for your x402 endpoints
-        </p>
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-lg font-semibold tracking-tight">Customers</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              Agent addresses paying for your x402 endpoints
+            </p>
+          </div>
+          <ExportButton type="customers" />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
