@@ -17,27 +17,33 @@ export function ProGate({ children, feature }: ProGateProps) {
   }
 
   return (
-    <div className="relative rounded-xl overflow-hidden">
-      <div className="opacity-30 pointer-events-none blur-[3px] select-none">
+    <div className="relative rounded-xl overflow-hidden min-h-[420px]">
+      {/* Blurred content behind */}
+      <div className="opacity-20 pointer-events-none blur-[3px] select-none" aria-hidden="true">
         {children}
       </div>
+
+      {/* Overlay — always centered, never clipped */}
       <div className="absolute inset-0 flex items-center justify-center pro-gate-backdrop">
-        <div className="pro-gate-card rounded-xl border shadow-premium-lg p-6 text-center max-w-xs mx-4">
-          <div className="w-11 h-11 rounded-xl bg-[#FAFAFA] flex items-center justify-center mx-auto mb-4">
-            <Lock className="w-5 h-5 text-quaternary" />
+        <div className="pro-gate-card rounded-2xl border shadow-premium-xl p-8 text-center max-w-sm mx-4">
+          <div className="w-14 h-14 rounded-2xl bg-[#FAFAFA] flex items-center justify-center mx-auto mb-5">
+            <Lock className="w-6 h-6 text-quaternary" />
           </div>
-          <p className="text-[15px] font-semibold tracking-tight mb-1.5">Pro Feature</p>
-          <p className="text-[13px] text-tertiary leading-relaxed mb-5">
+          <h3 className="text-[17px] font-semibold tracking-tight mb-2">Pro Feature</h3>
+          <p className="text-[14px] text-tertiary leading-relaxed mb-6">
             {feature}
           </p>
           <Link
             href="/pulse/upgrade"
-            className="inline-flex items-center gap-1.5 h-10 px-5 rounded-lg bg-foreground text-background text-[13px] font-medium hover:bg-foreground/90 transition-colors duration-300"
+            className="inline-flex items-center gap-2 h-11 px-6 rounded-xl bg-foreground text-background text-[14px] font-semibold hover:bg-foreground/90 transition-colors duration-300"
           >
-            <Sparkles className="w-3.5 h-3.5" />
+            <Sparkles className="w-4 h-4" />
             Upgrade to Pro
-            <ArrowRight className="w-3 h-3" />
+            <ArrowRight className="w-4 h-4" />
           </Link>
+          <p className="mt-4 text-[12px] text-quaternary">
+            $49 USDC/month — cancel anytime
+          </p>
         </div>
       </div>
     </div>
