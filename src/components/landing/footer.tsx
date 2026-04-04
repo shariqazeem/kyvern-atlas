@@ -6,12 +6,13 @@ const LINKS = {
     { label: "Pulse", href: "/pulse" },
     { label: "Dashboard", href: "/pulse/dashboard" },
     { label: "x402 Services", href: "/services" },
-    { label: "Setup Guide", href: "/pulse/dashboard/setup" },
     { label: "Pricing", href: "/pulse#pricing" },
   ],
-  Company: [
-    { label: "About", href: "#" },
-    { label: "Blog", href: "#" },
+  Developers: [
+    { label: "Setup Guide", href: "/pulse/dashboard/setup" },
+    { label: "npm @kyvernlabs/pulse", href: "https://www.npmjs.com/package/@kyvernlabs/pulse" },
+    { label: "npm @kyvernlabs/mcp", href: "https://www.npmjs.com/package/@kyvernlabs/mcp" },
+    { label: "GitHub", href: "https://github.com/shariqazeem/kyvernlabs" },
   ],
   Ecosystem: [
     { label: "x402 Protocol", href: "https://x402.org" },

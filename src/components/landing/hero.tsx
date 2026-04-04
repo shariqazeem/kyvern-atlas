@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { DollarSign, Zap, Users, TrendingUp, Wallet, ArrowRight, Terminal, X } from "lucide-react";
+import { DollarSign, Zap, Users, TrendingUp, ArrowRight, Terminal, X } from "lucide-react";
 import { useState } from "react";
 
 const ease = [0.25, 0.1, 0.25, 1] as const;
@@ -261,8 +261,7 @@ export function Hero() {
             className="group inline-flex items-center gap-2.5 h-[52px] px-8 rounded-xl bg-foreground text-background text-[15px] font-semibold hover:bg-foreground/90 transition-all duration-300"
             style={{ boxShadow: "0 2px 4px rgba(0,0,0,0.1), 0 8px 16px rgba(0,0,0,0.1)" }}
           >
-            <Wallet className="w-[18px] h-[18px]" />
-            Connect Wallet & Get Your Key
+            Start Free
             <ArrowRight className="w-[18px] h-[18px] transition-transform duration-300 group-hover:translate-x-0.5" />
           </Link>
           <button

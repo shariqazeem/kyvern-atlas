@@ -177,6 +177,15 @@ export function ProblemSection() {
               </span>
             </div>
             <TerminalChaos />
+            <div className="mt-4 space-y-2 pl-2">
+              {["No idea which agents pay you the most", "Can't tell if your pricing is competitive", "Zero visibility into payment trends", "Manual wallet balance checking"].map((pain, i) => (
+                <motion.p key={i} initial={{ opacity: 0, x: -8 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }}
+                  transition={{ duration: 0.3, delay: 1 + i * 0.08 }}
+                  className="flex items-center gap-2 text-[12px] text-red-400/70">
+                  <span className="w-1 h-1 rounded-full bg-red-400/50 shrink-0" />{pain}
+                </motion.p>
+              ))}
+            </div>
           </motion.div>
 
           <motion.div
@@ -195,6 +204,15 @@ export function ProblemSection() {
               </span>
             </div>
             <PulseDashboardMini />
+            <div className="mt-4 space-y-2 pl-2">
+              {["Revenue per endpoint, per agent, in real-time", "Market pricing benchmarks and percentile rank", "Retention curves and growth trends", "On-chain verified, click to BaseScan"].map((sol, i) => (
+                <motion.p key={i} initial={{ opacity: 0, x: 8 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }}
+                  transition={{ duration: 0.3, delay: 1.2 + i * 0.08 }}
+                  className="flex items-center gap-2 text-[12px] text-emerald-600/80">
+                  <span className="w-1 h-1 rounded-full bg-emerald-500/50 shrink-0" />{sol}
+                </motion.p>
+              ))}
+            </div>
           </motion.div>
         </div>
       </div>
