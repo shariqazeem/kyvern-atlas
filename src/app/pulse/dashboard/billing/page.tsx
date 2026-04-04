@@ -10,18 +10,24 @@ const FREE_FEATURES = [
   "1,000 events/day or $10 revenue",
   "7-day data retention",
   "1 API key",
-  "Basic dashboard",
+  "Overview dashboard",
+  "Transactions, endpoints, customers",
   "On-chain verification",
+  "Search & pagination",
+  "Dark mode",
 ];
 
 const PRO_FEATURES = [
-  "Unlimited events",
+  "Unlimited events + revenue",
   "90-day data retention",
   "Up to 10 API keys",
-  "Full analytics suite",
-  "Pricing benchmarks",
-  "Webhooks + alerts",
-  "CSV export + tax reports",
+  "Pricing benchmarks (market comparison)",
+  "Cohort analysis (retention curves)",
+  "Competitive intelligence",
+  "Smart alerts (5 types)",
+  "Webhooks (HMAC-SHA256 signed)",
+  "CSV export (transactions, endpoints, customers)",
+  "Custom date ranges",
   "Priority support",
 ];
 

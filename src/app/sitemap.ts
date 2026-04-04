@@ -65,6 +65,36 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.6,
     },
     {
+      url: `${baseUrl}/pulse/dashboard/benchmarks`,
+      lastModified: new Date(),
+      changeFrequency: "daily",
+      priority: 0.6,
+    },
+    {
+      url: `${baseUrl}/pulse/dashboard/cohorts`,
+      lastModified: new Date(),
+      changeFrequency: "daily",
+      priority: 0.6,
+    },
+    {
+      url: `${baseUrl}/pulse/dashboard/intelligence`,
+      lastModified: new Date(),
+      changeFrequency: "daily",
+      priority: 0.6,
+    },
+    {
+      url: `${baseUrl}/pulse/dashboard/webhooks`,
+      lastModified: new Date(),
+      changeFrequency: "weekly",
+      priority: 0.5,
+    },
+    {
+      url: `${baseUrl}/pulse/dashboard/alerts`,
+      lastModified: new Date(),
+      changeFrequency: "weekly",
+      priority: 0.5,
+    },
+    {
       url: `${baseUrl}/pulse/dashboard/keys`,
       lastModified: new Date(),
       changeFrequency: "monthly",

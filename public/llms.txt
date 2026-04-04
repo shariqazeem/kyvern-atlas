@@ -1,70 +1,51 @@
-# KyvernLabs — The Business Layer for the x402 Economy
+# KyvernLabs v0.2.0 — The Business Layer for the x402 Economy
 
-> Revenue analytics, wallet-native auth, and on-chain verification for x402 service providers. The "Shopify + Stripe for x402."
+> Revenue analytics, wallet management, and on-chain verification for x402 service providers.
 
-## What We Are
+## Products
 
-KyvernLabs builds business infrastructure for the x402 protocol — the internet-native payment standard under the Linux Foundation, backed by Coinbase, Cloudflare, Stripe, Google, Visa, Amazon, Microsoft, Solana Foundation, Mastercard, Shopify, and more.
+**Pulse** — Revenue intelligence for x402 endpoints
+**Vault** — Smart wallet monitoring for x402 providers
 
-195+ x402 services exist. $600M+ volume. Zero business tooling. KyvernLabs fills that gap.
-
-## Product: Pulse
-
-One-line middleware that captures every x402 payment flowing through your endpoint.
+## Quick Integration
 
 ```typescript
 import { withPulse } from '@kyvernlabs/pulse'
 export const GET = withPulse(withX402(handler, config, server), { apiKey: 'kv_live_...' })
 ```
 
-**Features:** SIWE wallet auth, auto kv_live_ API keys, multi-tenant dashboard, on-chain verification (tx hashes link to BaseScan), free/Pro tier gating, MCP server for AI agents.
-
 ## npm Packages
 
-- `@kyvernlabs/pulse` — x402 analytics middleware
-- `@kyvernlabs/mcp` — MCP server (Claude Desktop, Cursor, etc.)
+- `@kyvernlabs/pulse` v0.1.0 — x402 analytics middleware
+- `@kyvernlabs/mcp` v0.2.0 — MCP server (17 tools for AI agents)
 
-## MCP Setup (Claude Desktop)
+## MCP Server (Claude Desktop)
 
 ```json
-{
-  "mcpServers": {
-    "kyvernlabs-pulse": {
-      "command": "npx",
-      "args": ["@kyvernlabs/mcp"],
-      "env": { "KYVERNLABS_API_KEY": "kv_live_..." }
-    }
-  }
-}
+{ "mcpServers": { "kyvernlabs-pulse": { "command": "npx", "args": ["@kyvernlabs/mcp"], "env": { "KYVERNLABS_API_KEY": "kv_live_..." } } } }
 ```
 
-Tools: pulse_get_stats, pulse_get_endpoints, pulse_get_customers, pulse_get_transactions, pulse_get_timeseries, pulse_ingest_event.
+17 tools: pulse_get_stats, pulse_get_endpoints, pulse_get_customers, pulse_get_transactions, pulse_get_timeseries, pulse_ingest_event, pulse_get_benchmarks, pulse_get_cohorts, pulse_search_transactions, pulse_get_endpoint_detail, pulse_get_customer_detail, pulse_get_alerts, pulse_create_alert, pulse_get_webhooks, pulse_get_market_intelligence, pulse_get_usage, pulse_health_check.
 
-## x402 Services by KyvernLabs
+## Dashboard Pages
 
-- Price Oracle: `GET /api/x402/oracle?token=ETH` — $0.001/call
-- Agent Reputation: `GET /api/x402/reputation?address=0x...` — $0.01/call
+Overview, Transactions (search + pagination), Endpoints (sortable), Customers, Benchmarks (Pro), Cohorts (Pro), Intelligence (Pro), Webhooks (Pro), Alerts (Pro), API Keys, Setup Guide, Billing, Vault
 
-## API Endpoints
+## Features (Pro)
 
-- `POST /api/pulse/ingest` — Record payment event (X-API-Key auth)
-- `GET /api/pulse/stats?range=7d` — Revenue analytics
-- `GET /api/pulse/endpoints` — Per-endpoint breakdown
-- `GET /api/pulse/customers?limit=20` — Top paying agents
-- `GET /api/pulse/recent?limit=20` — Recent transactions with tx hashes
-- `GET /api/pulse/timeseries?range=7d` — Revenue over time
+Pricing benchmarks, cohort retention analysis, competitive intelligence, smart alerts (5 types), webhooks (HMAC-SHA256), CSV export, 90-day retention, 10 API keys, dark mode, custom date ranges
 
 ## Pricing
 
 - Free: 1,000 events/day or $10 revenue, 7-day retention, 1 key
-- Pro ($49 USDC/month via x402): Unlimited, 90-day, 10 keys, alerts, CSV
+- Pro ($49 USDC/month via x402): Unlimited, 90-day, all Pro features
 - Enterprise: Custom
 
 ## Links
 
 - Website: https://kyvernlabs.com
-- Dashboard: https://kyvernlabs.com/pulse/dashboard
+- Pulse: https://kyvernlabs.com/pulse
+- Vault: https://kyvernlabs.com/vault
 - Services: https://kyvernlabs.com/services
-- Setup: https://kyvernlabs.com/pulse/dashboard/setup
 - GitHub: https://github.com/shariqazeem/kyvernlabs
 - Full reference: https://kyvernlabs.com/llms-full.txt
