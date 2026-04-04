@@ -25,7 +25,7 @@ export function StatCard({ title, value, delta, icon: Icon, index = 0 }: StatCar
         delay: index * 0.08,
         ease: [0.25, 0.1, 0.25, 1],
       }}
-      className="bg-white rounded-xl border border-black/[0.06] p-5 shadow-premium hover:shadow-premium-lg hover:border-black/[0.1] transition-all duration-300 cursor-default"
+      className="bg-white dark:bg-gray-900 rounded-xl border border-black/[0.06] dark:border-gray-800 p-5 shadow-premium hover:shadow-premium-lg hover:border-black/[0.1] transition-all duration-300 cursor-default"
     >
       <div className="flex items-start justify-between">
         <div className="space-y-1.5">
@@ -34,7 +34,7 @@ export function StatCard({ title, value, delta, icon: Icon, index = 0 }: StatCar
             {value}
           </p>
         </div>
-        <div className="w-8 h-8 rounded-lg bg-[#FAFAFA] flex items-center justify-center">
+        <div className="w-8 h-8 rounded-lg bg-[#FAFAFA] dark:bg-gray-800 flex items-center justify-center">
           <Icon className="w-4 h-4 text-quaternary" />
         </div>
       </div>

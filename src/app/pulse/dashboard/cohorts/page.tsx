@@ -170,11 +170,11 @@ function CohortsContent() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <div className="h-6 w-40 bg-[#F0F0F0] rounded animate-pulse" />
+        <div className="h-6 w-40 bg-[#F0F0F0] dark:bg-gray-700 rounded animate-pulse" />
         <div className="grid grid-cols-3 gap-4">
-          {[...Array(3)].map((_, i) => <div key={i} className="h-24 bg-[#F0F0F0] rounded-xl animate-pulse" />)}
+          {[...Array(3)].map((_, i) => <div key={i} className="h-24 bg-[#F0F0F0] dark:bg-gray-700 rounded-xl animate-pulse" />)}
         </div>
-        <div className="h-80 bg-[#F0F0F0] rounded-xl animate-pulse" />
+        <div className="h-80 bg-[#F0F0F0] dark:bg-gray-700 rounded-xl animate-pulse" />
       </div>
     );
   }
@@ -186,7 +186,7 @@ function CohortsContent() {
           <h1 className="text-[18px] font-bold tracking-tight">Cohort Analysis</h1>
           <p className="text-[13px] text-tertiary mt-1">Agent retention curves by first-seen week</p>
         </div>
-        <div className="rounded-xl border border-black/[0.06] bg-white dark:bg-gray-900 p-8 text-center">
+        <div className="rounded-xl border border-black/[0.06] dark:border-gray-800 bg-white dark:bg-gray-900 p-8 text-center">
           <Users className="w-10 h-10 text-quaternary mx-auto mb-3" />
           <p className="text-[14px] font-medium">No cohort data yet</p>
           <p className="text-[12px] text-tertiary mt-1">Start receiving payments from agent wallets to see retention curves.</p>
@@ -218,7 +218,7 @@ function CohortsContent() {
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: i * 0.08, ease }}
-            className="rounded-xl border border-black/[0.06] bg-white dark:bg-gray-900 p-5"
+            className="rounded-xl border border-black/[0.06] dark:border-gray-800 bg-white dark:bg-gray-900 p-5"
             style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.02)" }}
           >
             <div className="flex items-center gap-2 mb-2">
@@ -236,7 +236,7 @@ function CohortsContent() {
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.3, ease }}
-        className="rounded-xl border border-black/[0.06] bg-white dark:bg-gray-900 p-5"
+        className="rounded-xl border border-black/[0.06] dark:border-gray-800 bg-white dark:bg-gray-900 p-5"
         style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.02)" }}
       >
         <div className="mb-4">
@@ -254,16 +254,16 @@ function CohortsContent() {
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.4, ease }}
-        className="rounded-xl border border-black/[0.06] bg-white dark:bg-gray-900 overflow-hidden"
+        className="rounded-xl border border-black/[0.06] dark:border-gray-800 bg-white dark:bg-gray-900 overflow-hidden"
         style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.02)" }}
       >
-        <div className="px-5 py-4 border-b border-black/[0.04]">
+        <div className="px-5 py-4 border-b border-black/[0.04] dark:border-gray-800">
           <h3 className="text-[14px] font-semibold tracking-tight">Cohort Details</h3>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[600px]">
             <thead>
-              <tr className="border-b border-black/[0.04]">
+              <tr className="border-b border-black/[0.04] dark:border-gray-800">
                 <th className="text-left text-[10px] font-medium text-quaternary uppercase tracking-wider px-5 py-3">Cohort</th>
                 <th className="text-right text-[10px] font-medium text-quaternary uppercase tracking-wider px-3 py-3">Size</th>
                 <th className="text-center text-[10px] font-medium text-quaternary uppercase tracking-wider px-3 py-3">W0</th>
@@ -275,7 +275,7 @@ function CohortsContent() {
             </thead>
             <tbody>
               {[...cohorts].reverse().map((c) => (
-                <tr key={c.cohort_week} className="border-b border-black/[0.03] last:border-0 hover:bg-[#FAFAFA] dark:hover:bg-gray-800 transition-colors">
+                <tr key={c.cohort_week} className="border-b border-black/[0.03] dark:border-gray-800/50 last:border-0 hover:bg-[#FAFAFA] dark:hover:bg-gray-800 transition-colors">
                   <td className="px-5 py-2.5 text-[12px] font-medium">{c.cohort_label}</td>
                   <td className="px-3 py-2.5 text-right font-mono-numbers text-[12px] text-tertiary">{c.cohort_size}</td>
                   <RetentionCell value={c.retention[0]} />

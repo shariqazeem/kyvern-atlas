@@ -215,7 +215,7 @@ function VaultContent() {
                   const isLow = (w.balance_usdc || 0) < 0.01 && w.balance_usdc !== null;
                   return (
                     <tr key={w.id} className={cn(
-                      "border-b border-black/[0.03] dark:border-gray-800 last:border-0 transition-colors",
+                      "border-b border-black/[0.03] dark:border-gray-800/50 dark:border-gray-800 last:border-0 transition-colors",
                       isLow ? "bg-amber-50/50 dark:bg-amber-900/10" : "hover:bg-[#FAFAFA] dark:hover:bg-gray-800"
                     )}>
                       <td className="px-5 py-3">

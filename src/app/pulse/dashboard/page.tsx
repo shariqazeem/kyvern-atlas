@@ -22,9 +22,9 @@ function DashboardContent() {
       <div className="space-y-6">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[...Array(4)].map((_, i) => (
-            <div key={i} className="bg-white rounded-xl border border-black/[0.06] p-5 h-[120px] animate-pulse">
-              <div className="h-3 w-20 bg-[#F0F0F0] rounded mb-3" />
-              <div className="h-6 w-28 bg-[#F0F0F0] rounded" />
+            <div key={i} className="bg-white dark:bg-gray-900 rounded-xl border border-black/[0.06] dark:border-gray-800 p-5 h-[120px] animate-pulse">
+              <div className="h-3 w-20 bg-[#F0F0F0] dark:bg-gray-700 rounded mb-3" />
+              <div className="h-6 w-28 bg-[#F0F0F0] dark:bg-gray-700 rounded" />
             </div>
           ))}
         </div>

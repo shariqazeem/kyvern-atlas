@@ -63,7 +63,7 @@ export default function SetupPage() {
         >
           <Code2 className="w-4 h-4 text-pulse" />
           <h2 className="text-[15px] font-semibold tracking-tight">Middleware Integration</h2>
-          <span className="text-[10px] font-medium text-quaternary bg-[#F0F0F0] px-2 py-0.5 rounded uppercase tracking-wider">Recommended</span>
+          <span className="text-[10px] font-medium text-quaternary bg-[#F0F0F0] dark:bg-gray-700 px-2 py-0.5 rounded uppercase tracking-wider">Recommended</span>
         </motion.div>
 
         {/* Step 1 */}
@@ -128,7 +128,7 @@ export const GET = withPulse(x402Handler, {
       </div>
 
       {/* Divider */}
-      <div className="border-t border-black/[0.04]" />
+      <div className="border-t border-black/[0.04] dark:border-gray-800" />
 
       {/* Section: MCP Server */}
       <div className="space-y-6">
@@ -175,7 +175,7 @@ export const GET = withPulse(x402Handler, {
         >
           <h3 className="text-[13px] font-semibold">Add to Claude Desktop</h3>
           <p className="text-[12px] text-tertiary mb-2">
-            Add this to your <code className="text-[11px] font-mono bg-[#F0F0F0] px-1.5 py-0.5 rounded">claude_desktop_config.json</code>:
+            Add this to your <code className="text-[11px] font-mono bg-[#F0F0F0] dark:bg-gray-700 px-1.5 py-0.5 rounded">claude_desktop_config.json</code>:
           </p>
           <CopyBlock
             code={`{
@@ -200,10 +200,10 @@ export const GET = withPulse(x402Handler, {
           className="space-y-3"
         >
           <h3 className="text-[13px] font-semibold">Available tools</h3>
-          <div className="rounded-xl border border-black/[0.06] overflow-hidden">
+          <div className="rounded-xl border border-black/[0.06] dark:border-gray-800 overflow-hidden">
             <table className="w-full text-[12px]">
               <thead>
-                <tr className="border-b border-black/[0.04] bg-[#FAFAFA]">
+                <tr className="border-b border-black/[0.04] dark:border-gray-800 bg-[#FAFAFA] dark:bg-gray-800">
                   <th className="text-left px-4 py-2.5 font-medium text-quaternary uppercase tracking-wider text-[10px]">Tool</th>
                   <th className="text-left px-4 py-2.5 font-medium text-quaternary uppercase tracking-wider text-[10px]">Description</th>
                 </tr>
@@ -217,7 +217,7 @@ export const GET = withPulse(x402Handler, {
                   { tool: "pulse_get_timeseries", desc: "Revenue over time for charting" },
                   { tool: "pulse_ingest_event", desc: "Record an x402 payment event" },
                 ].map((t) => (
-                  <tr key={t.tool} className="border-b border-black/[0.03] last:border-0">
+                  <tr key={t.tool} className="border-b border-black/[0.03] dark:border-gray-800/50 last:border-0">
                     <td className="px-4 py-2.5 font-mono text-pulse font-medium">{t.tool}</td>
                     <td className="px-4 py-2.5 text-secondary">{t.desc}</td>
                   </tr>
@@ -232,7 +232,7 @@ export const GET = withPulse(x402Handler, {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.5, delay: 0.25, ease }}
-          className="rounded-xl bg-[#FAFAFA] border border-black/[0.04] p-4"
+          className="rounded-xl bg-[#FAFAFA] dark:bg-gray-800 border border-black/[0.04] dark:border-gray-800 p-4"
         >
           <h3 className="text-[13px] font-semibold mb-2">Example prompts</h3>
           <div className="space-y-1.5">
@@ -249,7 +249,7 @@ export const GET = withPulse(x402Handler, {
       </div>
 
       {/* Divider */}
-      <div className="border-t border-black/[0.04]" />
+      <div className="border-t border-black/[0.04] dark:border-gray-800" />
 
       {/* Section: Direct API */}
       <div className="space-y-6">
@@ -297,7 +297,7 @@ export const GET = withPulse(x402Handler, {
       </div>
 
       {/* Divider */}
-      <div className="border-t border-black/[0.04]" />
+      <div className="border-t border-black/[0.04] dark:border-gray-800" />
 
       {/* What gets tracked */}
       <motion.div
@@ -305,7 +305,7 @@ export const GET = withPulse(x402Handler, {
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
         transition={{ duration: 0.5, ease }}
-        className="rounded-xl border border-black/[0.06] bg-white p-6 space-y-4"
+        className="rounded-xl border border-black/[0.06] dark:border-gray-800 bg-white p-6 space-y-4"
         style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.02)" }}
       >
         <h3 className="text-[14px] font-semibold">What Pulse tracks per transaction</h3>
@@ -318,7 +318,7 @@ export const GET = withPulse(x402Handler, {
             { icon: Package, label: "Tx hash", desc: "Blockchain transaction proof" },
             { icon: Code2, label: "Network", desc: "Which chain (Base, Ethereum, etc.)" },
           ].map((item, i) => (
-            <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-[#FAFAFA]">
+            <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-[#FAFAFA] dark:bg-gray-800">
               <item.icon className="w-4 h-4 text-quaternary mt-0.5" />
               <div>
                 <p className="text-[13px] font-medium">{item.label}</p>
@@ -370,7 +370,7 @@ export const GET = withPulse(x402Handler, {
             href={link.href}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 text-[12px] font-medium text-tertiary hover:text-primary transition-colors px-3 py-1.5 rounded-lg border border-black/[0.06] hover:border-black/[0.12]"
+            className="inline-flex items-center gap-1.5 text-[12px] font-medium text-tertiary hover:text-primary transition-colors px-3 py-1.5 rounded-lg border border-black/[0.06] dark:border-gray-800 hover:border-black/[0.12]"
           >
             <Package className="w-3 h-3" />
             {link.label}

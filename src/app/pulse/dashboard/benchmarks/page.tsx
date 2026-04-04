@@ -135,13 +135,13 @@ function BenchmarksContent() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <div className="h-6 w-40 bg-[#F0F0F0] rounded animate-pulse" />
+        <div className="h-6 w-40 bg-[#F0F0F0] dark:bg-gray-700 rounded animate-pulse" />
         <div className="grid grid-cols-3 gap-4">
           {[...Array(3)].map((_, i) => (
-            <div key={i} className="h-24 bg-[#F0F0F0] rounded-xl animate-pulse" />
+            <div key={i} className="h-24 bg-[#F0F0F0] dark:bg-gray-700 rounded-xl animate-pulse" />
           ))}
         </div>
-        <div className="h-64 bg-[#F0F0F0] rounded-xl animate-pulse" />
+        <div className="h-64 bg-[#F0F0F0] dark:bg-gray-700 rounded-xl animate-pulse" />
       </div>
     );
   }
@@ -181,7 +181,7 @@ function BenchmarksContent() {
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: i * 0.08, ease }}
-            className="rounded-xl border border-black/[0.06] bg-white p-5"
+            className="rounded-xl border border-black/[0.06] dark:border-gray-800 bg-white p-5"
             style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.02)" }}
           >
             <div className="flex items-center gap-2 mb-2">
@@ -199,16 +199,16 @@ function BenchmarksContent() {
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.3, ease }}
-          className="rounded-xl border border-black/[0.06] bg-white overflow-hidden"
+          className="rounded-xl border border-black/[0.06] dark:border-gray-800 bg-white overflow-hidden"
           style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.02)" }}
         >
-          <div className="px-5 py-4 border-b border-black/[0.04]">
+          <div className="px-5 py-4 border-b border-black/[0.04] dark:border-gray-800">
             <h3 className="text-[14px] font-semibold tracking-tight">Your Pricing vs Market</h3>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[600px]">
               <thead>
-                <tr className="border-b border-black/[0.04]">
+                <tr className="border-b border-black/[0.04] dark:border-gray-800">
                   <th className="text-left text-[10px] font-medium text-quaternary uppercase tracking-wider px-5 py-3">Endpoint</th>
                   <th className="text-right text-[10px] font-medium text-quaternary uppercase tracking-wider px-5 py-3">Your Price</th>
                   <th className="text-right text-[10px] font-medium text-quaternary uppercase tracking-wider px-5 py-3">Market Avg</th>
@@ -221,7 +221,7 @@ function BenchmarksContent() {
                 {data.user_comparison.map((uc) => {
                   const cfg = STATUS_CONFIG[uc.status];
                   return (
-                    <tr key={uc.endpoint} className="border-b border-black/[0.03] last:border-0 hover:bg-[#FAFAFA] transition-colors">
+                    <tr key={uc.endpoint} className="border-b border-black/[0.03] dark:border-gray-800/50 last:border-0 hover:bg-[#FAFAFA] dark:hover:bg-gray-800 dark:bg-gray-800 transition-colors">
                       <td className="px-5 py-3 font-mono text-[12px]">{uc.endpoint}</td>
                       <td className="px-5 py-3 text-right font-mono-numbers text-[12px] font-semibold">{formatCurrency(uc.user_price)}</td>
                       <td className="px-5 py-3 text-right font-mono-numbers text-[12px] text-tertiary">{formatCurrency(uc.market_avg)}</td>
@@ -244,7 +244,7 @@ function BenchmarksContent() {
       )}
 
       {data.user_comparison.length === 0 && (
-        <div className="rounded-xl border border-black/[0.06] bg-white p-8 text-center">
+        <div className="rounded-xl border border-black/[0.06] dark:border-gray-800 bg-white p-8 text-center">
           <BarChart3 className="w-8 h-8 text-quaternary mx-auto mb-3" />
           <p className="text-[13px] text-secondary font-medium">No endpoint data yet</p>
           <p className="text-[12px] text-tertiary mt-1">Start receiving payments to see how your pricing compares.</p>
@@ -256,7 +256,7 @@ function BenchmarksContent() {
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.4, ease }}
-        className="rounded-xl border border-black/[0.06] bg-white p-5"
+        className="rounded-xl border border-black/[0.06] dark:border-gray-800 bg-white p-5"
         style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.02)" }}
       >
         <div className="flex items-center justify-between mb-4">
@@ -275,17 +275,17 @@ function BenchmarksContent() {
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.5, ease }}
-        className="rounded-xl border border-black/[0.06] bg-white overflow-hidden"
+        className="rounded-xl border border-black/[0.06] dark:border-gray-800 bg-white overflow-hidden"
         style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.02)" }}
       >
-        <div className="px-5 py-4 border-b border-black/[0.04]">
+        <div className="px-5 py-4 border-b border-black/[0.04] dark:border-gray-800">
           <h3 className="text-[14px] font-semibold tracking-tight">Market Endpoints</h3>
           <p className="text-[11px] text-quaternary mt-0.5">All x402 endpoints tracked across the ecosystem</p>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[700px]">
             <thead>
-              <tr className="border-b border-black/[0.04]">
+              <tr className="border-b border-black/[0.04] dark:border-gray-800">
                 <th className="text-left text-[10px] font-medium text-quaternary uppercase tracking-wider px-5 py-3">Endpoint</th>
                 <th className="text-right text-[10px] font-medium text-quaternary uppercase tracking-wider px-5 py-3">Avg Price</th>
                 <th className="text-right text-[10px] font-medium text-quaternary uppercase tracking-wider px-5 py-3">Median</th>
@@ -297,7 +297,7 @@ function BenchmarksContent() {
             </thead>
             <tbody>
               {data.benchmarks.map((b) => (
-                <tr key={b.endpoint} className="border-b border-black/[0.03] last:border-0 hover:bg-[#FAFAFA] transition-colors">
+                <tr key={b.endpoint} className="border-b border-black/[0.03] dark:border-gray-800/50 last:border-0 hover:bg-[#FAFAFA] dark:hover:bg-gray-800 dark:bg-gray-800 transition-colors">
                   <td className="px-5 py-3 font-mono text-[12px]">{b.endpoint}</td>
                   <td className="px-5 py-3 text-right font-mono-numbers text-[12px] font-medium">{formatCurrency(b.avg_price)}</td>
                   <td className="px-5 py-3 text-right font-mono-numbers text-[12px] text-tertiary">{formatCurrency(b.median_price)}</td>

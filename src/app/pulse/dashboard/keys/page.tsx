@@ -40,8 +40,8 @@ export default function KeysPage() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <div className="h-6 w-32 bg-[#F0F0F0] rounded animate-pulse" />
-        <div className="h-40 bg-[#F0F0F0] rounded-xl animate-pulse" />
+        <div className="h-6 w-32 bg-[#F0F0F0] dark:bg-gray-700 rounded animate-pulse" />
+        <div className="h-40 bg-[#F0F0F0] dark:bg-gray-700 rounded-xl animate-pulse" />
       </div>
     );
   }
@@ -51,7 +51,7 @@ export default function KeysPage() {
       <div>
         <h1 className="text-[18px] font-semibold tracking-tight">API Keys</h1>
         <p className="text-[13px] text-tertiary mt-0.5">
-          Use these keys in your <code className="text-[12px] font-mono bg-[#F0F0F0] px-1 py-0.5 rounded">withPulse()</code> middleware configuration.
+          Use these keys in your <code className="text-[12px] font-mono bg-[#F0F0F0] dark:bg-gray-700 px-1 py-0.5 rounded">withPulse()</code> middleware configuration.
         </p>
       </div>
 
@@ -68,7 +68,7 @@ export default function KeysPage() {
               Your API key (shown once — copy it now)
             </span>
           </div>
-          <div className="flex items-center gap-2 bg-white rounded-lg border border-emerald-200 p-3">
+          <div className="flex items-center gap-2 bg-white dark:bg-gray-900 rounded-lg border border-emerald-200 p-3">
             <code className="flex-1 text-[13px] font-mono text-primary break-all">
               {revealed ? apiKey : apiKey.replace(/./g, "•").slice(0, 20) + apiKey.slice(-4)}
             </code>
@@ -99,12 +99,12 @@ export default function KeysPage() {
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.1, ease: [0.25, 0.1, 0.25, 1] }}
-        className="rounded-xl border border-black/[0.06] bg-white shadow-premium overflow-hidden"
+        className="rounded-xl border border-black/[0.06] dark:border-gray-800 bg-white shadow-premium overflow-hidden"
       >
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-black/[0.04]">
+              <tr className="border-b border-black/[0.04] dark:border-gray-800">
                 <th className="text-left text-[11px] font-medium text-quaternary px-5 py-3 uppercase tracking-wider">Key</th>
                 <th className="text-left text-[11px] font-medium text-quaternary px-5 py-3 uppercase tracking-wider">Name</th>
                 <th className="text-left text-[11px] font-medium text-quaternary px-5 py-3 uppercase tracking-wider">Created</th>
@@ -114,7 +114,7 @@ export default function KeysPage() {
             </thead>
             <tbody>
               {keys.map((key) => (
-                <tr key={key.id} className="border-b border-black/[0.03] last:border-0 hover:bg-[#FAFAFA] transition-colors">
+                <tr key={key.id} className="border-b border-black/[0.03] dark:border-gray-800/50 last:border-0 hover:bg-[#FAFAFA] dark:hover:bg-gray-800 dark:bg-gray-800 transition-colors">
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-2">
                       <Key className="w-3.5 h-3.5 text-quaternary" />

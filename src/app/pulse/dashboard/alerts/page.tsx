@@ -86,19 +86,19 @@ function CreateAlertForm({ webhooks, onCreated }: { webhooks: WebhookOption[]; o
   }
 
   return (
-    <div className="rounded-xl border border-black/[0.06] bg-white p-5 space-y-4" style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.02)" }}>
+    <div className="rounded-xl border border-black/[0.06] dark:border-gray-800 bg-white p-5 space-y-4" style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.02)" }}>
       <h3 className="text-[14px] font-semibold tracking-tight">Create Alert</h3>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label className="block text-[12px] text-tertiary font-medium mb-1">Name</label>
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Revenue drop alert"
-            className="w-full h-9 px-3 rounded-lg border border-black/[0.08] text-[13px] placeholder:text-quaternary focus:outline-none focus:ring-2 focus:ring-pulse/20" />
+            className="w-full h-9 px-3 rounded-lg border border-black/[0.08] dark:border-gray-700 text-[13px] placeholder:text-quaternary focus:outline-none focus:ring-2 focus:ring-pulse/20" />
         </div>
         <div>
           <label className="block text-[12px] text-tertiary font-medium mb-1">Type</label>
           <select value={type} onChange={(e) => setType(e.target.value)}
-            className="w-full h-9 px-3 rounded-lg border border-black/[0.08] text-[13px] bg-white focus:outline-none focus:ring-2 focus:ring-pulse/20">
+            className="w-full h-9 px-3 rounded-lg border border-black/[0.08] dark:border-gray-700 text-[13px] bg-white focus:outline-none focus:ring-2 focus:ring-pulse/20">
             {Object.entries(ALERT_TYPE_CONFIG).map(([k, v]) => (
               <option key={k} value={k}>{v.label}</option>
             ))}
@@ -113,14 +113,14 @@ function CreateAlertForm({ webhooks, onCreated }: { webhooks: WebhookOption[]; o
               {type === "latency_spike" ? "Threshold (ms)" : type === "daily_target" ? "Target ($)" : "Threshold (%)"}
             </label>
             <input type="number" value={threshold} onChange={(e) => setThreshold(e.target.value)} placeholder={type === "latency_spike" ? "500" : type === "daily_target" ? "100" : "50"}
-              className="w-full h-9 px-3 rounded-lg border border-black/[0.08] text-[13px] font-mono focus:outline-none focus:ring-2 focus:ring-pulse/20" />
+              className="w-full h-9 px-3 rounded-lg border border-black/[0.08] dark:border-gray-700 text-[13px] font-mono focus:outline-none focus:ring-2 focus:ring-pulse/20" />
           </div>
         )}
         {needsPeriod && (
           <div>
             <label className="block text-[12px] text-tertiary font-medium mb-1">Period</label>
             <select value={period} onChange={(e) => setPeriod(e.target.value)}
-              className="w-full h-9 px-3 rounded-lg border border-black/[0.08] text-[13px] bg-white focus:outline-none focus:ring-2 focus:ring-pulse/20">
+              className="w-full h-9 px-3 rounded-lg border border-black/[0.08] dark:border-gray-700 text-[13px] bg-white focus:outline-none focus:ring-2 focus:ring-pulse/20">
               <option value="1h">1 hour</option>
               <option value="6h">6 hours</option>
               <option value="24h">24 hours</option>
@@ -131,13 +131,13 @@ function CreateAlertForm({ webhooks, onCreated }: { webhooks: WebhookOption[]; o
           <div>
             <label className="block text-[12px] text-tertiary font-medium mb-1">Endpoint (optional)</label>
             <input value={endpoint} onChange={(e) => setEndpoint(e.target.value)} placeholder="/api/search"
-              className="w-full h-9 px-3 rounded-lg border border-black/[0.08] text-[13px] font-mono focus:outline-none focus:ring-2 focus:ring-pulse/20" />
+              className="w-full h-9 px-3 rounded-lg border border-black/[0.08] dark:border-gray-700 text-[13px] font-mono focus:outline-none focus:ring-2 focus:ring-pulse/20" />
           </div>
         )}
         <div>
           <label className="block text-[12px] text-tertiary font-medium mb-1">Notify via webhook</label>
           <select value={webhookId} onChange={(e) => setWebhookId(e.target.value)}
-            className="w-full h-9 px-3 rounded-lg border border-black/[0.08] text-[13px] bg-white focus:outline-none focus:ring-2 focus:ring-pulse/20">
+            className="w-full h-9 px-3 rounded-lg border border-black/[0.08] dark:border-gray-700 text-[13px] bg-white focus:outline-none focus:ring-2 focus:ring-pulse/20">
             <option value="">None</option>
             {webhooks.map((w) => (
               <option key={w.id} value={w.id}>{w.url.slice(0, 40)}...</option>
@@ -188,8 +188,8 @@ function AlertsContent() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <div className="h-6 w-32 bg-[#F0F0F0] rounded animate-pulse" />
-        <div className="h-40 bg-[#F0F0F0] rounded-xl animate-pulse" />
+        <div className="h-6 w-32 bg-[#F0F0F0] dark:bg-gray-700 rounded animate-pulse" />
+        <div className="h-40 bg-[#F0F0F0] dark:bg-gray-700 rounded-xl animate-pulse" />
       </div>
     );
   }
@@ -210,16 +210,16 @@ function AlertsContent() {
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease }}
-          className="rounded-xl border border-black/[0.06] bg-white overflow-hidden"
+          className="rounded-xl border border-black/[0.06] dark:border-gray-800 bg-white overflow-hidden"
           style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.02)" }}
         >
-          <div className="px-5 py-4 border-b border-black/[0.04]">
+          <div className="px-5 py-4 border-b border-black/[0.04] dark:border-gray-800">
             <h3 className="text-[14px] font-semibold tracking-tight">Your Alerts</h3>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[600px]">
               <thead>
-                <tr className="border-b border-black/[0.04]">
+                <tr className="border-b border-black/[0.04] dark:border-gray-800">
                   <th className="text-left text-[10px] font-medium text-quaternary uppercase tracking-wider px-5 py-3">Name</th>
                   <th className="text-left text-[10px] font-medium text-quaternary uppercase tracking-wider px-5 py-3">Type</th>
                   <th className="text-left text-[10px] font-medium text-quaternary uppercase tracking-wider px-5 py-3">Config</th>
@@ -230,10 +230,10 @@ function AlertsContent() {
               </thead>
               <tbody>
                 {alerts.map((a) => {
-                  const typeConfig = ALERT_TYPE_CONFIG[a.type] || { label: a.type, icon: Bell, color: "text-tertiary bg-[#F0F0F0]" };
+                  const typeConfig = ALERT_TYPE_CONFIG[a.type] || { label: a.type, icon: Bell, color: "text-tertiary bg-[#F0F0F0] dark:bg-gray-700" };
                   const TypeIcon = typeConfig.icon;
                   return (
-                    <tr key={a.id} className="border-b border-black/[0.03] last:border-0 hover:bg-[#FAFAFA] transition-colors">
+                    <tr key={a.id} className="border-b border-black/[0.03] dark:border-gray-800/50 last:border-0 hover:bg-[#FAFAFA] dark:hover:bg-gray-800 dark:bg-gray-800 transition-colors">
                       <td className="px-5 py-3">
                         <span className={cn("text-[13px] font-medium", a.is_active ? "text-primary" : "text-quaternary line-through")}>
                           {a.name}
@@ -270,7 +270,7 @@ function AlertsContent() {
       )}
 
       {alerts.length === 0 && (
-        <div className="rounded-xl border border-black/[0.06] bg-white p-8 text-center">
+        <div className="rounded-xl border border-black/[0.06] dark:border-gray-800 bg-white p-8 text-center">
           <Bell className="w-8 h-8 text-quaternary mx-auto mb-3" />
           <p className="text-[13px] text-secondary font-medium">No alerts configured</p>
           <p className="text-[12px] text-tertiary mt-1">Create one above to get notified on revenue changes and new agents.</p>

@@ -57,7 +57,7 @@ export function DemoTrigger() {
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.1, ease: [0.25, 0.1, 0.25, 1] }}
-        className="rounded-xl border border-black/[0.06] bg-white p-5 shadow-premium hover:shadow-premium-lg transition-shadow duration-300"
+        className="rounded-xl border border-black/[0.06] dark:border-gray-800 bg-white p-5 shadow-premium hover:shadow-premium-lg transition-shadow duration-300"
       >
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
@@ -95,7 +95,7 @@ export function DemoTrigger() {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             transition={{ duration: 0.3 }}
-            className="mt-4 pt-4 border-t border-black/[0.04]"
+            className="mt-4 pt-4 border-t border-black/[0.04] dark:border-gray-800"
           >
             <div className="flex items-center gap-2">
               <CheckCircle className="w-4 h-4 text-emerald-500" />

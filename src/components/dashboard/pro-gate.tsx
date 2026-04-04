@@ -21,9 +21,9 @@ export function ProGate({ children, feature }: ProGateProps) {
       <div className="opacity-40 pointer-events-none blur-[2px] select-none">
         {children}
       </div>
-      <div className="absolute inset-0 flex items-center justify-center bg-white/60 backdrop-blur-[1px]">
-        <div className="bg-white rounded-xl border border-black/[0.08] shadow-premium-lg p-5 text-center max-w-xs mx-4">
-          <div className="w-10 h-10 rounded-xl bg-[#FAFAFA] flex items-center justify-center mx-auto mb-3">
+      <div className="absolute inset-0 flex items-center justify-center bg-white/60 dark:bg-gray-950/60 backdrop-blur-[1px]">
+        <div className="bg-white dark:bg-gray-900 rounded-xl border border-black/[0.08] dark:border-gray-700 shadow-premium-lg p-5 text-center max-w-xs mx-4">
+          <div className="w-10 h-10 rounded-xl bg-[#FAFAFA] dark:bg-gray-800 flex items-center justify-center mx-auto mb-3">
             <Lock className="w-4.5 h-4.5 text-quaternary" />
           </div>
           <p className="text-[14px] font-semibold tracking-tight mb-1">Pro Feature</p>

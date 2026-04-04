@@ -49,7 +49,7 @@ export default function BillingPage() {
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: [0.25, 0.1, 0.25, 1] }}
-        className="rounded-xl border border-black/[0.06] bg-white p-6 shadow-premium"
+        className="rounded-xl border border-black/[0.06] dark:border-gray-800 bg-white p-6 shadow-premium"
       >
         <div className="flex items-center justify-between mb-4">
           <div>
@@ -57,7 +57,7 @@ export default function BillingPage() {
               <h3 className="text-[15px] font-semibold">Current Plan</h3>
               <span className={cn(
                 "inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full uppercase tracking-wider",
-                isPro ? "bg-pulse-50 text-pulse-600" : "bg-[#F0F0F0] text-tertiary"
+                isPro ? "bg-pulse-50 text-pulse-600" : "bg-[#F0F0F0] dark:bg-gray-700 text-tertiary"
               )}>
                 {isPro && <Sparkles className="w-2.5 h-2.5" />}
                 {isPro ? "Pro" : "Free"}
@@ -84,7 +84,7 @@ export default function BillingPage() {
           {/* Free tier */}
           <div className={cn(
             "rounded-lg border p-4",
-            !isPro ? "border-black/[0.08] bg-[#FAFAFA]" : "border-black/[0.04] opacity-60"
+            !isPro ? "border-black/[0.08] dark:border-gray-700 bg-[#FAFAFA] dark:bg-gray-800" : "border-black/[0.04] dark:border-gray-800 opacity-60"
           )}>
             <div className="flex items-baseline gap-1 mb-3">
               <span className="text-[20px] font-semibold font-mono-numbers">$0</span>
@@ -103,7 +103,7 @@ export default function BillingPage() {
           {/* Pro tier */}
           <div className={cn(
             "rounded-lg border p-4",
-            isPro ? "border-pulse/20 bg-pulse-50/30" : "border-black/[0.08]"
+            isPro ? "border-pulse/20 bg-pulse-50/30" : "border-black/[0.08] dark:border-gray-700"
           )}>
             <div className="flex items-baseline gap-1 mb-3">
               <span className="text-[20px] font-semibold font-mono-numbers">$49</span>
@@ -126,7 +126,7 @@ export default function BillingPage() {
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.1, ease: [0.25, 0.1, 0.25, 1] }}
-        className="rounded-xl border border-black/[0.06] bg-white p-6 shadow-premium"
+        className="rounded-xl border border-black/[0.06] dark:border-gray-800 bg-white p-6 shadow-premium"
       >
         <h3 className="text-[14px] font-semibold mb-2">Payment Method</h3>
         <p className="text-[13px] text-tertiary leading-relaxed">

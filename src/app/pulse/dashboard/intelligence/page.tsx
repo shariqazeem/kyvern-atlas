@@ -45,7 +45,7 @@ function CompetitivePosition({ data, userEndpoints }: { data: IntelData; userEnd
 
   if (userEndpoints.length === 0) {
     return (
-      <div className="rounded-xl border border-black/[0.06] bg-gradient-to-br from-pulse-50 to-white dark:from-gray-900 dark:to-gray-900 p-5">
+      <div className="rounded-xl border border-black/[0.06] dark:border-gray-800 bg-gradient-to-br from-pulse-50 to-white dark:from-gray-900 dark:to-gray-900 p-5">
         <h3 className="text-[14px] font-semibold tracking-tight mb-2">Your Competitive Position</h3>
         <p className="text-[13px] text-secondary leading-relaxed">
           Start receiving payments to see how you compare to the market. Your endpoints will be highlighted across all charts.
@@ -96,18 +96,18 @@ function IntelligenceContent() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <div className="h-6 w-48 bg-[#F0F0F0] rounded animate-pulse" />
+        <div className="h-6 w-48 bg-[#F0F0F0] dark:bg-gray-700 rounded animate-pulse" />
         <div className="grid grid-cols-4 gap-4">
-          {[...Array(4)].map((_, i) => <div key={i} className="h-24 bg-[#F0F0F0] rounded-xl animate-pulse" />)}
+          {[...Array(4)].map((_, i) => <div key={i} className="h-24 bg-[#F0F0F0] dark:bg-gray-700 rounded-xl animate-pulse" />)}
         </div>
-        <div className="h-64 bg-[#F0F0F0] rounded-xl animate-pulse" />
+        <div className="h-64 bg-[#F0F0F0] dark:bg-gray-700 rounded-xl animate-pulse" />
       </div>
     );
   }
 
   if (!data) {
     return (
-      <div className="rounded-xl border border-black/[0.06] bg-white dark:bg-gray-900 p-8 text-center">
+      <div className="rounded-xl border border-black/[0.06] dark:border-gray-800 bg-white dark:bg-gray-900 p-8 text-center">
         <Globe className="w-10 h-10 text-quaternary mx-auto mb-3" />
         <p className="text-[14px] font-medium">Not enough market data yet</p>
         <p className="text-[12px] text-tertiary mt-1">Competitive intelligence requires data from multiple providers.</p>
@@ -140,7 +140,7 @@ function IntelligenceContent() {
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: i * 0.06, ease }}
-            className="rounded-xl border border-black/[0.06] bg-white dark:bg-gray-900 p-5"
+            className="rounded-xl border border-black/[0.06] dark:border-gray-800 bg-white dark:bg-gray-900 p-5"
             style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.02)" }}
           >
             <div className="flex items-center gap-2 mb-2">
@@ -163,7 +163,7 @@ function IntelligenceContent() {
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.3, ease }}
-        className="rounded-xl border border-black/[0.06] bg-white dark:bg-gray-900 p-5"
+        className="rounded-xl border border-black/[0.06] dark:border-gray-800 bg-white dark:bg-gray-900 p-5"
         style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.02)" }}
       >
         <h3 className="text-[14px] font-semibold tracking-tight mb-1">Market Growth</h3>
@@ -193,10 +193,10 @@ function IntelligenceContent() {
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.35, ease }}
-        className="rounded-xl border border-black/[0.06] bg-white dark:bg-gray-900 overflow-hidden"
+        className="rounded-xl border border-black/[0.06] dark:border-gray-800 bg-white dark:bg-gray-900 overflow-hidden"
         style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.02)" }}
       >
-        <div className="px-5 py-4 border-b border-black/[0.04] flex items-center justify-between">
+        <div className="px-5 py-4 border-b border-black/[0.04] dark:border-gray-800 flex items-center justify-between">
           <h3 className="text-[14px] font-semibold tracking-tight">Top Endpoints</h3>
           <div className="flex items-center bg-muted dark:bg-gray-800 rounded-lg p-0.5">
             {(["revenue", "volume"] as const).map((t) => (
@@ -210,7 +210,7 @@ function IntelligenceContent() {
         <div className="overflow-x-auto">
           <table className="w-full min-w-[600px]">
             <thead>
-              <tr className="border-b border-black/[0.04]">
+              <tr className="border-b border-black/[0.04] dark:border-gray-800">
                 <th className="text-left text-[10px] font-medium text-quaternary uppercase tracking-wider px-5 py-3 w-8">#</th>
                 <th className="text-left text-[10px] font-medium text-quaternary uppercase tracking-wider px-3 py-3">Endpoint</th>
                 <th className="text-left text-[10px] font-medium text-quaternary uppercase tracking-wider px-3 py-3">Category</th>
@@ -224,7 +224,7 @@ function IntelligenceContent() {
                 const isUser = user_endpoints.includes(ep.endpoint);
                 return (
                   <tr key={ep.endpoint} className={cn(
-                    "border-b border-black/[0.03] last:border-0 transition-colors",
+                    "border-b border-black/[0.03] dark:border-gray-800/50 last:border-0 transition-colors",
                     isUser ? "bg-pulse-50/50 dark:bg-pulse-900/10" : "hover:bg-[#FAFAFA] dark:hover:bg-gray-800"
                   )}>
                     <td className="px-5 py-2.5 text-[12px] text-quaternary font-mono">{i + 1}</td>
@@ -255,7 +255,7 @@ function IntelligenceContent() {
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.4, ease }}
-        className="rounded-xl border border-black/[0.06] bg-white dark:bg-gray-900 p-5"
+        className="rounded-xl border border-black/[0.06] dark:border-gray-800 bg-white dark:bg-gray-900 p-5"
         style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.02)" }}
       >
         <h3 className="text-[14px] font-semibold tracking-tight mb-1">Category Pricing</h3>
@@ -285,7 +285,7 @@ function IntelligenceContent() {
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.45, ease }}
-          className="rounded-xl border border-black/[0.06] bg-white dark:bg-gray-900 p-5"
+          className="rounded-xl border border-black/[0.06] dark:border-gray-800 bg-white dark:bg-gray-900 p-5"
           style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.02)" }}
         >
           <div className="flex items-center gap-2 mb-4">
@@ -297,7 +297,7 @@ function IntelligenceContent() {
               const isUser = user_endpoints.includes(g.endpoint);
               return (
                 <div key={g.endpoint} className={cn(
-                  "flex items-center justify-between p-3 rounded-lg border border-black/[0.04]",
+                  "flex items-center justify-between p-3 rounded-lg border border-black/[0.04] dark:border-gray-800",
                   isUser ? "bg-pulse-50/50 dark:bg-pulse-900/10" : "bg-[#FAFAFA] dark:bg-gray-800"
                 )}>
                   <div className="flex items-center gap-2 min-w-0">

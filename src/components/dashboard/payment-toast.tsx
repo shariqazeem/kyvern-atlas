@@ -23,7 +23,7 @@ export function PaymentToast({ visible, txHash, network, amount, onDismiss }: Pa
           transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
           className="fixed bottom-6 right-6 z-50 max-w-sm"
         >
-          <div className="bg-white rounded-xl border border-black/[0.08] shadow-premium-xl p-4 backdrop-blur-sm">
+          <div className="bg-white dark:bg-gray-900 rounded-xl border border-black/[0.08] dark:border-gray-700 shadow-premium-xl p-4 backdrop-blur-sm">
             <div className="flex items-start gap-3">
               <div className="w-8 h-8 rounded-full bg-emerald-50 flex items-center justify-center shrink-0 mt-0.5">
                 <Check className="w-4 h-4 text-emerald-600" />
