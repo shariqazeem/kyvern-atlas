@@ -1,12 +1,25 @@
-# KyvernLabs — Complete Technical Reference
+# KyvernLabs — Complete Technical Reference (Updated April 4, 2026)
 
 ## What is KyvernLabs?
 
-KyvernLabs is the business infrastructure layer for the x402 economy. The x402 protocol (HTTP 402 Payment Required) enables machine-to-machine micropayments over HTTP. It is backed by the x402 Foundation under the Linux Foundation, with founding members including Coinbase, Cloudflare, Stripe, Google, Visa, Mastercard, Amazon, Microsoft, Solana Foundation, Shopify, and more.
+KyvernLabs is the business infrastructure layer for the x402 economy. We are the "Shopify + Stripe for x402" — the tooling that turns any x402 endpoint into a profitable company.
 
-There are 195+ x402 services processing $600M+ annualized volume and 119M+ transactions. KyvernLabs provides the analytics and business tools these services need to operate profitably.
+The x402 protocol (HTTP 402 Payment Required) enables machine-to-machine micropayments over HTTP. The x402 Foundation launched April 2, 2026 under the Linux Foundation with founding members: Coinbase, Cloudflare, Stripe, Google, Visa, Mastercard, Amazon, Microsoft, Solana Foundation, Shopify, American Express, Circle, Fiserv, and more.
 
-## Product: Pulse
+There are 195+ x402 services processing $600M+ annualized volume and 119M+ transactions. Nobody has built the business layer — KyvernLabs fills that gap.
+
+## Live URLs
+
+- Website: https://kyvernlabs.com
+- Pulse product: https://kyvernlabs.com/pulse
+- Dashboard: https://kyvernlabs.com/pulse/dashboard
+- x402 Services: https://kyvernlabs.com/services
+- Setup Guide: https://kyvernlabs.com/pulse/dashboard/setup
+- npm middleware: https://www.npmjs.com/package/@kyvernlabs/pulse
+- npm MCP server: https://www.npmjs.com/package/@kyvernlabs/mcp
+- GitHub: https://github.com/shariqazeem/kyvernlabs
+
+## Product: Pulse — Revenue Intelligence for x402
 
 ### Architecture
 
@@ -22,7 +35,38 @@ Agent/Client → HTTP Request → x402 Endpoint (your API)
                      SQLite DB → Dashboard (kyvernlabs.com/pulse/dashboard)
 ```
 
-### Middleware Integration
+### Published npm Packages
+
+**@kyvernlabs/pulse** (v0.1.0) — Middleware
+```bash
+npm install @kyvernlabs/pulse
+```
+```typescript
+import { withPulse } from '@kyvernlabs/pulse'
+export const GET = withPulse(withX402(handler, config, server), {
+  apiKey: 'kv_live_your_key'
+})
+```
+
+**@kyvernlabs/mcp** (v0.1.0) — MCP Server for AI Agents
+```bash
+npm install -g @kyvernlabs/mcp
+```
+Claude Desktop config:
+```json
+{
+  "mcpServers": {
+    "kyvernlabs-pulse": {
+      "command": "npx",
+      "args": ["@kyvernlabs/mcp"],
+      "env": { "KYVERNLABS_API_KEY": "kv_live_..." }
+    }
+  }
+}
+```
+MCP Tools: pulse_get_stats, pulse_get_endpoints, pulse_get_customers, pulse_get_transactions, pulse_get_timeseries, pulse_ingest_event.
+
+### Middleware Integration (Full Example)
 
 ```typescript
 import { withPulse } from '@kyvernlabs/pulse'
@@ -30,117 +74,150 @@ import { withX402 } from '@x402/next'
 import { x402ResourceServer, HTTPFacilitatorClient } from '@x402/core/server'
 import { ExactEvmScheme } from '@x402/evm/exact/server'
 
-// Set up x402
 const facilitator = new HTTPFacilitatorClient({ url: 'https://x402.org/facilitator' })
 const server = new x402ResourceServer(facilitator)
 server.register('eip155:84532', new ExactEvmScheme())
 
-// Your handler
 async function handler(req) {
   return NextResponse.json({ data: 'premium content' })
 }
 
-// Layer 1: x402 payment gate
 const x402Handler = withX402(handler, {
-  accepts: {
-    scheme: 'exact',
-    price: '$0.01',
-    network: 'eip155:84532',
-    payTo: '0xYOUR_WALLET'
-  }
+  accepts: { scheme: 'exact', price: '$0.01', network: 'eip155:84532', payTo: '0xYOUR_WALLET' }
 }, server)
 
-// Layer 2: Pulse analytics captures every payment
-export const GET = withPulse(x402Handler, {
-  apiKey: 'kv_live_your_key_here'
-})
+export const GET = withPulse(x402Handler, { apiKey: 'kv_live_your_key_here' })
 ```
 
 ### x402 Payment Flow
 
 1. Client sends HTTP request to your endpoint
-2. Server responds with 402 + `PAYMENT-REQUIRED` header (base64 JSON with price, network, payTo)
+2. Server responds with 402 + `PAYMENT-REQUIRED` header (base64 JSON)
 3. Client signs USDC payment via EIP-3009 TransferWithAuthorization
-4. Client retries with `PAYMENT-SIGNATURE` header (base64 JSON with signed payment)
-5. Server sends to facilitator for verification
-6. Facilitator settles on-chain (Base, Ethereum, Solana, Polygon)
-7. Server responds with 200 + `PAYMENT-RESPONSE` header (tx hash, payer, network)
+4. Client retries with `PAYMENT-SIGNATURE` header
+5. Server verifies via facilitator, executes handler, settles via facilitator
+6. Server responds with 200 + `PAYMENT-RESPONSE` header (tx hash, payer, network)
+7. withPulse() captures all payment data from headers (non-blocking, fire-and-forget)
+
+### Authentication System
+
+- **SIWE (Sign-In With Ethereum)**: User connects wallet → signs SIWE message → server verifies cryptographically → creates httpOnly session cookie → auto-generates kv_live_ API key
+- **Wallet = Identity**: No emails, no passwords. Wallet address is the account.
+- **API Key Format**: `kv_live_` prefix + 24 char nanoid, SHA-256 hashed in database
+- **Multi-Tenant**: Every API query scoped to authenticated user's api_key_id
+- **Session**: httpOnly cookie, 7-day expiry, survives refresh
+
+### KyvernLabs x402 Services (dogfooding Pulse)
+
+**Price Oracle**: `GET /api/x402/oracle?token=ETH` — $0.001 USDC/call
+- Real-time crypto prices (BTC, ETH, SOL, USDC, MATIC, AVAX, ARB, OP, LINK)
+- Returns: price_usd, change_24h_pct, market_cap_usd, volume_24h_usd
+
+**Agent Reputation**: `GET /api/x402/reputation?address=0x...` — $0.01 USDC/call
+- On-chain wallet analysis on Base Sepolia
+- Returns: reputation_score (0-100), tier (unknown/new/moderate/good/excellent)
+- Checks: transaction_count, eth_balance, usdc_balance
+- Analysis flags: has_funds, is_active, can_pay_x402
+
+Both services wrapped with withPulse() — revenue tracked in our own dashboard.
+Live proof: 6+ verified on-chain payments captured.
 
 ### What Pulse Captures Per Transaction
 
 | Field | Source |
 |-------|--------|
 | endpoint | Request URL pathname |
-| amount_usd | PAYMENT-SIGNATURE → accepted.amount (converted from atomic units) |
+| amount_usd | PAYMENT-SIGNATURE → accepted.amount (atomic → USD) |
 | payer_address | PAYMENT-RESPONSE → payer |
 | tx_hash | PAYMENT-RESPONSE → transaction |
-| network | PAYMENT-SIGNATURE → accepted.network (CAIP-2 format, e.g., eip155:84532) |
-| asset | PAYMENT-SIGNATURE → accepted.asset (token contract address) |
-| scheme | PAYMENT-SIGNATURE → accepted.scheme (exact or upto) |
-| latency_ms | Measured by middleware (start to response) |
-| status | success if settlement succeeded, error otherwise |
-| source | "middleware" for real x402 payments, "seed" for demo data |
-
-### Authentication
-
-- **Dashboard**: SIWE (Sign-In With Ethereum) — wallet signs a message, server verifies, issues httpOnly session cookie. Wallet address = identity.
-- **Middleware/API**: `X-API-Key` header with `kv_live_` prefixed key. Key is SHA-256 hashed in database.
-- **MCP Server**: API key passed via environment variable `KYVERNLABS_API_KEY`.
+| network | PAYMENT-SIGNATURE → accepted.network (CAIP-2) |
+| asset | PAYMENT-SIGNATURE → accepted.asset (token contract) |
+| scheme | PAYMENT-SIGNATURE → accepted.scheme (exact/upto) |
+| latency_ms | Measured by middleware |
+| status | success if settlement succeeded |
+| source | "middleware" for real, "seed" for demo |
 
 ### API Reference
 
 Base URL: `https://kyvernlabs.com/api`
 
-#### POST /api/pulse/ingest
-Record an x402 payment event.
-- Headers: `X-API-Key: kv_live_...`
-- Body: `{ endpoint: string, amount_usd: number, payer_address: string, latency_ms?: number, status?: "success"|"error"|"timeout", tx_hash?: string, network?: string, asset?: string, scheme?: string }`
-- Returns: `{ success: true, event_id: string, source: "middleware"|"seed" }`
-- Deduplicates by tx_hash.
-- Returns 429 if free tier limit exceeded.
+**POST /api/pulse/ingest** — Record x402 payment event
+- Auth: `X-API-Key: kv_live_...`
+- Body: `{ endpoint, amount_usd, payer_address, latency_ms?, status?, tx_hash?, network?, asset?, scheme? }`
+- Returns: `{ success, event_id, source }`
+- Deduplicates by tx_hash. Returns 429 if free tier exceeded.
 
-#### GET /api/pulse/stats?range=7d
-Aggregated analytics.
-- Headers: Session cookie (dashboard) or will return 401
-- Query: range = "24h" | "7d" | "30d"
-- Returns: `{ revenue, calls, customers, avg_price, deltas: { revenue_pct, calls_pct, customers_pct, avg_price_pct }, has_real_data, source_breakdown }`
+**GET /api/pulse/stats?range=7d** — Aggregated analytics
+- Auth: Session cookie
+- Returns: `{ revenue, calls, customers, avg_price, deltas, has_real_data, source_breakdown }`
 
-#### GET /api/pulse/endpoints
-Per-endpoint breakdown.
+**GET /api/pulse/endpoints** — Per-endpoint breakdown
 - Returns: `{ endpoints: [{ path, label, calls, revenue, avg_latency, error_rate, last_called }] }`
 
-#### GET /api/pulse/customers?limit=20
-Top paying agents.
+**GET /api/pulse/customers?limit=20** — Top paying agents
 - Returns: `{ customers: [{ address, total_spent, call_count, first_seen, last_seen, top_endpoint }] }`
 
-#### GET /api/pulse/recent?limit=20
-Recent transactions.
+**GET /api/pulse/recent?limit=20** — Recent transactions
 - Returns: `{ transactions: [{ id, timestamp, endpoint, amount_usd, payer_address, latency_ms, status, network, asset, tx_hash, scheme, source }] }`
 
-#### GET /api/pulse/timeseries?range=7d
-Revenue over time.
-- Returns: `{ data: [{ timestamp, revenue, calls }], granularity: "hour"|"day", truncated: boolean }`
-- Free tier truncated to 7 days max.
+**GET /api/pulse/timeseries?range=7d** — Revenue over time
+- Returns: `{ data: [{ timestamp, revenue, calls }], granularity, truncated }`
+
+**GET /api/pulse/usage** — Current tier usage
+- Returns: `{ events_used, events_limit, revenue_used, revenue_limit, tier, allowed }`
+
+**GET /api/pulse/proof** — Public proof stats
+- Returns: `{ verified_payments, connected_endpoints, payments_last_hour, total_revenue }`
+
+**Auth endpoints:**
+- GET /api/auth/nonce — SIWE nonce
+- POST /api/auth/verify — Verify SIWE signature, create account + session
+- GET /api/auth/session — Check current session
+- POST /api/auth/logout — Clear session
+- GET /api/auth/keys — List API keys
+- POST /api/auth/keys — Create new key (Pro only)
+
+**x402 services:**
+- GET /api/x402/oracle?token=ETH — Price oracle ($0.001/call, x402-gated)
+- GET /api/x402/reputation?address=0x... — Reputation score ($0.01/call, x402-gated)
+- GET /api/x402/price?symbol=ETH — Demo price endpoint ($0.001/call, x402-gated)
 
 ### Tier Limits
 
-Free: 1,000 events/day OR $10 revenue captured (whichever first), 7-day data retention, 1 API key.
-Pro ($49 USDC/month on Base): Unlimited events, 90-day retention, 10 API keys, CSV export, alerts.
+Free: 1,000 events/day OR $10 revenue captured (whichever first), 7-day retention, 1 API key.
+Pro ($49 USDC/month on Base via x402): Unlimited events, 90-day retention, 10 API keys, CSV export, alerts.
 Enterprise: Custom.
 
-### Supported Networks
+Pro is paid with x402 itself — USDC on Base. Users send 49 USDC to our wallet, paste tx hash, we verify on-chain and activate. KyvernLabs eats its own dogfood.
 
-- Base Sepolia (testnet): eip155:84532
-- Base (mainnet): eip155:8453
-- Ethereum: eip155:1
-- Polygon: eip155:137
+### Dashboard Pages
+
+- **Overview**: stat cards (revenue, calls, agents, avg price) with deltas, revenue chart, top endpoints/customers
+- **Transactions**: individual events with "Verified" badges and clickable BaseScan tx hash links
+- **Endpoints**: per-endpoint revenue, calls, latency, error rates
+- **Customers**: per-agent wallet spend breakdown with copy address
+- **API Keys**: view/copy/manage kv_live_ keys (full key visible)
+- **Setup Guide**: 3 integration paths (middleware, MCP server, direct API) with auto-populated keys
+- **Billing**: current plan, tier comparison, upgrade CTA
+
+### Product Roadmap
+
+1. Pulse (SHIPPED) — Revenue analytics
+2. Vault (6mo) — Smart contract wallets with per-agent budgets
+3. Router (12mo) — Smart routing to cheapest/fastest x402 service
+4. Marketplace (18mo) — Launch x402 APIs in minutes
 
 ### Tech Stack
 
 - Next.js 14, TypeScript, Tailwind CSS, Framer Motion
 - SQLite via better-sqlite3 (WAL mode)
-- wagmi for wallet connection
-- SIWE for authentication
-- @x402/core, @x402/next, @x402/evm, @x402/fetch for x402 protocol
-- viem for Ethereum interactions
-- Deployed on Ubuntu with nginx + PM2 + Let's Encrypt SSL
+- wagmi for wallet connection, SIWE for auth
+- @x402/core, @x402/next, @x402/evm, @x402/fetch for x402
+- viem + ethers for blockchain interactions
+- Deployed: Ubuntu VM, nginx, PM2, Let's Encrypt SSL
+- Domain: kyvernlabs.com
+- SEO: sitemap.xml, robots.txt, JSON-LD, 35+ keywords, llms.txt
+
+### Founder
+
+Shariq Azeem (@shariqshkt) — 5 hackathon wins ($4,250 total), deep x402 expertise, built 3 previous x402 projects (ParallaxPay $1,500 win, TrendSurfer, x402-Oracle). Solo founder. Building KyvernLabs as a real company, not a hackathon project.
