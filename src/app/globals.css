@@ -217,6 +217,24 @@
   .border-subtle { border-color: hsl(var(--border-subtle)); }
   .border-default { border-color: hsl(var(--border-default)); }
 
+  /* ProGate overlay — light and dark */
+  .pro-gate-backdrop {
+    background: rgba(255, 255, 255, 0.5);
+    backdrop-filter: blur(2px);
+  }
+  .pro-gate-card {
+    background: white;
+    border-color: rgba(0, 0, 0, 0.08);
+  }
+  .dark .pro-gate-backdrop {
+    background: rgba(10, 10, 10, 0.7);
+    backdrop-filter: blur(4px);
+  }
+  .dark .pro-gate-card {
+    background: hsl(0 0% 10%);
+    border-color: hsl(0 0% 18%);
+  }
+
   /* Gradient text */
   .text-gradient {
     background: linear-gradient(135deg, hsl(var(--foreground)) 0%, hsl(var(--text-tertiary)) 100%);
