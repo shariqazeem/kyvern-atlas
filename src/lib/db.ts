@@ -205,6 +205,33 @@ function migrate(db: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_alerts_api_key ON alerts(api_key_id);
   `);
 
+  // Vault — wallet monitoring
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS wallets (
+      id TEXT PRIMARY KEY,
+      api_key_id TEXT NOT NULL,
+      address TEXT NOT NULL,
+      label TEXT NOT NULL,
+      network TEXT NOT NULL DEFAULT 'eip155:84532',
+      purpose TEXT NOT NULL DEFAULT 'receivable',
+      endpoint TEXT,
+      is_monitored INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_wallets_api_key ON wallets(api_key_id);
+  `);
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS wallet_snapshots (
+      id TEXT PRIMARY KEY,
+      wallet_id TEXT NOT NULL,
+      balance_eth REAL NOT NULL DEFAULT 0,
+      balance_usdc REAL NOT NULL DEFAULT 0,
+      fetched_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_snapshots_wallet ON wallet_snapshots(wallet_id);
+  `);
+
   // Ensure demo API key exists (needed for middleware ingest + demo endpoint)
   db.prepare(`
     INSERT OR IGNORE INTO api_keys (id, key_hash, key_prefix, name, email)

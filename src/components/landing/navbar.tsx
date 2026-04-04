@@ -28,6 +28,7 @@ export function Navbar() {
                 { label: "Products", href: "#products" },
                 { label: "Developers", href: "#developers" },
                 { label: "Services", href: "/services" },
+                { label: "Vault", href: "/vault" },
               ].map((item) => (
                 <a
                   key={item.label}
