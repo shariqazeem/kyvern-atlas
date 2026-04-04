@@ -157,6 +157,37 @@ function migrate(db: Database.Database) {
   }
   db.exec("CREATE INDEX IF NOT EXISTS idx_api_keys_wallet ON api_keys(wallet_address)");
 
+  // Webhooks table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS webhooks (
+      id TEXT PRIMARY KEY,
+      api_key_id TEXT NOT NULL,
+      url TEXT NOT NULL,
+      events TEXT NOT NULL DEFAULT '["payment.received"]',
+      secret TEXT NOT NULL,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      last_triggered_at TEXT,
+      failure_count INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS idx_webhooks_api_key ON webhooks(api_key_id);
+  `);
+
+  // Webhook deliveries log
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS webhook_deliveries (
+      id TEXT PRIMARY KEY,
+      webhook_id TEXT NOT NULL,
+      event_type TEXT NOT NULL,
+      payload TEXT NOT NULL,
+      response_status INTEGER,
+      response_body TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      delivered_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_deliveries_webhook ON webhook_deliveries(webhook_id);
+  `);
+
   // Ensure demo API key exists (needed for middleware ingest + demo endpoint)
   db.prepare(`
     INSERT OR IGNORE INTO api_keys (id, key_hash, key_prefix, name, email)

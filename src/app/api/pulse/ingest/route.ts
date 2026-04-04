@@ -4,6 +4,7 @@ import { z } from "zod";
 import { getDb } from "@/lib/db";
 import { authenticateIngestRequest } from "@/lib/auth";
 import { checkUsageLimit } from "@/lib/tier";
+import { fireWebhooks } from "@/lib/webhooks";
 
 const IngestSchema = z.object({
   endpoint: z.string().min(1),
@@ -105,6 +106,17 @@ export async function POST(request: NextRequest) {
 
     // Update last_used_at
     db.prepare("UPDATE api_keys SET last_used_at = ? WHERE id = ?").run(timestamp, keyRow.id);
+
+    // Fire webhooks asynchronously (non-blocking)
+    fireWebhooks(keyRow.id, parsed.status === "error" ? "payment.failed" : "payment.received", {
+      endpoint: parsed.endpoint,
+      amount_usd: parsed.amount_usd,
+      payer_address: parsed.payer_address,
+      tx_hash: parsed.tx_hash,
+      network: parsed.network,
+      latency_ms: parsed.latency_ms,
+      status: parsed.status,
+    });
 
     return NextResponse.json({ success: true, event_id: eventId, source });
   } catch (error) {
