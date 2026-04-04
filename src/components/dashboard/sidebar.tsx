@@ -27,6 +27,7 @@ const NAV_GROUPS = [
       { href: "/pulse/dashboard/transactions", label: "Transactions", icon: ArrowLeftRight },
       { href: "/pulse/dashboard/endpoints", label: "Endpoints", icon: Globe },
       { href: "/pulse/dashboard/customers", label: "Customers", icon: Users },
+      { href: "/pulse/dashboard/cohorts", label: "Cohorts", icon: Users },
     ],
   },
   {
