@@ -17,6 +17,9 @@ const nextConfig = {
       "@safe-global/safe-apps-provider": false,
       "@walletconnect/ethereum-provider": false,
       "@walletconnect/modal": false,
+      "porto": false,
+      "porto/internal": false,
+      "@coinbase/wallet-sdk": false,
     };
     return config;
   },

@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { Shield, Zap, Globe, ExternalLink } from "lucide-react";
+import { KYVERN_PAY_TO } from "@/lib/utils";
 
 const ease = [0.25, 0.1, 0.25, 1] as const;
 
@@ -102,7 +103,7 @@ export function SocialProof() {
             className="text-center"
           >
             <a
-              href="https://sepolia.basescan.org/address/0x55c3aBb091D1a43C3872718b3b8B3AE8c20B592E"
+              href={`https://sepolia.basescan.org/address/${KYVERN_PAY_TO}`}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 text-[13px] font-medium text-tertiary hover:text-primary transition-colors duration-300"
@@ -112,42 +113,33 @@ export function SocialProof() {
             </a>
           </motion.div>
 
-          {/* Testimonials */}
-          <div className="mt-14 grid grid-cols-1 md:grid-cols-2 gap-4">
-            {[
-              {
-                quote: "One-line integration, instant revenue visibility. This is what every x402 service needs.",
-                author: "Early x402 builder",
-                role: "DeFi API provider on Base",
-              },
-              {
-                quote: "Finally I can see which agents pay me the most and which endpoints generate real revenue.",
-                author: "Beta tester",
-                role: "Data API on Base Sepolia",
-              },
-            ].map((t, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, y: 12 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: 0.5 + i * 0.12, ease }}
-                className="p-5 rounded-2xl border border-black/[0.04] bg-[#FAFAFA]"
-              >
-                <p className="text-[14px] text-secondary leading-relaxed">
-                  &ldquo;{t.quote}&rdquo;
-                </p>
-                <div className="mt-4 flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-pulse-400 to-indigo-500 flex items-center justify-center text-[10px] font-bold text-white">
-                    {t.author.split(" ").map(w => w[0]).join("")}
+          {/* How It Works — replaces fake testimonials */}
+          <div className="mt-14">
+            <p className="text-[11px] uppercase tracking-[0.2em] font-medium text-quaternary text-center mb-6">
+              How it works
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {[
+                { step: "1", title: "Install middleware", desc: "npm install @kyvernlabs/pulse and wrap your handler with withPulse()" },
+                { step: "2", title: "Receive a payment", desc: "An agent pays your x402 endpoint — Pulse captures it automatically" },
+                { step: "3", title: "See your revenue", desc: "Dashboard shows revenue, customers, and tx hashes in real time" },
+              ].map((s, i) => (
+                <motion.div
+                  key={s.step}
+                  initial={{ opacity: 0, y: 12 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.4, delay: 0.5 + i * 0.1, ease }}
+                  className="text-center p-5 rounded-2xl border border-black/[0.04] bg-[#FAFAFA]"
+                >
+                  <div className="w-8 h-8 rounded-full bg-foreground text-background flex items-center justify-center text-[12px] font-bold mx-auto mb-3">
+                    {s.step}
                   </div>
-                  <div>
-                    <p className="text-[12px] font-semibold text-primary">{t.author}</p>
-                    <p className="text-[11px] text-quaternary">{t.role}</p>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
+                  <p className="text-[13px] font-semibold tracking-tight">{s.title}</p>
+                  <p className="text-[11px] text-tertiary mt-1 leading-relaxed">{s.desc}</p>
+                </motion.div>
+              ))}
+            </div>
           </div>
         </motion.div>
       </div>

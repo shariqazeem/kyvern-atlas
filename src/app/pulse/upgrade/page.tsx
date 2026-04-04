@@ -17,9 +17,9 @@ import {
   Wallet,
   Sparkles,
 } from "lucide-react";
-import { getExplorerTxUrl, truncateTxHash } from "@/lib/utils";
+import { getExplorerTxUrl, truncateTxHash, KYVERN_PAY_TO } from "@/lib/utils";
 
-const PAYTO = "0x55c3aBb091D1a43C3872718b3b8B3AE8c20B592E";
+const PAYTO = KYVERN_PAY_TO;
 const AMOUNT = "49";
 const NETWORK_NAME = "Base Sepolia";
 const USDC_CONTRACT = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";

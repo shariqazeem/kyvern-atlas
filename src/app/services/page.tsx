@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 import { Navbar } from "@/components/landing/navbar";
 import { Footer } from "@/components/landing/footer";
+import { KYVERN_PAY_TO } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import {
   BarChart3,
@@ -229,7 +230,7 @@ export default function ServicesPage() {
                   Tracked via <span className="font-medium text-pulse">withPulse()</span> middleware
                 </span>
                 <a
-                  href="https://sepolia.basescan.org/address/0x55c3aBb091D1a43C3872718b3b8B3AE8c20B592E"
+                  href={`https://sepolia.basescan.org/address/${KYVERN_PAY_TO}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1 text-[11px] font-medium text-tertiary hover:text-primary transition-colors"

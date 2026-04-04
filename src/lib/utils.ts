@@ -44,6 +44,9 @@ export function getNetworkName(network?: string): string {
   return NETWORKS[network]?.name || network;
 }
 
+// Shared pay-to address constant
+export const KYVERN_PAY_TO = process.env.NEXT_PUBLIC_PAY_TO_ADDRESS || "0x55c3aBb091D1a43C3872718b3b8B3AE8c20B592E";
+
 export function getExplorerTxUrl(txHash: string, network?: string): string {
   const base = network ? NETWORKS[network]?.explorer : "https://sepolia.basescan.org";
   return `${base || "https://sepolia.basescan.org"}/tx/${txHash}`;
