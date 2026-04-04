@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Key, Copy, Check, Eye, EyeOff, Shield } from "lucide-react";
+import { Key, Copy, Check, Eye, EyeOff, Shield, RefreshCw } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 
 interface ApiKeyInfo {
@@ -22,6 +22,8 @@ export default function KeysPage() {
   const [copied, setCopied] = useState<string | null>(null);
   const [revealed, setRevealed] = useState(false);
   const [showNewKey, setShowNewKey] = useState(!!apiKey);
+  const [rotatedKey, setRotatedKey] = useState<string | null>(null);
+  const [rotating, setRotating] = useState(false);
 
   useEffect(() => {
     fetch("/api/auth/keys", { credentials: "include" })
@@ -94,6 +96,40 @@ export default function KeysPage() {
         </motion.div>
       )}
 
+      {/* Rotated key banner */}
+      {rotatedKey && (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-xl border border-emerald-200 bg-emerald-50 p-5"
+        >
+          <div className="flex items-center gap-2 mb-3">
+            <Shield className="w-4 h-4 text-emerald-600" />
+            <span className="text-[13px] font-semibold text-emerald-800">
+              New API key generated — copy it now
+            </span>
+          </div>
+          <div className="flex items-center gap-2 bg-white rounded-lg border border-emerald-200 p-3">
+            <code className="flex-1 text-[13px] font-mono text-primary break-all">{rotatedKey}</code>
+            <button
+              onClick={() => { copyToClipboard(rotatedKey, "rotated"); }}
+              className="p-1.5 rounded hover:bg-emerald-50 transition-colors"
+            >
+              {copied === "rotated" ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5 text-tertiary" />}
+            </button>
+          </div>
+          <p className="mt-2 text-[11px] text-emerald-600">
+            This key will not be shown again. The old key has been revoked.
+          </p>
+          <button
+            onClick={() => setRotatedKey(null)}
+            className="mt-3 text-[12px] font-medium text-emerald-700 hover:underline"
+          >
+            I&apos;ve copied it — dismiss
+          </button>
+        </motion.div>
+      )}
+
       {/* Keys table */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
@@ -131,13 +167,48 @@ export default function KeysPage() {
                     {key.last_used_at ? new Date(key.last_used_at).toLocaleDateString() : "Never"}
                   </td>
                   <td className="px-5 py-3 text-right">
-                    <button
-                      onClick={() => copyToClipboard(key.key_full || key.key_prefix, key.id)}
-                      className="inline-flex items-center gap-1 text-[11px] font-medium text-pulse hover:text-pulse-600 transition-colors"
-                    >
-                      {copied === key.id ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
-                      {copied === key.id ? "Copied!" : "Copy key"}
-                    </button>
+                    <div className="flex items-center justify-end gap-2">
+                      {key.key_full ? (
+                        <button
+                          onClick={() => copyToClipboard(key.key_full!, key.id)}
+                          className="inline-flex items-center gap-1 text-[11px] font-medium text-pulse hover:text-pulse-600 transition-colors"
+                        >
+                          {copied === key.id ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+                          {copied === key.id ? "Copied!" : "Copy key"}
+                        </button>
+                      ) : (
+                        <span className="text-[10px] text-quaternary">Key hidden</span>
+                      )}
+                      <button
+                        onClick={async () => {
+                          if (!confirm("Rotate this key? The old key will stop working immediately.")) return;
+                          setRotating(true);
+                          try {
+                            const res = await fetch("/api/auth/keys/rotate", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              credentials: "include",
+                              body: JSON.stringify({ key_id: key.id }),
+                            });
+                            const data = await res.json();
+                            if (data.full_key) {
+                              setRotatedKey(data.full_key);
+                              // Refresh keys list
+                              fetch("/api/auth/keys", { credentials: "include" })
+                                .then((r) => r.json())
+                                .then((d) => setKeys(d.keys || []));
+                            }
+                          } catch { /* ignore */ }
+                          finally { setRotating(false); }
+                        }}
+                        disabled={rotating}
+                        className="inline-flex items-center gap-1 text-[11px] font-medium text-tertiary hover:text-primary transition-colors"
+                        title="Generate a new key (old key stops working)"
+                      >
+                        <RefreshCw className={`w-3 h-3 ${rotating ? "animate-spin" : ""}`} />
+                        Rotate
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
