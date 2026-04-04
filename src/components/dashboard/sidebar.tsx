@@ -15,6 +15,7 @@ import {
   CreditCard,
   Webhook,
   Bell,
+  TrendingUp,
   Activity,
 } from "lucide-react";
 
@@ -28,6 +29,7 @@ const NAV_GROUPS = [
       { href: "/pulse/dashboard/endpoints", label: "Endpoints", icon: Globe },
       { href: "/pulse/dashboard/customers", label: "Customers", icon: Users },
       { href: "/pulse/dashboard/cohorts", label: "Cohorts", icon: Users },
+      { href: "/pulse/dashboard/intelligence", label: "Intelligence", icon: TrendingUp },
     ],
   },
   {
