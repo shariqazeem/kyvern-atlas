@@ -14,7 +14,8 @@ import { formatCurrency, formatNumber } from "@/lib/utils";
 
 function DashboardContent() {
   const { timeRange } = useDashboardStore();
-  const { data, loading } = usePulseStats(timeRange);
+  const effectiveRange = timeRange === "custom" ? "30d" : timeRange;
+  const { data, loading } = usePulseStats(effectiveRange);
 
   if (loading) {
     return (

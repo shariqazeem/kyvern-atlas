@@ -3,13 +3,15 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Activity, Sparkles } from "lucide-react";
+import { Activity, Sparkles, Sun, Moon, Monitor } from "lucide-react";
 import { TimeRangeSelector } from "./time-range-selector";
 import { MobileNav } from "./mobile-nav";
 import { useAuth } from "@/hooks/use-auth";
+import { useTheme } from "@/hooks/use-theme";
 
 export function DashboardHeader() {
   const { isAuthenticated, plan, wallet, signOut } = useAuth();
+  const { theme, cycleTheme } = useTheme();
   const [recentCount, setRecentCount] = useState<number | null>(null);
 
   useEffect(() => {
@@ -57,6 +59,15 @@ export function DashboardHeader() {
           </div>
         </div>
         <div className="flex items-center gap-3">
+          <button
+            onClick={cycleTheme}
+            className="p-1.5 rounded-lg hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors"
+            title={`Theme: ${theme}`}
+          >
+            {theme === "dark" ? <Moon className="w-4 h-4 text-tertiary" /> :
+             theme === "system" ? <Monitor className="w-4 h-4 text-tertiary" /> :
+             <Sun className="w-4 h-4 text-tertiary" />}
+          </button>
           <TimeRangeSelector />
           {isAuthenticated && wallet && (
             <>

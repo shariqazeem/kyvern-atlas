@@ -57,7 +57,8 @@ function CustomTooltip({
 
 export function RevenueChart() {
   const { timeRange } = useDashboardStore();
-  const { data, loading } = useTimeseries(timeRange);
+  const effectiveRange = timeRange === "custom" ? "30d" : timeRange;
+  const { data, loading } = useTimeseries(effectiveRange);
 
   if (loading || !data) {
     return (

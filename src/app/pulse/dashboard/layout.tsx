@@ -14,7 +14,7 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-gray-50/80">
+    <div className="min-h-screen bg-gray-50/80 dark:bg-gray-950 transition-colors duration-300">
       <DashboardHeader />
       <div className="flex">
         <div className="hidden md:block">
