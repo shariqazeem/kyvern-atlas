@@ -14,6 +14,7 @@ import {
   Code2,
   CreditCard,
   Webhook,
+  Bell,
   Activity,
 } from "lucide-react";
 
@@ -33,6 +34,7 @@ const NAV_GROUPS = [
     items: [
       { href: "/pulse/dashboard/keys", label: "API Keys", icon: Key },
       { href: "/pulse/dashboard/webhooks", label: "Webhooks", icon: Webhook },
+      { href: "/pulse/dashboard/alerts", label: "Alerts", icon: Bell },
       { href: "/pulse/dashboard/setup", label: "Setup Guide", icon: Code2 },
     ],
   },

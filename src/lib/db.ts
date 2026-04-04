@@ -188,6 +188,23 @@ function migrate(db: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_deliveries_webhook ON webhook_deliveries(webhook_id);
   `);
 
+  // Alerts table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS alerts (
+      id TEXT PRIMARY KEY,
+      api_key_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      type TEXT NOT NULL,
+      config TEXT NOT NULL,
+      webhook_id TEXT,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      last_triggered_at TEXT,
+      trigger_count INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_alerts_api_key ON alerts(api_key_id);
+  `);
+
   // Ensure demo API key exists (needed for middleware ingest + demo endpoint)
   db.prepare(`
     INSERT OR IGNORE INTO api_keys (id, key_hash, key_prefix, name, email)

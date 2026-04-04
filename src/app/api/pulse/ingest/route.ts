@@ -5,6 +5,7 @@ import { getDb } from "@/lib/db";
 import { authenticateIngestRequest } from "@/lib/auth";
 import { checkUsageLimit } from "@/lib/tier";
 import { fireWebhooks } from "@/lib/webhooks";
+import { evaluateAlerts } from "@/lib/alerts";
 
 const IngestSchema = z.object({
   endpoint: z.string().min(1),
@@ -116,6 +117,17 @@ export async function POST(request: NextRequest) {
       network: parsed.network,
       latency_ms: parsed.latency_ms,
       status: parsed.status,
+    });
+
+    // Evaluate alerts synchronously (fast DB queries)
+    evaluateAlerts(keyRow.id, {
+      endpoint: parsed.endpoint,
+      amount_usd: parsed.amount_usd,
+      payer_address: parsed.payer_address,
+      latency_ms: parsed.latency_ms,
+      status: parsed.status,
+      tx_hash: parsed.tx_hash,
+      network: parsed.network,
     });
 
     return NextResponse.json({ success: true, event_id: eventId, source });
