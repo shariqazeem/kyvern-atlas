@@ -163,3 +163,139 @@ function migrate(db: Database.Database) {
     VALUES ('demo_key_001', 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', 'kv_demo_', 'Pulse Demo', 'demo@kyvernlabs.com')
   `).run();
 }
+
+// --- Benchmark Queries (cross-user market intelligence) ---
+
+export interface MarketBenchmark {
+  endpoint: string;
+  avg_price: number;
+  median_price: number;
+  p25_price: number;
+  p75_price: number;
+  total_calls: number;
+  provider_count: number;
+  avg_latency: number;
+}
+
+export interface UserPricingComparison {
+  endpoint: string;
+  user_price: number;
+  market_avg: number;
+  market_median: number;
+  percentile_rank: number;
+  status: "competitive" | "above_market" | "below_market";
+}
+
+export function getMarketBenchmarks(): {
+  benchmarks: MarketBenchmark[];
+  market_stats: { total_endpoints: number; total_providers: number; avg_price: number; data_points: number };
+} {
+  const db = getDb();
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+  // Get all endpoints with aggregate stats (across ALL users)
+  const rows = db.prepare(`
+    SELECT
+      endpoint,
+      AVG(amount_usd) as avg_price,
+      COUNT(*) as total_calls,
+      COUNT(DISTINCT api_key_id) as provider_count,
+      ROUND(AVG(latency_ms), 0) as avg_latency
+    FROM events
+    WHERE timestamp >= ?
+    GROUP BY endpoint
+    ORDER BY total_calls DESC
+  `).all(thirtyDaysAgo) as Array<{
+    endpoint: string;
+    avg_price: number;
+    total_calls: number;
+    provider_count: number;
+    avg_latency: number;
+  }>;
+
+  // For each endpoint, compute percentiles from individual event prices
+  const benchmarks: MarketBenchmark[] = rows.map((row) => {
+    const prices = db.prepare(
+      "SELECT amount_usd FROM events WHERE endpoint = ? AND timestamp >= ? ORDER BY amount_usd"
+    ).all(row.endpoint, thirtyDaysAgo) as Array<{ amount_usd: number }>;
+
+    const priceArr = prices.map((p) => p.amount_usd);
+    const n = priceArr.length;
+
+    return {
+      endpoint: row.endpoint,
+      avg_price: Math.round(row.avg_price * 10000) / 10000,
+      median_price: n > 0 ? priceArr[Math.floor(n / 2)] : 0,
+      p25_price: n > 0 ? priceArr[Math.floor(n * 0.25)] : 0,
+      p75_price: n > 0 ? priceArr[Math.floor(n * 0.75)] : 0,
+      total_calls: row.total_calls,
+      provider_count: row.provider_count,
+      avg_latency: row.avg_latency || 0,
+    };
+  });
+
+  // Market-wide stats
+  const globalStats = db.prepare(`
+    SELECT
+      COUNT(DISTINCT endpoint) as total_endpoints,
+      COUNT(DISTINCT api_key_id) as total_providers,
+      AVG(amount_usd) as avg_price,
+      COUNT(*) as data_points
+    FROM events WHERE timestamp >= ?
+  `).get(thirtyDaysAgo) as { total_endpoints: number; total_providers: number; avg_price: number; data_points: number };
+
+  return {
+    benchmarks,
+    market_stats: {
+      total_endpoints: globalStats.total_endpoints,
+      total_providers: globalStats.total_providers,
+      avg_price: Math.round((globalStats.avg_price || 0) * 10000) / 10000,
+      data_points: globalStats.data_points,
+    },
+  };
+}
+
+export function getUserPricingComparison(apiKeyId: string): UserPricingComparison[] {
+  const db = getDb();
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+  // Get user's endpoints with their average price
+  const userEndpoints = db.prepare(`
+    SELECT endpoint, AVG(amount_usd) as user_price
+    FROM events
+    WHERE api_key_id = ? AND timestamp >= ?
+    GROUP BY endpoint
+  `).all(apiKeyId, thirtyDaysAgo) as Array<{ endpoint: string; user_price: number }>;
+
+  return userEndpoints.map((ue) => {
+    // Get ALL prices for this endpoint across the market
+    const prices = db.prepare(
+      "SELECT amount_usd FROM events WHERE endpoint = ? AND timestamp >= ? ORDER BY amount_usd"
+    ).all(ue.endpoint, thirtyDaysAgo) as Array<{ amount_usd: number }>;
+
+    const priceArr = prices.map((p) => p.amount_usd);
+    const n = priceArr.length;
+
+    const marketAvg = n > 0 ? priceArr.reduce((a, b) => a + b, 0) / n : 0;
+    const marketMedian = n > 0 ? priceArr[Math.floor(n / 2)] : 0;
+    const p25 = n > 0 ? priceArr[Math.floor(n * 0.25)] : 0;
+    const p75 = n > 0 ? priceArr[Math.floor(n * 0.75)] : 0;
+
+    // Calculate percentile rank (what % of the market is priced below the user)
+    const belowCount = priceArr.filter((p) => p < ue.user_price).length;
+    const percentileRank = n > 0 ? Math.round((belowCount / n) * 100) : 50;
+
+    const status: "competitive" | "above_market" | "below_market" =
+      ue.user_price > p75 ? "above_market" :
+      ue.user_price < p25 ? "below_market" : "competitive";
+
+    return {
+      endpoint: ue.endpoint,
+      user_price: Math.round(ue.user_price * 10000) / 10000,
+      market_avg: Math.round(marketAvg * 10000) / 10000,
+      market_median: Math.round(marketMedian * 10000) / 10000,
+      percentile_rank: percentileRank,
+      status,
+    };
+  });
+}

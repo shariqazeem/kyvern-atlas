@@ -9,6 +9,7 @@ import {
   Globe,
   Users,
   ArrowLeftRight,
+  BarChart3,
   Key,
   Code2,
   CreditCard,
@@ -20,6 +21,7 @@ const NAV_GROUPS = [
     label: "Analytics",
     items: [
       { href: "/pulse/dashboard", label: "Overview", icon: LayoutDashboard },
+      { href: "/pulse/dashboard/benchmarks", label: "Benchmarks", icon: BarChart3 },
       { href: "/pulse/dashboard/transactions", label: "Transactions", icon: ArrowLeftRight },
       { href: "/pulse/dashboard/endpoints", label: "Endpoints", icon: Globe },
       { href: "/pulse/dashboard/customers", label: "Customers", icon: Users },
