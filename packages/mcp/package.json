@@ -1,7 +1,7 @@
 {
   "name": "@kyvernlabs/mcp",
-  "version": "0.1.0",
-  "description": "MCP server for KyvernLabs Pulse — let AI agents query x402 revenue analytics",
+  "version": "0.2.0",
+  "description": "MCP server for KyvernLabs Pulse — 17 tools for AI agents to query x402 revenue analytics",
   "main": "dist/index.js",
   "bin": {
     "kyvernlabs-mcp": "./dist/index.js"
