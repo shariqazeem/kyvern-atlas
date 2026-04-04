@@ -47,7 +47,7 @@ export function MobileNav() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.2 }}
-            className="absolute top-[57px] left-0 right-0 bg-white dark:bg-gray-950 border-b border-black/[0.06] dark:border-gray-800 shadow-premium-lg z-40 p-3"
+            className="absolute top-[57px] left-0 right-0 bg-white border-b border-black/[0.06] shadow-premium-lg z-40 p-3"
           >
             {NAV_ITEMS.map((item) => {
               const isActive =
@@ -62,8 +62,8 @@ export function MobileNav() {
                   className={cn(
                     "flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] font-medium transition-colors",
                     isActive
-                      ? "bg-[#F0F0F0] dark:bg-gray-700 text-primary"
-                      : "text-tertiary hover:text-primary hover:bg-[#FAFAFA] dark:hover:bg-gray-800 dark:bg-gray-800"
+                      ? "bg-[#F0F0F0] text-primary"
+                      : "text-tertiary hover:text-primary hover:bg-[#FAFAFA]"
                   )}
                 >
                   <item.icon className="w-4 h-4" />

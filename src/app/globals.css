@@ -28,6 +28,14 @@
   --text-tertiary: 0 0% 45%;
   --text-quaternary: 0 0% 62%;
 
+  /* Dashboard surfaces — use these instead of hardcoded colors */
+  --surface-primary: 0 0% 100%;        /* white — cards, panels */
+  --surface-secondary: 0 0% 98%;       /* #FAFAFA — subtle bg */
+  --surface-tertiary: 0 0% 94%;        /* #F0F0F0 — active states */
+  --surface-hover: 0 0% 98%;           /* hover bg */
+  --border-subtle: 0 0% 94%;           /* subtle borders */
+  --border-default: 0 0% 90%;          /* default borders */
+
   /* Pulse brand */
   --pulse: 217 91% 60%;
   --pulse-foreground: 0 0% 100%;
@@ -62,6 +70,13 @@
   --text-secondary: 0 0% 70%;
   --text-tertiary: 0 0% 50%;
   --text-quaternary: 0 0% 35%;
+
+  --surface-primary: 0 0% 7%;
+  --surface-secondary: 0 0% 10%;
+  --surface-tertiary: 0 0% 16%;
+  --surface-hover: 0 0% 12%;
+  --border-subtle: 0 0% 16%;
+  --border-default: 0 0% 20%;
 }
 
 @layer base {
@@ -77,11 +92,59 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
-  /* Precise typography defaults */
   h1, h2, h3, h4, h5, h6 {
     letter-spacing: -0.025em;
     line-height: 1.1;
   }
+
+  /*
+   * Dark mode overrides for hardcoded colors in dashboard components.
+   * This catches bg-white, bg-[#FAFAFA], bg-[#F0F0F0] etc. that
+   * components use instead of CSS variables.
+   */
+  .dark .bg-white { background-color: hsl(var(--surface-primary)) !important; }
+  .dark .bg-\[\#FAFAFA\] { background-color: hsl(var(--surface-secondary)) !important; }
+  .dark .bg-\[\#F0F0F0\] { background-color: hsl(var(--surface-tertiary)) !important; }
+  .dark .bg-\[\#F8F9FA\] { background-color: hsl(var(--surface-secondary)) !important; }
+  .dark .bg-\[\#F5F5F5\] { background-color: hsl(var(--surface-secondary)) !important; }
+  .dark .bg-gray-50\/80 { background-color: hsl(0 0% 4%) !important; }
+
+  /* Dark borders */
+  .dark .border-black\/\[0\.04\] { border-color: hsl(var(--border-subtle)) !important; }
+  .dark .border-black\/\[0\.05\] { border-color: hsl(var(--border-subtle)) !important; }
+  .dark .border-black\/\[0\.06\] { border-color: hsl(var(--border-default)) !important; }
+  .dark .border-black\/\[0\.08\] { border-color: hsl(var(--border-default)) !important; }
+  .dark .border-black\/\[0\.03\] { border-color: hsl(0 0% 14%) !important; }
+  .dark .border-black\/\[0\.02\] { border-color: hsl(0 0% 12%) !important; }
+
+  /* Dark hover states */
+  .dark .hover\:bg-\[\#FAFAFA\]:hover { background-color: hsl(var(--surface-hover)) !important; }
+  .dark .hover\:bg-\[\#F0F0F0\]:hover { background-color: hsl(var(--surface-tertiary)) !important; }
+  .dark .hover\:border-black\/\[0\.15\]:hover { border-color: hsl(0 0% 25%) !important; }
+  .dark .hover\:border-black\/\[0\.12\]:hover { border-color: hsl(0 0% 22%) !important; }
+  .dark .hover\:border-black\/\[0\.16\]:hover { border-color: hsl(0 0% 28%) !important; }
+  .dark .hover\:border-black\/\[0\.14\]:hover { border-color: hsl(0 0% 25%) !important; }
+
+  /* Dark backgrounds with alpha */
+  .dark .bg-white\/80 { background-color: hsla(0, 0%, 5%, 0.8) !important; }
+  .dark .bg-white\/60 { background-color: hsla(0, 0%, 5%, 0.6) !important; }
+  .dark .bg-white\/90 { background-color: hsla(0, 0%, 7%, 0.9) !important; }
+
+  /* ProGate overlay */
+  .dark .bg-white\/60.backdrop-blur-\[1px\] { background-color: hsla(0, 0%, 4%, 0.7) !important; }
+
+  /* Badge backgrounds in dark */
+  .dark .bg-emerald-50 { background-color: hsla(142, 76%, 36%, 0.15) !important; }
+  .dark .bg-amber-50 { background-color: hsla(38, 92%, 50%, 0.15) !important; }
+  .dark .bg-red-50 { background-color: hsla(0, 84%, 60%, 0.15) !important; }
+  .dark .bg-blue-50 { background-color: hsla(217, 91%, 60%, 0.15) !important; }
+  .dark .bg-pulse-50 { background-color: hsla(217, 91%, 60%, 0.12) !important; }
+  .dark .bg-gray-100 { background-color: hsl(0 0% 14%) !important; }
+
+  /* Dark mode shadows */
+  .dark .shadow-premium { box-shadow: 0 1px 2px rgba(0,0,0,0.2), 0 1px 3px rgba(0,0,0,0.15) !important; }
+  .dark .shadow-premium-lg { box-shadow: 0 4px 12px rgba(0,0,0,0.2), 0 2px 4px rgba(0,0,0,0.1) !important; }
+  .dark .shadow-premium-xl { box-shadow: 0 8px 30px rgba(0,0,0,0.3), 0 4px 12px rgba(0,0,0,0.15) !important; }
 }
 
 @layer utilities {
@@ -145,6 +208,14 @@
     font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
   }
+
+  /* Dashboard surface utilities — auto dark mode */
+  .surface { background-color: hsl(var(--surface-primary)); }
+  .surface-secondary { background-color: hsl(var(--surface-secondary)); }
+  .surface-tertiary { background-color: hsl(var(--surface-tertiary)); }
+  .surface-hover:hover { background-color: hsl(var(--surface-hover)); }
+  .border-subtle { border-color: hsl(var(--border-subtle)); }
+  .border-default { border-color: hsl(var(--border-default)); }
 
   /* Gradient text */
   .text-gradient {

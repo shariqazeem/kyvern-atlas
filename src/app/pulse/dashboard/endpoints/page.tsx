@@ -55,15 +55,15 @@ export default function EndpointsPage() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-white dark:bg-gray-900 rounded-lg border border-border p-4 shadow-premium">
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-lg border border-border p-4 shadow-premium">
           <p className="text-xs text-muted-foreground font-medium">Active Endpoints</p>
           <p className="text-xl font-semibold font-mono-numbers mt-1">{raw.length}</p>
         </motion.div>
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="bg-white dark:bg-gray-900 rounded-lg border border-border p-4 shadow-premium">
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="bg-white rounded-lg border border-border p-4 shadow-premium">
           <p className="text-xs text-muted-foreground font-medium">Total Revenue</p>
           <p className="text-xl font-semibold font-mono-numbers mt-1">{formatCurrency(totalRevenue)}</p>
         </motion.div>
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="bg-white dark:bg-gray-900 rounded-lg border border-border p-4 shadow-premium">
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="bg-white rounded-lg border border-border p-4 shadow-premium">
           <p className="text-xs text-muted-foreground font-medium">Total Calls</p>
           <p className="text-xl font-semibold font-mono-numbers mt-1">{totalCalls.toLocaleString()}</p>
         </motion.div>
@@ -71,7 +71,7 @@ export default function EndpointsPage() {
 
       <SearchBar value={search} onChange={(v) => { setSearch(v); setOffset(0); }} placeholder="Search endpoints..." />
 
-      <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} className="bg-white dark:bg-gray-900 rounded-lg border border-border shadow-premium overflow-hidden">
+      <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-lg border border-border shadow-premium overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[600px]">
             <thead>
@@ -90,7 +90,7 @@ export default function EndpointsPage() {
             </thead>
             <tbody>
               {paged.map((ep) => (
-                <tr key={ep.path} className="border-b border-border/50 last:border-0 hover:bg-muted/30 dark:hover:bg-gray-800 transition-colors">
+                <tr key={ep.path} className="border-b border-border/50 last:border-0 hover:bg-muted/30 transition-colors">
                   <td className="px-5 py-3"><div className="flex items-center gap-2"><Globe className="w-3.5 h-3.5 text-muted-foreground" /><span className="font-mono text-xs">{ep.path}</span></div></td>
                   <td className="px-5 py-3 text-sm text-muted-foreground">{ep.label || "—"}</td>
                   <td className="px-5 py-3 text-right font-mono-numbers text-sm">{ep.calls.toLocaleString()}</td>

@@ -17,7 +17,7 @@ export function SearchBar({ value, onChange, placeholder = "Search..." }: Search
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full h-9 pl-9 pr-3 rounded-lg border border-black/[0.08] dark:border-gray-700 dark:bg-gray-800 text-[13px] placeholder:text-quaternary focus:outline-none focus:ring-2 focus:ring-pulse/20 focus:border-pulse/30 transition-all"
+        className="w-full h-9 pl-9 pr-3 rounded-lg border border-black/[0.08] text-[13px] placeholder:text-quaternary focus:outline-none focus:ring-2 focus:ring-pulse/20 focus:border-pulse/30 transition-all"
       />
     </div>
   );
@@ -35,7 +35,7 @@ export function FilterDropdown({ value, onChange, options, label }: FilterDropdo
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="h-9 px-3 rounded-lg border border-black/[0.08] dark:border-gray-700 dark:bg-gray-800 text-[12px] font-medium bg-white focus:outline-none focus:ring-2 focus:ring-pulse/20"
+      className="h-9 px-3 rounded-lg border border-black/[0.08] text-[12px] font-medium bg-white focus:outline-none focus:ring-2 focus:ring-pulse/20"
       aria-label={label}
     >
       {options.map((o) => (
@@ -70,7 +70,7 @@ export function Pagination({ offset, limit, total, onPrev, onNext }: PaginationP
         <button
           onClick={onPrev}
           disabled={!hasPrev}
-          className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md border border-black/[0.08] dark:border-gray-700 text-[11px] font-medium disabled:opacity-30 hover:bg-[#FAFAFA] dark:hover:bg-gray-800 transition-colors"
+          className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md border border-black/[0.08] text-[11px] font-medium disabled:opacity-30 hover:bg-[#FAFAFA] transition-colors"
         >
           <ChevronLeft className="w-3 h-3" />
           Prev
@@ -78,7 +78,7 @@ export function Pagination({ offset, limit, total, onPrev, onNext }: PaginationP
         <button
           onClick={onNext}
           disabled={!hasNext}
-          className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md border border-black/[0.08] dark:border-gray-700 text-[11px] font-medium disabled:opacity-30 hover:bg-[#FAFAFA] dark:hover:bg-gray-800 transition-colors"
+          className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md border border-black/[0.08] text-[11px] font-medium disabled:opacity-30 hover:bg-[#FAFAFA] transition-colors"
         >
           Next
           <ChevronRight className="w-3 h-3" />

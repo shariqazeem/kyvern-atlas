@@ -78,7 +78,7 @@ export function OnboardingChecklist({ hasEvents }: OnboardingChecklistProps) {
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, ease: [0.25, 0.1, 0.25, 1] }}
-      className="rounded-xl border border-black/[0.06] dark:border-gray-800 bg-white p-5 shadow-premium"
+      className="rounded-xl border border-black/[0.06] bg-white p-5 shadow-premium"
     >
       <div className="flex items-center justify-between mb-4">
         <div>
@@ -93,7 +93,7 @@ export function OnboardingChecklist({ hasEvents }: OnboardingChecklistProps) {
       </div>
 
       {/* Progress bar */}
-      <div className="h-1 bg-[#F0F0F0] dark:bg-gray-700 rounded-full mb-5 overflow-hidden">
+      <div className="h-1 bg-[#F0F0F0] rounded-full mb-5 overflow-hidden">
         <motion.div
           initial={{ width: 0 }}
           animate={{ width: `${(completedCount / 4) * 100}%` }}

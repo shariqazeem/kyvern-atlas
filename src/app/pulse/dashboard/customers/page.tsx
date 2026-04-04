@@ -66,15 +66,15 @@ export default function CustomersPage() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-white dark:bg-gray-900 rounded-lg border border-border p-4 shadow-premium">
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-lg border border-border p-4 shadow-premium">
           <p className="text-xs text-muted-foreground font-medium">Unique Agents</p>
           <p className="text-xl font-semibold font-mono-numbers mt-1">{raw.length}</p>
         </motion.div>
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="bg-white dark:bg-gray-900 rounded-lg border border-border p-4 shadow-premium">
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="bg-white rounded-lg border border-border p-4 shadow-premium">
           <p className="text-xs text-muted-foreground font-medium">Total Revenue</p>
           <p className="text-xl font-semibold font-mono-numbers mt-1">{formatCurrency(totalSpent)}</p>
         </motion.div>
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="bg-white dark:bg-gray-900 rounded-lg border border-border p-4 shadow-premium">
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="bg-white rounded-lg border border-border p-4 shadow-premium">
           <p className="text-xs text-muted-foreground font-medium">Avg Revenue / Agent</p>
           <p className="text-xl font-semibold font-mono-numbers mt-1">{formatCurrency(raw.length > 0 ? totalSpent / raw.length : 0)}</p>
         </motion.div>
@@ -82,7 +82,7 @@ export default function CustomersPage() {
 
       <SearchBar value={search} onChange={(v) => { setSearch(v); setOffset(0); }} placeholder="Search wallet addresses..." />
 
-      <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} className="bg-white dark:bg-gray-900 rounded-lg border border-border shadow-premium overflow-hidden">
+      <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-lg border border-border shadow-premium overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[700px]">
             <thead>
@@ -109,7 +109,7 @@ export default function CustomersPage() {
             </thead>
             <tbody>
               {paged.map((customer) => (
-                <tr key={customer.address} className="border-b border-border/50 last:border-0 hover:bg-muted/30 dark:hover:bg-gray-800 transition-colors">
+                <tr key={customer.address} className="border-b border-border/50 last:border-0 hover:bg-muted/30 transition-colors">
                   <td className="px-5 py-3">
                     <button onClick={() => copyAddress(customer.address)} className="flex items-center gap-2 group">
                       <span className="font-mono text-xs">{truncateAddress(customer.address)}</span>

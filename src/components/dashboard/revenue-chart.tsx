@@ -62,7 +62,7 @@ export function RevenueChart() {
 
   if (loading || !data) {
     return (
-      <div className="bg-white dark:bg-gray-900 rounded-lg border border-border p-5 shadow-premium h-[360px] animate-pulse">
+      <div className="bg-white rounded-lg border border-border p-5 shadow-premium h-[360px] animate-pulse">
         <div className="h-4 w-32 bg-muted rounded mb-6" />
         <div className="h-full bg-muted/50 rounded" />
       </div>
@@ -71,11 +71,11 @@ export function RevenueChart() {
 
   if (data.data.length === 0) {
     return (
-      <div className="bg-white dark:bg-gray-900 rounded-xl border border-black/[0.06] dark:border-gray-800 p-5 shadow-premium">
+      <div className="bg-white rounded-xl border border-black/[0.06] p-5 shadow-premium">
         <h3 className="text-[12px] font-medium text-quaternary mb-4">Revenue Over Time</h3>
         <div className="h-[200px] flex items-center justify-center">
           <div className="text-center">
-            <div className="w-10 h-10 rounded-xl bg-[#FAFAFA] dark:bg-gray-800 flex items-center justify-center mx-auto mb-3">
+            <div className="w-10 h-10 rounded-xl bg-[#FAFAFA] flex items-center justify-center mx-auto mb-3">
               <svg viewBox="0 0 20 20" className="w-5 h-5 text-quaternary">
                 <path d="M2 15 L5 10 L9 12 L14 5 L18 8" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.4" />
               </svg>
@@ -95,7 +95,7 @@ export function RevenueChart() {
       initial={{ opacity: 0, y: 15 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay: 0.35, ease: [0.25, 0.1, 0.25, 1] }}
-      className="bg-white dark:bg-gray-900 rounded-lg border border-border p-5 shadow-premium"
+      className="bg-white rounded-lg border border-border p-5 shadow-premium"
     >
       <h3 className="text-sm font-medium text-muted-foreground mb-4">
         Revenue Over Time

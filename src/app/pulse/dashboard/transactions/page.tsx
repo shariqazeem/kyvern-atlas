@@ -80,15 +80,15 @@ export default function TransactionsPage() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-white dark:bg-gray-900 rounded-lg border border-border p-4 shadow-premium">
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-lg border border-border p-4 shadow-premium">
           <p className="text-xs text-muted-foreground font-medium">Total Events</p>
           <p className="text-xl font-semibold font-mono-numbers mt-1">{total}</p>
         </motion.div>
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="bg-white dark:bg-gray-900 rounded-lg border border-border p-4 shadow-premium">
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="bg-white rounded-lg border border-border p-4 shadow-premium">
           <p className="text-xs text-muted-foreground font-medium">On-Chain Verified</p>
           <p className="text-xl font-semibold font-mono-numbers mt-1">{verifiedCount}</p>
         </motion.div>
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="bg-white dark:bg-gray-900 rounded-lg border border-border p-4 shadow-premium">
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="bg-white rounded-lg border border-border p-4 shadow-premium">
           <p className="text-xs text-muted-foreground font-medium">Revenue (shown)</p>
           <p className="text-xl font-semibold font-mono-numbers mt-1">{formatCurrency(totalRevenue)}</p>
         </motion.div>
@@ -115,7 +115,7 @@ export default function TransactionsPage() {
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.15 }}
-        className="bg-white dark:bg-gray-900 rounded-lg border border-border shadow-premium overflow-hidden"
+        className="bg-white rounded-lg border border-border shadow-premium overflow-hidden"
       >
         <div className="overflow-x-auto">
           <table className="w-full min-w-[800px]">
@@ -133,7 +133,7 @@ export default function TransactionsPage() {
             </thead>
             <tbody>
               {data.map((tx) => (
-                <tr key={tx.id} className="border-b border-border/50 last:border-0 hover:bg-muted/30 dark:hover:bg-gray-800 transition-colors">
+                <tr key={tx.id} className="border-b border-border/50 last:border-0 hover:bg-muted/30 transition-colors">
                   <td className="px-5 py-3 text-xs text-muted-foreground whitespace-nowrap">
                     {format(parseISO(tx.timestamp), "MMM d HH:mm:ss")}
                   </td>
@@ -163,7 +163,7 @@ export default function TransactionsPage() {
                         <Check className="w-2.5 h-2.5" /> Verified
                       </span>
                     ) : (
-                      <span className="inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500">Demo</span>
+                      <span className="inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500">Demo</span>
                     )}
                   </td>
                 </tr>

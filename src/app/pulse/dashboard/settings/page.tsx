@@ -55,7 +55,7 @@ export default function SettingsPage() {
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease }}
-        className="rounded-xl border border-black/[0.06] dark:border-gray-800 bg-white dark:bg-gray-900 p-6"
+        className="rounded-xl border border-black/[0.06] bg-white p-6"
         style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.02)" }}
       >
         <div className="flex items-center gap-2 mb-4">
@@ -88,14 +88,14 @@ export default function SettingsPage() {
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.1, ease }}
-        className="rounded-xl border border-black/[0.06] dark:border-gray-800 bg-white dark:bg-gray-900 p-6"
+        className="rounded-xl border border-black/[0.06] bg-white p-6"
         style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.02)" }}
       >
         <h3 className="text-[14px] font-semibold tracking-tight mb-4">Data Management</h3>
         <button
           onClick={exportAllData}
           disabled={exporting || plan !== "pro"}
-          className="inline-flex items-center gap-2 h-9 px-4 rounded-lg border border-black/[0.08] dark:border-gray-700 text-[12px] font-medium text-secondary hover:text-primary disabled:opacity-50 transition-colors"
+          className="inline-flex items-center gap-2 h-9 px-4 rounded-lg border border-black/[0.08] text-[12px] font-medium text-secondary hover:text-primary disabled:opacity-50 transition-colors"
         >
           <Download className="w-3.5 h-3.5" />
           {exporting ? "Exporting..." : "Export All Data (CSV)"}

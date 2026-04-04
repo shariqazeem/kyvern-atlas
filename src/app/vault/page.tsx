@@ -60,24 +60,24 @@ function AddWalletForm({ onAdded }: { onAdded: () => void }) {
 
   return (
     <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}
-      className="rounded-xl border border-black/[0.06] dark:border-gray-800 bg-white dark:bg-gray-900 p-5 space-y-3" style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.02)" }}>
+      className="rounded-xl border border-black/[0.06] bg-white p-5 space-y-3" style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.02)" }}>
       <h3 className="text-[14px] font-semibold tracking-tight">Add Wallet to Monitor</h3>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="sm:col-span-2">
           <label className="block text-[12px] text-tertiary font-medium mb-1">Wallet Address</label>
           <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="0x..."
-            className="w-full h-9 px-3 rounded-lg border border-black/[0.08] dark:border-gray-700 dark:bg-gray-800 text-[13px] font-mono placeholder:text-quaternary focus:outline-none focus:ring-2 focus:ring-pulse/20" />
+            className="w-full h-9 px-3 rounded-lg border border-black/[0.08] text-[13px] font-mono placeholder:text-quaternary focus:outline-none focus:ring-2 focus:ring-pulse/20" />
         </div>
         <div>
           <label className="block text-[12px] text-tertiary font-medium mb-1">Label</label>
           <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Main Revenue"
-            className="w-full h-9 px-3 rounded-lg border border-black/[0.08] dark:border-gray-700 dark:bg-gray-800 text-[13px] placeholder:text-quaternary focus:outline-none focus:ring-2 focus:ring-pulse/20" />
+            className="w-full h-9 px-3 rounded-lg border border-black/[0.08] text-[13px] placeholder:text-quaternary focus:outline-none focus:ring-2 focus:ring-pulse/20" />
         </div>
       </div>
       <div>
         <label className="block text-[12px] text-tertiary font-medium mb-1">Purpose</label>
         <select value={purpose} onChange={(e) => setPurpose(e.target.value)}
-          className="h-9 px-3 rounded-lg border border-black/[0.08] dark:border-gray-700 dark:bg-gray-800 text-[12px] bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-pulse/20">
+          className="h-9 px-3 rounded-lg border border-black/[0.08] text-[12px] bg-white focus:outline-none focus:ring-2 focus:ring-pulse/20">
           <option value="receivable">Receivable (x402 payments)</option>
           <option value="gas">Gas (transaction fees)</option>
           <option value="operational">Operational</option>
@@ -133,9 +133,9 @@ function VaultContent() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <div className="h-8 w-40 bg-[#F0F0F0] dark:bg-gray-800 rounded animate-pulse" />
+        <div className="h-8 w-40 bg-[#F0F0F0] rounded animate-pulse" />
         <div className="grid grid-cols-3 gap-4">
-          {[...Array(3)].map((_, i) => <div key={i} className="h-24 bg-[#F0F0F0] dark:bg-gray-800 rounded-xl animate-pulse" />)}
+          {[...Array(3)].map((_, i) => <div key={i} className="h-24 bg-[#F0F0F0] rounded-xl animate-pulse" />)}
         </div>
       </div>
     );
@@ -152,7 +152,7 @@ function VaultContent() {
         </div>
         <div className="flex items-center gap-2">
           <button onClick={syncAll} disabled={syncing}
-            className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg border border-black/[0.08] dark:border-gray-700 text-[12px] font-medium text-secondary hover:text-primary disabled:opacity-50 transition-colors">
+            className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg border border-black/[0.08] text-[12px] font-medium text-secondary hover:text-primary disabled:opacity-50 transition-colors">
             <RefreshCw className={cn("w-3.5 h-3.5", syncing && "animate-spin")} />
             {syncing ? "Syncing..." : "Sync All"}
           </button>
@@ -172,7 +172,7 @@ function VaultContent() {
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: i * 0.08, ease }}
-            className="rounded-xl border border-black/[0.06] dark:border-gray-800 bg-white dark:bg-gray-900 p-5"
+            className="rounded-xl border border-black/[0.06] bg-white p-5"
             style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.02)" }}
           >
             <div className="flex items-center gap-2 mb-2">
@@ -191,16 +191,16 @@ function VaultContent() {
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.3, ease }}
-          className="rounded-xl border border-black/[0.06] dark:border-gray-800 bg-white dark:bg-gray-900 overflow-hidden"
+          className="rounded-xl border border-black/[0.06] bg-white overflow-hidden"
           style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.02)" }}
         >
-          <div className="px-5 py-4 border-b border-black/[0.04] dark:border-gray-800">
+          <div className="px-5 py-4 border-b border-black/[0.04]">
             <h3 className="text-[14px] font-semibold tracking-tight">Your Wallets</h3>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[700px]">
               <thead>
-                <tr className="border-b border-black/[0.04] dark:border-gray-800">
+                <tr className="border-b border-black/[0.04]">
                   <th className="text-left text-[10px] font-medium text-quaternary uppercase tracking-wider px-5 py-3">Address</th>
                   <th className="text-left text-[10px] font-medium text-quaternary uppercase tracking-wider px-3 py-3">Label</th>
                   <th className="text-left text-[10px] font-medium text-quaternary uppercase tracking-wider px-3 py-3">Purpose</th>
@@ -215,8 +215,8 @@ function VaultContent() {
                   const isLow = (w.balance_usdc || 0) < 0.01 && w.balance_usdc !== null;
                   return (
                     <tr key={w.id} className={cn(
-                      "border-b border-black/[0.03] dark:border-gray-800/50 dark:border-gray-800 last:border-0 transition-colors",
-                      isLow ? "bg-amber-50/50 dark:bg-amber-900/10" : "hover:bg-[#FAFAFA] dark:hover:bg-gray-800"
+                      "border-b border-black/[0.03]/50 last:border-0 transition-colors",
+                      isLow ? "bg-amber-50/50 dark:bg-amber-900/10" : "hover:bg-[#FAFAFA]"
                     )}>
                       <td className="px-5 py-3">
                         <a href={`https://sepolia.basescan.org/address/${w.address}`} target="_blank" rel="noopener noreferrer"
@@ -261,7 +261,7 @@ function VaultContent() {
           </div>
         </motion.div>
       ) : (
-        <div className="rounded-xl border border-black/[0.06] dark:border-gray-800 bg-white dark:bg-gray-900 p-8 text-center">
+        <div className="rounded-xl border border-black/[0.06] bg-white p-8 text-center">
           <Wallet className="w-10 h-10 text-quaternary mx-auto mb-3" />
           <p className="text-[14px] font-medium">No wallets monitored</p>
           <p className="text-[12px] text-tertiary mt-1">Add your x402 payment wallets to track balances and get low-funds alerts.</p>

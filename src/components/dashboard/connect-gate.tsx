@@ -27,7 +27,7 @@ export function ConnectGate({ children }: { children: React.ReactNode }) {
           transition={{ duration: 0.5, ease: [0.25, 0.1, 0.25, 1] }}
           className="max-w-sm w-full text-center"
         >
-          <div className="w-14 h-14 rounded-2xl bg-[#FAFAFA] dark:bg-gray-800 flex items-center justify-center mx-auto mb-6">
+          <div className="w-14 h-14 rounded-2xl bg-[#FAFAFA] flex items-center justify-center mx-auto mb-6">
             <Shield className="w-6 h-6 text-tertiary" />
           </div>
           <h2 className="text-[18px] font-semibold tracking-tight mb-2">
@@ -44,7 +44,7 @@ export function ConnectGate({ children }: { children: React.ReactNode }) {
                 <button
                   key={connector.uid}
                   onClick={() => connect({ connector })}
-                  className="w-full flex items-center justify-center gap-2.5 h-11 rounded-lg border border-black/[0.08] dark:border-gray-700 text-[13px] font-medium hover:border-black/[0.15] hover:bg-[#FAFAFA] dark:hover:bg-gray-800 transition-all duration-300"
+                  className="w-full flex items-center justify-center gap-2.5 h-11 rounded-lg border border-black/[0.08] text-[13px] font-medium hover:border-black/[0.15] hover:bg-[#FAFAFA] transition-all duration-300"
                 >
                   {connector.name}
                 </button>

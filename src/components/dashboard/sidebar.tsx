@@ -82,12 +82,12 @@ function UsageMeter() {
   const isNearLimit = pct > 80;
 
   return (
-    <div className="px-4 py-3 border-t border-black/[0.04] dark:border-gray-800">
+    <div className="px-4 py-3 border-t border-black/[0.04]">
       <div className="flex items-center justify-between mb-1.5">
         <span className="text-[10px] font-medium text-quaternary uppercase tracking-wider">Usage today</span>
         <span className="text-[10px] text-quaternary">{usage.events_used.toLocaleString()} / {usage.events_limit.toLocaleString()}</span>
       </div>
-      <div className="h-1.5 bg-[#F0F0F0] dark:bg-gray-700 rounded-full overflow-hidden">
+      <div className="h-1.5 bg-[#F0F0F0] rounded-full overflow-hidden">
         <div
           className={cn(
             "h-full rounded-full transition-all duration-500",
@@ -112,7 +112,7 @@ export function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="w-[240px] shrink-0 border-r border-black/[0.04] dark:border-gray-800 bg-white dark:bg-gray-950 h-[calc(100vh-57px)] sticky top-[57px] flex flex-col">
+    <aside className="w-[240px] shrink-0 border-r border-black/[0.04] bg-white h-[calc(100vh-57px)] sticky top-[57px] flex flex-col">
       <nav className="flex-1 p-3 space-y-1">
         <div className="px-3 py-2 mb-1">
           <div className="flex items-center gap-2 text-[11px] font-medium text-quaternary uppercase tracking-[0.12em]">
@@ -125,7 +125,7 @@ export function Sidebar() {
           <div key={group.label}>
             {gi > 0 && (
               <>
-                <div className="my-2 mx-3 border-t border-black/[0.04] dark:border-gray-800" />
+                <div className="my-2 mx-3 border-t border-black/[0.04]" />
                 <p className="px-3 py-1.5 text-[10px] font-medium text-quaternary uppercase tracking-[0.12em]">
                   {group.label}
                 </p>
@@ -143,8 +143,8 @@ export function Sidebar() {
                   className={cn(
                     "flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium transition-all duration-200",
                     isActive
-                      ? "bg-[#F0F0F0] dark:bg-gray-800 text-primary"
-                      : "text-tertiary hover:text-primary hover:bg-[#FAFAFA] dark:hover:bg-gray-800"
+                      ? "bg-[#F0F0F0] text-primary"
+                      : "text-tertiary hover:text-primary hover:bg-[#FAFAFA]"
                   )}
                 >
                   <item.icon className="w-4 h-4" />

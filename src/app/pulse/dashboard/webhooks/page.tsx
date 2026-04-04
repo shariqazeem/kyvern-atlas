@@ -85,7 +85,7 @@ function CreateWebhookForm({ onCreated }: { onCreated: () => void }) {
           <span className="text-[13px] font-semibold text-emerald-800">Webhook created — save your signing secret</span>
         </div>
         <p className="text-[12px] text-emerald-600">This secret is used to verify webhook payloads. It will not be shown again.</p>
-        <div className="flex items-center gap-2 bg-white dark:bg-gray-900 rounded-lg border border-emerald-200 p-3">
+        <div className="flex items-center gap-2 bg-white rounded-lg border border-emerald-200 p-3">
           <code className="flex-1 text-[12px] font-mono text-primary break-all">{secret}</code>
           <button onClick={() => { navigator.clipboard.writeText(secret); setCopied(true); setTimeout(() => setCopied(false), 2000); }} className="p-1.5 rounded hover:bg-emerald-50 transition-colors">
             {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5 text-tertiary" />}
@@ -99,7 +99,7 @@ function CreateWebhookForm({ onCreated }: { onCreated: () => void }) {
   }
 
   return (
-    <div className="rounded-xl border border-black/[0.06] dark:border-gray-800 bg-white p-5 space-y-4" style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.02)" }}>
+    <div className="rounded-xl border border-black/[0.06] bg-white p-5 space-y-4" style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.02)" }}>
       <h3 className="text-[14px] font-semibold tracking-tight">Create Webhook</h3>
       <div>
         <label className="block text-[12px] text-tertiary font-medium mb-1.5">Endpoint URL (HTTPS)</label>
@@ -108,7 +108,7 @@ function CreateWebhookForm({ onCreated }: { onCreated: () => void }) {
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           placeholder="https://your-app.com/webhooks/pulse"
-          className="w-full h-10 px-3 rounded-lg border border-black/[0.08] dark:border-gray-700 text-[13px] placeholder:text-quaternary focus:outline-none focus:ring-2 focus:ring-pulse/20 focus:border-pulse/30"
+          className="w-full h-10 px-3 rounded-lg border border-black/[0.08] text-[13px] placeholder:text-quaternary focus:outline-none focus:ring-2 focus:ring-pulse/20 focus:border-pulse/30"
         />
       </div>
       <div>
@@ -120,7 +120,7 @@ function CreateWebhookForm({ onCreated }: { onCreated: () => void }) {
               onClick={() => setEvents((prev) => prev.includes(et.value) ? prev.filter((e) => e !== et.value) : [...prev, et.value])}
               className={cn(
                 "text-[11px] font-medium px-2.5 py-1 rounded-lg border transition-colors",
-                events.includes(et.value) ? "bg-pulse-50 border-pulse/20 text-pulse-600" : "border-black/[0.06] dark:border-gray-800 text-tertiary hover:border-black/[0.12]"
+                events.includes(et.value) ? "bg-pulse-50 border-pulse/20 text-pulse-600" : "border-black/[0.06] text-tertiary hover:border-black/[0.12]"
               )}
             >
               {et.label}
@@ -177,13 +177,13 @@ function WebhookRow({ wh, onUpdate, onDelete }: { wh: WebhookData; onUpdate: () 
   const events: string[] = (() => { try { return JSON.parse(wh.events); } catch { return []; } })();
 
   return (
-    <div className="border-b border-black/[0.03] dark:border-gray-800/50 last:border-0">
-      <div className="flex items-center gap-4 px-5 py-3 hover:bg-[#FAFAFA] dark:hover:bg-gray-800 dark:bg-gray-800 transition-colors">
+    <div className="border-b border-black/[0.03]/50 last:border-0">
+      <div className="flex items-center gap-4 px-5 py-3 hover:bg-[#FAFAFA] transition-colors">
         <div className="flex-1 min-w-0">
           <p className="text-[12px] font-mono text-primary truncate">{wh.url}</p>
           <div className="flex items-center gap-2 mt-1">
             {events.slice(0, 3).map((e) => (
-              <span key={e} className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-[#F0F0F0] dark:bg-gray-700 text-tertiary">{e}</span>
+              <span key={e} className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-[#F0F0F0] text-tertiary">{e}</span>
             ))}
             {events.length > 3 && <span className="text-[9px] text-quaternary">+{events.length - 3}</span>}
           </div>
@@ -205,7 +205,7 @@ function WebhookRow({ wh, onUpdate, onDelete }: { wh: WebhookData; onUpdate: () 
           <button onClick={remove} className="p-1.5 rounded hover:bg-red-50 transition-colors">
             <Trash2 className="w-3 h-3 text-red-400" />
           </button>
-          <button onClick={loadDeliveries} className="p-1.5 rounded hover:bg-[#F0F0F0] dark:bg-gray-700 transition-colors">
+          <button onClick={loadDeliveries} className="p-1.5 rounded hover:bg-[#F0F0F0] transition-colors">
             {expanded ? <ChevronUp className="w-3 h-3 text-tertiary" /> : <ChevronDown className="w-3 h-3 text-tertiary" />}
           </button>
         </div>
@@ -264,8 +264,8 @@ function WebhooksContent() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <div className="h-6 w-32 bg-[#F0F0F0] dark:bg-gray-700 rounded animate-pulse" />
-        <div className="h-40 bg-[#F0F0F0] dark:bg-gray-700 rounded-xl animate-pulse" />
+        <div className="h-6 w-32 bg-[#F0F0F0] rounded animate-pulse" />
+        <div className="h-40 bg-[#F0F0F0] rounded-xl animate-pulse" />
       </div>
     );
   }
@@ -286,10 +286,10 @@ function WebhooksContent() {
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease }}
-          className="rounded-xl border border-black/[0.06] dark:border-gray-800 bg-white overflow-hidden"
+          className="rounded-xl border border-black/[0.06] bg-white overflow-hidden"
           style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.02)" }}
         >
-          <div className="px-5 py-4 border-b border-black/[0.04] dark:border-gray-800">
+          <div className="px-5 py-4 border-b border-black/[0.04]">
             <h3 className="text-[14px] font-semibold tracking-tight">Your Webhooks</h3>
           </div>
           {webhooks.map((wh) => (
@@ -299,7 +299,7 @@ function WebhooksContent() {
       )}
 
       {webhooks.length === 0 && (
-        <div className="rounded-xl border border-black/[0.06] dark:border-gray-800 bg-white p-8 text-center">
+        <div className="rounded-xl border border-black/[0.06] bg-white p-8 text-center">
           <Webhook className="w-8 h-8 text-quaternary mx-auto mb-3" />
           <p className="text-[13px] text-secondary font-medium">No webhooks configured</p>
           <p className="text-[12px] text-tertiary mt-1">Create one above to get real-time notifications.</p>
@@ -307,10 +307,10 @@ function WebhooksContent() {
       )}
 
       {/* Verification docs */}
-      <div className="rounded-xl border border-black/[0.06] dark:border-gray-800 bg-[#FAFAFA] dark:bg-gray-800 p-5">
+      <div className="rounded-xl border border-black/[0.06] bg-[#FAFAFA] p-5">
         <h3 className="text-[13px] font-semibold mb-2">Verifying Signatures</h3>
         <p className="text-[12px] text-tertiary leading-relaxed mb-3">
-          Each webhook delivery includes an <code className="text-[11px] font-mono bg-white px-1.5 py-0.5 rounded border border-black/[0.06] dark:border-gray-800">X-Kyvern-Signature</code> header.
+          Each webhook delivery includes an <code className="text-[11px] font-mono bg-white px-1.5 py-0.5 rounded border border-black/[0.06]">X-Kyvern-Signature</code> header.
           Verify it by computing HMAC-SHA256 of the raw request body using your webhook secret.
         </p>
         <pre className="bg-[#09090B] text-gray-300 rounded-xl p-4 text-[12px] font-mono overflow-x-auto leading-relaxed">

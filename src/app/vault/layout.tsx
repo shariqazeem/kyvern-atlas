@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 
 export default function VaultLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-gray-50/80 dark:bg-gray-950 transition-colors duration-300">
+    <div className="min-h-screen bg-gray-50/80 dark:bg-[#0a0a0a] transition-colors duration-300">
       <DashboardHeader />
       <main className="max-w-[1100px] mx-auto p-4 md:p-6">{children}</main>
     </div>
