@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
-import { authenticateSession } from "@/lib/auth";
+import { authenticateRequest } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -16,13 +16,15 @@ interface EndpointRow {
 
 export async function GET(request: NextRequest) {
   try {
-    const auth = authenticateSession(request);
+    const auth = authenticateRequest(request);
     if ("error" in auth) {
       return NextResponse.json({ error: auth.error }, { status: 401 });
     }
 
     const db = getDb();
-    const rows = db.prepare(`
+    const pathFilter = request.nextUrl.searchParams.get("path");
+
+    let query = `
       SELECT
         e.endpoint as path,
         ep.label,
@@ -33,10 +35,19 @@ export async function GET(request: NextRequest) {
         MAX(e.timestamp) as last_called
       FROM events e
       LEFT JOIN endpoints ep ON ep.api_key_id = e.api_key_id AND ep.path = e.endpoint
-      WHERE e.api_key_id = ?
+      WHERE e.api_key_id = ?`;
+    const params: (string | number)[] = [auth.apiKeyId];
+
+    if (pathFilter) {
+      query += " AND e.endpoint = ?";
+      params.push(pathFilter);
+    }
+
+    query += `
       GROUP BY e.endpoint
-      ORDER BY revenue DESC
-    `).all(auth.apiKeyId) as EndpointRow[];
+      ORDER BY revenue DESC`;
+
+    const rows = db.prepare(query).all(...params) as EndpointRow[];
 
     return NextResponse.json({ endpoints: rows });
   } catch (error) {

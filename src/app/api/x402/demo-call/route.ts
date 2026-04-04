@@ -2,9 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { privateKeyToAccount } from "viem/accounts";
 import { wrapFetchWithPayment, x402Client } from "@x402/fetch";
 import { ExactEvmScheme } from "@x402/evm/exact/client";
+import { checkRateLimit, getClientIP } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
   try {
+    // Rate limit: 10 req/min per IP (prevents wallet drain)
+    const ip = getClientIP(req);
+    const rl = checkRateLimit(`demo:${ip}`, 10, 60000);
+    if (!rl.allowed) {
+      return NextResponse.json({ error: "Rate limit exceeded. Max 10 demo calls per minute." }, { status: 429 });
+    }
+
     const clientKey = process.env.X402_CLIENT_PRIVATE_KEY;
     if (!clientKey) {
       return NextResponse.json(

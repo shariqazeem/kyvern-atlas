@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
-import { authenticateSession } from "@/lib/auth";
+import { authenticateRequest } from "@/lib/auth";
 
 function getDateRange(range: string): { start: string; prevStart: string; end: string } {
   const now = new Date();
@@ -44,7 +44,7 @@ function pctChange(curr: number, prev: number): number {
 
 export async function GET(request: NextRequest) {
   try {
-    const auth = authenticateSession(request);
+    const auth = authenticateRequest(request);
     if ("error" in auth) {
       return NextResponse.json({ error: auth.error }, { status: 401 });
     }

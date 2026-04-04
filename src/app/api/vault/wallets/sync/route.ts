@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { authenticateSession } from "@/lib/auth";
+import { authenticateRequest } from "@/lib/auth";
 import { syncWalletBalances } from "@/lib/vault";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
-  const auth = authenticateSession(req);
+  const auth = authenticateRequest(req);
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: 401 });
 
   try {

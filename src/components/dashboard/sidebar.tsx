@@ -16,6 +16,8 @@ import {
   Webhook,
   Bell,
   TrendingUp,
+  Wallet,
+  Settings,
   Activity,
 } from "lucide-react";
 
@@ -42,9 +44,16 @@ const NAV_GROUPS = [
     ],
   },
   {
+    label: "Products",
+    items: [
+      { href: "/vault", label: "Vault", icon: Wallet },
+    ],
+  },
+  {
     label: "Account",
     items: [
       { href: "/pulse/dashboard/billing", label: "Billing", icon: CreditCard },
+      { href: "/pulse/dashboard/settings", label: "Settings", icon: Settings },
     ],
   },
 ];

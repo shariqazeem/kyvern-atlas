@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { DashboardHeader } from "@/components/dashboard/header";
 import { Sidebar } from "@/components/dashboard/sidebar";
+import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 
 export const metadata: Metadata = {
   title: "Pulse Dashboard — x402 Revenue Analytics",
@@ -20,7 +21,9 @@ export default function DashboardLayout({
         <div className="hidden md:block">
           <Sidebar />
         </div>
-        <main className="flex-1 p-4 md:p-6 max-w-[1200px]">{children}</main>
+        <main className="flex-1 p-4 md:p-6 max-w-[1200px]">
+          <DashboardShell>{children}</DashboardShell>
+        </main>
       </div>
     </div>
   );

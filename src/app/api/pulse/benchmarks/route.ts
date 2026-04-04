@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { authenticateSession } from "@/lib/auth";
+import { authenticateRequest } from "@/lib/auth";
 import { getTierForApiKey } from "@/lib/tier";
 import { getMarketBenchmarks, getUserPricingComparison } from "@/lib/db";
 
@@ -11,7 +11,7 @@ const CACHE_TTL = 5 * 60 * 1000;
 
 export async function GET(request: NextRequest) {
   try {
-    const auth = authenticateSession(request);
+    const auth = authenticateRequest(request);
     if ("error" in auth) {
       return NextResponse.json({ error: auth.error }, { status: 401 });
     }

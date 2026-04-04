@@ -94,6 +94,11 @@ function migrate(db: Database.Database) {
   db.exec("CREATE INDEX IF NOT EXISTS idx_events_tx_hash ON events(tx_hash)");
   db.exec("CREATE INDEX IF NOT EXISTS idx_events_source ON events(source)");
 
+  // Composite indexes for query performance
+  db.exec("CREATE INDEX IF NOT EXISTS idx_events_apikey_ts ON events(api_key_id, timestamp DESC)");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_daily_stats_lookup ON daily_stats(api_key_id, date)");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_snapshots_wallet_ts ON wallet_snapshots(wallet_id, fetched_at DESC)");
+
   // Waitlist table
   db.exec(`
     CREATE TABLE IF NOT EXISTS waitlist (

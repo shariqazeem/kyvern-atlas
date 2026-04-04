@@ -6,6 +6,7 @@ import { authenticateIngestRequest } from "@/lib/auth";
 import { checkUsageLimit } from "@/lib/tier";
 import { fireWebhooks } from "@/lib/webhooks";
 import { evaluateAlerts } from "@/lib/alerts";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 const IngestSchema = z.object({
   endpoint: z.string().min(1),
@@ -27,6 +28,12 @@ export async function POST(request: NextRequest) {
     const auth = authenticateIngestRequest(request);
     if ("error" in auth) {
       return NextResponse.json({ error: auth.error }, { status: 401 });
+    }
+
+    // Rate limit: 100 req/min per API key
+    const rl = checkRateLimit(`ingest:${auth.apiKeyId}`, 100, 60000);
+    if (!rl.allowed) {
+      return NextResponse.json({ error: "Rate limit exceeded. Max 100 req/min." }, { status: 429 });
     }
     const keyRow = { id: auth.apiKeyId };
 

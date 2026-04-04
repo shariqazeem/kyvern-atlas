@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { authenticateSession } from "@/lib/auth";
+import { authenticateRequest } from "@/lib/auth";
 import { checkUsageLimit } from "@/lib/tier";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
-    const auth = authenticateSession(req);
+    const auth = authenticateRequest(req);
     if ("error" in auth) {
       return NextResponse.json({ error: auth.error }, { status: 401 });
     }

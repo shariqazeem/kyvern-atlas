@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
-import { authenticateSession } from "@/lib/auth";
+import { authenticateRequest } from "@/lib/auth";
 import { getTierForApiKey } from "@/lib/tier";
 import { generateCSV, csvResponse } from "@/lib/csv";
 
@@ -25,7 +25,7 @@ function getStartDate(range: string): string {
 }
 
 export async function GET(req: NextRequest) {
-  const auth = authenticateSession(req);
+  const auth = authenticateRequest(req);
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: 401 });
   const blocked = proGate(auth.apiKeyId);
   if (blocked) return blocked;

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
-import { authenticateSession } from "@/lib/auth";
+import { authenticateRequest } from "@/lib/auth";
 import { getTierForApiKey, getRetentionDays } from "@/lib/tier";
 
 interface TimeseriesRow {
@@ -11,7 +11,7 @@ interface TimeseriesRow {
 
 export async function GET(request: NextRequest) {
   try {
-    const auth = authenticateSession(request);
+    const auth = authenticateRequest(request);
     if ("error" in auth) {
       return NextResponse.json({ error: auth.error }, { status: 401 });
     }

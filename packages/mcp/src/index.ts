@@ -224,16 +224,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "pulse_get_endpoint_detail": {
-        // Get all endpoints then filter to the requested one
-        const data = await pulseAPI("/endpoints") as { endpoints: Array<Record<string, unknown>> };
-        const match = data.endpoints?.find((e) => e.path === a.endpoint);
+        const data = await pulseAPI(`/endpoints?path=${encodeURIComponent(String(a.endpoint))}`) as { endpoints: Array<Record<string, unknown>> };
+        const match = data.endpoints?.[0];
         if (!match) return err(`Endpoint "${a.endpoint}" not found. Use pulse_get_endpoints to see available endpoints.`);
         return ok(match);
       }
 
       case "pulse_get_customer_detail": {
-        const data = await pulseAPI(`/customers?limit=200`) as { customers: Array<Record<string, unknown>> };
-        const match = data.customers?.find((c) => String(c.address).toLowerCase() === String(a.address).toLowerCase());
+        const data = await pulseAPI(`/customers?address=${encodeURIComponent(String(a.address))}`) as { customers: Array<Record<string, unknown>> };
+        const match = data.customers?.[0];
         if (!match) return err(`Agent "${a.address}" not found. Use pulse_get_customers to see known agents.`);
         return ok(match);
       }

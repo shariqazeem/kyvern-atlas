@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { getDb } from "@/lib/db";
-import { authenticateSession } from "@/lib/auth";
+import { authenticateRequest } from "@/lib/auth";
 import { getTierForApiKey } from "@/lib/tier";
 import { ALERT_TYPES } from "@/lib/alerts";
 
@@ -16,7 +16,7 @@ function proCheck(apiKeyId: string) {
 }
 
 export async function GET(req: NextRequest) {
-  const auth = authenticateSession(req);
+  const auth = authenticateRequest(req);
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: 401 });
   const blocked = proCheck(auth.apiKeyId);
   if (blocked) return blocked;
@@ -41,7 +41,7 @@ const CreateSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const auth = authenticateSession(req);
+  const auth = authenticateRequest(req);
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: 401 });
   const blocked = proCheck(auth.apiKeyId);
   if (blocked) return blocked;
@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  const auth = authenticateSession(req);
+  const auth = authenticateRequest(req);
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: 401 });
 
   const id = req.nextUrl.searchParams.get("id");
@@ -93,7 +93,7 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const auth = authenticateSession(req);
+  const auth = authenticateRequest(req);
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: 401 });
 
   const id = req.nextUrl.searchParams.get("id");

@@ -63,8 +63,8 @@ export function createAccount(walletAddress: string): {
     );
 
     db.prepare(
-      "INSERT INTO api_keys (id, key_hash, key_prefix, name, wallet_address, tier, key_full) VALUES (?, ?, ?, ?, ?, 'free', ?)"
-    ).run(keyId, keyHash, keyPrefix, "Default", wallet, fullKey);
+      "INSERT INTO api_keys (id, key_hash, key_prefix, name, wallet_address, tier) VALUES (?, ?, ?, ?, ?, 'free')"
+    ).run(keyId, keyHash, keyPrefix, "Default", wallet);
   });
 
   createTx();
@@ -159,6 +159,35 @@ export function authenticateSession(
   }
 
   return { apiKeyId, wallet: session.wallet_address };
+}
+
+/**
+ * Unified auth: tries session cookie first, then X-API-Key header.
+ * Works for both dashboard (browser) and MCP (API key) requests.
+ */
+export function authenticateRequest(
+  req: NextRequest
+): { apiKeyId: string; wallet: string } | { error: string } {
+  // 1. Try session cookie (dashboard)
+  const sessionResult = authenticateSession(req);
+  if (!("error" in sessionResult)) {
+    return sessionResult;
+  }
+
+  // 2. Try X-API-Key header (MCP / programmatic)
+  const apiKeyResult = authenticateIngestRequest(req);
+  if (!("error" in apiKeyResult)) {
+    // Resolve wallet address from the API key
+    const db = getDb();
+    const row = db
+      .prepare("SELECT wallet_address FROM api_keys WHERE id = ?")
+      .get(apiKeyResult.apiKeyId) as { wallet_address: string } | undefined;
+    const wallet = row?.wallet_address || "";
+    return { apiKeyId: apiKeyResult.apiKeyId, wallet };
+  }
+
+  // Both failed — return a helpful error
+  return { error: "Not authenticated. Provide a session cookie or X-API-Key header." };
 }
 
 export function authenticateIngestRequest(
