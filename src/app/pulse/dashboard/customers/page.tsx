@@ -125,6 +125,35 @@ export default function CustomersPage() {
         </motion.div>
       )}
 
+      {/* Churn Risk Panel */}
+      {(() => {
+        const atRisk = raw.filter((c) => c.persona.name === "The Ghost");
+        const revenueAtRisk = atRisk.reduce((s, c) => s + c.total_spent, 0);
+        if (atRisk.length === 0) return null;
+        return (
+          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
+            className="rounded-xl border border-amber-200 bg-amber-50/40 p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-[14px]">⚠️</span>
+              <h3 className="text-[13px] font-semibold text-amber-800">Churn Risk</h3>
+              <span className="text-[11px] text-amber-600">{atRisk.length} agent{atRisk.length > 1 ? "s" : ""} at risk</span>
+            </div>
+            <p className="text-[12px] text-amber-700 mb-3">
+              These agents were active but haven&apos;t been seen in 7+ days. Estimated revenue at risk: <strong className="font-mono-numbers">{formatCurrency(revenueAtRisk)}</strong>
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {atRisk.slice(0, 5).map((c) => (
+                <span key={c.address} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white border border-amber-200 text-[11px]">
+                  <span>👻</span>
+                  <span className="font-mono">{truncateAddress(c.address)}</span>
+                  <span className="text-amber-600 font-medium">{formatCurrency(c.total_spent)}</span>
+                </span>
+              ))}
+            </div>
+          </motion.div>
+        );
+      })()}
+
       <SearchBar value={search} onChange={(v) => { setSearch(v); setOffset(0); }} placeholder="Search wallet addresses..." />
 
       <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-lg border border-border shadow-premium overflow-hidden">
