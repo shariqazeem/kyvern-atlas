@@ -19,6 +19,7 @@ import {
   Wallet,
   Activity,
   Sparkles,
+  FlaskConical,
 } from "lucide-react";
 
 const NAV_GROUPS = [
@@ -38,6 +39,7 @@ const NAV_GROUPS = [
       { href: "/pulse/dashboard/customers", label: "Customers", icon: Users },
       { href: "/pulse/dashboard/cohorts", label: "Cohorts", icon: Users },
       { href: "/pulse/dashboard/intelligence", label: "Intelligence", icon: TrendingUp },
+      { href: "/pulse/dashboard/experiments", label: "Experiments", icon: FlaskConical },
     ],
   },
   {
