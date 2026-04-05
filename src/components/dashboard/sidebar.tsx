@@ -18,9 +18,16 @@ import {
   TrendingUp,
   Wallet,
   Activity,
+  Sparkles,
 } from "lucide-react";
 
 const NAV_GROUPS = [
+  {
+    label: "",
+    items: [
+      { href: "/pulse/dashboard/copilot", label: "Copilot", icon: Sparkles },
+    ],
+  },
   {
     label: "Analytics",
     items: [
