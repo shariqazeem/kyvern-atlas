@@ -357,7 +357,7 @@ export default function UpgradePage() {
                         <div className="flex-1 h-px bg-white/10" />
                       </div>
                       <a
-                        href={`https://www.moonpay.com/buy/usdc_base?walletAddress=${address}&baseCurrencyAmount=${PLANS[selectedPlan].amount}&baseCurrencyCode=usd`}
+                        href={`https://buy.moonpay.com?currencyCode=usdc_base&walletAddress=${address}&baseCurrencyAmount=${PLANS[selectedPlan].amount}&baseCurrencyCode=usd`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="w-full inline-flex items-center justify-center gap-2 h-11 rounded-lg border border-white/20 text-white/70 text-[13px] font-medium hover:bg-white/5 transition-colors"
