@@ -8,8 +8,10 @@ import { RevenueChart } from "@/components/dashboard/revenue-chart";
 import { EndpointTable } from "@/components/dashboard/endpoint-table";
 import { CustomerTable } from "@/components/dashboard/customer-table";
 import { RecentTransactions } from "@/components/dashboard/recent-transactions";
+import { MoneyMoments } from "@/components/dashboard/money-moments";
 import { ConnectGate } from "@/components/dashboard/connect-gate";
 import { OnboardingChecklist } from "@/components/dashboard/onboarding-checklist";
+import { RevenueNarrator } from "@/components/dashboard/revenue-narrator";
 import { formatCurrency, formatNumber } from "@/lib/utils";
 
 function DashboardContent() {
@@ -42,6 +44,9 @@ function DashboardContent() {
           Revenue intelligence for your x402 endpoints
         </p>
       </div>
+
+      {/* AI Revenue Insights — the first thing users see */}
+      {hasData && <RevenueNarrator />}
 
       {/* Onboarding checklist — shows until first event */}
       <OnboardingChecklist hasEvents={!!hasData} />
@@ -89,6 +94,9 @@ function DashboardContent() {
           </div>
 
           <RecentTransactions limit={10} />
+
+          {/* Money Moments — social-style feed of revenue events */}
+          <MoneyMoments limit={5} showViewAll />
         </>
       )}
     </div>

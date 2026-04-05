@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { DashboardHeader } from "@/components/dashboard/header";
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
+import { CommandPalette } from "@/components/dashboard/command-palette";
 
 export const metadata: Metadata = {
   title: "Pulse Dashboard — x402 Revenue Analytics",
@@ -16,6 +17,7 @@ export default function DashboardLayout({
 }) {
   return (
     <div className="min-h-screen bg-gray-50/80 dark:bg-[#0a0a0a] transition-colors duration-300">
+      <CommandPalette />
       <DashboardHeader />
       <div className="flex">
         <div className="hidden md:block">

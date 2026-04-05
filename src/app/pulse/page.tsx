@@ -6,6 +6,7 @@ import { Navbar } from "@/components/landing/navbar";
 import { Footer } from "@/components/landing/footer";
 import { WaitlistForm } from "@/components/landing/waitlist-form";
 import { SocialProof } from "@/components/landing/social-proof";
+import { RevenueSimulator } from "@/components/landing/revenue-simulator";
 import {
   ArrowRight,
   Activity,
@@ -362,6 +363,8 @@ export default function PulseLanding() {
       </section>
 
       <SocialProof />
+
+      <RevenueSimulator />
 
       {/* Pricing */}
       <section id="pricing" className="py-24 lg:py-28 px-6 bg-[#FAFAFA]">

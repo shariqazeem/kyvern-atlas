@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useCustomers } from "@/hooks/use-customers";
+import { usePersonas } from "@/hooks/use-personas";
 import { formatCurrency, truncateAddress } from "@/lib/utils";
 import { ExportButton } from "./export-button";
 
@@ -10,7 +10,7 @@ interface CustomerTableProps {
 }
 
 export function CustomerTable({ limit }: CustomerTableProps) {
-  const { data, loading } = useCustomers(limit || 20);
+  const { data, loading } = usePersonas(limit || 20);
   const customers = limit ? data.slice(0, limit) : data;
 
   if (loading) {
@@ -39,7 +39,7 @@ export function CustomerTable({ limit }: CustomerTableProps) {
       </div>
       <div className="space-y-0">
         <div className="grid grid-cols-4 gap-4 text-xs text-muted-foreground font-medium pb-2 border-b border-border">
-          <span>Agent Address</span>
+          <span>Agent</span>
           <span className="text-right">Total Spent</span>
           <span className="text-right">Calls</span>
           <span className="text-right">Top Endpoint</span>
@@ -52,7 +52,8 @@ export function CustomerTable({ limit }: CustomerTableProps) {
             transition={{ duration: 0.3, delay: 0.55 + i * 0.05 }}
             className="grid grid-cols-4 gap-4 py-2.5 text-sm border-b border-border/50 last:border-0 hover:bg-muted/30 transition-colors -mx-2 px-2 rounded"
           >
-            <span className="font-mono text-xs text-foreground">
+            <span className="font-mono text-xs text-foreground flex items-center gap-1.5">
+              <span title={customer.persona.name}>{customer.persona.emoji}</span>
               {truncateAddress(customer.address)}
             </span>
             <span className="text-right font-mono-numbers font-medium">
@@ -62,7 +63,7 @@ export function CustomerTable({ limit }: CustomerTableProps) {
               {customer.call_count.toLocaleString()}
             </span>
             <span className="text-right font-mono text-xs text-muted-foreground truncate">
-              {customer.top_endpoint}
+              {customer.favorite_endpoint}
             </span>
           </motion.div>
         ))}

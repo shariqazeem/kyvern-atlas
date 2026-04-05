@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
+import confetti from "canvas-confetti";
 import { Navbar } from "@/components/landing/navbar";
 import { Footer } from "@/components/landing/footer";
 import { useSubscription } from "@/hooks/use-subscription";
@@ -61,6 +62,20 @@ export default function UpgradePage() {
   const [subResult, setSubResult] = useState<{ expires_at?: string } | null>(null);
 
   const address = wallets?.[0]?.address;
+
+  // Celebration confetti when Pro activates
+  useEffect(() => {
+    if (status === "done") {
+      const duration = 3000;
+      const end = Date.now() + duration;
+      const frame = () => {
+        confetti({ particleCount: 3, angle: 60, spread: 55, origin: { x: 0 } });
+        confetti({ particleCount: 3, angle: 120, spread: 55, origin: { x: 1 } });
+        if (Date.now() < end) requestAnimationFrame(frame);
+      };
+      frame();
+    }
+  }, [status]);
 
   async function handleUpgrade() {
     setError(null);
@@ -212,10 +227,23 @@ export default function UpgradePage() {
 
               {/* Payment states */}
               {status === "done" ? (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2 text-emerald-400">
-                    <Check className="w-5 h-5" />
-                    <span className="text-[14px] font-semibold">Pro activated!</span>
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.5, ease: [0.25, 0.1, 0.25, 1] }}
+                  className="space-y-4"
+                >
+                  <div className="text-center py-2">
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ type: "spring", stiffness: 200, delay: 0.2 }}
+                      className="w-16 h-16 rounded-full bg-emerald-500/20 flex items-center justify-center mx-auto mb-3"
+                    >
+                      <Check className="w-8 h-8 text-emerald-400" />
+                    </motion.div>
+                    <h3 className="text-[18px] font-bold text-white">Welcome to Pulse Pro!</h3>
+                    <p className="text-[13px] text-white/50 mt-1">Your business intelligence just leveled up.</p>
                   </div>
                   {subResult?.expires_at && (
                     <p className="text-[12px] text-white/50">
@@ -232,7 +260,7 @@ export default function UpgradePage() {
                     className="w-full inline-flex items-center justify-center gap-2 h-11 rounded-lg bg-white text-foreground text-[13px] font-medium hover:bg-white/90 transition-colors">
                     Open Dashboard <ArrowRight className="w-3.5 h-3.5" />
                   </a>
-                </div>
+                </motion.div>
               ) : (
                 <div className="space-y-4">
                   <button

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Activity, Sparkles, Sun, Moon, Monitor } from "lucide-react";
+import { Activity, Sparkles, Sun, Moon, Monitor, Search } from "lucide-react";
 import { TimeRangeSelector } from "./time-range-selector";
 import { MobileNav } from "./mobile-nav";
 import { LiveIndicator } from "./live-indicator";
@@ -62,6 +62,24 @@ export function DashboardHeader() {
           </div>
         </div>
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => {
+              const event = new KeyboardEvent("keydown", {
+                key: "k",
+                metaKey: true,
+                bubbles: true,
+              });
+              document.dispatchEvent(event);
+            }}
+            className="hidden sm:inline-flex items-center gap-2 h-8 px-2.5 rounded-lg border border-black/[0.08] hover:border-black/[0.14] bg-white hover:bg-[#FAFAFA] transition-all duration-200 cursor-pointer"
+            title="Search (Cmd+K)"
+          >
+            <Search className="w-3.5 h-3.5 text-[hsl(var(--text-quaternary))]" />
+            <span className="text-[12px] text-[hsl(var(--text-quaternary))]">Search...</span>
+            <kbd className="inline-flex items-center gap-0.5 text-[10px] font-medium text-[hsl(var(--text-quaternary))] bg-[#F5F5F5] border border-black/[0.06] rounded px-1.5 py-0.5 font-mono ml-2">
+              <span className="text-[11px]">&#8984;</span>K
+            </kbd>
+          </button>
           <button
             onClick={cycleTheme}
             className="p-1.5 rounded-lg hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors"

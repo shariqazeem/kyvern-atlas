@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
-import { useCustomers } from "@/hooks/use-customers";
+import { usePersonas } from "@/hooks/use-personas";
 import { formatCurrency, truncateAddress } from "@/lib/utils";
 import { Copy, ArrowUpDown } from "lucide-react";
 import { ExportButton } from "@/components/dashboard/export-button";
@@ -13,16 +13,18 @@ const PAGE_SIZE = 20;
 type SortKey = "total_spent" | "call_count" | "first_seen";
 
 export default function CustomersPage() {
-  const { data: raw, loading } = useCustomers(200);
+  const { data: raw, distribution, loading } = usePersonas(200);
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<SortKey>("total_spent");
   const [sortAsc, setSortAsc] = useState(false);
   const [offset, setOffset] = useState(0);
   const [copiedAddress, setCopiedAddress] = useState<string | null>(null);
+  const [personaFilter, setPersonaFilter] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     let d = raw;
     if (search) d = d.filter((c) => c.address.toLowerCase().includes(search.toLowerCase()));
+    if (personaFilter) d = d.filter((c) => c.persona.name === personaFilter);
     d = [...d].sort((a, b) => {
       if (sortBy === "first_seen") {
         return sortAsc
@@ -34,10 +36,20 @@ export default function CustomersPage() {
       return sortAsc ? va - vb : vb - va;
     });
     return d;
-  }, [raw, search, sortBy, sortAsc]);
+  }, [raw, search, sortBy, sortAsc, personaFilter]);
 
   const paged = filtered.slice(offset, offset + PAGE_SIZE);
   const totalSpent = raw.reduce((sum, c) => sum + c.total_spent, 0);
+
+  // Build persona filter options from distribution
+  const personaOptions = useMemo(() => {
+    return Object.entries(distribution)
+      .sort(([, a], [, b]) => b - a)
+      .map(([name, count]) => {
+        const match = raw.find((c) => c.persona.name === name);
+        return { name, count, emoji: match?.persona.emoji || "", color: match?.persona.color || "#78716c" };
+      });
+  }, [distribution, raw]);
 
   function toggleSort(key: SortKey) {
     if (sortBy === key) setSortAsc(!sortAsc);
@@ -80,6 +92,39 @@ export default function CustomersPage() {
         </motion.div>
       </div>
 
+      {/* Persona Distribution Chips */}
+      {personaOptions.length > 0 && (
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }} className="flex flex-wrap gap-2">
+          <button
+            onClick={() => { setPersonaFilter(null); setOffset(0); }}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
+              personaFilter === null
+                ? "bg-foreground text-white border-foreground"
+                : "bg-white text-muted-foreground border-border hover:border-foreground/20"
+            }`}
+          >
+            All
+            <span className="font-mono-numbers">{raw.length}</span>
+          </button>
+          {personaOptions.map((p) => (
+            <button
+              key={p.name}
+              onClick={() => { setPersonaFilter(personaFilter === p.name ? null : p.name); setOffset(0); }}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
+                personaFilter === p.name
+                  ? "text-white border-transparent"
+                  : "bg-white text-muted-foreground border-border hover:border-foreground/20"
+              }`}
+              style={personaFilter === p.name ? { backgroundColor: p.color, borderColor: p.color } : undefined}
+            >
+              <span>{p.emoji}</span>
+              {p.name}
+              <span className="font-mono-numbers">{p.count}</span>
+            </button>
+          ))}
+        </motion.div>
+      )}
+
       <SearchBar value={search} onChange={(v) => { setSearch(v); setOffset(0); }} placeholder="Search wallet addresses..." />
 
       <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-lg border border-border shadow-premium overflow-hidden">
@@ -87,7 +132,8 @@ export default function CustomersPage() {
           <table className="w-full min-w-[700px]">
             <thead>
               <tr className="border-b border-border">
-                <th className="text-left text-xs font-medium text-muted-foreground px-5 py-3">Agent Address</th>
+                <th className="text-left text-xs font-medium text-muted-foreground px-5 py-3">Agent</th>
+                <th className="text-left text-xs font-medium text-muted-foreground px-5 py-3">Persona</th>
                 <th className="text-right text-xs font-medium text-muted-foreground px-5 py-3">
                   <button onClick={() => toggleSort("total_spent")} className="inline-flex items-center gap-1 hover:text-foreground">
                     Total Spent <ArrowUpDown className={`w-3 h-3 ${sortBy === "total_spent" ? "text-pulse" : ""}`} />
@@ -117,14 +163,23 @@ export default function CustomersPage() {
                       {copiedAddress === customer.address && <span className="text-[10px] text-pulse">Copied</span>}
                     </button>
                   </td>
+                  <td className="px-5 py-3">
+                    <span
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium text-white"
+                      style={{ backgroundColor: customer.persona.color }}
+                      title={customer.persona.description}
+                    >
+                      {customer.persona.emoji} {customer.persona.name}
+                    </span>
+                  </td>
                   <td className="px-5 py-3 text-right font-mono-numbers text-sm font-medium">{formatCurrency(customer.total_spent)}</td>
                   <td className="px-5 py-3 text-right font-mono-numbers text-sm text-muted-foreground">{customer.call_count.toLocaleString()}</td>
-                  <td className="px-5 py-3"><span className="font-mono text-xs text-muted-foreground">{customer.top_endpoint}</span></td>
+                  <td className="px-5 py-3"><span className="font-mono text-xs text-muted-foreground">{customer.favorite_endpoint}</span></td>
                   <td className="px-5 py-3 text-right text-xs text-muted-foreground">{format(parseISO(customer.first_seen), "MMM d")}</td>
                   <td className="px-5 py-3 text-right text-xs text-muted-foreground">{format(parseISO(customer.last_seen), "MMM d")}</td>
                 </tr>
               ))}
-              {paged.length === 0 && <tr><td colSpan={6} className="px-5 py-8 text-center text-[13px] text-tertiary">No customers found</td></tr>}
+              {paged.length === 0 && <tr><td colSpan={7} className="px-5 py-8 text-center text-[13px] text-tertiary">No customers found</td></tr>}
             </tbody>
           </table>
         </div>

@@ -135,3 +135,31 @@ export interface NetworkConfig {
   chainId: string;
   explorerUrl: string;
 }
+
+// Agent Persona Engine
+export interface Persona {
+  name: string;
+  emoji: string;
+  color: string;
+  description: string;
+}
+
+export interface CustomerWithPersona {
+  address: string;
+  persona: Persona;
+  total_spent: number;
+  call_count: number;
+  first_seen: string;
+  last_seen: string;
+  favorite_endpoint: string;
+  days_active: number;
+  endpoint_diversity: number;
+  avg_daily_spend: number;
+  recency: number;
+  tenure: number;
+}
+
+export interface PersonasResponse {
+  customers: CustomerWithPersona[];
+  distribution: Record<string, number>;
+}

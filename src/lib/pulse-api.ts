@@ -3,6 +3,7 @@ import type {
   EndpointsResponse,
   CustomersResponse,
   TimeseriesResponse,
+  PersonasResponse,
   TimeRange,
 } from "@/types/pulse";
 
@@ -28,4 +29,8 @@ export function getCustomers(limit = 20) {
 
 export function getTimeseries(range: TimeRange) {
   return fetchJSON<TimeseriesResponse>(`${BASE}/timeseries?range=${range}`);
+}
+
+export function getPersonas(limit = 200) {
+  return fetchJSON<PersonasResponse>(`${BASE}/personas?limit=${limit}`);
 }
