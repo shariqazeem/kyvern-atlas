@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Key, Copy, Check, Eye, EyeOff, Shield, RefreshCw } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { ConfirmModal } from "@/components/dashboard/confirm-modal";
 
 interface ApiKeyInfo {
   id: string;
@@ -24,6 +25,7 @@ export default function KeysPage() {
   const [showNewKey, setShowNewKey] = useState(!!apiKey);
   const [rotatedKey, setRotatedKey] = useState<string | null>(null);
   const [rotating, setRotating] = useState(false);
+  const [rotateTarget, setRotateTarget] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/auth/keys", { credentials: "include" })
@@ -32,6 +34,28 @@ export default function KeysPage() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
+
+  async function handleRotate() {
+    if (!rotateTarget) return;
+    setRotating(true);
+    setRotateTarget(null);
+    try {
+      const res = await fetch("/api/auth/keys/rotate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ key_id: rotateTarget }),
+      });
+      const data = await res.json();
+      if (data.full_key) {
+        setRotatedKey(data.full_key);
+        fetch("/api/auth/keys", { credentials: "include" })
+          .then((r) => r.json())
+          .then((d) => setKeys(d.keys || []));
+      }
+    } catch { /* ignore */ }
+    finally { setRotating(false); }
+  }
 
   function copyToClipboard(text: string, id: string) {
     navigator.clipboard.writeText(text);
@@ -180,27 +204,7 @@ export default function KeysPage() {
                         <span className="text-[10px] text-quaternary">Key hidden</span>
                       )}
                       <button
-                        onClick={async () => {
-                          if (!confirm("Rotate this key? The old key will stop working immediately.")) return;
-                          setRotating(true);
-                          try {
-                            const res = await fetch("/api/auth/keys/rotate", {
-                              method: "POST",
-                              headers: { "Content-Type": "application/json" },
-                              credentials: "include",
-                              body: JSON.stringify({ key_id: key.id }),
-                            });
-                            const data = await res.json();
-                            if (data.full_key) {
-                              setRotatedKey(data.full_key);
-                              // Refresh keys list
-                              fetch("/api/auth/keys", { credentials: "include" })
-                                .then((r) => r.json())
-                                .then((d) => setKeys(d.keys || []));
-                            }
-                          } catch { /* ignore */ }
-                          finally { setRotating(false); }
-                        }}
+                        onClick={() => setRotateTarget(key.id)}
                         disabled={rotating}
                         className="inline-flex items-center gap-1 text-[11px] font-medium text-tertiary hover:text-primary transition-colors"
                         title="Generate a new key (old key stops working)"
@@ -223,6 +227,15 @@ export default function KeysPage() {
           </table>
         </div>
       </motion.div>
+      <ConfirmModal
+        open={!!rotateTarget}
+        title="Rotate API Key"
+        description="The old key will stop working immediately. Any middleware using the current key will need to be updated."
+        confirmLabel="Rotate Key"
+        variant="warning"
+        onConfirm={handleRotate}
+        onCancel={() => setRotateTarget(null)}
+      />
     </div>
   );
 }

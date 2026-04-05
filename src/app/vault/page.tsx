@@ -7,6 +7,7 @@ import {
   DollarSign, Coins, Eye,
 } from "lucide-react";
 import { ConnectGate } from "@/components/dashboard/connect-gate";
+import { ConfirmModal } from "@/components/dashboard/confirm-modal";
 import { truncateAddress } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
@@ -102,6 +103,7 @@ function VaultContent() {
   const [totalEth, setTotalEth] = useState(0);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [removeTarget, setRemoveTarget] = useState<string | null>(null);
 
   const load = useCallback(() => {
     fetch("/api/vault/wallets", { credentials: "include" })
@@ -125,9 +127,9 @@ function VaultContent() {
   }
 
   async function remove(id: string) {
-    if (!confirm("Remove this wallet?")) return;
     await fetch(`/api/vault/wallets?id=${id}`, { method: "DELETE", credentials: "include" });
     load();
+    setRemoveTarget(null);
   }
 
   if (loading) {
@@ -249,7 +251,7 @@ function VaultContent() {
                         )}
                       </td>
                       <td className="px-5 py-3 text-right">
-                        <button onClick={() => remove(w.id)} className="p-1.5 rounded hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+                        <button onClick={() => setRemoveTarget(w.id)} className="p-1.5 rounded hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
                           <Trash2 className="w-3 h-3 text-red-400" />
                         </button>
                       </td>
@@ -267,6 +269,15 @@ function VaultContent() {
           <p className="text-[12px] text-tertiary mt-1">Add your x402 payment wallets to track balances and get low-funds alerts.</p>
         </div>
       )}
+      <ConfirmModal
+        open={!!removeTarget}
+        title="Remove Wallet"
+        description="This wallet will be removed from monitoring. Balance history will be deleted."
+        confirmLabel="Remove"
+        variant="danger"
+        onConfirm={() => removeTarget && remove(removeTarget)}
+        onCancel={() => setRemoveTarget(null)}
+      />
     </div>
   );
 }
