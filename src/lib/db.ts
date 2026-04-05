@@ -210,6 +210,16 @@ function migrate(db: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_alerts_api_key ON alerts(api_key_id);
   `);
 
+  // Alerts column migration — add Slack/Discord notification URLs
+  const alertCols = db.pragma("table_info(alerts)") as Array<{ name: string }>;
+  const alertColNames = new Set(alertCols.map((c) => c.name));
+  if (!alertColNames.has("slack_url")) {
+    db.exec("ALTER TABLE alerts ADD COLUMN slack_url TEXT");
+  }
+  if (!alertColNames.has("discord_url")) {
+    db.exec("ALTER TABLE alerts ADD COLUMN discord_url TEXT");
+  }
+
   // Vault — wallet monitoring
   db.exec(`
     CREATE TABLE IF NOT EXISTS wallets (
@@ -217,7 +227,7 @@ function migrate(db: Database.Database) {
       api_key_id TEXT NOT NULL,
       address TEXT NOT NULL,
       label TEXT NOT NULL,
-      network TEXT NOT NULL DEFAULT 'eip155:84532',
+      network TEXT NOT NULL DEFAULT 'eip155:8453',
       purpose TEXT NOT NULL DEFAULT 'receivable',
       endpoint TEXT,
       is_monitored INTEGER NOT NULL DEFAULT 1,

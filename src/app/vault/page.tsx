@@ -219,7 +219,7 @@ function VaultContent() {
                       isLow ? "bg-amber-50/50 dark:bg-amber-900/10" : "hover:bg-[#FAFAFA]"
                     )}>
                       <td className="px-5 py-3">
-                        <a href={`https://sepolia.basescan.org/address/${w.address}`} target="_blank" rel="noopener noreferrer"
+                        <a href={`https://basescan.org/address/${w.address}`} target="_blank" rel="noopener noreferrer"
                           className="inline-flex items-center gap-1.5 font-mono text-[12px] text-pulse hover:underline">
                           {truncateAddress(w.address, 8)}
                           <ExternalLink className="w-2.5 h-2.5" />

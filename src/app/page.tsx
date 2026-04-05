@@ -10,6 +10,7 @@ export const metadata: Metadata = {
 import { Hero } from "@/components/landing/hero";
 import { ProblemSection } from "@/components/landing/problem-section";
 import { SocialProof } from "@/components/landing/social-proof";
+import { Leaderboard } from "@/components/landing/leaderboard";
 import { ProductsSection } from "@/components/landing/products-section";
 import { DevelopersSection } from "@/components/landing/developers-section";
 import { FinalCTA } from "@/components/landing/final-cta";
@@ -22,6 +23,7 @@ export default function Home() {
       <Hero />
       <ProblemSection />
       <SocialProof />
+      <Leaderboard />
       <DevelopersSection />
       <ProductsSection />
       <FinalCTA />

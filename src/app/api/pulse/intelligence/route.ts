@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 import { authenticateRequest } from "@/lib/auth";
-import { getTierForApiKey } from "@/lib/tier";
 
 export const dynamic = "force-dynamic";
 
@@ -25,14 +24,12 @@ export async function GET(request: NextRequest) {
     const auth = authenticateRequest(request);
     if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: 401 });
 
-    if (getTierForApiKey(auth.apiKeyId) !== "pro") {
-      return NextResponse.json({ error: "pro_required", message: "Competitive Intelligence requires Pulse Pro." }, { status: 403 });
-    }
-
+    // Intelligence is free until we have 20+ providers (seeds network effect)
+    // Once we hit critical mass, gate behind Pro
     const db = getDb();
     const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString();
 
-    // Check minimum user threshold for privacy
+    // Check provider count — gate behind Pro only when we have enough data
     const providerCount = db.prepare(
       "SELECT COUNT(DISTINCT api_key_id) as count FROM events WHERE timestamp >= ?"
     ).get(thirtyDaysAgo) as { count: number };

@@ -7,7 +7,6 @@ import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Cell,
 } from "recharts";
-import { ProGate } from "@/components/dashboard/pro-gate";
 import { formatCurrency } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
@@ -321,9 +320,6 @@ function IntelligenceContent() {
 }
 
 export default function IntelligencePage() {
-  return (
-    <ProGate feature="Market-wide competitive intelligence. See how your x402 pricing and volume compare to the entire ecosystem.">
-      <IntelligenceContent />
-    </ProGate>
-  );
+  // Intelligence is free until we have 20+ providers (seeds network effect)
+  return <IntelligenceContent />;
 }

@@ -19,11 +19,10 @@ import {
 } from "lucide-react";
 import { getExplorerTxUrl, truncateTxHash, KYVERN_PAY_TO } from "@/lib/utils";
 
-const USDC_ADDRESS = "0x036CbD53842c5426634e7929541eC2318f3dCF7e" as const;
+const USDC_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" as const;
 const PAYTO = KYVERN_PAY_TO as `0x${string}`;
-// $1 on testnet, $49 on mainnet
-const PRO_AMOUNT = process.env.NEXT_PUBLIC_PRO_PRICE || "1";
-const NETWORK_NAME = "Base Sepolia";
+const PRO_AMOUNT = process.env.NEXT_PUBLIC_PRO_PRICE || "49";
+const NETWORK_NAME = "Base";
 
 const USDC_ABI = [
   {
@@ -224,7 +223,7 @@ export default function UpgradePage() {
                     </p>
                   )}
                   {txHash && (
-                    <a href={getExplorerTxUrl(txHash, "eip155:84532")} target="_blank" rel="noopener noreferrer"
+                    <a href={getExplorerTxUrl(txHash, "eip155:8453")} target="_blank" rel="noopener noreferrer"
                       className="inline-flex items-center gap-1 text-[12px] font-mono text-pulse-300 hover:underline">
                       {truncateTxHash(txHash)} <ExternalLink className="w-2.5 h-2.5" />
                     </a>
@@ -275,7 +274,7 @@ export default function UpgradePage() {
 
                   {txHash && (status as string) !== "idle" && (status as string) !== "done" && (
                     <div className="text-center">
-                      <a href={getExplorerTxUrl(txHash, "eip155:84532")} target="_blank" rel="noopener noreferrer"
+                      <a href={getExplorerTxUrl(txHash, "eip155:8453")} target="_blank" rel="noopener noreferrer"
                         className="inline-flex items-center gap-1 text-[11px] font-mono text-white/40 hover:text-white/60">
                         {truncateTxHash(txHash)} <ExternalLink className="w-2.5 h-2.5" />
                       </a>

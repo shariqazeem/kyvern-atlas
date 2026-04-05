@@ -85,8 +85,7 @@ export default function SettingsPage() {
               <p className="text-[11px] text-quaternary font-medium uppercase tracking-wider mb-1">Your Wallet Address</p>
               <p className="text-[12px] font-mono text-primary break-all">{wallet}</p>
               <p className="text-[10px] text-quaternary mt-1.5">
-                Send USDC to this address on Base Sepolia to fund your wallet for Pro upgrades.
-                {" "}<a href="https://faucet.circle.com/" target="_blank" rel="noopener noreferrer" className="text-pulse hover:underline">Get testnet USDC →</a>
+                Send USDC to this address on Base to fund your wallet for Pro upgrades.
               </p>
             </div>
           )}

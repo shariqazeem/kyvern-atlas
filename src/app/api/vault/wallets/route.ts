@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
 const CreateSchema = z.object({
   address: z.string().regex(/^0x[a-fA-F0-9]{40}$/, "Invalid EVM address"),
   label: z.string().min(1).max(50),
-  network: z.string().default("eip155:84532"),
+  network: z.string().default("eip155:8453"),
   purpose: z.enum(["receivable", "gas", "operational"]).default("receivable"),
   endpoint: z.string().optional(),
 });

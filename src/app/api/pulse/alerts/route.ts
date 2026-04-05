@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
 
   const db = getDb();
   const alerts = db.prepare(
-    "SELECT id, name, type, config, webhook_id, is_active, last_triggered_at, trigger_count, created_at FROM alerts WHERE api_key_id = ? ORDER BY created_at DESC"
+    "SELECT id, name, type, config, webhook_id, slack_url, discord_url, is_active, last_triggered_at, trigger_count, created_at FROM alerts WHERE api_key_id = ? ORDER BY created_at DESC"
   ).all(auth.apiKeyId);
 
   return NextResponse.json({ alerts });
@@ -38,6 +38,8 @@ const CreateSchema = z.object({
     endpoint: z.string().optional(),
   }),
   webhook_id: z.string().optional(),
+  slack_url: z.string().url().optional().or(z.literal("")),
+  discord_url: z.string().url().optional().or(z.literal("")),
 });
 
 export async function POST(req: NextRequest) {
@@ -63,8 +65,8 @@ export async function POST(req: NextRequest) {
     const id = nanoid();
 
     db.prepare(
-      "INSERT INTO alerts (id, api_key_id, name, type, config, webhook_id) VALUES (?, ?, ?, ?, ?, ?)"
-    ).run(id, auth.apiKeyId, parsed.name, parsed.type, JSON.stringify(parsed.config), parsed.webhook_id || null);
+      "INSERT INTO alerts (id, api_key_id, name, type, config, webhook_id, slack_url, discord_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+    ).run(id, auth.apiKeyId, parsed.name, parsed.type, JSON.stringify(parsed.config), parsed.webhook_id || null, parsed.slack_url || null, parsed.discord_url || null);
 
     return NextResponse.json({ alert: { id, name: parsed.name, type: parsed.type } });
   } catch (error) {
@@ -86,6 +88,28 @@ export async function PATCH(req: NextRequest) {
   const alert = db.prepare("SELECT api_key_id, is_active FROM alerts WHERE id = ?").get(id) as { api_key_id: string; is_active: number } | undefined;
   if (!alert || alert.api_key_id !== auth.apiKeyId) {
     return NextResponse.json({ error: "Alert not found" }, { status: 404 });
+  }
+
+  // Check for body — if present, update specific fields; otherwise toggle is_active
+  let body: Record<string, unknown> | null = null;
+  try { body = await req.json(); } catch { /* no body = toggle mode */ }
+
+  if (body && (body.slack_url !== undefined || body.discord_url !== undefined)) {
+    const updates: string[] = [];
+    const params: (string | number | null)[] = [];
+
+    if (body.slack_url !== undefined) {
+      updates.push("slack_url = ?");
+      params.push((body.slack_url as string) || null);
+    }
+    if (body.discord_url !== undefined) {
+      updates.push("discord_url = ?");
+      params.push((body.discord_url as string) || null);
+    }
+    params.push(id);
+
+    db.prepare(`UPDATE alerts SET ${updates.join(", ")} WHERE id = ?`).run(...params);
+    return NextResponse.json({ success: true });
   }
 
   db.prepare("UPDATE alerts SET is_active = ? WHERE id = ?").run(alert.is_active ? 0 : 1, id);

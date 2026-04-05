@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Bell, Plus, Trash2, TrendingDown, TrendingUp, UserPlus, Timer, Target } from "lucide-react";
+import { Bell, Plus, Trash2, TrendingDown, TrendingUp, UserPlus, Timer, Target, MessageSquare, Hash } from "lucide-react";
 import { ProGate } from "@/components/dashboard/pro-gate";
 import { cn } from "@/lib/utils";
 import { format, parseISO } from "date-fns";
@@ -24,6 +24,8 @@ interface AlertData {
   type: string;
   config: string;
   webhook_id: string | null;
+  slack_url: string | null;
+  discord_url: string | null;
   is_active: number;
   last_triggered_at: string | null;
   trigger_count: number;
@@ -53,6 +55,8 @@ function CreateAlertForm({ webhooks, onCreated }: { webhooks: WebhookOption[]; o
   const [period, setPeriod] = useState("24h");
   const [endpoint, setEndpoint] = useState("");
   const [webhookId, setWebhookId] = useState("");
+  const [slackUrl, setSlackUrl] = useState("");
+  const [discordUrl, setDiscordUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -73,11 +77,16 @@ function CreateAlertForm({ webhooks, onCreated }: { webhooks: WebhookOption[]; o
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ name, type, config, webhook_id: webhookId || undefined }),
+        body: JSON.stringify({
+          name, type, config,
+          webhook_id: webhookId || undefined,
+          slack_url: slackUrl || undefined,
+          discord_url: discordUrl || undefined,
+        }),
       });
       const data = await res.json();
       if (data.alert) {
-        setName(""); setThreshold(""); setEndpoint("");
+        setName(""); setThreshold(""); setEndpoint(""); setSlackUrl(""); setDiscordUrl("");
         onCreated();
       } else {
         setError(data.error || "Failed");
@@ -144,6 +153,19 @@ function CreateAlertForm({ webhooks, onCreated }: { webhooks: WebhookOption[]; o
               <option key={w.id} value={w.id}>{w.url.slice(0, 40)}...</option>
             ))}
           </select>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label className="block text-[12px] text-tertiary font-medium mb-1">Slack Webhook URL (optional)</label>
+          <input value={slackUrl} onChange={(e) => setSlackUrl(e.target.value)} placeholder="https://hooks.slack.com/services/..."
+            className="w-full h-9 px-3 rounded-lg border border-black/[0.08] text-[13px] font-mono placeholder:text-quaternary focus:outline-none focus:ring-2 focus:ring-pulse/20" />
+        </div>
+        <div>
+          <label className="block text-[12px] text-tertiary font-medium mb-1">Discord Webhook URL (optional)</label>
+          <input value={discordUrl} onChange={(e) => setDiscordUrl(e.target.value)} placeholder="https://discord.com/api/webhooks/..."
+            className="w-full h-9 px-3 rounded-lg border border-black/[0.08] text-[13px] font-mono placeholder:text-quaternary focus:outline-none focus:ring-2 focus:ring-pulse/20" />
         </div>
       </div>
 
@@ -237,9 +259,21 @@ function AlertsContent() {
                   return (
                     <tr key={a.id} className="border-b border-black/[0.03]/50 last:border-0 hover:bg-[#FAFAFA] transition-colors">
                       <td className="px-5 py-3">
-                        <span className={cn("text-[13px] font-medium", a.is_active ? "text-primary" : "text-quaternary line-through")}>
-                          {a.name}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className={cn("text-[13px] font-medium", a.is_active ? "text-primary" : "text-quaternary line-through")}>
+                            {a.name}
+                          </span>
+                          {a.slack_url && (
+                            <span title="Slack notifications enabled" className="inline-flex items-center justify-center w-4 h-4 rounded bg-[#4A154B]/10">
+                              <MessageSquare className="w-2.5 h-2.5 text-[#4A154B]" />
+                            </span>
+                          )}
+                          {a.discord_url && (
+                            <span title="Discord notifications enabled" className="inline-flex items-center justify-center w-4 h-4 rounded bg-[#5865F2]/10">
+                              <Hash className="w-2.5 h-2.5 text-[#5865F2]" />
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-5 py-3">
                         <span className={cn("inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full uppercase tracking-wider", typeConfig.color)}>

@@ -147,7 +147,7 @@ export function SocialProof() {
           {/* Verify + How It Works */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
             <a
-              href={`https://sepolia.basescan.org/address/${KYVERN_PAY_TO}`}
+              href={`https://basescan.org/address/${KYVERN_PAY_TO}`}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 text-[13px] font-medium text-tertiary hover:text-primary transition-colors duration-300"

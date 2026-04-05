@@ -1,9 +1,9 @@
 import { createPublicClient, http, formatUnits } from "viem";
-import { baseSepolia } from "viem/chains";
+import { base } from "viem/chains";
 import { nanoid } from "nanoid";
 import { getDb } from "./db";
 
-const USDC_ADDRESS = "0x036CbD53842c5426634e7929541eC2318f3dCF7e" as const;
+const USDC_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" as const;
 
 const ERC20_ABI = [{
   name: "balanceOf",
@@ -14,7 +14,7 @@ const ERC20_ABI = [{
 }] as const;
 
 function getClient() {
-  return createPublicClient({ chain: baseSepolia, transport: http() });
+  return createPublicClient({ chain: base, transport: http() });
 }
 
 interface WalletRow {

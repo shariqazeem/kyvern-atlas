@@ -1,7 +1,7 @@
 "use client";
 
 import { PrivyProvider } from "@privy-io/react-auth";
-import { base, baseSepolia } from "viem/chains";
+import { base } from "viem/chains";
 
 const PRIVY_APP_ID = process.env.NEXT_PUBLIC_PRIVY_APP_ID || "";
 
@@ -18,8 +18,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
           showWalletLoginFirst: false,
         },
         loginMethods: ["email", "google", "wallet"],
-        defaultChain: baseSepolia,
-        supportedChains: [baseSepolia, base],
+        defaultChain: base,
+        supportedChains: [base],
         embeddedWallets: {
           ethereum: {
             createOnLogin: "users-without-wallets",

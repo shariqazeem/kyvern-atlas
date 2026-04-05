@@ -6,6 +6,7 @@ import Image from "next/image";
 import { Activity, Sparkles, Sun, Moon, Monitor } from "lucide-react";
 import { TimeRangeSelector } from "./time-range-selector";
 import { MobileNav } from "./mobile-nav";
+import { LiveIndicator } from "./live-indicator";
 import { useAuth } from "@/hooks/use-auth";
 import { useTheme } from "@/hooks/use-theme";
 
@@ -56,6 +57,8 @@ export function DashboardHeader() {
                 </span>
               </>
             )}
+            <div className="h-4 w-px bg-black/[0.06]" />
+            <LiveIndicator />
           </div>
         </div>
         <div className="flex items-center gap-3">

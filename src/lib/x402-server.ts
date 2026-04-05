@@ -4,7 +4,7 @@ import { ExactEvmScheme } from "@x402/evm/exact/server";
 import type { Network } from "@x402/core/types";
 
 const FACILITATOR_URL = process.env.X402_FACILITATOR_URL || "https://x402.org/facilitator";
-const NETWORK: Network = (process.env.X402_NETWORK || "eip155:84532") as Network;
+const NETWORK: Network = (process.env.X402_NETWORK || "eip155:8453") as Network;
 
 let _facilitator: HTTPFacilitatorClient | null = null;
 let _server: x402ResourceServer | null = null;

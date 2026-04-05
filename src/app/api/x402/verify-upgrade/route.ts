@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createPublicClient, http } from "viem";
-import { baseSepolia } from "viem/chains";
+import { base } from "viem/chains";
 import { nanoid } from "nanoid";
 import { getDb } from "@/lib/db";
 
 const PAYTO = (process.env.X402_PAYTO_ADDRESS || "").toLowerCase();
-const USDC_ADDRESS = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
+const USDC_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
 
-// Minimum payment: $1 on testnet, $49 on mainnet
+// Minimum payment: $49 on mainnet, $1 on testnet
 const MIN_AMOUNT = process.env.X402_NETWORK === "eip155:8453" ? 49_000_000n : 1_000_000n;
 
 export async function POST(req: NextRequest) {
@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
 
     // Verify the transaction on-chain
     const client = createPublicClient({
-      chain: baseSepolia,
+      chain: base,
       transport: http(),
     });
 
@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
       subId,
       payerAddress,
       txHash,
-      "eip155:84532",
+      "eip155:8453",
       Number(transferAmount) / 1e6,
       now.toISOString(),
       expiresAt.toISOString()

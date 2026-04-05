@@ -103,7 +103,7 @@ export default function ServicesPage() {
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
             </span>
-            Live on Base Sepolia — paying real USDC
+            Live on Base — paying real USDC
           </motion.div>
 
           <motion.h1
@@ -230,7 +230,7 @@ export default function ServicesPage() {
                   Tracked via <span className="font-medium text-pulse">withPulse()</span> middleware
                 </span>
                 <a
-                  href={`https://sepolia.basescan.org/address/${KYVERN_PAY_TO}`}
+                  href={`https://basescan.org/address/${KYVERN_PAY_TO}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1 text-[11px] font-medium text-tertiary hover:text-primary transition-colors"

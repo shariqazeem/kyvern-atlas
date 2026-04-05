@@ -35,6 +35,111 @@ function CopyBlock({ code }: { code: string }) {
   );
 }
 
+const FRAMEWORKS = [
+  {
+    name: "Next.js",
+    label: "Next.js",
+    code: (key: string) => `// app/api/my-service/route.ts
+import { withX402 } from '@x402/next'
+import { withPulse } from '@kyvernlabs/pulse'
+
+const handler = async (req) => {
+  return Response.json({ data: "premium content" })
+}
+
+export const GET = withPulse(
+  withX402(handler, x402Config),
+  { apiKey: '${key}' }
+)`,
+  },
+  {
+    name: "Express",
+    label: "Express",
+    code: (key: string) => `// server.js
+import express from 'express'
+import { withPulse } from '@kyvernlabs/pulse'
+
+const app = express()
+
+const handler = (req, res) => {
+  res.json({ data: "premium content" })
+}
+
+app.get('/api/my-service',
+  withPulse(handler, { apiKey: '${key}' })
+)`,
+  },
+  {
+    name: "Hono",
+    label: "Hono",
+    code: (key: string) => `// src/index.ts (Cloudflare Workers / Bun)
+import { Hono } from 'hono'
+import { withPulse } from '@kyvernlabs/pulse'
+
+const app = new Hono()
+
+app.get('/api/my-service', async (c) => {
+  // Pulse middleware wraps your handler
+  return withPulse(
+    async () => c.json({ data: "premium content" }),
+    { apiKey: '${key}' }
+  )(c.req.raw)
+})
+
+export default app`,
+  },
+  {
+    name: "Direct",
+    label: "Any Language",
+    code: (key: string) => `# Works with any language — just POST to the ingest API
+# Python example:
+
+import requests
+
+requests.post("https://kyvernlabs.com/api/pulse/ingest",
+  headers={
+    "X-API-Key": "${key}",
+    "Content-Type": "application/json"
+  },
+  json={
+    "endpoint": "/api/my-service",
+    "amount_usd": 0.01,
+    "payer_address": "0xagent...",
+    "tx_hash": "0xtx...",
+    "network": "eip155:8453",
+    "status": "success"
+  }
+)`,
+  },
+];
+
+function FrameworkTabs({ displayKey }: { displayKey: string }) {
+  const [active, setActive] = useState(0);
+
+  return (
+    <div className="rounded-xl border border-black/[0.06] overflow-hidden">
+      <div className="flex border-b border-black/[0.04] bg-[#FAFAFA]">
+        {FRAMEWORKS.map((fw, i) => (
+          <button
+            key={fw.name}
+            onClick={() => setActive(i)}
+            className={`px-4 py-2.5 text-[12px] font-medium transition-colors ${
+              active === i
+                ? "text-pulse border-b-2 border-pulse bg-white"
+                : "text-quaternary hover:text-secondary"
+            }`}
+          >
+            {fw.label}
+          </button>
+        ))}
+      </div>
+      <div className="p-0">
+        <CopyBlock code={FRAMEWORKS[active].code(displayKey)} />
+      </div>
+    </div>
+  );
+}
+
 export default function SetupPage() {
   const { apiKey, apiKeyPrefix, isAuthenticated } = useAuth();
   const displayKey = isAuthenticated ? (apiKey || apiKeyPrefix + "...") : "kv_live_your_key_here";
@@ -126,6 +231,18 @@ export const GET = withPulse(x402Handler, {
           </p>
         </motion.div>
       </div>
+
+      {/* Framework Templates */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.5, delay: 0.25, ease }}
+        className="space-y-4"
+      >
+        <h3 className="text-[13px] font-semibold">Framework-specific examples</h3>
+        <FrameworkTabs displayKey={displayKey} />
+      </motion.div>
 
       {/* Divider */}
       <div className="border-t border-black/[0.04]" />

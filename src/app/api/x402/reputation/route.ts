@@ -3,15 +3,15 @@ import { withX402 } from "@x402/next";
 import { getResourceServer, getPayToAddress, getNetwork } from "@/lib/x402-server";
 import { withPulse } from "@/lib/pulse-middleware";
 import { createPublicClient, http, formatUnits } from "viem";
-import { baseSepolia } from "viem/chains";
+import { base } from "viem/chains";
 
 export const dynamic = "force-dynamic";
 
-const USDC_ADDRESS = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
+const USDC_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
 
 async function getWalletReputation(address: string) {
   const client = createPublicClient({
-    chain: baseSepolia,
+    chain: base,
     transport: http(),
   });
 
@@ -70,7 +70,7 @@ async function getWalletReputation(address: string) {
 
   return {
     address,
-    network: "eip155:84532",
+    network: "eip155:8453",
     reputation_score: Math.min(score, 100),
     tier,
     on_chain: {
@@ -86,7 +86,7 @@ async function getWalletReputation(address: string) {
     timestamp: new Date().toISOString(),
     source: "kyvernlabs-reputation",
     powered_by: "x402",
-    note: "Reputation score based on Base Sepolia on-chain activity. Higher score = more trustworthy payer.",
+    note: "Reputation score based on Base on-chain activity. Higher score = more trustworthy payer.",
   };
 }
 

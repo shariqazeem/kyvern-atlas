@@ -1,5 +1,6 @@
 import { getDb } from "./db";
 import { fireWebhooks } from "./webhooks";
+import { sendSlackNotification, sendDiscordNotification, formatAlertNotification } from "./notifications";
 
 export const ALERT_TYPES = [
   "revenue_drop",
@@ -18,6 +19,8 @@ interface AlertRow {
   type: string;
   config: string;
   webhook_id: string | null;
+  slack_url: string | null;
+  discord_url: string | null;
   last_triggered_at: string | null;
   trigger_count: number;
 }
@@ -64,6 +67,28 @@ function triggerAlert(alert: AlertRow, reason: string, event: EventContext) {
         status: `alert:${alert.type}:${reason}`,
       });
     }
+  }
+
+  // Send Slack notification (fire-and-forget)
+  if (alert.slack_url) {
+    const payload = formatAlertNotification(alert.name, alert.type, {
+      endpoint: event.endpoint,
+      amount_usd: event.amount_usd,
+      payer_address: event.payer_address,
+      latency_ms: event.latency_ms,
+    });
+    sendSlackNotification(alert.slack_url, payload).catch(() => {});
+  }
+
+  // Send Discord notification (fire-and-forget)
+  if (alert.discord_url) {
+    const payload = formatAlertNotification(alert.name, alert.type, {
+      endpoint: event.endpoint,
+      amount_usd: event.amount_usd,
+      payer_address: event.payer_address,
+      latency_ms: event.latency_ms,
+    });
+    sendDiscordNotification(alert.discord_url, payload).catch(() => {});
   }
 }
 

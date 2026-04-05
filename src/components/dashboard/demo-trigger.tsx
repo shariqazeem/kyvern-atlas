@@ -68,7 +68,7 @@ export function DemoTrigger() {
               <h3 className="text-[14px] font-semibold tracking-tight">Try a Real x402 Transaction</h3>
             </div>
             <p className="text-[12px] text-tertiary ml-9">
-              Agent pays $0.001 USDC on Base Sepolia → Pulse captures it → appears below with blockchain proof.
+              Agent pays $0.001 USDC on Base → Pulse captures it → appears below with blockchain proof.
             </p>
           </div>
           <button

@@ -34,7 +34,6 @@ export function truncateAddress(address: string, chars = 6): string {
 // x402 network helpers
 const NETWORKS: Record<string, { name: string; explorer: string; txPath?: string }> = {
   // EVM chains
-  "eip155:84532": { name: "Base Sepolia", explorer: "https://sepolia.basescan.org" },
   "eip155:8453": { name: "Base", explorer: "https://basescan.org" },
   "eip155:1": { name: "Ethereum", explorer: "https://etherscan.io" },
   "eip155:137": { name: "Polygon", explorer: "https://polygonscan.com" },
@@ -58,7 +57,7 @@ export const KYVERN_PAY_TO = process.env.NEXT_PUBLIC_PAY_TO_ADDRESS || "0x55c3aB
 
 export function getExplorerTxUrl(txHash: string, network?: string): string {
   const net = network ? NETWORKS[network] : null;
-  const explorer = net?.explorer || "https://sepolia.basescan.org";
+  const explorer = net?.explorer || "https://basescan.org";
   const txPath = net?.txPath || "/tx/";
   return `${explorer}${txPath}${txHash}`;
 }
