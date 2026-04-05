@@ -3,12 +3,9 @@
 import { motion } from "framer-motion";
 import { Shield, ArrowRight } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { useAccount, useConnect } from "wagmi";
 
 export function ConnectGate({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading, signIn } = useAuth();
-  const { isConnected } = useAccount();
-  const { connectors, connect } = useConnect();
 
   if (isLoading) {
     return (
@@ -31,39 +28,24 @@ export function ConnectGate({ children }: { children: React.ReactNode }) {
             <Shield className="w-6 h-6 text-tertiary" />
           </div>
           <h2 className="text-[18px] font-semibold tracking-tight mb-2">
-            Connect your wallet
+            Sign in to Pulse
           </h2>
           <p className="text-[13px] text-tertiary leading-relaxed mb-8">
-            Sign in with your wallet to view your x402 analytics.
-            Your wallet address is your identity — no email needed.
+            Use email, Google, or your wallet to access your x402 analytics dashboard.
           </p>
 
-          {!isConnected ? (
-            <div className="space-y-2">
-              {connectors.map((connector) => (
-                <button
-                  key={connector.uid}
-                  onClick={() => connect({ connector })}
-                  className="w-full flex items-center justify-center gap-2.5 h-11 rounded-lg border border-black/[0.08] text-[13px] font-medium hover:border-black/[0.15] hover:bg-[#FAFAFA] transition-all duration-300"
-                >
-                  {connector.name}
-                </button>
-              ))}
-            </div>
-          ) : (
-            <button
-              onClick={signIn}
-              className="w-full inline-flex items-center justify-center gap-2 h-11 rounded-lg bg-foreground text-background text-[13px] font-medium hover:bg-foreground/90 transition-colors duration-300"
-            >
-              Sign in with wallet
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          )}
+          <button
+            onClick={signIn}
+            className="w-full inline-flex items-center justify-center gap-2 h-11 rounded-lg bg-foreground text-background text-[13px] font-medium hover:bg-foreground/90 transition-colors duration-300"
+          >
+            Sign in
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
 
           <p className="mt-6 text-[11px] text-quaternary">
-            We use Sign-In With Ethereum (SIWE) for cryptographic verification.
+            Email, Google, MetaMask, Coinbase Wallet, and more.
             <br />
-            No passwords. No emails. Just your wallet.
+            No setup required. Your account is created automatically.
           </p>
         </motion.div>
       </div>

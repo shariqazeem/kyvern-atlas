@@ -1,30 +1,31 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useAccount, useSignMessage, useDisconnect } from "wagmi";
-import { SiweMessage } from "siwe";
+import { usePrivy, useWallets } from "@privy-io/react-auth";
 
 interface AuthState {
   wallet: string | null;
+  email: string | null;
   isConnected: boolean;
   isAuthenticated: boolean;
   isLoading: boolean;
   isNewUser: boolean;
-  apiKey: string | null; // full key, shown once for new users
+  apiKey: string | null;
   apiKeyPrefix: string | null;
   apiKeyId: string | null;
   plan: "free" | "pro";
   proExpiresAt: string | null;
   onboardingCompleted: boolean;
+  loginMethod: string | null;
 }
 
 export function useAuth() {
-  const { address, isConnected } = useAccount();
-  const { signMessageAsync } = useSignMessage();
-  const { disconnect: wagmiDisconnect } = useDisconnect();
+  const { ready, authenticated, user, login, logout: privyLogout } = usePrivy();
+  const { wallets } = useWallets();
 
   const [state, setState] = useState<AuthState>({
     wallet: null,
+    email: null,
     isConnected: false,
     isAuthenticated: false,
     isLoading: true,
@@ -35,116 +36,114 @@ export function useAuth() {
     plan: "free",
     proExpiresAt: null,
     onboardingCompleted: false,
+    loginMethod: null,
   });
 
-  // Check existing session on mount
-  const checkSession = useCallback(async () => {
-    try {
-      const res = await fetch("/api/auth/session", { credentials: "include" });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.authenticated) {
-          setState((prev) => ({
-            ...prev,
-            wallet: data.wallet,
-            isConnected: true,
-            isAuthenticated: true,
-            isLoading: false,
-            apiKeyPrefix: data.apiKeyPrefix,
-            apiKeyId: data.apiKeyId,
-            plan: data.plan,
-            proExpiresAt: data.proExpiresAt,
-            onboardingCompleted: data.onboardingCompleted,
-          }));
-          return;
-        }
-      }
-    } catch {
-      // Session check failed, not authenticated
+  // Get the user's wallet address (from connected wallet or Privy embedded wallet)
+  const getWalletAddress = useCallback((): string | null => {
+    if (!user) return null;
+
+    // Check linked wallets first
+    if (wallets && wallets.length > 0) {
+      return wallets[0].address;
     }
-    setState((prev) => ({ ...prev, isLoading: false }));
-  }, []);
 
+    // Check Privy user's wallet
+    if (user.wallet) {
+      return user.wallet.address;
+    }
+
+    return null;
+  }, [user, wallets]);
+
+  // Sync with our backend when Privy auth state changes
   useEffect(() => {
-    checkSession();
-  }, [checkSession]);
+    if (!ready) return;
 
-  // Update connection state from wagmi
-  useEffect(() => {
-    setState((prev) => ({
-      ...prev,
-      isConnected,
-      wallet: address || null,
-    }));
-  }, [isConnected, address]);
+    if (!authenticated || !user) {
+      setState((prev) => ({
+        ...prev,
+        isLoading: false,
+        isAuthenticated: false,
+        isConnected: false,
+        wallet: null,
+        email: null,
+      }));
+      return;
+    }
 
-  // Sign in with SIWE
-  const signIn = useCallback(async () => {
-    if (!address) return;
+    const walletAddress = getWalletAddress();
+    const email = user.email?.address || null;
+    const loginMethod = user.email ? "email" : user.google ? "google" : "wallet";
 
-    setState((prev) => ({ ...prev, isLoading: true }));
+    // If we have a wallet, sync with our backend
+    if (walletAddress) {
+      syncWithBackend(walletAddress, email, loginMethod);
+    } else {
+      // User logged in with email but embedded wallet not ready yet — wait
+      setState((prev) => ({
+        ...prev,
+        isLoading: true,
+        email,
+        loginMethod,
+      }));
+    }
+  }, [ready, authenticated, user, wallets, getWalletAddress]);
 
+  async function syncWithBackend(walletAddress: string, email: string | null, loginMethod: string) {
     try {
-      // Get nonce from server
-      const nonceRes = await fetch("/api/auth/nonce");
-      const { nonce } = await nonceRes.json();
-
-      // Construct SIWE message
-      const message = new SiweMessage({
-        domain: window.location.host,
-        address,
-        statement: "Sign in to KyvernLabs Pulse",
-        uri: window.location.origin,
-        version: "1",
-        chainId: 84532, // Base Sepolia
-        nonce,
-      });
-
-      const messageStr = message.prepareMessage();
-
-      // Prompt wallet to sign
-      const signature = await signMessageAsync({ message: messageStr });
-
-      // Verify on server
-      const verifyRes = await fetch("/api/auth/verify", {
+      // Try to verify/create account via our backend
+      const res = await fetch("/api/auth/privy-sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ message: messageStr, signature }),
+        body: JSON.stringify({ wallet_address: walletAddress, email }),
       });
 
-      const data = await verifyRes.json();
+      const data = await res.json();
 
       if (data.success) {
-        setState((prev) => ({
-          ...prev,
-          wallet: data.wallet,
+        setState({
+          wallet: walletAddress,
+          email,
+          isConnected: true,
           isAuthenticated: true,
           isLoading: false,
-          isNewUser: data.isNew,
-          apiKey: data.apiKey || null, // only set for new users
-          apiKeyPrefix: data.apiKeyPrefix,
-          plan: "free",
-        }));
+          isNewUser: data.isNew || false,
+          apiKey: data.apiKey || null,
+          apiKeyPrefix: data.apiKeyPrefix || null,
+          apiKeyId: data.apiKeyId || null,
+          plan: data.plan || "free",
+          proExpiresAt: data.proExpiresAt || null,
+          onboardingCompleted: data.onboardingCompleted || false,
+          loginMethod,
+        });
       } else {
-        setState((prev) => ({ ...prev, isLoading: false }));
+        setState((prev) => ({
+          ...prev,
+          isLoading: false,
+          isAuthenticated: false,
+        }));
       }
-    } catch (err) {
-      console.error("SIWE sign-in failed:", err);
+    } catch {
       setState((prev) => ({ ...prev, isLoading: false }));
     }
-  }, [address, signMessageAsync]);
+  }
 
-  // Sign out
+  const signIn = useCallback(() => {
+    login();
+  }, [login]);
+
   const signOut = useCallback(async () => {
     try {
       await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
     } catch {
       // ignore
     }
-    wagmiDisconnect();
+    await privyLogout();
     setState({
       wallet: null,
+      email: null,
       isConnected: false,
       isAuthenticated: false,
       isLoading: false,
@@ -155,19 +154,26 @@ export function useAuth() {
       plan: "free",
       proExpiresAt: null,
       onboardingCompleted: false,
+      loginMethod: null,
     });
-  }, [wagmiDisconnect]);
+  }, [privyLogout]);
 
-  // Clear the one-time API key after it's been shown
   const clearApiKey = useCallback(() => {
     setState((prev) => ({ ...prev, apiKey: null, isNewUser: false }));
   }, []);
+
+  const refreshSession = useCallback(async () => {
+    const walletAddress = getWalletAddress();
+    if (walletAddress) {
+      await syncWithBackend(walletAddress, state.email, state.loginMethod || "wallet");
+    }
+  }, [getWalletAddress, state.email, state.loginMethod]);
 
   return {
     ...state,
     signIn,
     signOut,
     clearApiKey,
-    refreshSession: checkSession,
+    refreshSession,
   };
 }

@@ -10,7 +10,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useTheme } from "@/hooks/use-theme";
 
 export function DashboardHeader() {
-  const { isAuthenticated, plan, wallet, signOut } = useAuth();
+  const { isAuthenticated, plan, wallet, email, signOut } = useAuth();
   const { theme, cycleTheme } = useTheme();
   const [recentCount, setRecentCount] = useState<number | null>(null);
 
@@ -69,12 +69,12 @@ export function DashboardHeader() {
              <Sun className="w-4 h-4 text-tertiary" />}
           </button>
           <TimeRangeSelector />
-          {isAuthenticated && wallet && (
+          {isAuthenticated && (
             <>
               <div className="h-5 w-px bg-black/[0.06] hidden sm:block" />
               <div className="hidden sm:flex items-center gap-2">
                 <span className="text-[11px] font-mono text-tertiary">
-                  {wallet.slice(0, 6)}...{wallet.slice(-4)}
+                  {email || (wallet ? `${wallet.slice(0, 6)}...${wallet.slice(-4)}` : "")}
                 </span>
                 <button
                   onClick={signOut}

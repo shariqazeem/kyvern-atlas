@@ -25,6 +25,9 @@ const nextConfig = {
       "porto": false,
       "porto/internal": false,
       "@coinbase/wallet-sdk": false,
+      "@farcaster/mini-app-solana": false,
+      "@farcaster/mini-app": false,
+      "@solana/web3.js": false,
     };
     return config;
   },

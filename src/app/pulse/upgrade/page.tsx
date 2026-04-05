@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { Navbar } from "@/components/landing/navbar";
 import { Footer } from "@/components/landing/footer";
 import { useSubscription } from "@/hooks/use-subscription";
-import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
-import { parseUnits } from "viem";
+import { useWallets } from "@privy-io/react-auth";
+import { encodeFunctionData, parseUnits } from "viem";
 import {
   Check,
   Loader2,
@@ -51,77 +51,90 @@ const PRO_FEATURES = [
 ];
 
 export default function UpgradePage() {
-  const { isPro, expiresAt } = useSubscription();
-  const { isConnected, address } = useAccount();
+  const { isPro, expiresAt, isConnected } = useSubscription();
+  const { wallets } = useWallets();
   const [status, setStatus] = useState<"idle" | "paying" | "confirming" | "verifying" | "done">("idle");
   const [error, setError] = useState<string | null>(null);
+  const [txHash, setTxHash] = useState<string | undefined>();
   const [subResult, setSubResult] = useState<{ expires_at?: string } | null>(null);
 
-  // wagmi write contract
-  const { writeContract, data: txHash, isPending, error: writeError } = useWriteContract();
+  const address = wallets?.[0]?.address;
 
-  // Wait for tx confirmation
-  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
-    hash: txHash,
-  });
+  async function handleUpgrade() {
+    setError(null);
+    setStatus("paying");
 
-  // Update status based on wagmi state
-  useEffect(() => {
-    if (isPending) setStatus("paying");
-    if (isConfirming) setStatus("confirming");
-  }, [isPending, isConfirming]);
+    try {
+      const wallet = wallets?.[0];
+      if (!wallet) {
+        setError("No wallet connected. Please sign in first.");
+        setStatus("idle");
+        return;
+      }
 
-  // When tx is confirmed, verify on backend
-  useEffect(() => {
-    if (isConfirmed && txHash) {
+      // Get the wallet provider (EIP-1193)
+      const provider = await wallet.getEthereumProvider();
+
+      // Encode the USDC transfer call
+      const data = encodeFunctionData({
+        abi: USDC_ABI,
+        functionName: "transfer",
+        args: [PAYTO, parseUnits(PRO_AMOUNT, 6)],
+      });
+
+      setStatus("confirming");
+
+      // Send the transaction via EIP-1193
+      const hash = await provider.request({
+        method: "eth_sendTransaction",
+        params: [{
+          from: wallet.address,
+          to: USDC_ADDRESS,
+          data,
+        }],
+      }) as `0x${string}`;
+
+      setTxHash(hash);
+
+      // Wait for confirmation by polling
+      let confirmed = false;
+      for (let i = 0; i < 60; i++) {
+        await new Promise((r) => setTimeout(r, 2000));
+        const receipt = await provider.request({
+          method: "eth_getTransactionReceipt",
+          params: [hash],
+        });
+        if (receipt) { confirmed = true; break; }
+      }
+      if (!confirmed) throw new Error("Transaction not confirmed after 2 minutes");
+
+      // Verify on backend
       setStatus("verifying");
-      fetch("/api/x402/verify-upgrade", {
+      const res = await fetch("/api/x402/verify-upgrade", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tx_hash: txHash }),
-      })
-        .then((r) => r.json())
-        .then((d) => {
-          if (d.success) {
-            setSubResult(d);
-            setStatus("done");
-          } else {
-            setError(d.error || "Verification failed");
-            setStatus("idle");
-          }
-        })
-        .catch((e) => {
-          setError(String(e));
-          setStatus("idle");
-        });
-    }
-  }, [isConfirmed, txHash]);
+        body: JSON.stringify({ tx_hash: hash }),
+      });
+      const d = await res.json();
 
-  // Handle write errors
-  useEffect(() => {
-    if (writeError) {
-      const msg = writeError.message || String(writeError);
-      if (msg.includes("User rejected") || msg.includes("denied")) {
+      if (d.success) {
+        setSubResult(d);
+        setStatus("done");
+      } else {
+        setError(d.error || "Verification failed");
+        setStatus("idle");
+      }
+    } catch (err) {
+      const msg = String(err);
+      if (msg.includes("user rejected") || msg.includes("denied") || msg.includes("User rejected")) {
         setError("Transaction cancelled");
       } else if (msg.includes("insufficient")) {
         setError("Insufficient USDC balance");
       } else {
-        setError(msg.slice(0, 100));
+        setError(msg.slice(0, 120));
       }
       setStatus("idle");
     }
-  }, [writeError]);
-
-  function handleUpgrade() {
-    setError(null);
-    setStatus("paying");
-
-    writeContract({
-      address: USDC_ADDRESS,
-      abi: USDC_ABI,
-      functionName: "transfer",
-      args: [PAYTO, parseUnits(PRO_AMOUNT, 6)],
-    });
   }
 
   return (
