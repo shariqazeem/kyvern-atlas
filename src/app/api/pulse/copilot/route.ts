@@ -16,6 +16,11 @@ const ELSA_API_KEY = process.env.ELSA_API_KEY || "";
 // Used when LLM_PROVIDER=heuristic (default, no API costs)
 function classifyQuery(query: string): string {
   const q = query.toLowerCase();
+  // Stellar-specific queries must match BEFORE general revenue
+  if (q.match(/stellar.*revenue|revenue.*stellar|stellar.*earn|how much.*stellar/)) return "stellar_revenue";
+  if (q.match(/stellar.*trans|trans.*stellar/)) return "stellar_transactions";
+  if (q.match(/cross.chain|multi.chain|chain.*compar|base.*vs.*stellar|stellar.*vs.*base/)) return "cross_chain";
+  if (q.match(/stellar/)) return "stellar_revenue";
   if (q.match(/revenue.*(week|7d|7 day|this week)/)) return "revenue_week";
   if (q.match(/revenue.*(month|30d|30 day|this month)/)) return "revenue_month";
   if (q.match(/revenue.*(today|24h|today)/)) return "revenue_today";
@@ -27,10 +32,6 @@ function classifyQuery(query: string): string {
   if (q.match(/price|pricing|compet|benchmark|market|compar/)) return "pricing";
   if (q.match(/new.*(agent|customer)|first.*(time|seen)/)) return "new_agents";
   if (q.match(/error|fail|latency|slow|performance/)) return "performance";
-  if (q.match(/stellar.*revenue|revenue.*stellar|stellar.*earn|how much.*stellar/)) return "stellar_revenue";
-  if (q.match(/stellar.*trans|trans.*stellar/)) return "stellar_transactions";
-  if (q.match(/cross.chain|multi.chain|chain.*compar|base.*vs.*stellar|stellar.*vs.*base/)) return "cross_chain";
-  if (q.match(/stellar/)) return "stellar_revenue";
   if (q.match(/summary|overview|how.*doing|status|health/)) return "summary";
   return "general";
 }
