@@ -242,4 +242,53 @@
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
+
+  /* === Sprint 3: Micro-Interactions === */
+
+  /* Card hover lift — consistent across all cards */
+  .card-hover {
+    transition: transform 0.2s cubic-bezier(0.25, 0.1, 0.25, 1),
+                box-shadow 0.2s cubic-bezier(0.25, 0.1, 0.25, 1);
+  }
+  .card-hover:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+  }
+
+  /* Button press scale — tactile feedback */
+  .btn-press {
+    transition: transform 100ms ease;
+  }
+  .btn-press:active {
+    transform: scale(0.98);
+  }
+
+  /* Skeleton-to-content fade */
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease forwards;
+  }
+
+  /* Table row hover — consistent */
+  .row-hover {
+    transition: background-color 0.15s ease;
+  }
+  .row-hover:hover {
+    background-color: rgb(248, 250, 252);
+  }
+
+  /* Data freshness pulse */
+  .freshness-pulse {
+    animation: freshPulse 2s ease-in-out;
+  }
+}
+
+/* Global keyframes */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes freshPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
 }
