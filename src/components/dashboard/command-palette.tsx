@@ -143,14 +143,14 @@ export function CommandPalette() {
               >
                 {/* ── Search input ──────────────────────────────── */}
                 <div className="flex items-center gap-2.5 px-4 h-12 border-b border-black/[0.06]">
-                  <Search className="w-4 h-4 text-[hsl(var(--text-quaternary))] shrink-0" />
+                  <Search className="w-4 h-4 text-slate-400 shrink-0" />
                   <CommandRoot.Input
                     value={search}
                     onValueChange={setSearch}
                     placeholder="Search pages, actions, stats..."
-                    className="flex-1 bg-transparent text-[13px] font-medium text-[hsl(var(--text-primary))] placeholder:text-[hsl(var(--text-quaternary))] outline-none"
+                    className="flex-1 bg-transparent text-[13px] font-medium text-slate-900 placeholder:text-slate-400 outline-none"
                   />
-                  <kbd className="hidden sm:inline-flex items-center gap-0.5 text-[10px] font-medium text-[hsl(var(--text-quaternary))] bg-[#F5F5F5] border border-black/[0.06] rounded px-1.5 py-0.5 font-mono">
+                  <kbd className="hidden sm:inline-flex items-center gap-0.5 text-[10px] font-medium text-slate-400 bg-[#F5F5F5] border border-black/[0.06] rounded px-1.5 py-0.5 font-mono">
                     ESC
                   </kbd>
                 </div>
@@ -158,7 +158,7 @@ export function CommandPalette() {
                 {/* ── Results list ──────────────────────────────── */}
                 <CommandRoot.List className="max-h-[min(60vh,380px)] overflow-y-auto overscroll-contain p-2 scroll-py-2">
                   <CommandRoot.Empty className="flex flex-col items-center justify-center py-10 text-[13px] text-[hsl(var(--text-tertiary))]">
-                    <Search className="w-5 h-5 mb-2 text-[hsl(var(--text-quaternary))]" />
+                    <Search className="w-5 h-5 mb-2 text-slate-400" />
                     No results found.
                   </CommandRoot.Empty>
 
@@ -166,7 +166,7 @@ export function CommandPalette() {
                   {showStats && stats && (
                     <CommandRoot.Group
                       heading={
-                        <span className="text-[10px] font-medium text-[hsl(var(--text-quaternary))] uppercase tracking-[0.1em] px-2">
+                        <span className="text-[10px] font-medium text-slate-400 uppercase tracking-[0.1em] px-2">
                           Quick Stats (7d)
                         </span>
                       }
@@ -181,7 +181,7 @@ export function CommandPalette() {
                           <DollarSign className="w-3.5 h-3.5 text-emerald-600" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-[13px] font-medium text-[hsl(var(--text-primary))]">Revenue</p>
+                          <p className="text-[13px] font-medium text-slate-900">Revenue</p>
                           <p className="text-[11px] text-[hsl(var(--text-tertiary))] font-mono">
                             ${stats.revenue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </p>
@@ -197,7 +197,7 @@ export function CommandPalette() {
                           <Activity className="w-3.5 h-3.5 text-blue-600" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-[13px] font-medium text-[hsl(var(--text-primary))]">API Calls</p>
+                          <p className="text-[13px] font-medium text-slate-900">API Calls</p>
                           <p className="text-[11px] text-[hsl(var(--text-tertiary))] font-mono">
                             {stats.calls.toLocaleString()}
                           </p>
@@ -213,7 +213,7 @@ export function CommandPalette() {
                           <Hash className="w-3.5 h-3.5 text-purple-600" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-[13px] font-medium text-[hsl(var(--text-primary))]">Unique Customers</p>
+                          <p className="text-[13px] font-medium text-slate-900">Unique Customers</p>
                           <p className="text-[11px] text-[hsl(var(--text-tertiary))] font-mono">
                             {stats.customers.toLocaleString()}
                           </p>
@@ -225,7 +225,7 @@ export function CommandPalette() {
                   {/* ── Navigation ─────────────────────────────── */}
                   <CommandRoot.Group
                     heading={
-                      <span className="text-[10px] font-medium text-[hsl(var(--text-quaternary))] uppercase tracking-[0.1em] px-2">
+                      <span className="text-[10px] font-medium text-slate-400 uppercase tracking-[0.1em] px-2">
                         Navigation
                       </span>
                     }
@@ -251,7 +251,7 @@ export function CommandPalette() {
                   {/* ── Actions ─────────────────────────────────── */}
                   <CommandRoot.Group
                     heading={
-                      <span className="text-[10px] font-medium text-[hsl(var(--text-quaternary))] uppercase tracking-[0.1em] px-2">
+                      <span className="text-[10px] font-medium text-slate-400 uppercase tracking-[0.1em] px-2">
                         Actions
                       </span>
                     }
@@ -284,7 +284,7 @@ export function CommandPalette() {
                 {/* ── Footer ───────────────────────────────────── */}
                 <div className="flex items-center justify-between px-4 py-2.5 border-t border-black/[0.06] bg-[#FAFAFA]">
                   <div className="flex items-center gap-3">
-                    <span className="flex items-center gap-1 text-[10px] text-[hsl(var(--text-quaternary))]">
+                    <span className="flex items-center gap-1 text-[10px] text-slate-400">
                       <kbd className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 bg-white border border-black/[0.08] rounded text-[10px] font-mono font-medium text-[hsl(var(--text-tertiary))]">
                         &uarr;
                       </kbd>
@@ -293,14 +293,14 @@ export function CommandPalette() {
                       </kbd>
                       Navigate
                     </span>
-                    <span className="flex items-center gap-1 text-[10px] text-[hsl(var(--text-quaternary))]">
+                    <span className="flex items-center gap-1 text-[10px] text-slate-400">
                       <kbd className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 bg-white border border-black/[0.08] rounded text-[10px] font-mono font-medium text-[hsl(var(--text-tertiary))]">
                         &crarr;
                       </kbd>
                       Select
                     </span>
                   </div>
-                  <span className="text-[10px] text-[hsl(var(--text-quaternary))]">
+                  <span className="text-[10px] text-slate-400">
                     Pulse Command Palette
                   </span>
                 </div>

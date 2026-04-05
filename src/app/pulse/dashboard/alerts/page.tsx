@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Bell, Plus, Trash2, TrendingDown, TrendingUp, UserPlus, Timer, Target, MessageSquare, Hash } from "lucide-react";
+import { ConfirmModal } from "@/components/dashboard/confirm-modal";
 import { ProGate } from "@/components/dashboard/pro-gate";
 import { cn } from "@/lib/utils";
 import { format, parseISO } from "date-fns";
@@ -281,6 +282,7 @@ function AlertsContent() {
   const [alerts, setAlerts] = useState<AlertData[]>([]);
   const [webhooks, setWebhooks] = useState<WebhookOption[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   function load() {
     Promise.all([
       fetch("/api/pulse/alerts", { credentials: "include" }).then((r) => r.json()),
@@ -299,9 +301,9 @@ function AlertsContent() {
   }
 
   async function deleteAlert(id: string) {
-    if (!confirm("Delete this alert?")) return;
     await fetch(`/api/pulse/alerts?id=${id}`, { method: "DELETE", credentials: "include" });
     load();
+    setDeleteTarget(null);
   }
 
   if (loading) {
@@ -391,7 +393,7 @@ function AlertsContent() {
                           <button onClick={() => toggleAlert(a.id)} className="text-[10px] font-medium text-tertiary hover:text-primary px-2 py-1 rounded transition-colors">
                             {a.is_active ? "Disable" : "Enable"}
                           </button>
-                          <button onClick={() => deleteAlert(a.id)} className="p-1.5 rounded hover:bg-red-50 transition-colors">
+                          <button onClick={() => setDeleteTarget(a.id)} className="p-1.5 rounded hover:bg-red-50 transition-colors">
                             <Trash2 className="w-3 h-3 text-red-400" />
                           </button>
                         </div>
@@ -412,6 +414,15 @@ function AlertsContent() {
           <p className="text-[12px] text-tertiary mt-1">Create one above to get notified on revenue changes and new agents.</p>
         </div>
       )}
+      <ConfirmModal
+        open={!!deleteTarget}
+        title="Delete Alert"
+        description="This alert will be permanently deleted. Any associated webhook notifications will stop."
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={() => deleteTarget && deleteAlert(deleteTarget)}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

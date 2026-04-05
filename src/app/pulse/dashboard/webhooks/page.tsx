@@ -14,6 +14,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { ProGate } from "@/components/dashboard/pro-gate";
+import { ConfirmModal } from "@/components/dashboard/confirm-modal";
 import { cn } from "@/lib/utils";
 import { format, parseISO } from "date-fns";
 
@@ -146,6 +147,7 @@ function WebhookRow({ wh, onUpdate, onDelete }: { wh: WebhookData; onUpdate: () 
   const [expanded, setExpanded] = useState(false);
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [toggling, setToggling] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   function loadDeliveries() {
     if (!expanded) {
@@ -170,9 +172,9 @@ function WebhookRow({ wh, onUpdate, onDelete }: { wh: WebhookData; onUpdate: () 
   }
 
   async function remove() {
-    if (!confirm("Delete this webhook?")) return;
     await fetch(`/api/pulse/webhooks?id=${wh.id}`, { method: "DELETE", credentials: "include" });
     onDelete();
+    setShowDeleteModal(false);
   }
 
   const events: string[] = (() => { try { return JSON.parse(wh.events); } catch { return []; } })();
@@ -203,7 +205,7 @@ function WebhookRow({ wh, onUpdate, onDelete }: { wh: WebhookData; onUpdate: () 
           <button onClick={toggle} disabled={toggling} className="text-[10px] font-medium text-tertiary hover:text-primary px-2 py-1 rounded transition-colors">
             {wh.is_active ? "Disable" : "Enable"}
           </button>
-          <button onClick={remove} className="p-1.5 rounded hover:bg-red-50 transition-colors">
+          <button onClick={() => setShowDeleteModal(true)} className="p-1.5 rounded hover:bg-red-50 transition-colors">
             <Trash2 className="w-3 h-3 text-red-400" />
           </button>
           <button onClick={loadDeliveries} className="p-1.5 rounded hover:bg-[#F0F0F0] transition-colors">
@@ -244,6 +246,15 @@ function WebhookRow({ wh, onUpdate, onDelete }: { wh: WebhookData; onUpdate: () 
           </motion.div>
         )}
       </AnimatePresence>
+      <ConfirmModal
+        open={showDeleteModal}
+        title="Delete Webhook"
+        description="This webhook will be permanently deleted along with its delivery history."
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={remove}
+        onCancel={() => setShowDeleteModal(false)}
+      />
     </div>
   );
 }

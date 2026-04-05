@@ -222,7 +222,7 @@ export default function BillingPage() {
         <p className="text-[13px] text-tertiary leading-relaxed">
           Pay with <span className="font-medium text-primary">USDC on Base</span> via
           the x402 protocol — the same way your agents pay you.
-          {" "}Credit card payments via Stripe coming soon.
+          {" "}Save 15% by paying with USDC instead of credit card.
         </p>
         {plan === "pro" && (
           <p className="text-[12px] text-quaternary mt-2">

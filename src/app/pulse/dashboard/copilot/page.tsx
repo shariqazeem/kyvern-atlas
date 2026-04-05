@@ -30,6 +30,11 @@ export default function CopilotPage() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Auto-focus input on mount
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
