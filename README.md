@@ -1,73 +1,130 @@
-# KyvernLabs
+# Pulse by KyvernLabs
 
-**The business infrastructure layer for the x402 economy.**
+### Revenue intelligence for the x402 protocol
 
 [![npm @kyvernlabs/pulse](https://img.shields.io/npm/v/@kyvernlabs/pulse?label=%40kyvernlabs%2Fpulse&color=blue)](https://www.npmjs.com/package/@kyvernlabs/pulse)
 [![npm @kyvernlabs/mcp](https://img.shields.io/npm/v/@kyvernlabs/mcp?label=%40kyvernlabs%2Fmcp&color=blue)](https://www.npmjs.com/package/@kyvernlabs/mcp)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![x402](https://img.shields.io/badge/x402-Foundation-black)](https://x402.org)
+[![x402 Foundation](https://img.shields.io/badge/x402-Foundation-black)](https://x402.org)
 
-Revenue analytics, wallet-native auth, and on-chain verification for x402 service providers. Built for the x402 Foundation ecosystem (Coinbase, Cloudflare, Stripe, Google, Visa, Solana, Amazon, Microsoft).
+Track every x402 micropayment, every AI agent customer, every endpoint — blockchain-verified, real-time, multi-tenant isolated. One line of middleware.
 
-**Live at [kyvernlabs.com](https://kyvernlabs.com)**
+[Live Dashboard](https://kyvernlabs.com/pulse/dashboard) | [API Docs](https://kyvernlabs.com/docs/api) | [npm](https://www.npmjs.com/package/@kyvernlabs/pulse) | [Changelog](https://kyvernlabs.com/changelog)
 
-## Architecture
+---
+
+## How it works
 
 ```
-Agent/Client → HTTP Request → Your x402 Endpoint
-                                    ↓
-                        withPulse() wraps withX402()
-                              ↓                ↓
-                     Captures payment     x402 verify + settle
-                        headers
-                              ↓
-                     POST /api/pulse/ingest (fire-and-forget)
-                              ↓
-                     SQLite → Dashboard (kyvernlabs.com/pulse/dashboard)
+1. Connect wallet → get kv_live_ API key (12 seconds)
+2. npm install @kyvernlabs/pulse
+3. Wrap your x402 endpoint → see every payment in your dashboard
 ```
-
-## Quick Start
-
-```bash
-git clone https://github.com/shariqazeem/kyvernlabs.git
-cd kyvernlabs
-cp .env.example .env.local   # Edit with your values
-npm install --legacy-peer-deps
-npm run dev
-```
-
-Open [http://localhost:3000](http://localhost:3000).
-
-## Environment Variables
-
-Copy `.env.example` to `.env.local` and fill in:
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `X402_PAYTO_ADDRESS` | Yes | Wallet that receives x402 payments |
-| `X402_CLIENT_PRIVATE_KEY` | For demo | Test wallet for "Make Live Payment" demo |
-| `X402_FACILITATOR_URL` | No | x402 facilitator (default: `https://x402.org/facilitator`) |
-| `X402_NETWORK` | No | Network (default: `eip155:84532` Base Sepolia) |
-| `PULSE_API_KEY` | No | Default API key for demo endpoint (default: `demo_key_001`) |
-| `NEXT_PUBLIC_BASE_URL` | For production | Your deployment URL (e.g., `https://kyvernlabs.com`) |
-| `NEXT_PUBLIC_PAY_TO_ADDRESS` | No | Pay-to address shown in UI (defaults to X402_PAYTO_ADDRESS) |
-| `PULSE_DB_PATH` | No | SQLite database path (default: `./pulse.db`) |
-
-## npm Packages
-
-### @kyvernlabs/pulse — Middleware
 
 ```typescript
 import { withPulse } from '@kyvernlabs/pulse'
 import { withX402 } from '@x402/next'
 
+// One line. That's the entire integration.
 export const GET = withPulse(
-  withX402(handler, config, server),
+  withX402(handler, x402Config),
   { apiKey: 'kv_live_your_key' }
 )
 ```
 
-### @kyvernlabs/mcp — MCP Server
+Every x402 payment captured: endpoint, amount (USDC), payer wallet, latency, tx hash, network, status. On-chain verified via BaseScan.
+
+---
+
+## Architecture
+
+```
+x402 Agent → HTTP 402 → Your Endpoint
+                              │
+                    withPulse() middleware
+                         │          │
+                 Captures payment   x402 settles
+                    headers         on-chain
+                         │
+                 POST /api/pulse/ingest
+                    (fire-and-forget)
+                         │
+            ┌────────────┼────────────┐
+            │            │            │
+        Dashboard    Webhooks     Alerts
+        (real-time)  (HMAC-SHA256) (Slack/Discord)
+```
+
+### Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Frontend | Next.js 14, TypeScript, Tailwind CSS, Framer Motion |
+| Backend | Next.js API routes, 40+ endpoints |
+| Database | SQLite (better-sqlite3, WAL mode) |
+| Auth | Privy (email, Google, wallet), session cookies |
+| Payments | USDC on Base via x402 protocol |
+| AI | MCP server (17 tools), AI Copilot, heuristic insights |
+
+---
+
+## What Pulse tracks per transaction
+
+- Endpoint path called
+- Payment amount (USDC)
+- Payer wallet address (AI agent)
+- Response latency (ms)
+- Transaction hash (on-chain proof, links to BaseScan)
+- Network (Base, Solana, Polygon, Ethereum)
+- Success / error / timeout status
+
+---
+
+## Dashboard features
+
+**Free tier:**
+- Revenue dashboard with real-time stats and charts
+- Transactions with on-chain verification badges
+- Endpoint analytics (health score, calls, revenue, latency, error rate)
+- Customer intelligence (agent personas, churn risk)
+- Market intelligence (ecosystem-wide data)
+- 5,000 events/day, 14-day retention
+
+**Growth tier ($19/mo):**
+- Pricing benchmarks vs market
+- 50,000 events/day, 30-day retention
+- CSV export, 3 API keys
+
+**Pro tier ($49/mo USDC):**
+- AI Copilot (natural language revenue queries)
+- A/B pricing experiments
+- Smart alerts with Slack/Discord
+- Webhooks (HMAC-SHA256 signed)
+- Revenue forecast with confidence bands
+- Agent persona engine, cohort analysis
+- Unlimited everything, 90-day retention
+
+---
+
+## npm packages
+
+### @kyvernlabs/pulse — Middleware
+
+Wraps any x402 endpoint. Captures every payment. Zero impact on your payment flow.
+
+```bash
+npm install @kyvernlabs/pulse
+```
+
+Works with: Next.js, Express, Hono, Cloudflare Workers, or any framework via direct API.
+
+### @kyvernlabs/mcp — AI Agent Tools
+
+17 MCP tools for Claude Desktop, Cursor, and any MCP-compatible AI assistant.
+
+```bash
+npm install -g @kyvernlabs/mcp
+```
 
 ```json
 {
@@ -81,22 +138,65 @@ export const GET = withPulse(
 }
 ```
 
-## Product Roadmap
+Your AI can ask: "What's my x402 revenue this week?" and get real answers from your Pulse data.
 
-1. **Pulse** (shipped) — Revenue analytics for x402 sellers
-2. **Vault** (6mo) — Smart contract wallets with per-agent budgets
-3. **Router** (12mo) — Smart routing to cheapest/fastest x402 service
-4. **Marketplace** (18mo) — Launch x402 APIs in minutes
+---
+
+## Ecosystem positioning
+
+```
+x402 Protocol (Linux Foundation)
+├── Payment rails (Coinbase, Stripe, Cloudflare)
+├── x402 Services (195+ endpoints)
+└── KyvernLabs Pulse ← you are here
+    ├── Revenue analytics (real-time, per-endpoint)
+    ├── Customer intelligence (agent wallets, personas, churn)
+    ├── On-chain verification (BaseScan links)
+    ├── Market intelligence (ecosystem benchmarks)
+    ├── AI Copilot (natural language queries)
+    ├── MCP tools (17 tools for AI assistants)
+    └── One-line middleware (@kyvernlabs/pulse)
+```
+
+Compatible with all x402 ecosystem projects: HeyAnna, FateFi, ClawBet, ValidFi, and every x402 service provider.
+
+---
+
+## Public tools (no login required)
+
+- [x402 Service Registry](https://kyvernlabs.com/registry) — directory of every x402 endpoint
+- [Market Gap Finder](https://kyvernlabs.com/tools/gaps) — find high-demand, low-supply categories
+- [State of x402 Report](https://kyvernlabs.com/reports) — monthly ecosystem analysis
+- [Market Data API](https://kyvernlabs.com/docs/api) — programmatic access to ecosystem data
+- [Public Leaderboard](https://kyvernlabs.com) — top endpoints by volume and revenue
+
+---
+
+## Self-hosting
+
+```bash
+git clone https://github.com/shariqazeem/kyvernlabs.git
+cd kyvernlabs
+cp .env.example .env.local
+npm install --legacy-peer-deps
+npm run dev
+```
+
+See `.env.example` for required environment variables.
+
+---
 
 ## Links
 
 - **Website**: [kyvernlabs.com](https://kyvernlabs.com)
-- **Pulse**: [kyvernlabs.com/pulse](https://kyvernlabs.com/pulse)
-- **Services**: [kyvernlabs.com/services](https://kyvernlabs.com/services)
+- **Dashboard**: [kyvernlabs.com/pulse/dashboard](https://kyvernlabs.com/pulse/dashboard)
+- **API Docs**: [kyvernlabs.com/docs/api](https://kyvernlabs.com/docs/api)
+- **Changelog**: [kyvernlabs.com/changelog](https://kyvernlabs.com/changelog)
 - **npm pulse**: [@kyvernlabs/pulse](https://www.npmjs.com/package/@kyvernlabs/pulse)
 - **npm mcp**: [@kyvernlabs/mcp](https://www.npmjs.com/package/@kyvernlabs/mcp)
 - **x402 Protocol**: [x402.org](https://x402.org)
+- **Twitter**: [@KyvernLabs](https://x.com/KyvernLabs)
 
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE)

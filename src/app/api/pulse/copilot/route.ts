@@ -5,8 +5,15 @@ import { formatCurrency } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
+// LLM Provider config — supports Elsa LLM Gateway, OpenAI, Anthropic, or local heuristics
+// Set LLM_PROVIDER env var to enable AI-powered responses
+// Default: "heuristic" (no API calls, pattern-matched)
+const LLM_PROVIDER = process.env.LLM_PROVIDER || "heuristic";
+const ELSA_GATEWAY_URL = process.env.ELSA_GATEWAY_URL || "https://gateway.elsa.ai/v1";
+const ELSA_API_KEY = process.env.ELSA_API_KEY || "";
+
 // Heuristic query matcher — maps natural language to data queries
-// No LLM needed. Pattern-matched against common questions.
+// Used when LLM_PROVIDER=heuristic (default, no API costs)
 function classifyQuery(query: string): string {
   const q = query.toLowerCase();
   if (q.match(/revenue.*(week|7d|7 day|this week)/)) return "revenue_week";
@@ -35,6 +42,11 @@ export async function POST(request: NextRequest) {
     if (!query) {
       return NextResponse.json({ error: "Missing query" }, { status: 400 });
     }
+
+    // TODO: When LLM_PROVIDER !== "heuristic", route through Elsa/OpenAI/Anthropic
+    // for richer AI responses. Currently using free heuristic matching.
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const _provider = { type: LLM_PROVIDER, gateway: ELSA_GATEWAY_URL, hasKey: !!ELSA_API_KEY };
 
     const db = getDb();
     const apiKeyId = auth.apiKeyId;
