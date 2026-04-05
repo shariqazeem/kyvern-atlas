@@ -118,7 +118,6 @@ export default function CustomersPage() {
               }`}
               style={personaFilter === p.name ? { backgroundColor: p.color, borderColor: p.color } : undefined}
             >
-              <span>{p.emoji}</span>
               {p.name}
               <span className="font-mono-numbers">{p.count}</span>
             </button>
@@ -135,7 +134,7 @@ export default function CustomersPage() {
           <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
             className="rounded-xl border border-amber-200 bg-amber-50/40 p-4">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-[14px]">⚠️</span>
+              <span className="w-5 h-5 rounded bg-amber-100 flex items-center justify-center text-[11px] font-bold text-amber-600">!</span>
               <h3 className="text-[13px] font-semibold text-amber-800">Churn Risk</h3>
               <span className="text-[11px] text-amber-600">{atRisk.length} agent{atRisk.length > 1 ? "s" : ""} at risk</span>
             </div>
@@ -145,7 +144,7 @@ export default function CustomersPage() {
             <div className="flex flex-wrap gap-2">
               {atRisk.slice(0, 5).map((c) => (
                 <span key={c.address} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white border border-amber-200 text-[11px]">
-                  <span>👻</span>
+                  <span className="w-4 h-4 rounded bg-slate-100 flex items-center justify-center text-[9px] font-bold text-slate-400">?</span>
                   <span className="font-mono">{truncateAddress(c.address)}</span>
                   <span className="text-amber-600 font-medium">{formatCurrency(c.total_spent)}</span>
                 </span>
@@ -200,7 +199,7 @@ export default function CustomersPage() {
                       style={{ backgroundColor: customer.persona.color }}
                       title={customer.persona.description}
                     >
-                      {customer.persona.emoji} {customer.persona.name}
+                      {customer.persona.name}
                     </span>
                   </td>
                   <td className="px-5 py-3 text-right font-mono-numbers text-sm font-medium">{formatCurrency(customer.total_spent)}</td>

@@ -244,7 +244,7 @@ function SuggestedAlerts({ onCreated }: { onCreated: () => void }) {
       className="rounded-xl border border-pulse/10 bg-pulse-50/30 p-5 space-y-3"
     >
       <div className="flex items-center gap-2">
-        <span className="text-[14px]">💡</span>
+        <span className="w-5 h-5 rounded bg-pulse-50 flex items-center justify-center text-[10px] font-bold text-pulse">AI</span>
         <h3 className="text-[13px] font-semibold text-pulse-700">Suggested Alerts</h3>
         <span className="text-[10px] text-pulse-500">Based on your data</span>
       </div>

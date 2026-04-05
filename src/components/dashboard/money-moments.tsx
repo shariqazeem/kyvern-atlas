@@ -45,7 +45,7 @@ function ShareButton({ moment }: { moment: Moment }) {
 
   const handleShare = async () => {
     const lines = [
-      `${moment.emoji} ${moment.title}`,
+      `${moment.title}`,
       moment.description,
     ];
     if (moment.amount_usd) {
@@ -99,9 +99,21 @@ function MomentCard({ moment, index }: { moment: Moment; index: number }) {
       }}
       className="flex gap-3 p-3 rounded-lg hover:bg-[#FAFAFA] transition-colors group"
     >
-      {/* Emoji icon */}
-      <div className="w-10 h-10 rounded-xl bg-[#F8F8F8] border border-black/[0.04] flex items-center justify-center text-lg shrink-0">
-        {moment.emoji}
+      {/* Type indicator */}
+      <div className={`w-10 h-10 rounded-xl border border-black/[0.04] flex items-center justify-center text-[10px] font-bold uppercase tracking-wider shrink-0 ${
+        moment.type === "new_agent" ? "bg-blue-50 text-blue-500" :
+        moment.type === "milestone" ? "bg-emerald-50 text-emerald-500" :
+        moment.type === "record_payment" ? "bg-amber-50 text-amber-500" :
+        moment.type === "hot_endpoint" ? "bg-orange-50 text-orange-500" :
+        moment.type === "whale_alert" ? "bg-purple-50 text-purple-500" :
+        "bg-slate-50 text-slate-400"
+      }`}>
+        {moment.type === "new_agent" ? "NEW" :
+         moment.type === "milestone" ? "GOAL" :
+         moment.type === "record_payment" ? "REC" :
+         moment.type === "hot_endpoint" ? "HOT" :
+         moment.type === "whale_alert" ? "TOP" :
+         "EVT"}
       </div>
 
       {/* Content */}

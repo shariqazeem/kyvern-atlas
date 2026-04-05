@@ -62,7 +62,7 @@ function revenueTrendInsight(
       type: "celebration",
       title: "First Revenue Week",
       message: `You earned $${thisWeek.revenue.toFixed(2)} this week across ${thisWeek.calls} calls. Great start!`,
-      icon: "\u{1F389}",
+      icon: "",
     };
   }
 
@@ -78,7 +78,7 @@ function revenueTrendInsight(
       type: "growth",
       title: "Revenue Growing",
       message: `Revenue is up ${Math.round(pctChange)}% this week${endpointNote}. You earned $${thisWeek.revenue.toFixed(2)} from ${thisWeek.calls} calls.`,
-      icon: "\u{1F4C8}",
+      icon: "",
     };
   }
 
@@ -89,7 +89,7 @@ function revenueTrendInsight(
       type: "warning",
       title: "Revenue Declined",
       message: `Revenue dropped ${Math.abs(Math.round(pctChange))}% compared to last week${endpointNote}. Consider reviewing your pricing or uptime.`,
-      icon: "\u{1F4C9}",
+      icon: "",
     };
   }
 
@@ -106,7 +106,7 @@ function newAgentInsight(newAgents: NewAgent[]): Insight | null {
     type: "info",
     title: "New Agents Detected",
     message: `${newAgents.length} new agent${newAgents.length === 1 ? "" : "s"} discovered your endpoints this week, contributing $${totalRevenue.toFixed(2)} in revenue.`,
-    icon: "\u{1F195}",
+    icon: "",
   };
 }
 
@@ -126,7 +126,7 @@ function topCustomerConcentrationInsight(
       type: "warning",
       title: "Revenue Concentration",
       message: `Agent ${shortAddr} accounts for ${Math.round(pct)}% of your revenue ($${top.revenue.toFixed(2)}). Consider diversifying your customer base.`,
-      icon: "\u{26A0}\u{FE0F}",
+      icon: "",
     };
   }
 
@@ -159,7 +159,7 @@ function endpointPerformanceInsight(
       type: "growth",
       title: "Endpoint Trending Up",
       message: `Your ${bestEndpoint.endpoint} endpoint is growing ${Math.round(bestGrowth)}% week-over-week \u2014 your fastest growing service.`,
-      icon: "\u{1F680}",
+      icon: "",
     };
   }
 
@@ -179,7 +179,7 @@ function latencyWarningInsight(endpoints: EndpointWeekly[]): Insight | null {
     type: "warning",
     title: "High Latency Detected",
     message: `${worst.endpoint} has high average latency (${Math.round(worst.avg_latency)}ms). This may affect agent satisfaction and call volume.`,
-    icon: "\u{23F1}\u{FE0F}",
+    icon: "",
   };
 }
 
@@ -196,7 +196,7 @@ function revenueMilestoneInsight(
         type: "celebration",
         title: `$${m} Milestone Reached`,
         message: `Congratulations! Your total revenue just crossed $${m}. You\u2019ve earned $${totalAllTime.toFixed(2)} all-time.`,
-        icon: "\u{1F3C6}",
+        icon: "",
       };
     }
   }

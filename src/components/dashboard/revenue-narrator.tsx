@@ -187,10 +187,13 @@ export function RevenueNarrator() {
                 )}
               >
                 <div className="flex items-start gap-3">
-                  {/* Icon */}
-                  <div className="w-8 h-8 rounded-lg bg-white/80 border border-black/[0.04] flex items-center justify-center shrink-0 text-base leading-none">
-                    {insight.icon}
-                  </div>
+                  {/* Type indicator */}
+                  <div className={`w-2 h-2 rounded-full shrink-0 mt-2 ${
+                    insight.type === "growth" ? "bg-emerald-400" :
+                    insight.type === "warning" ? "bg-amber-400" :
+                    insight.type === "celebration" ? "bg-blue-400" :
+                    "bg-slate-300"
+                  }`} />
 
                   {/* Content */}
                   <div className="flex-1 min-w-0">

@@ -84,7 +84,7 @@ export async function GET(request: NextRequest) {
       moments.push({
         id: `new_agent_${evt.id}`,
         type: "new_agent",
-        emoji: "\uD83C\uDD95",
+        emoji: "",
         title: "New Agent Detected",
         description: `First payment from ${evt.payer_address.slice(0, 6)}...${evt.payer_address.slice(-4)} on ${evt.endpoint}`,
         amount_usd: evt.amount_usd,
@@ -120,7 +120,7 @@ export async function GET(request: NextRequest) {
           moments.push({
             id: `milestone_${threshold}`,
             type: "milestone",
-            emoji: "\uD83C\uDFC6",
+            emoji: "",
             title: `$${threshold} Revenue Milestone`,
             description: `Cumulative revenue crossed $${threshold}! Current total: $${totalRevenue.toFixed(2)}`,
             amount_usd: threshold,
@@ -159,7 +159,7 @@ export async function GET(request: NextRequest) {
           moments.push({
             id: `record_${recordEvent.id}`,
             type: "record_payment",
-            emoji: "\u26A1",
+            emoji: "",
             title: "Record Payment",
             description: `Highest single payment: $${recordEvent.amount_usd.toFixed(4)} from ${recordEvent.payer_address.slice(0, 6)}...${recordEvent.payer_address.slice(-4)}`,
             amount_usd: recordEvent.amount_usd,
@@ -199,7 +199,7 @@ export async function GET(request: NextRequest) {
       moments.push({
         id: `hot_${nanoid(8)}`,
         type: "hot_endpoint",
-        emoji: "\uD83D\uDD25",
+        emoji: "",
         title: "Hot Endpoint",
         description: `${ep.endpoint} is up ${growthPct}% this week (${ep.this_week} calls vs ${ep.last_week} last week)`,
         amount_usd: null,
@@ -223,7 +223,7 @@ export async function GET(request: NextRequest) {
       moments.push({
         id: `whale_${evt.id}`,
         type: "whale_alert",
-        emoji: "\uD83D\uDC0B",
+        emoji: "",
         title: "Whale Alert",
         description: `$${evt.amount_usd.toFixed(2)} payment from ${evt.payer_address.slice(0, 6)}...${evt.payer_address.slice(-4)}`,
         amount_usd: evt.amount_usd,
@@ -268,7 +268,7 @@ export async function GET(request: NextRequest) {
       moments.push({
         id: `comeback_${nanoid(8)}`,
         type: "comeback",
-        emoji: "\uD83D\uDD04",
+        emoji: "",
         title: "Agent Comeback",
         description: `${agent.payer_address.slice(0, 6)}...${agent.payer_address.slice(-4)} returned after ${daysSince} days`,
         amount_usd: agent.amount_usd,
