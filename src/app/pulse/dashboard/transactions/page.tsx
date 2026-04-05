@@ -28,6 +28,7 @@ export default function TransactionsPage() {
   const [search, setSearch] = useState("");
   const [sourceFilter, setSourceFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [networkFilter, setNetworkFilter] = useState("");
   const [offset, setOffset] = useState(0);
 
   const fetchData = useCallback(async () => {
@@ -35,6 +36,7 @@ export default function TransactionsPage() {
     if (search) params.set("search", search);
     if (sourceFilter) params.set("source", sourceFilter);
     if (statusFilter) params.set("status", statusFilter);
+    if (networkFilter) params.set("network", networkFilter);
 
     try {
       const res = await fetch(`/api/pulse/recent?${params}`, { credentials: "include" });
@@ -50,7 +52,7 @@ export default function TransactionsPage() {
     } finally {
       setLoading(false);
     }
-  }, [search, sourceFilter, statusFilter, offset]);
+  }, [search, sourceFilter, statusFilter, networkFilter, offset]);
 
   useEffect(() => {
     setLoading(true);
@@ -59,7 +61,7 @@ export default function TransactionsPage() {
   }, [fetchData, search]);
 
   // Reset offset when filters change
-  useEffect(() => { setOffset(0); }, [search, sourceFilter, statusFilter]);
+  useEffect(() => { setOffset(0); }, [search, sourceFilter, statusFilter, networkFilter]);
 
   if (loading && data.length === 0) {
     return (
@@ -112,6 +114,12 @@ export default function TransactionsPage() {
           { value: "success", label: "Success" },
           { value: "error", label: "Error" },
         ]} />
+        <FilterDropdown label="Network" value={networkFilter} onChange={setNetworkFilter} options={[
+          { value: "", label: "All networks" },
+          { value: "eip155:8453", label: "Base" },
+          { value: "stellar:testnet", label: "Stellar Testnet" },
+          { value: "stellar:pubnet", label: "Stellar" },
+        ]} />
       </div>
 
       <motion.div
@@ -160,7 +168,7 @@ export default function TransactionsPage() {
                   </td>
                   <td className="px-5 py-3 text-right font-mono-numbers text-xs text-muted-foreground">{tx.latency_ms}ms</td>
                   <td className="px-5 py-3 text-right">
-                    <OnChainBadge txHash={tx.tx_hash || null} network={tx.network || null} />
+                    <OnChainBadge txHash={tx.tx_hash || null} network={tx.network || null} source={tx.source || null} />
                   </td>
                 </tr>
               ))}

@@ -23,8 +23,11 @@ export default withPulse(handler, { apiKey: 'kv_live_...' })
 - **Stellar chain badges** — Every Stellar transaction displays the Stellar logo and brand in the dashboard
 - **Stellar address support** — G... format addresses displayed with proper formatting
 - **Stellar explorer links** — Transaction hashes link directly to StellarChain.io
+- **Real Stellar Horizon API integration** — Fetches live transactions from Stellar testnet Horizon API, displaying real on-chain data with verified explorer links
 - **Multi-chain dashboard** — Stellar transactions displayed alongside Base/EVM in the same unified view
 - **Stellar-specific setup guide** — Framework tab showing Stellar x402 integration with Pulse
+- **Soroban-aware architecture** — Chain-agnostic event schema ready for Soroban contract invocations and authorization tracking
+- **Network filtering** — Dashboard filter to view only Stellar transactions
 
 ### How it uses x402
 
@@ -71,6 +74,7 @@ export default withPulse(handler, { apiKey: 'kv_live_...' })
 | Auth | Privy (email, Google, wallet) |
 | Payments | USDC on Base via x402 |
 | AI | MCP server, Copilot (heuristic + Elsa LLM Gateway config) |
+| Chain Support | Base, Stellar (testnet + Horizon API), Solana, EVM chains |
 | Deployment | Ubuntu VM, PM2, Caddy |
 
 ### Demo

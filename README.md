@@ -75,7 +75,7 @@ x402 Agent → HTTP 402 → Your Endpoint
 - Payer wallet address (AI agent)
 - Response latency (ms)
 - Transaction hash (on-chain proof, links to BaseScan)
-- Network (Base, Solana, Polygon, Ethereum)
+- Network (Base, Stellar, Solana, Polygon, Ethereum, Arbitrum, Optimism)
 - Success / error / timeout status
 
 ---

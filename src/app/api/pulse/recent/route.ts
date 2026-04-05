@@ -18,6 +18,7 @@ export async function GET(request: NextRequest) {
     const source = sp.get("source");
     const status = sp.get("status");
     const search = sp.get("search");
+    const network = sp.get("network");
 
     let where = "WHERE api_key_id = ?";
     const params: (string | number)[] = [auth.apiKeyId];
@@ -29,6 +30,10 @@ export async function GET(request: NextRequest) {
     if (status) {
       where += " AND status = ?";
       params.push(status);
+    }
+    if (network) {
+      where += " AND network = ?";
+      params.push(network);
     }
     if (search) {
       where += " AND (endpoint LIKE ? OR payer_address LIKE ? OR tx_hash LIKE ?)";
