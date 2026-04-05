@@ -16,7 +16,7 @@ import {
 import { ProGate } from "@/components/dashboard/pro-gate";
 import { formatCurrency } from "@/lib/utils";
 import { cn } from "@/lib/utils";
-import { useAuth } from "@/hooks/use-auth";
+
 
 const ease = [0.25, 0.1, 0.25, 1] as const;
 
@@ -120,10 +120,7 @@ function BenchmarksContent() {
   const [data, setData] = useState<BenchmarkData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { isAuthenticated } = useAuth();
-
   useEffect(() => {
-    if (!isAuthenticated) return;
     fetch("/api/pulse/benchmarks", { credentials: "include" })
       .then((r) => {
         if (r.status === 403) throw new Error("pro_required");
@@ -133,7 +130,7 @@ function BenchmarksContent() {
       .then(setData)
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [isAuthenticated]);
+  }, []);
 
   if (loading) {
     return (

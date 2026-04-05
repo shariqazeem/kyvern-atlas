@@ -9,7 +9,7 @@ import {
 } from "recharts";
 import { formatCurrency } from "@/lib/utils";
 import { cn } from "@/lib/utils";
-import { useAuth } from "@/hooks/use-auth";
+
 
 const ease = [0.25, 0.1, 0.25, 1] as const;
 
@@ -84,16 +84,13 @@ function IntelligenceContent() {
   const [data, setData] = useState<IntelData | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<"volume" | "revenue">("revenue");
-  const { isAuthenticated } = useAuth();
-
   useEffect(() => {
-    if (!isAuthenticated) return;
     fetch("/api/pulse/intelligence", { credentials: "include" })
       .then((r) => r.ok ? r.json() : null)
       .then(setData)
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [isAuthenticated]);
+  }, []);
 
   if (loading) {
     return (

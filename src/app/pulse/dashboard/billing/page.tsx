@@ -8,16 +8,14 @@ import { Check, ArrowRight, Sparkles, Zap, TrendingUp, BarChart3, Users, Activit
 import { cn, formatCurrency } from "@/lib/utils";
 
 function ROISection() {
-  const { isAuthenticated } = useAuth();
   const [stats, setStats] = useState<{ revenue: number; calls: number; customers: number } | null>(null);
 
   useEffect(() => {
-    if (!isAuthenticated) return;
     fetch("/api/pulse/stats?range=30d", { credentials: "include" })
       .then((r) => r.ok ? r.json() : null)
       .then((d) => d && setStats({ revenue: d.revenue, calls: d.calls, customers: d.customers }))
       .catch(() => {});
-  }, [isAuthenticated]);
+  }, []);
 
   if (!stats || (stats.revenue === 0 && stats.calls === 0)) return null;
 

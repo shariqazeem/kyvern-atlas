@@ -1,32 +1,31 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import type { StatsResponse, TimeRange } from "@/types/pulse";
 import { getStats } from "@/lib/pulse-api";
-import { useAuth } from "@/hooks/use-auth";
 
 export function usePulseStats(range: TimeRange) {
   const [data, setData] = useState<StatsResponse | null>(null);
   const [loading, setLoading] = useState(true);
-  const { isAuthenticated } = useAuth();
+  const hasFetched = useRef(false);
 
   const fetchData = useCallback(async () => {
-    if (!isAuthenticated) return;
     try {
       const stats = await getStats(range);
       setData(stats);
-    } catch (err) {
-      console.error("Failed to fetch stats:", err);
+      hasFetched.current = true;
+    } catch {
+      // Session might not be ready yet — will retry
     } finally {
       setLoading(false);
     }
-  }, [range, isAuthenticated]);
+  }, [range]);
 
+  // Fetch immediately on mount — session cookie persists across navigation
   useEffect(() => {
-    if (!isAuthenticated) return;
     setLoading(true);
     fetchData();
-  }, [fetchData, isAuthenticated]);
+  }, [fetchData]);
 
   return { data, loading };
 }

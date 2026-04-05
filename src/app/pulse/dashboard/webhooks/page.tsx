@@ -16,7 +16,7 @@ import {
 import { ProGate } from "@/components/dashboard/pro-gate";
 import { cn } from "@/lib/utils";
 import { format, parseISO } from "date-fns";
-import { useAuth } from "@/hooks/use-auth";
+
 
 const ease = [0.25, 0.1, 0.25, 1] as const;
 
@@ -251,8 +251,6 @@ function WebhookRow({ wh, onUpdate, onDelete }: { wh: WebhookData; onUpdate: () 
 function WebhooksContent() {
   const [webhooks, setWebhooks] = useState<WebhookData[]>([]);
   const [loading, setLoading] = useState(true);
-  const { isAuthenticated } = useAuth();
-
   function loadWebhooks() {
     fetch("/api/pulse/webhooks", { credentials: "include" })
       .then((r) => r.json())
@@ -261,7 +259,7 @@ function WebhooksContent() {
       .finally(() => setLoading(false));
   }
 
-  useEffect(() => { if (!isAuthenticated) return; loadWebhooks(); }, [isAuthenticated]);
+  useEffect(() => { loadWebhooks(); }, []);
 
   if (loading) {
     return (
