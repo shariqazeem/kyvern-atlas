@@ -22,8 +22,12 @@ import { getExplorerTxUrl, truncateTxHash, KYVERN_PAY_TO } from "@/lib/utils";
 
 const USDC_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" as const;
 const PAYTO = KYVERN_PAY_TO as `0x${string}`;
-const PRO_AMOUNT = process.env.NEXT_PUBLIC_PRO_PRICE || "49";
 const NETWORK_NAME = "Base";
+
+const PLANS = {
+  growth: { amount: "19", label: "Growth", period: "30-day access" },
+  pro: { amount: "49", label: "Pro", period: "30-day access" },
+} as const;
 
 const USDC_ABI = [
   {
@@ -38,23 +42,33 @@ const USDC_ABI = [
   },
 ] as const;
 
+const GROWTH_FEATURES = [
+  "50,000 events/day",
+  "$5,000/month revenue tracked",
+  "30-day data retention",
+  "3 API keys",
+  "10 alerts (all types)",
+  "Pricing benchmarks",
+  "CSV export",
+];
+
 const PRO_FEATURES = [
   "Unlimited events + revenue",
   "90-day data retention",
   "Up to 10 API keys",
-  "Pricing benchmarks",
-  "Cohort analysis",
-  "Competitive intelligence",
-  "Smart alerts (5 types)",
+  "Cohort analysis + intelligence",
+  "Slack/Discord alerts",
   "Webhooks (HMAC signed)",
-  "CSV export",
+  "A/B pricing experiments",
+  "Historical data import",
   "Priority support",
 ];
 
 export default function UpgradePage() {
   const { isPro, expiresAt, isConnected } = useSubscription();
   const { wallets } = useWallets();
-  useAuth(); // ensures session is synced
+  useAuth();
+  const [selectedPlan, setSelectedPlan] = useState<"growth" | "pro">("pro");
   const [status, setStatus] = useState<"idle" | "paying" | "confirming" | "verifying" | "done">("idle");
   const [error, setError] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<string | undefined>();
@@ -92,12 +106,19 @@ export default function UpgradePage() {
       const data = encodeFunctionData({
         abi: USDC_ABI,
         functionName: "transfer",
-        args: [PAYTO, parseUnits(PRO_AMOUNT, 6)],
+        args: [PAYTO, parseUnits(PLANS[selectedPlan].amount, 6)],
       });
 
       setStatus("confirming");
 
-      // Use wallet provider directly — avoids Privy embedded wallet lookup issues
+      // Switch wallet to Base mainnet if needed
+      try {
+        await wallet.switchChain(8453); // Base mainnet chain ID
+      } catch {
+        // May already be on Base or wallet doesn't support switching
+      }
+
+      // Use wallet provider directly
       const provider = await wallet.getEthereumProvider();
       const hash = await provider.request({
         method: "eth_sendTransaction",
@@ -105,6 +126,7 @@ export default function UpgradePage() {
           from: wallet.address,
           to: USDC_ADDRESS,
           data,
+          chainId: "0x2105", // Base mainnet (8453 in hex)
         }],
       }) as string;
       setTxHash(hash);
@@ -130,11 +152,15 @@ export default function UpgradePage() {
     } catch (err) {
       const msg = String(err);
       if (msg.includes("user rejected") || msg.includes("denied") || msg.includes("User rejected")) {
-        setError("Transaction cancelled");
-      } else if (msg.includes("insufficient")) {
-        setError("Insufficient USDC balance");
+        setError("Transaction cancelled.");
+      } else if (msg.includes("insufficient") || msg.includes("exceeds balance") || msg.includes("transfer amount exceeds")) {
+        setError("Insufficient USDC balance. You need " + PLANS[selectedPlan].amount + " USDC on Base to upgrade.");
+      } else if (msg.includes("TransactionReceiptNotFound") || msg.includes("could not be found")) {
+        setError("Transaction is still processing. Please wait a moment and check your dashboard — it may have gone through.");
+      } else if (msg.includes("network") || msg.includes("chain")) {
+        setError("Please switch your wallet to Base network and try again.");
       } else {
-        setError(msg.slice(0, 120));
+        setError("Transaction failed. Please ensure you have " + PLANS[selectedPlan].amount + " USDC on Base mainnet.");
       }
       setStatus("idle");
     }
@@ -195,8 +221,38 @@ export default function UpgradePage() {
             </motion.div>
           )}
 
-          {/* Pricing card */}
+          {/* Plan selector + pricing card */}
           {!isPro && (
+            <>
+            {/* Plan tabs */}
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.1, ease: [0.25, 0.1, 0.25, 1] }}
+              className="flex items-center justify-center gap-2 mb-6"
+            >
+              <button
+                onClick={() => setSelectedPlan("growth")}
+                className={`px-5 py-2 rounded-lg text-[13px] font-medium transition-all ${
+                  selectedPlan === "growth"
+                    ? "bg-foreground text-white"
+                    : "bg-white border border-black/[0.08] text-secondary hover:bg-slate-50"
+                }`}
+              >
+                Growth — $19/mo
+              </button>
+              <button
+                onClick={() => setSelectedPlan("pro")}
+                className={`px-5 py-2 rounded-lg text-[13px] font-medium transition-all ${
+                  selectedPlan === "pro"
+                    ? "bg-foreground text-white"
+                    : "bg-white border border-black/[0.08] text-secondary hover:bg-slate-50"
+                }`}
+              >
+                Pro — $49/mo
+              </button>
+            </motion.div>
+
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -205,16 +261,16 @@ export default function UpgradePage() {
             >
               <div className="flex items-baseline gap-1 mb-1">
                 <span className="text-[36px] font-semibold tracking-[-0.03em] font-mono-numbers">
-                  ${PRO_AMOUNT}
+                  ${PLANS[selectedPlan].amount}
                 </span>
                 <span className="text-white/40 text-[14px]">/month USDC</span>
               </div>
               <p className="text-[13px] text-white/50 mb-6">
-                {NETWORK_NAME} • 30-day access • Cancel anytime
+                {NETWORK_NAME} • {PLANS[selectedPlan].period} • Cancel anytime
               </p>
 
               <ul className="space-y-2.5 mb-8">
-                {PRO_FEATURES.map((f) => (
+                {(selectedPlan === "pro" ? PRO_FEATURES : GROWTH_FEATURES).map((f) => (
                   <li key={f} className="flex items-center gap-2.5 text-[13px] text-white/75">
                     <Check className="w-3.5 h-3.5 text-white/40 shrink-0" />
                     {f}
@@ -268,7 +324,7 @@ export default function UpgradePage() {
                     {status === "idle" && (
                       <>
                         <Zap className="w-4 h-4" />
-                        Pay ${PRO_AMOUNT} USDC — Upgrade Now
+                        Pay ${PLANS[selectedPlan].amount} USDC — Upgrade Now
                       </>
                     )}
                     {status === "paying" && (
@@ -324,6 +380,7 @@ export default function UpgradePage() {
                 </div>
               )}
             </motion.div>
+          </>
           )}
 
           <motion.p
