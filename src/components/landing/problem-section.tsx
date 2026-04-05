@@ -68,7 +68,7 @@ function PulseDashboardMini() {
         </span>
       </div>
       <div className="p-5 space-y-4">
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {[
             { label: "Revenue", value: "$12,847", delta: "+23%" },
             { label: "API Calls", value: "8,492", delta: "+13%" },

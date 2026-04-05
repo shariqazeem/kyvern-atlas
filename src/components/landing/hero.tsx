@@ -69,7 +69,7 @@ function DashboardPreview() {
 
         {/* Dashboard */}
         <div className="p-8 lg:p-10 bg-[#F8F9FA]">
-          <div className="grid grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
             {[
               { label: "Revenue", value: "$12,847", delta: "+23.1%", icon: DollarSign, pulse: true },
               { label: "API Calls", value: "8,492", delta: "+12.8%", icon: Zap },
@@ -301,7 +301,7 @@ export function Hero() {
           transition={{ duration: 0.8, delay: 2.4, ease }}
           className="mt-8 mb-8"
         >
-          <div className="max-w-3xl mx-auto grid grid-cols-3 divide-x divide-black/[0.06]">
+          <div className="max-w-3xl mx-auto grid grid-cols-1 sm:grid-cols-3 sm:divide-x divide-black/[0.06]">
             {[
               { value: "195+", label: "x402 Services" },
               { value: "$600M+", label: "Annualized Volume" },

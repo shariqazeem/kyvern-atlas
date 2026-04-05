@@ -6,7 +6,7 @@ import confetti from "canvas-confetti";
 import { Navbar } from "@/components/landing/navbar";
 import { Footer } from "@/components/landing/footer";
 import { useSubscription } from "@/hooks/use-subscription";
-import { useWallets, usePrivy } from "@privy-io/react-auth";
+import { useWallets } from "@privy-io/react-auth";
 import { useAuth } from "@/hooks/use-auth";
 import { encodeFunctionData, parseUnits } from "viem";
 import {
@@ -55,7 +55,6 @@ export default function UpgradePage() {
   const { isPro, expiresAt, isConnected } = useSubscription();
   const { wallets } = useWallets();
   useAuth(); // ensures session is synced
-  const { sendTransaction } = usePrivy();
   const [status, setStatus] = useState<"idle" | "paying" | "confirming" | "verifying" | "done">("idle");
   const [error, setError] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<string | undefined>();
@@ -98,20 +97,18 @@ export default function UpgradePage() {
 
       setStatus("confirming");
 
-      // Use Privy's sendTransaction — handles funding UI if insufficient balance
-      const receipt = await sendTransaction(
-        {
+      // Use wallet provider directly — avoids Privy embedded wallet lookup issues
+      const provider = await wallet.getEthereumProvider();
+      const hash = await provider.request({
+        method: "eth_sendTransaction",
+        params: [{
+          from: wallet.address,
           to: USDC_ADDRESS,
           data,
-        },
-        {
-          fundWalletConfig: {
-            amount: "0.001",
-          },
-        }
-      );
+        }],
+      }) as string;
+      setTxHash(hash);
 
-      const hash = receipt.hash;
       setTxHash(hash);
 
       // Verify on backend

@@ -508,7 +508,7 @@ export const GET = withPulse(x402Handler, {
         style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.02)" }}
       >
         <h3 className="text-[14px] font-semibold">What Pulse tracks per transaction</h3>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {[
             { icon: Terminal, label: "Endpoint path", desc: "Which API was called" },
             { icon: Package, label: "Payment amount", desc: "USD value of x402 payment" },

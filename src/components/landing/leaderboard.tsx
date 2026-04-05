@@ -287,7 +287,7 @@ export function Leaderboard() {
             {tab !== "trending" ? (
               <div className="overflow-x-auto">
                 {/* Table header */}
-                <div className="grid grid-cols-[1fr_80px_100px_90px_80px] gap-2 px-5 py-2.5 border-b border-black/[0.03] text-[10px] uppercase tracking-[0.12em] font-medium text-quaternary">
+                <div className="grid grid-cols-[1fr_80px_100px_90px_80px] gap-2 px-5 min-w-[500px] py-2.5 border-b border-black/[0.03] text-[10px] uppercase tracking-[0.12em] font-medium text-quaternary">
                   <span>Endpoint</span>
                   <span className="text-right">Calls</span>
                   <span className="text-right">Revenue</span>
@@ -307,7 +307,7 @@ export function Leaderboard() {
                       whileInView={{ opacity: 1 }}
                       viewport={{ once: true }}
                       transition={{ duration: 0.3, delay: 0.45 + i * 0.04 }}
-                      className="grid grid-cols-[1fr_80px_100px_90px_80px] gap-2 px-5 py-3 border-b border-black/[0.02] last:border-0 hover:bg-[#FAFAFA] transition-colors duration-150"
+                      className="grid grid-cols-[1fr_80px_100px_90px_80px] gap-2 px-5 min-w-[500px] py-3 border-b border-black/[0.02] last:border-0 hover:bg-[#FAFAFA] transition-colors duration-150"
                     >
                       <span className="font-mono text-[12px] text-secondary truncate">{row.endpoint}</span>
                       <span className="font-mono-numbers text-[12px] text-primary text-right font-medium">

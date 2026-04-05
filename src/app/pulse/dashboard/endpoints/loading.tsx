@@ -2,7 +2,7 @@ export default function EndpointsLoading() {
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="h-5 w-28 bg-slate-100 rounded animate-pulse" />
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[...Array(3)].map((_, i) => (
           <div key={i} className="rounded-lg border border-black/[0.06] bg-white p-4 space-y-2">
             <div className="h-3 w-24 bg-slate-100 rounded animate-pulse" />

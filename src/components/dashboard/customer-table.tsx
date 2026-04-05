@@ -38,7 +38,7 @@ export function CustomerTable({ limit }: CustomerTableProps) {
         <ExportButton type="customers" compact />
       </div>
       <div className="space-y-0">
-        <div className="grid grid-cols-4 gap-4 text-xs text-muted-foreground font-medium pb-2 border-b border-border">
+        <div className="grid grid-cols-4 gap-4 text-xs min-w-[400px] text-muted-foreground font-medium pb-2 border-b border-border">
           <span>Agent</span>
           <span className="text-right">Total Spent</span>
           <span className="text-right">Calls</span>

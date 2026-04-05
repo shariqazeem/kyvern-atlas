@@ -28,7 +28,7 @@ function ROISection() {
     >
       <h3 className="text-[14px] font-semibold mb-1">Pulse ROI</h3>
       <p className="text-[12px] text-tertiary mb-4">What Pulse has tracked for you in the last 30 days</p>
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
             <BarChart3 className="w-4 h-4 text-emerald-600" />
