@@ -20,6 +20,7 @@ import {
   Activity,
   Sparkles,
   FlaskConical,
+  Shield,
 } from "lucide-react";
 
 const NAV_GROUPS = [
@@ -49,6 +50,7 @@ const NAV_GROUPS = [
       { href: "/pulse/dashboard/webhooks", label: "Webhooks", icon: Webhook },
       { href: "/pulse/dashboard/alerts", label: "Alerts", icon: Bell },
       { href: "/pulse/dashboard/setup", label: "Setup Guide", icon: Code2 },
+      { href: "/pulse/dashboard/badges", label: "Verified Badge", icon: Shield },
     ],
   },
   {
