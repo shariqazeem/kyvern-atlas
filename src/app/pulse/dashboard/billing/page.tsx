@@ -1,10 +1,72 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { useAuth } from "@/hooks/use-auth";
-import { Check, ArrowRight, Sparkles, Zap, TrendingUp } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Check, ArrowRight, Sparkles, Zap, TrendingUp, BarChart3, Users, Activity } from "lucide-react";
+import { cn, formatCurrency } from "@/lib/utils";
+
+function ROISection() {
+  const { isAuthenticated } = useAuth();
+  const [stats, setStats] = useState<{ revenue: number; calls: number; customers: number } | null>(null);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    fetch("/api/pulse/stats?range=30d", { credentials: "include" })
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => d && setStats({ revenue: d.revenue, calls: d.calls, customers: d.customers }))
+      .catch(() => {});
+  }, [isAuthenticated]);
+
+  if (!stats || (stats.revenue === 0 && stats.calls === 0)) return null;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, delay: 0.05, ease: [0.25, 0.1, 0.25, 1] }}
+      className="rounded-xl border border-emerald-100 bg-emerald-50/30 p-6"
+    >
+      <h3 className="text-[14px] font-semibold mb-1">Pulse ROI</h3>
+      <p className="text-[12px] text-tertiary mb-4">What Pulse has tracked for you in the last 30 days</p>
+      <div className="grid grid-cols-3 gap-4">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
+            <BarChart3 className="w-4 h-4 text-emerald-600" />
+          </div>
+          <div>
+            <p className="text-[16px] font-semibold font-mono-numbers">{formatCurrency(stats.revenue)}</p>
+            <p className="text-[10px] text-quaternary">Revenue tracked</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
+            <Activity className="w-4 h-4 text-blue-600" />
+          </div>
+          <div>
+            <p className="text-[16px] font-semibold font-mono-numbers">{stats.calls.toLocaleString()}</p>
+            <p className="text-[10px] text-quaternary">Transactions</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
+            <Users className="w-4 h-4 text-purple-600" />
+          </div>
+          <div>
+            <p className="text-[16px] font-semibold font-mono-numbers">{stats.customers}</p>
+            <p className="text-[10px] text-quaternary">Unique agents</p>
+          </div>
+        </div>
+      </div>
+      {stats.revenue > 0 && (
+        <p className="text-[11px] text-emerald-700 mt-4">
+          Without Pulse, you would have no visibility into this revenue. That&apos;s worth more than $49/mo.
+        </p>
+      )}
+    </motion.div>
+  );
+}
 
 const TIERS = [
   {
@@ -147,6 +209,9 @@ export default function BillingPage() {
           })}
         </div>
       </motion.div>
+
+      {/* ROI Calculator */}
+      <ROISection />
 
       {/* Payment method */}
       <motion.div
