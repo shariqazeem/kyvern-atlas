@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Copy, Check, Terminal, Package, Code2, Bot, Cpu } from "lucide-react";
+import { Copy, Check, Terminal, Package, Code2, Bot, Cpu, Zap, Loader2, CheckCircle } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 
@@ -112,6 +112,85 @@ requests.post("https://kyvernlabs.com/api/pulse/ingest",
 )`,
   },
 ];
+
+function TestPaymentButton({ apiKey }: { apiKey: string }) {
+  const [status, setStatus] = useState<"idle" | "sending" | "done" | "error">("idle");
+  const [eventId, setEventId] = useState<string | null>(null);
+  const { isAuthenticated } = useAuth();
+
+  async function sendTestPayment() {
+    if (!isAuthenticated || status === "sending") return;
+    setStatus("sending");
+    try {
+      const res = await fetch("/api/pulse/ingest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-API-Key": apiKey },
+        body: JSON.stringify({
+          endpoint: "/api/test-payment",
+          amount_usd: 0.001,
+          payer_address: "0xTestAgent_" + Math.random().toString(36).slice(2, 10),
+          latency_ms: Math.floor(50 + Math.random() * 150),
+          status: "success",
+          network: "eip155:8453",
+          asset: "USDC",
+          scheme: "exact",
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setEventId(data.event_id);
+        setStatus("done");
+      } else {
+        setStatus("error");
+      }
+    } catch {
+      setStatus("error");
+    }
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, delay: 0.25, ease }}
+      className="rounded-xl border border-pulse/10 bg-pulse-50/30 p-5 space-y-3"
+    >
+      <div className="flex items-center gap-2">
+        <Zap className="w-4 h-4 text-pulse" />
+        <h3 className="text-[13px] font-semibold text-pulse-700">Test your integration</h3>
+      </div>
+      <p className="text-[12px] text-pulse-600">
+        Send a test payment event to verify everything is connected. It will appear in your dashboard instantly.
+      </p>
+      {status === "done" ? (
+        <div className="flex items-center gap-2 p-3 rounded-lg bg-emerald-50 border border-emerald-100">
+          <CheckCircle className="w-4 h-4 text-emerald-600" />
+          <div>
+            <p className="text-[12px] font-medium text-emerald-700">Test payment received!</p>
+            <p className="text-[11px] text-emerald-600">
+              Event ID: <span className="font-mono">{eventId?.slice(0, 12)}...</span> — {" "}
+              <a href="/pulse/dashboard" className="underline">View in dashboard</a>
+            </p>
+          </div>
+        </div>
+      ) : (
+        <button
+          onClick={sendTestPayment}
+          disabled={status === "sending" || !isAuthenticated}
+          className="inline-flex items-center gap-2 h-9 px-4 rounded-lg bg-pulse text-white text-[12px] font-medium hover:bg-pulse-700 disabled:opacity-50 transition-colors"
+        >
+          {status === "sending" ? (
+            <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Sending...</>
+          ) : status === "error" ? (
+            "Retry test payment"
+          ) : (
+            <><Zap className="w-3.5 h-3.5" /> Send Test Payment</>
+          )}
+        </button>
+      )}
+    </motion.div>
+  );
+}
 
 function FrameworkTabs({ displayKey }: { displayKey: string }) {
   const [active, setActive] = useState(0);
@@ -230,6 +309,9 @@ export const GET = withPulse(x402Handler, {
             to see revenue, customers, and performance in real time.
           </p>
         </motion.div>
+
+        {/* Test Payment Button */}
+        <TestPaymentButton apiKey={displayKey} />
       </div>
 
       {/* Framework Templates */}
