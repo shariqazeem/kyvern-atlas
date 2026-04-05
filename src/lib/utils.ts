@@ -45,6 +45,7 @@ const NETWORKS: Record<string, { name: string; explorer: string; txPath?: string
   "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1": { name: "Solana Devnet", explorer: "https://solscan.io", txPath: "/tx/?cluster=devnet" },
   // Stellar
   "stellar:pubnet": { name: "Stellar", explorer: "https://stellarchain.io", txPath: "/transactions/" },
+  "stellar:testnet": { name: "Stellar Testnet", explorer: "https://testnet.stellarchain.io", txPath: "/transactions/" },
 };
 
 export function getNetworkName(network?: string): string {

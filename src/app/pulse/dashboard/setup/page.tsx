@@ -89,10 +89,33 @@ app.get('/api/my-service', async (c) => {
 export default app`,
   },
   {
+    name: "Stellar",
+    label: "Stellar",
+    code: (key: string) => `// Stellar x402 endpoint with Pulse analytics
+// Works with x402 on Stellar (Soroban + stablecoins)
+
+import { withPulse } from '@kyvernlabs/pulse'
+
+// Your Stellar x402 handler
+const handler = async (req) => {
+  // Pulse captures: payer (G... address), amount,
+  // Stellar tx hash, network (stellar:pubnet)
+  return Response.json({ data: "stellar data" })
+}
+
+export default withPulse(handler, {
+  apiKey: '${key}'
+})
+
+// Pulse auto-detects Stellar network from
+// the x402 payment headers and displays
+// Stellar chain badges in your dashboard.`,
+  },
+  {
     name: "Direct",
     label: "Any Language",
-    code: (key: string) => `# Works with any language — just POST to the ingest API
-# Python example:
+    code: (key: string) => `# Works with any language/chain — POST to the ingest API
+# Stellar Python example:
 
 import requests
 
@@ -102,11 +125,12 @@ requests.post("https://kyvernlabs.com/api/pulse/ingest",
     "Content-Type": "application/json"
   },
   json={
-    "endpoint": "/api/my-service",
+    "endpoint": "/api/stellar/data-feed",
     "amount_usd": 0.01,
-    "payer_address": "0xagent...",
-    "tx_hash": "0xtx...",
-    "network": "eip155:8453",
+    "payer_address": "GABCDEF...",
+    "tx_hash": "abc123...",
+    "network": "stellar:pubnet",
+    "asset": "USDC",
     "status": "success"
   }
 )`,
@@ -116,32 +140,48 @@ requests.post("https://kyvernlabs.com/api/pulse/ingest",
 function TestPaymentButton({ apiKey }: { apiKey: string }) {
   const [status, setStatus] = useState<"idle" | "sending" | "done" | "error">("idle");
   const [eventId, setEventId] = useState<string | null>(null);
+  const [lastNetwork, setLastNetwork] = useState<string>("");
   const { isAuthenticated } = useAuth();
 
-  async function sendTestPayment() {
+  async function sendTestPayment(chain: "base" | "stellar") {
     if (!isAuthenticated || status === "sending") return;
     setStatus("sending");
     try {
-      const res = await fetch("/api/pulse/ingest", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-API-Key": apiKey },
-        body: JSON.stringify({
-          endpoint: "/api/test-payment",
-          amount_usd: 0.001,
-          payer_address: "0xTestAgent_" + Math.random().toString(36).slice(2, 10),
-          latency_ms: Math.floor(50 + Math.random() * 150),
-          status: "success",
-          network: "eip155:8453",
-          asset: "USDC",
-          scheme: "exact",
-        }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setEventId(data.event_id);
-        setStatus("done");
+      if (chain === "stellar") {
+        // Use the Stellar demo endpoint
+        const res = await fetch("/api/x402/stellar-demo", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-API-Key": apiKey },
+          credentials: "include",
+          body: JSON.stringify({ endpoint: "/api/stellar/data-feed", amount_usd: 0.01 }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          setEventId(data.event_id);
+          setLastNetwork("Stellar Testnet");
+          setStatus("done");
+        } else { setStatus("error"); }
       } else {
-        setStatus("error");
+        const res = await fetch("/api/pulse/ingest", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-API-Key": apiKey },
+          body: JSON.stringify({
+            endpoint: "/api/test-payment",
+            amount_usd: 0.001,
+            payer_address: "0xTestAgent_" + Math.random().toString(36).slice(2, 10),
+            latency_ms: Math.floor(50 + Math.random() * 150),
+            status: "success",
+            network: "eip155:8453",
+            asset: "USDC",
+            scheme: "exact",
+          }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          setEventId(data.event_id);
+          setLastNetwork("Base");
+          setStatus("done");
+        } else { setStatus("error"); }
       }
     } catch {
       setStatus("error");
@@ -166,27 +206,40 @@ function TestPaymentButton({ apiKey }: { apiKey: string }) {
         <div className="flex items-center gap-2 p-3 rounded-lg bg-emerald-50 border border-emerald-100">
           <CheckCircle className="w-4 h-4 text-emerald-600" />
           <div>
-            <p className="text-[12px] font-medium text-emerald-700">Test payment received!</p>
+            <p className="text-[12px] font-medium text-emerald-700">Test payment received on {lastNetwork}!</p>
             <p className="text-[11px] text-emerald-600">
               Event ID: <span className="font-mono">{eventId?.slice(0, 12)}...</span> — {" "}
-              <a href="/pulse/dashboard" className="underline">View in dashboard</a>
+              <a href="/pulse/dashboard/transactions" className="underline">View in transactions</a>
             </p>
           </div>
         </div>
       ) : (
+        <div className="flex items-center gap-2">
         <button
-          onClick={sendTestPayment}
+          onClick={() => sendTestPayment("base")}
           disabled={status === "sending" || !isAuthenticated}
           className="inline-flex items-center gap-2 h-9 px-4 rounded-lg bg-pulse text-white text-[12px] font-medium hover:bg-pulse-700 disabled:opacity-50 transition-colors"
         >
           {status === "sending" ? (
             <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Sending...</>
           ) : status === "error" ? (
-            "Retry test payment"
+            "Retry"
           ) : (
-            <><Zap className="w-3.5 h-3.5" /> Send Test Payment</>
+            <><Zap className="w-3.5 h-3.5" /> Test Base</>
           )}
         </button>
+        <button
+          onClick={() => sendTestPayment("stellar")}
+          disabled={status === "sending" || !isAuthenticated}
+          className="inline-flex items-center gap-2 h-9 px-4 rounded-lg bg-slate-900 text-white text-[12px] font-medium hover:bg-slate-800 disabled:opacity-50 transition-colors"
+        >
+          {status === "sending" ? (
+            <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Sending...</>
+          ) : (
+            <><Zap className="w-3.5 h-3.5" /> Test Stellar</>
+          )}
+        </button>
+        </div>
       )}
     </motion.div>
   );
