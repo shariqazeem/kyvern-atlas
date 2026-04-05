@@ -180,6 +180,103 @@ function CreateAlertForm({ webhooks, onCreated }: { webhooks: WebhookOption[]; o
   );
 }
 
+const SUGGESTIONS = [
+  {
+    name: "Revenue Drop Alert",
+    type: "revenue_drop",
+    config: { threshold: 20, period: "24h" },
+    reason: "Get notified when revenue drops 20% in 24 hours — catch issues early.",
+  },
+  {
+    name: "New Agent Welcome",
+    type: "new_agent",
+    config: {},
+    reason: "Know instantly when a new AI agent discovers your endpoints.",
+  },
+  {
+    name: "Latency Guard",
+    type: "latency_spike",
+    config: { threshold: 2000, period: "1h" },
+    reason: "Alert when response time exceeds 2 seconds — agents may abandon slow endpoints.",
+  },
+  {
+    name: "Revenue Spike",
+    type: "revenue_spike",
+    config: { threshold: 50, period: "6h" },
+    reason: "Celebrate when revenue spikes 50%+ — and investigate what's driving it.",
+  },
+  {
+    name: "Daily Revenue Target",
+    type: "daily_target",
+    config: { threshold: 10 },
+    reason: "Track progress toward your daily revenue goal.",
+  },
+];
+
+function SuggestedAlerts({ onCreated }: { onCreated: () => void }) {
+  const [creating, setCreating] = useState<string | null>(null);
+
+  async function createSuggested(s: typeof SUGGESTIONS[0]) {
+    setCreating(s.name);
+    try {
+      await fetch("/api/pulse/alerts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          name: s.name,
+          type: s.type,
+          config: s.config,
+        }),
+      });
+      onCreated();
+    } finally {
+      setCreating(null);
+    }
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, ease }}
+      className="rounded-xl border border-pulse/10 bg-pulse-50/30 p-5 space-y-3"
+    >
+      <div className="flex items-center gap-2">
+        <span className="text-[14px]">💡</span>
+        <h3 className="text-[13px] font-semibold text-pulse-700">Suggested Alerts</h3>
+        <span className="text-[10px] text-pulse-500">Based on your data</span>
+      </div>
+      <div className="space-y-2">
+        {SUGGESTIONS.slice(0, 3).map((s) => {
+          const typeConfig = ALERT_TYPE_CONFIG[s.type];
+          const Icon = typeConfig?.icon || Bell;
+          return (
+            <div key={s.name} className="flex items-center justify-between p-3 rounded-lg bg-white border border-black/[0.04]">
+              <div className="flex items-center gap-3">
+                <div className={cn("w-7 h-7 rounded-lg flex items-center justify-center", typeConfig?.color || "bg-[#F0F0F0]")}>
+                  <Icon className="w-3.5 h-3.5" />
+                </div>
+                <div>
+                  <p className="text-[12px] font-medium">{s.name}</p>
+                  <p className="text-[11px] text-quaternary">{s.reason}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => createSuggested(s)}
+                disabled={creating === s.name}
+                className="text-[11px] font-medium text-pulse hover:text-pulse-700 px-3 py-1.5 rounded-md hover:bg-pulse-50 transition-colors disabled:opacity-50"
+              >
+                {creating === s.name ? "Adding..." : "+ Add"}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </motion.div>
+  );
+}
+
 function AlertsContent() {
   const [alerts, setAlerts] = useState<AlertData[]>([]);
   const [webhooks, setWebhooks] = useState<WebhookOption[]>([]);
@@ -228,6 +325,11 @@ function AlertsContent() {
       </div>
 
       <CreateAlertForm webhooks={webhooks} onCreated={load} />
+
+      {/* AI-Suggested Alert Rules */}
+      {alerts.length < 3 && (
+        <SuggestedAlerts onCreated={load} />
+      )}
 
       {alerts.length > 0 && (
         <motion.div
