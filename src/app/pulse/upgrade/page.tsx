@@ -6,7 +6,7 @@ import confetti from "canvas-confetti";
 import { Navbar } from "@/components/landing/navbar";
 import { Footer } from "@/components/landing/footer";
 import { useSubscription } from "@/hooks/use-subscription";
-import { useWallets, useFundWallet } from "@privy-io/react-auth";
+import { useWallets } from "@privy-io/react-auth";
 import { useAuth } from "@/hooks/use-auth";
 import { encodeFunctionData, parseUnits } from "viem";
 import {
@@ -69,7 +69,6 @@ export default function UpgradePage() {
   const { isPro, expiresAt, isConnected } = useSubscription();
   const { wallets } = useWallets();
   useAuth();
-  const { fundWallet } = useFundWallet();
   const [selectedPlan, setSelectedPlan] = useState<"growth" | "pro">("pro");
   const [status, setStatus] = useState<"idle" | "paying" | "confirming" | "verifying" | "done">("idle");
   const [error, setError] = useState<string | null>(null);
@@ -354,18 +353,20 @@ export default function UpgradePage() {
                     <>
                       <div className="flex items-center gap-3">
                         <div className="flex-1 h-px bg-white/10" />
-                        <span className="text-[11px] text-white/30 uppercase tracking-wider">or</span>
+                        <span className="text-[11px] text-white/30 uppercase tracking-wider">or need USDC?</span>
                         <div className="flex-1 h-px bg-white/10" />
                       </div>
-                      <button
-                        onClick={() => fundWallet({ address, options: { chain: { id: 8453 }, amount: PLANS[selectedPlan].amount } })}
+                      <a
+                        href={`https://www.moonpay.com/buy/usdc_base?walletAddress=${address}&baseCurrencyAmount=${PLANS[selectedPlan].amount}&baseCurrencyCode=usd`}
+                        target="_blank"
+                        rel="noopener noreferrer"
                         className="w-full inline-flex items-center justify-center gap-2 h-11 rounded-lg border border-white/20 text-white/70 text-[13px] font-medium hover:bg-white/5 transition-colors"
                       >
                         <CreditCard className="w-4 h-4" />
-                        Buy USDC with Credit Card
-                      </button>
+                        Buy ${PLANS[selectedPlan].amount} USDC with Card
+                      </a>
                       <p className="text-[10px] text-white/30 text-center">
-                        Purchase USDC via MoonPay, then pay above. Visa, Mastercard, Apple Pay accepted.
+                        Opens MoonPay. Buy USDC on Base with Visa, Mastercard, or Apple Pay. Then come back and pay above.
                       </p>
                     </>
                   )}
