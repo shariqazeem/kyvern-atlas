@@ -10,7 +10,8 @@ interface OnboardingChecklistProps {
 }
 
 export function OnboardingChecklist({ hasEvents }: OnboardingChecklistProps) {
-  const { apiKeyPrefix } = useAuth();
+  const { apiKey, apiKeyPrefix } = useAuth();
+  const fullKey = apiKey || apiKeyPrefix;
   const [dismissed, setDismissed] = useState(false);
   const [copiedKey, setCopiedKey] = useState(false);
   const [steps, setSteps] = useState({
@@ -59,8 +60,8 @@ export function OnboardingChecklist({ hasEvents }: OnboardingChecklistProps) {
   }
 
   function copyKey() {
-    if (apiKeyPrefix) {
-      navigator.clipboard.writeText(apiKeyPrefix + "...");
+    if (fullKey) {
+      navigator.clipboard.writeText(fullKey);
       setCopiedKey(true);
       markStep("copyKey");
       setTimeout(() => setCopiedKey(false), 2000);

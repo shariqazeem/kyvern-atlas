@@ -36,8 +36,8 @@ function CopyBlock({ code }: { code: string }) {
 }
 
 export default function SetupPage() {
-  const { apiKeyPrefix, isAuthenticated } = useAuth();
-  const displayKey = isAuthenticated && apiKeyPrefix ? apiKeyPrefix + "..." : "kv_live_your_key_here";
+  const { apiKey, apiKeyPrefix, isAuthenticated } = useAuth();
+  const displayKey = isAuthenticated ? (apiKey || apiKeyPrefix + "...") : "kv_live_your_key_here";
 
   return (
     <div className="max-w-2xl space-y-10">
