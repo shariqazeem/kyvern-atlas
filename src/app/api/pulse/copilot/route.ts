@@ -27,6 +27,10 @@ function classifyQuery(query: string): string {
   if (q.match(/price|pricing|compet|benchmark|market|compar/)) return "pricing";
   if (q.match(/new.*(agent|customer)|first.*(time|seen)/)) return "new_agents";
   if (q.match(/error|fail|latency|slow|performance/)) return "performance";
+  if (q.match(/stellar.*revenue|revenue.*stellar|stellar.*earn|how much.*stellar/)) return "stellar_revenue";
+  if (q.match(/stellar.*trans|trans.*stellar/)) return "stellar_transactions";
+  if (q.match(/cross.chain|multi.chain|chain.*compar|base.*vs.*stellar|stellar.*vs.*base/)) return "cross_chain";
+  if (q.match(/stellar/)) return "stellar_revenue";
   if (q.match(/summary|overview|how.*doing|status|health/)) return "summary";
   return "general";
 }
@@ -202,6 +206,54 @@ export async function POST(request: NextRequest) {
           response += `\n${status} ${ep.endpoint} — ${ep.avg_latency}ms avg, ${ep.error_rate}% errors (${ep.calls} calls)`;
         });
         data = { endpoints: perf };
+        break;
+      }
+
+      case "stellar_revenue": {
+        const stellarStats = db.prepare(`
+          SELECT COUNT(*) as calls, ROUND(SUM(amount_usd), 4) as revenue,
+                 COUNT(DISTINCT payer_address) as agents,
+                 COUNT(DISTINCT endpoint) as endpoints
+          FROM events WHERE api_key_id = ? AND network LIKE 'stellar%' AND timestamp >= ?
+        `).get(apiKeyId, sevenDaysAgo) as { calls: number; revenue: number; agents: number; endpoints: number };
+
+        if (stellarStats.calls === 0) {
+          response = "No Stellar transactions found yet. Go to Setup Guide and click 'Test Stellar' to send your first Stellar payment through Pulse.";
+        } else {
+          response = `Your Stellar revenue (last 7 days):\n\n${formatCurrency(stellarStats.revenue)} from ${stellarStats.calls} transactions across ${stellarStats.endpoints} endpoints, served ${stellarStats.agents} unique Stellar agents.`;
+        }
+        data = { stats: { stellar_revenue: stellarStats.revenue, stellar_calls: stellarStats.calls, stellar_agents: stellarStats.agents } };
+        break;
+      }
+
+      case "stellar_transactions": {
+        const stellarTxs = db.prepare(`
+          SELECT endpoint, amount_usd, payer_address, tx_hash, timestamp
+          FROM events WHERE api_key_id = ? AND network LIKE 'stellar%'
+          ORDER BY timestamp DESC LIMIT 5
+        `).all(apiKeyId) as Array<{ endpoint: string; amount_usd: number; payer_address: string; tx_hash: string; timestamp: string }>;
+
+        response = `Recent Stellar transactions:`;
+        stellarTxs.forEach((tx, i) => {
+          response += `\n${i + 1}. ${tx.endpoint} — ${formatCurrency(tx.amount_usd)} from ${tx.payer_address.slice(0, 10)}...`;
+        });
+        if (stellarTxs.length === 0) response = "No Stellar transactions found yet.";
+        break;
+      }
+
+      case "cross_chain": {
+        const baseStats = db.prepare(`
+          SELECT COUNT(*) as calls, ROUND(SUM(amount_usd), 4) as revenue
+          FROM events WHERE api_key_id = ? AND (network = 'eip155:8453' OR network IS NULL) AND timestamp >= ?
+        `).get(apiKeyId, thirtyDaysAgo) as { calls: number; revenue: number };
+
+        const stellarStats2 = db.prepare(`
+          SELECT COUNT(*) as calls, ROUND(SUM(amount_usd), 4) as revenue
+          FROM events WHERE api_key_id = ? AND network LIKE 'stellar%' AND timestamp >= ?
+        `).get(apiKeyId, thirtyDaysAgo) as { calls: number; revenue: number };
+
+        response = `Cross-chain revenue comparison (last 30 days):\n\nBase: ${formatCurrency(baseStats.revenue)} from ${baseStats.calls} transactions\nStellar: ${formatCurrency(stellarStats2.revenue)} from ${stellarStats2.calls} transactions\n\nTotal: ${formatCurrency((baseStats.revenue || 0) + (stellarStats2.revenue || 0))}`;
+        data = { stats: { base_revenue: baseStats.revenue, stellar_revenue: stellarStats2.revenue, base_calls: baseStats.calls, stellar_calls: stellarStats2.calls } };
         break;
       }
 
