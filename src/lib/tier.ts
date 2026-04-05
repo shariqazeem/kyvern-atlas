@@ -2,33 +2,50 @@ import { getDb } from "./db";
 
 export const TIER_LIMITS = {
   free: {
-    events_per_day: 1000,
-    revenue_per_day_usd: 10,
-    retention_days: 7,
+    events_per_day: 5000,
+    revenue_per_day_usd: 100,
+    retention_days: 14,
     max_api_keys: 1,
+    max_alerts: 3,
     csv_export: false,
-    alerts: false,
+    webhooks: false,
     pricing_benchmarks: false,
+    intelligence: true,
+  },
+  growth: {
+    events_per_day: 50000,
+    revenue_per_day_usd: 5000,
+    retention_days: 30,
+    max_api_keys: 3,
+    max_alerts: 10,
+    csv_export: true,
+    webhooks: false,
+    pricing_benchmarks: true,
+    intelligence: true,
   },
   pro: {
     events_per_day: Infinity,
     revenue_per_day_usd: Infinity,
     retention_days: 90,
     max_api_keys: 10,
+    max_alerts: Infinity,
     csv_export: true,
-    alerts: true,
+    webhooks: true,
     pricing_benchmarks: true,
+    intelligence: true,
   },
 } as const;
 
-export type Tier = "free" | "pro";
+export type Tier = "free" | "growth" | "pro";
 
 export function getTierForWallet(walletAddress: string): Tier {
   const db = getDb();
   const sub = db.prepare(
-    "SELECT id FROM subscriptions WHERE wallet_address = ? AND status = 'active' AND expires_at > datetime('now') LIMIT 1"
-  ).get(walletAddress.toLowerCase());
-  return sub ? "pro" : "free";
+    "SELECT plan FROM subscriptions WHERE wallet_address = ? AND status = 'active' AND expires_at > datetime('now') ORDER BY expires_at DESC LIMIT 1"
+  ).get(walletAddress.toLowerCase()) as { plan: string } | undefined;
+  if (!sub) return "free";
+  if (sub.plan === "growth") return "growth";
+  return "pro";
 }
 
 export function getTierForApiKey(apiKeyId: string): Tier {
@@ -59,6 +76,22 @@ export function checkUsageLimit(apiKeyId: string): {
       events_limit: Infinity,
       revenue_used: 0,
       revenue_limit: Infinity,
+      tier,
+    };
+  }
+
+  if (tier === "growth") {
+    const today = new Date().toISOString().split("T")[0];
+    const usage = db.prepare(`
+      SELECT COUNT(*) as event_count, COALESCE(SUM(amount_usd), 0) as revenue
+      FROM events WHERE api_key_id = ? AND date(timestamp) = ?
+    `).get(apiKeyId, today) as { event_count: number; revenue: number };
+    return {
+      allowed: usage.event_count < limits.events_per_day && usage.revenue < limits.revenue_per_day_usd,
+      events_used: usage.event_count,
+      events_limit: limits.events_per_day,
+      revenue_used: Math.round(usage.revenue * 100) / 100,
+      revenue_limit: limits.revenue_per_day_usd,
       tier,
     };
   }

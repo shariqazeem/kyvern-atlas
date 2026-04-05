@@ -46,7 +46,7 @@ export function FinalCTA() {
             </Link>
           </div>
           <p className="mt-6 text-[12px] text-white/30">
-            Free for up to 1,000 events/day. No credit card required.
+            Free for up to 5,000 events/day. No credit card required.
           </p>
         </motion.div>
       </div>

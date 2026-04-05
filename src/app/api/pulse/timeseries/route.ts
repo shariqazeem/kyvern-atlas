@@ -20,12 +20,13 @@ export async function GET(request: NextRequest) {
     const db = getDb();
     let range = request.nextUrl.searchParams.get("range") || "30d";
 
-    // Tier enforcement — free users capped to 7-day history
+    // Tier enforcement — cap to retention limit
     const tier = getTierForApiKey(apiKeyId);
     const maxDays = getRetentionDays(tier);
     let truncated = false;
-    if (range === "30d" && maxDays < 30) {
-      range = "7d";
+    const requestedDays = range === "30d" ? 30 : range === "7d" ? 7 : 1;
+    if (requestedDays > maxDays) {
+      range = `${maxDays}d`;
       truncated = true;
     }
 

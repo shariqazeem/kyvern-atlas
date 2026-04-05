@@ -13,7 +13,7 @@ interface AuthState {
   apiKey: string | null;
   apiKeyPrefix: string | null;
   apiKeyId: string | null;
-  plan: "free" | "pro";
+  plan: "free" | "growth" | "pro";
   proExpiresAt: string | null;
   onboardingCompleted: boolean;
   loginMethod: string | null;
