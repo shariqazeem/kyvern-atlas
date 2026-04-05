@@ -4,26 +4,17 @@ import { motion } from "framer-motion";
 import { Navbar } from "@/components/landing/navbar";
 import { Footer } from "@/components/landing/footer";
 import { KYVERN_PAY_TO } from "@/lib/utils";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   BarChart3,
   Shield,
   ExternalLink,
-  Zap,
-  Globe,
   ArrowRight,
   Check,
   Copy,
 } from "lucide-react";
 
 const ease = [0.25, 0.1, 0.25, 1] as const;
-
-interface ProofData {
-  verified_payments: number;
-  connected_endpoints: number;
-  total_revenue: number;
-  payments_last_hour: number;
-}
 
 const SERVICES = [
   {
@@ -68,12 +59,7 @@ const SERVICES = [
 ];
 
 export default function ServicesPage() {
-  const [proof, setProof] = useState<ProofData | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetch("/api/pulse/proof").then(r => r.json()).then(setProof).catch(() => {});
-  }, []);
 
   function copyEndpoint(url: string, id: string) {
     navigator.clipboard.writeText(`https://kyvernlabs.com${url}`);
@@ -127,26 +113,14 @@ export default function ServicesPage() {
             Every payment tracked through our own Pulse dashboard.
           </motion.p>
 
-          {/* Live stats */}
-          {proof && (
-            <motion.div
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.4, ease }}
-              className="mt-10 flex items-center justify-center gap-8 lg:gap-12"
-            >
-              {[
-                { icon: Check, value: proof.verified_payments.toString(), label: "Verified payments" },
-                { icon: Globe, value: proof.connected_endpoints.toString(), label: "Endpoints" },
-                { icon: Zap, value: `$${proof.total_revenue.toFixed(3)}`, label: "USDC captured" },
-              ].map((s) => (
-                <div key={s.label} className="text-center">
-                  <p className="text-[24px] font-bold font-mono-numbers tracking-tight">{s.value}</p>
-                  <p className="text-[11px] text-quaternary uppercase tracking-[0.15em] font-medium mt-0.5">{s.label}</p>
-                </div>
-              ))}
-            </motion.div>
-          )}
+          <motion.p
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.4, ease }}
+            className="mt-8 text-[12px] text-quaternary text-center"
+          >
+            Reference implementations demonstrating x402 payment integration with Pulse analytics.
+          </motion.p>
         </div>
       </section>
 

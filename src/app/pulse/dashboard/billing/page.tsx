@@ -61,7 +61,7 @@ const TIERS = [
 
 export default function BillingPage() {
   const { plan, proExpiresAt } = useAuth();
-  const isPaid = plan === "pro";
+  const isPaid = plan === "pro" || plan === "growth";
 
   return (
     <div className="space-y-6 max-w-3xl">

@@ -289,6 +289,9 @@ export function Hero() {
             Built for the x402 Foundation ecosystem
           </p>
           <LogoCarousel />
+          <p className="text-center text-[11px] text-quaternary mt-1 max-w-xl mx-auto leading-relaxed">
+            Built on x402, a Linux Foundation protocol. These organizations are founding members of the x402 Foundation — not partners or customers of KyvernLabs.
+          </p>
         </motion.div>
 
         {/* Stats */}

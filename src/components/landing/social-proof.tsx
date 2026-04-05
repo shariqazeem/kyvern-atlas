@@ -1,59 +1,11 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useEffect, useState } from "react";
-import { Shield, Zap, Globe, ExternalLink, Check } from "lucide-react";
-import { KYVERN_PAY_TO, truncateAddress, formatCurrency } from "@/lib/utils";
+import { Shield, Zap, Globe, Users } from "lucide-react";
 
 const ease = [0.25, 0.1, 0.25, 1] as const;
 
-interface ProofData {
-  verified_payments: number;
-  connected_endpoints: number;
-  total_revenue: number;
-}
-
-interface LiveTx {
-  endpoint: string;
-  amount_usd: number;
-  payer_address: string;
-  timestamp: string;
-  tx_hash?: string;
-  source?: string;
-}
-
-function timeAgo(ts: string): string {
-  const diff = Date.now() - new Date(ts).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.floor(hours / 24)}d ago`;
-}
-
 export function SocialProof() {
-  const [data, setData] = useState<ProofData | null>(null);
-  const [txns, setTxns] = useState<LiveTx[]>([]);
-
-  useEffect(() => {
-    fetch("/api/pulse/proof").then((r) => r.json()).then(setData).catch(() => {});
-    fetch("/api/pulse/recent?source=middleware&limit=5")
-      .then((r) => r.json())
-      .then((d) => setTxns(d.transactions || []))
-      .catch(() => {});
-
-    // Auto-refresh every 30s
-    const interval = setInterval(() => {
-      fetch("/api/pulse/proof").then((r) => r.json()).then(setData).catch(() => {});
-      fetch("/api/pulse/recent?source=middleware&limit=5")
-        .then((r) => r.json())
-        .then((d) => setTxns(d.transactions || []))
-        .catch(() => {});
-    }, 30000);
-    return () => clearInterval(interval);
-  }, []);
-
   return (
     <section className="py-28 lg:py-36 px-6">
       <div className="max-w-4xl mx-auto">
@@ -66,21 +18,22 @@ export function SocialProof() {
           {/* Header */}
           <div className="text-center mb-14">
             <p className="text-[12px] uppercase tracking-[0.2em] font-medium text-quaternary mb-5">
-              Live proof
+              x402 Ecosystem
             </p>
             <h2 className="text-[clamp(1.75rem,4vw,2.75rem)] font-bold tracking-[-0.04em] leading-[0.95]">
-              Real payments. Real blockchain.
+              A protocol already at scale.
               <br />
-              <span className="text-tertiary">Not a simulation.</span>
+              <span className="text-tertiary">Pulse brings the business layer.</span>
             </h2>
           </div>
 
-          {/* Stats */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10">
+          {/* Ecosystem Stats */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
             {[
-              { icon: Shield, value: data ? data.verified_payments.toString() : "0", label: "On-chain verified", detail: "Each with a BaseScan tx hash", color: "text-emerald-600", bg: "bg-emerald-50" },
-              { icon: Globe, value: data ? data.connected_endpoints.toString() : "0", label: "Endpoints tracked", detail: "Via withPulse() middleware", color: "text-pulse-600", bg: "bg-pulse-50" },
-              { icon: Zap, value: data ? `$${data.total_revenue.toFixed(2)}` : "$0.00", label: "USDC captured", detail: "Real micropayments on Base", color: "text-amber-600", bg: "bg-amber-50" },
+              { icon: Zap, value: "$24M+", label: "Monthly volume", detail: "Across the x402 ecosystem", color: "text-amber-600", bg: "bg-amber-50" },
+              { icon: Globe, value: "75M+", label: "Transactions processed", detail: "On-chain verified payments", color: "text-pulse-600", bg: "bg-pulse-50" },
+              { icon: Shield, value: "195+", label: "Active services", detail: "Live x402 endpoints", color: "text-emerald-600", bg: "bg-emerald-50" },
+              { icon: Users, value: "20+", label: "Foundation members", detail: "Including Coinbase, Stripe, Visa", color: "text-indigo-600", bg: "bg-indigo-50" },
             ].map((stat, i) => (
               <motion.div
                 key={stat.label}
@@ -102,60 +55,9 @@ export function SocialProof() {
             ))}
           </div>
 
-          {/* Live Transaction Feed */}
-          {txns.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: 16 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: 0.4, ease }}
-              className="rounded-2xl border border-black/[0.06] bg-white overflow-hidden mb-8"
-              style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.02)" }}
-            >
-              <div className="px-5 py-3 border-b border-black/[0.04] flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-                  </span>
-                  <span className="text-[12px] font-medium text-primary">Live Payments</span>
-                </div>
-                <span className="text-[10px] text-quaternary">Auto-refreshes every 30s</span>
-              </div>
-              {txns.map((tx, i) => (
-                <motion.div
-                  key={tx.timestamp + tx.payer_address}
-                  initial={{ opacity: 0 }}
-                  whileInView={{ opacity: 1 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.3, delay: 0.5 + i * 0.08 }}
-                  className="flex items-center gap-4 px-5 py-2.5 border-b border-black/[0.02] last:border-0 hover:bg-[#FAFAFA] transition-colors"
-                >
-                  <span className="font-mono text-[11px] text-secondary w-28 truncate">{tx.endpoint}</span>
-                  <span className="font-mono-numbers text-[11px] font-semibold w-16 text-right">{formatCurrency(tx.amount_usd)}</span>
-                  <span className="font-mono text-[10px] text-quaternary w-24 truncate">{truncateAddress(tx.payer_address)}</span>
-                  <span className="text-[10px] text-quaternary w-16 text-right">{timeAgo(tx.timestamp)}</span>
-                  <span className="inline-flex items-center gap-1 text-[8px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-600 uppercase tracking-wider ml-auto shrink-0">
-                    <Check className="w-2 h-2" />
-                    Verified
-                  </span>
-                </motion.div>
-              ))}
-            </motion.div>
-          )}
-
-          {/* Verify + How It Works */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
-            <a
-              href={`https://basescan.org/address/${KYVERN_PAY_TO}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 text-[13px] font-medium text-tertiary hover:text-primary transition-colors duration-300"
-            >
-              Verify all payments on BaseScan
-              <ExternalLink className="w-3.5 h-3.5" />
-            </a>
-          </div>
+          <p className="text-center text-[11px] text-quaternary">
+            Ecosystem data from the x402 Foundation leaderboard. These are protocol-wide metrics — not KyvernLabs metrics.
+          </p>
 
           {/* How It Works mini */}
           <div className="mt-14">
