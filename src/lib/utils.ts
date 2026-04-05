@@ -32,11 +32,20 @@ export function truncateAddress(address: string, chars = 6): string {
 }
 
 // x402 network helpers
-const NETWORKS: Record<string, { name: string; explorer: string }> = {
+const NETWORKS: Record<string, { name: string; explorer: string; txPath?: string }> = {
+  // EVM chains
   "eip155:84532": { name: "Base Sepolia", explorer: "https://sepolia.basescan.org" },
   "eip155:8453": { name: "Base", explorer: "https://basescan.org" },
   "eip155:1": { name: "Ethereum", explorer: "https://etherscan.io" },
   "eip155:137": { name: "Polygon", explorer: "https://polygonscan.com" },
+  "eip155:42161": { name: "Arbitrum", explorer: "https://arbiscan.io" },
+  "eip155:10": { name: "Optimism", explorer: "https://optimistic.etherscan.io" },
+  "eip155:43114": { name: "Avalanche", explorer: "https://snowtrace.io" },
+  // Solana
+  "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp": { name: "Solana", explorer: "https://solscan.io", txPath: "/tx/" },
+  "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1": { name: "Solana Devnet", explorer: "https://solscan.io", txPath: "/tx/?cluster=devnet" },
+  // Stellar
+  "stellar:pubnet": { name: "Stellar", explorer: "https://stellarchain.io", txPath: "/transactions/" },
 };
 
 export function getNetworkName(network?: string): string {
@@ -48,8 +57,10 @@ export function getNetworkName(network?: string): string {
 export const KYVERN_PAY_TO = process.env.NEXT_PUBLIC_PAY_TO_ADDRESS || "0x55c3aBb091D1a43C3872718b3b8B3AE8c20B592E";
 
 export function getExplorerTxUrl(txHash: string, network?: string): string {
-  const base = network ? NETWORKS[network]?.explorer : "https://sepolia.basescan.org";
-  return `${base || "https://sepolia.basescan.org"}/tx/${txHash}`;
+  const net = network ? NETWORKS[network] : null;
+  const explorer = net?.explorer || "https://sepolia.basescan.org";
+  const txPath = net?.txPath || "/tx/";
+  return `${explorer}${txPath}${txHash}`;
 }
 
 export function truncateTxHash(hash: string, chars = 8): string {
