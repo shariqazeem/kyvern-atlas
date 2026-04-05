@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { usePersonas } from "@/hooks/use-personas";
 import { formatCurrency, truncateAddress } from "@/lib/utils";
 import { Copy, ArrowUpDown } from "lucide-react";
+import { AgentAvatar } from "@/components/x402/agent-avatar";
 import { ExportButton } from "@/components/dashboard/export-button";
 import { SearchBar, Pagination } from "@/components/dashboard/table-controls";
 import { format, parseISO } from "date-fns";
@@ -187,6 +188,7 @@ export default function CustomersPage() {
                 <tr key={customer.address} className="border-b border-border/50 last:border-0 hover:bg-muted/30 transition-colors">
                   <td className="px-5 py-3">
                     <button onClick={() => copyAddress(customer.address)} className="flex items-center gap-2 group">
+                      <AgentAvatar address={customer.address} size={22} />
                       <span className="font-mono text-xs">{truncateAddress(customer.address)}</span>
                       <Copy className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                       {copiedAddress === customer.address && <span className="text-[10px] text-pulse">Copied</span>}

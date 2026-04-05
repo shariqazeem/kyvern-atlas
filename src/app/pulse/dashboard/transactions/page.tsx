@@ -7,9 +7,11 @@ import {
   truncateAddress,
   truncateTxHash,
   getExplorerTxUrl,
-  getNetworkName,
 } from "@/lib/utils";
-import { ExternalLink, Check } from "lucide-react";
+import { ExternalLink } from "lucide-react";
+import { AgentAvatar } from "@/components/x402/agent-avatar";
+import { ChainBadge } from "@/components/x402/chain-badge";
+import { OnChainBadge } from "@/components/x402/onchain-badge";
 import { ExportButton } from "@/components/dashboard/export-button";
 import { SearchBar, FilterDropdown, Pagination } from "@/components/dashboard/table-controls";
 import { format, parseISO } from "date-fns";
@@ -140,14 +142,13 @@ export default function TransactionsPage() {
                   </td>
                   <td className="px-5 py-3"><span className="font-mono text-xs">{tx.endpoint}</span></td>
                   <td className="px-5 py-3 text-right font-mono-numbers text-xs font-medium">{formatCurrency(tx.amount_usd)}</td>
-                  <td className="px-5 py-3 font-mono text-xs text-muted-foreground">{truncateAddress(tx.payer_address)}</td>
                   <td className="px-5 py-3">
-                    {tx.network ? (
-                      <span className="inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
-                        {getNetworkName(tx.network)}
-                      </span>
-                    ) : <span className="text-xs text-muted-foreground">—</span>}
+                    <div className="flex items-center gap-1.5">
+                      <AgentAvatar address={tx.payer_address} size={20} />
+                      <span className="font-mono text-xs text-muted-foreground">{truncateAddress(tx.payer_address)}</span>
+                    </div>
                   </td>
+                  <td className="px-5 py-3"><ChainBadge network={tx.network || null} /></td>
                   <td className="px-5 py-3">
                     {tx.tx_hash ? (
                       <a href={getExplorerTxUrl(tx.tx_hash, tx.network)} target="_blank" rel="noopener noreferrer"
@@ -159,13 +160,7 @@ export default function TransactionsPage() {
                   </td>
                   <td className="px-5 py-3 text-right font-mono-numbers text-xs text-muted-foreground">{tx.latency_ms}ms</td>
                   <td className="px-5 py-3 text-right">
-                    {tx.source === "middleware" ? (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400">
-                        <Check className="w-2.5 h-2.5" /> Verified
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500">Demo</span>
-                    )}
+                    <OnChainBadge txHash={tx.tx_hash || null} network={tx.network || null} />
                   </td>
                 </tr>
               ))}
