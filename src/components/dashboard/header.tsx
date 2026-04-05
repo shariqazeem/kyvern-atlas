@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Activity, Sparkles, Sun, Moon, Monitor, Search } from "lucide-react";
+import { Activity, Sparkles, Sun, Moon, Monitor, Search, Settings } from "lucide-react";
 import { TimeRangeSelector } from "./time-range-selector";
 import { MobileNav } from "./mobile-nav";
 import { LiveIndicator } from "./live-indicator";
@@ -90,6 +90,13 @@ export function DashboardHeader() {
              <Sun className="w-4 h-4 text-tertiary" />}
           </button>
           <TimeRangeSelector />
+          <Link
+            href="/pulse/dashboard/settings"
+            className="p-1.5 rounded-lg hover:bg-black/[0.04] transition-colors"
+            title="Settings"
+          >
+            <Settings className="w-4 h-4 text-tertiary" />
+          </Link>
           {isAuthenticated && (
             <>
               <div className="h-5 w-px bg-black/[0.06] hidden sm:block" />
