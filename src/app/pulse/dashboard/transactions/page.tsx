@@ -14,6 +14,7 @@ import { ExportButton } from "@/components/dashboard/export-button";
 import { SearchBar, FilterDropdown, Pagination } from "@/components/dashboard/table-controls";
 import { format, parseISO } from "date-fns";
 import type { RecentTransaction } from "@/types/pulse";
+import { useAuth } from "@/hooks/use-auth";
 
 const PAGE_SIZE = 20;
 
@@ -27,8 +28,10 @@ export default function TransactionsPage() {
   const [sourceFilter, setSourceFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [offset, setOffset] = useState(0);
+  const { isAuthenticated } = useAuth();
 
   const fetchData = useCallback(async () => {
+    if (!isAuthenticated) return;
     const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(offset) });
     if (search) params.set("search", search);
     if (sourceFilter) params.set("source", sourceFilter);
@@ -48,13 +51,14 @@ export default function TransactionsPage() {
     } finally {
       setLoading(false);
     }
-  }, [search, sourceFilter, statusFilter, offset]);
+  }, [search, sourceFilter, statusFilter, offset, isAuthenticated]);
 
   useEffect(() => {
+    if (!isAuthenticated) return;
     setLoading(true);
     const timer = setTimeout(fetchData, search ? 300 : 0); // debounce search
     return () => clearTimeout(timer);
-  }, [fetchData, search]);
+  }, [fetchData, search, isAuthenticated]);
 
   // Reset offset when filters change
   useEffect(() => { setOffset(0); }, [search, sourceFilter, statusFilter]);

@@ -6,6 +6,7 @@ import { Bell, Plus, Trash2, TrendingDown, TrendingUp, UserPlus, Timer, Target }
 import { ProGate } from "@/components/dashboard/pro-gate";
 import { cn } from "@/lib/utils";
 import { format, parseISO } from "date-fns";
+import { useAuth } from "@/hooks/use-auth";
 
 const ease = [0.25, 0.1, 0.25, 1] as const;
 
@@ -161,6 +162,7 @@ function AlertsContent() {
   const [alerts, setAlerts] = useState<AlertData[]>([]);
   const [webhooks, setWebhooks] = useState<WebhookOption[]>([]);
   const [loading, setLoading] = useState(true);
+  const { isAuthenticated } = useAuth();
 
   function load() {
     Promise.all([
@@ -172,7 +174,7 @@ function AlertsContent() {
     }).finally(() => setLoading(false));
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { if (!isAuthenticated) return; load(); }, [isAuthenticated]);
 
   async function toggleAlert(id: string) {
     await fetch(`/api/pulse/alerts?id=${id}`, { method: "PATCH", credentials: "include" });

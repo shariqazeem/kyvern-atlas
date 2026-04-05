@@ -15,6 +15,7 @@ import {
 } from "recharts";
 import { ProGate } from "@/components/dashboard/pro-gate";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/use-auth";
 
 const ease = [0.25, 0.1, 0.25, 1] as const;
 
@@ -158,14 +159,16 @@ function CohortChart({ cohorts }: { cohorts: CohortData[] }) {
 function CohortsContent() {
   const [data, setData] = useState<CohortResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const { isAuthenticated } = useAuth();
 
   useEffect(() => {
+    if (!isAuthenticated) return;
     fetch("/api/pulse/cohorts?periods=8", { credentials: "include" })
       .then((r) => r.ok ? r.json() : null)
       .then(setData)
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  }, [isAuthenticated]);
 
   if (loading) {
     return (
