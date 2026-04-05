@@ -97,17 +97,25 @@ export function getAccountByWallet(
 
 export function createSession(walletAddress: string): string {
   const db = getDb();
+  const wallet = walletAddress.toLowerCase();
+
+  // Reuse existing valid session if one exists (prevents invalidating active cookies)
+  const existing = db.prepare(
+    "SELECT token FROM sessions WHERE wallet_address = ? AND expires_at > datetime('now') LIMIT 1"
+  ).get(wallet) as { token: string } | undefined;
+
+  if (existing) {
+    return existing.token;
+  }
+
+  // No valid session — clean up expired ones and create new
   const token = nanoid(48);
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(); // 7 days
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
-  // Clean old sessions for this wallet
-  db.prepare("DELETE FROM sessions WHERE wallet_address = ?").run(
-    walletAddress.toLowerCase()
-  );
-
+  db.prepare("DELETE FROM sessions WHERE wallet_address = ?").run(wallet);
   db.prepare(
     "INSERT INTO sessions (token, wallet_address, expires_at) VALUES (?, ?, ?)"
-  ).run(token, walletAddress.toLowerCase(), expiresAt);
+  ).run(token, wallet, expiresAt);
 
   return token;
 }

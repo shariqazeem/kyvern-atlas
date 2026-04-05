@@ -56,19 +56,49 @@ export function useAuth() {
     return null;
   }, [user, wallets]);
 
-  // Sync with our backend when Privy auth state changes
+  // Try to load session from cookie first (instant, no Privy needed)
+  useEffect(() => {
+    fetch("/api/auth/session", { credentials: "include" })
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (data?.authenticated) {
+          setState({
+            wallet: data.wallet,
+            email: null,
+            isConnected: true,
+            isAuthenticated: true,
+            isLoading: false,
+            isNewUser: false,
+            apiKey: null,
+            apiKeyPrefix: data.apiKeyPrefix || null,
+            apiKeyId: data.apiKeyId || null,
+            plan: data.plan || "free",
+            proExpiresAt: data.proExpiresAt || null,
+            onboardingCompleted: data.onboardingCompleted || false,
+            loginMethod: null,
+          });
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // Sync with Privy when it becomes ready (handles first login, new sessions)
   useEffect(() => {
     if (!ready) return;
 
     if (!authenticated || !user) {
-      setState((prev) => ({
-        ...prev,
-        isLoading: false,
-        isAuthenticated: false,
-        isConnected: false,
-        wallet: null,
-        email: null,
-      }));
+      setState((prev) => {
+        // Don't override if we already loaded from session cookie
+        if (prev.isAuthenticated) return prev;
+        return {
+          ...prev,
+          isLoading: false,
+          isAuthenticated: false,
+          isConnected: false,
+          wallet: null,
+          email: null,
+        };
+      });
       return;
     }
 
@@ -76,11 +106,9 @@ export function useAuth() {
     const email = user.email?.address || null;
     const loginMethod = user.email ? "email" : user.google ? "google" : "wallet";
 
-    // If we have a wallet, sync with our backend
     if (walletAddress) {
       syncWithBackend(walletAddress, email, loginMethod);
     } else {
-      // User logged in with email but embedded wallet not ready yet — wait
       setState((prev) => ({
         ...prev,
         isLoading: true,
