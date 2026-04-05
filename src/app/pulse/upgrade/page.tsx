@@ -5,7 +5,8 @@ import { motion } from "framer-motion";
 import { Navbar } from "@/components/landing/navbar";
 import { Footer } from "@/components/landing/footer";
 import { useSubscription } from "@/hooks/use-subscription";
-import { useWallets } from "@privy-io/react-auth";
+import { useWallets, usePrivy } from "@privy-io/react-auth";
+import { useAuth } from "@/hooks/use-auth";
 import { encodeFunctionData, parseUnits } from "viem";
 import {
   Check,
@@ -53,6 +54,8 @@ const PRO_FEATURES = [
 export default function UpgradePage() {
   const { isPro, expiresAt, isConnected } = useSubscription();
   const { wallets } = useWallets();
+  useAuth(); // ensures session is synced
+  const { sendTransaction } = usePrivy();
   const [status, setStatus] = useState<"idle" | "paying" | "confirming" | "verifying" | "done">("idle");
   const [error, setError] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<string | undefined>();
@@ -72,9 +75,6 @@ export default function UpgradePage() {
         return;
       }
 
-      // Get the wallet provider (EIP-1193)
-      const provider = await wallet.getEthereumProvider();
-
       // Encode the USDC transfer call
       const data = encodeFunctionData({
         abi: USDC_ABI,
@@ -84,29 +84,21 @@ export default function UpgradePage() {
 
       setStatus("confirming");
 
-      // Send the transaction via EIP-1193
-      const hash = await provider.request({
-        method: "eth_sendTransaction",
-        params: [{
-          from: wallet.address,
+      // Use Privy's sendTransaction — handles funding UI if insufficient balance
+      const receipt = await sendTransaction(
+        {
           to: USDC_ADDRESS,
           data,
-        }],
-      }) as `0x${string}`;
+        },
+        {
+          fundWalletConfig: {
+            amount: "0.001",
+          },
+        }
+      );
 
+      const hash = receipt.hash;
       setTxHash(hash);
-
-      // Wait for confirmation by polling
-      let confirmed = false;
-      for (let i = 0; i < 60; i++) {
-        await new Promise((r) => setTimeout(r, 2000));
-        const receipt = await provider.request({
-          method: "eth_getTransactionReceipt",
-          params: [hash],
-        });
-        if (receipt) { confirmed = true; break; }
-      }
-      if (!confirmed) throw new Error("Transaction not confirmed after 2 minutes");
 
       // Verify on backend
       setStatus("verifying");

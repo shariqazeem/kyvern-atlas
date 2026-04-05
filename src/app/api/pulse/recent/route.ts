@@ -36,8 +36,13 @@ export async function GET(request: NextRequest) {
       params.push(like, like, like);
     }
 
-    // Total count for pagination
-    const countRow = db.prepare(`SELECT COUNT(*) as total FROM events ${where}`).get(...params) as { total: number };
+    // Total count + aggregate stats for pagination header
+    const stats = db.prepare(`
+      SELECT COUNT(*) as total,
+             SUM(CASE WHEN source = 'middleware' THEN 1 ELSE 0 END) as verified_count,
+             ROUND(SUM(amount_usd), 4) as total_revenue
+      FROM events ${where}
+    `).get(...params) as { total: number; verified_count: number; total_revenue: number };
 
     const rows = db.prepare(`
       SELECT id, timestamp, endpoint, amount_usd, payer_address, latency_ms,
@@ -48,7 +53,9 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       transactions: rows,
-      total: countRow.total,
+      total: stats.total,
+      verified_count: stats.verified_count || 0,
+      total_revenue: stats.total_revenue || 0,
       limit,
       offset,
     });

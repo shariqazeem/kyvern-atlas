@@ -20,6 +20,8 @@ const PAGE_SIZE = 20;
 export default function TransactionsPage() {
   const [data, setData] = useState<RecentTransaction[]>([]);
   const [total, setTotal] = useState(0);
+  const [verifiedCount, setVerifiedCount] = useState(0);
+  const [totalRevenue, setTotalRevenue] = useState(0);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [sourceFilter, setSourceFilter] = useState("");
@@ -38,6 +40,8 @@ export default function TransactionsPage() {
         const json = await res.json();
         setData(json.transactions || []);
         setTotal(json.total || 0);
+        setVerifiedCount(json.verified_count || 0);
+        setTotalRevenue(json.total_revenue || 0);
       }
     } catch {
       // ignore
@@ -54,9 +58,6 @@ export default function TransactionsPage() {
 
   // Reset offset when filters change
   useEffect(() => { setOffset(0); }, [search, sourceFilter, statusFilter]);
-
-  const verifiedCount = data.filter((tx) => tx.source === "middleware").length;
-  const totalRevenue = data.reduce((sum, tx) => sum + tx.amount_usd, 0);
 
   if (loading && data.length === 0) {
     return (
