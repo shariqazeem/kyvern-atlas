@@ -25,6 +25,7 @@ function classifyQuery(query: string): string {
   if (q.match(/revenue.*(month|30d|30 day|this month)/)) return "revenue_month";
   if (q.match(/revenue.*(today|24h|today)/)) return "revenue_today";
   if (q.match(/revenue|earn|income|money|mak/)) return "revenue_overview";
+  if (q.match(/chain.*service|multi.*service|workflow|agent.*chain|discover.*pay/)) return "agent_workflows";
   if (q.match(/top.*(customer|agent|payer|wallet)|who.*pay|biggest.*spend/)) return "top_customers";
   if (q.match(/churn|risk|leaving|ghost|lost|inactive/)) return "churn_risk";
   if (q.match(/endpoint.*(profit|best|top|most)|most.*profit|which.*endpoint/)) return "top_endpoints";
@@ -255,6 +256,30 @@ export async function POST(request: NextRequest) {
 
         response = `Cross-chain revenue comparison (last 30 days):\n\nBase: ${formatCurrency(baseStats.revenue)} from ${baseStats.calls} transactions\nStellar: ${formatCurrency(stellarStats2.revenue)} from ${stellarStats2.calls} transactions\n\nTotal: ${formatCurrency((baseStats.revenue || 0) + (stellarStats2.revenue || 0))}`;
         data = { stats: { base_revenue: baseStats.revenue, stellar_revenue: stellarStats2.revenue, base_calls: baseStats.calls, stellar_calls: stellarStats2.calls } };
+        break;
+      }
+
+      case "agent_workflows": {
+        // Find agents that use multiple endpoints (multi-service workflows)
+        const multiService = db.prepare(`
+          SELECT payer_address as address, COUNT(DISTINCT endpoint) as endpoints_used,
+                 COUNT(*) as total_calls, ROUND(SUM(amount_usd), 4) as total_spent
+          FROM events WHERE api_key_id = ? AND timestamp >= ?
+          GROUP BY payer_address
+          HAVING COUNT(DISTINCT endpoint) >= 2
+          ORDER BY endpoints_used DESC LIMIT 5
+        `).all(apiKeyId, sevenDaysAgo) as Array<{ address: string; endpoints_used: number; total_calls: number; total_spent: number }>;
+
+        if (multiService.length === 0) {
+          response = "No multi-service agent workflows detected yet. When agents chain multiple x402 endpoints (e.g., data-feed then translate), Pulse tracks the full workflow.";
+        } else {
+          response = `${multiService.length} agents are chaining multiple x402 services:`;
+          multiService.forEach((a, i) => {
+            response += `\n${i + 1}. ${a.address.slice(0, 12)}... — uses ${a.endpoints_used} endpoints, ${a.total_calls} calls, ${formatCurrency(a.total_spent)} spent`;
+          });
+          response += "\n\nThese agents discover, pay, and chain services autonomously — exactly the x402 agent workflow pattern.";
+        }
+        data = { customers: multiService };
         break;
       }
 

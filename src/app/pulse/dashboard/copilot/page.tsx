@@ -16,9 +16,9 @@ interface Message {
 }
 
 const SUGGESTED_PROMPTS = [
-  { icon: BarChart3, text: "What's my revenue this week?" },
-  { icon: Users, text: "Who are my top customers?" },
-  { icon: Globe, text: "Which endpoint is most profitable?" },
+  { icon: BarChart3, text: "What's my Stellar revenue?" },
+  { icon: Globe, text: "Compare Base vs Stellar revenue" },
+  { icon: Users, text: "Which agents chain multiple services?" },
   { icon: TrendingUp, text: "How is my revenue trending?" },
   { icon: AlertTriangle, text: "Are any agents at risk of churning?" },
 ];
