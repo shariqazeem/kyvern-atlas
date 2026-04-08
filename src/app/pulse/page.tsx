@@ -516,7 +516,7 @@ export default function PulseLanding() {
               Start free. Scale with your revenue.
             </h2>
             <p className="mt-3 text-[14px] text-tertiary">
-              Pay with USDC on Base or credit card via MoonPay.
+              Pay with USDC on Base — from your connected wallet or any external one.
             </p>
           </motion.div>
 

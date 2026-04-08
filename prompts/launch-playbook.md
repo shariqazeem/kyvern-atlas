@@ -4,9 +4,10 @@
 
 - [x] X Premium on @KyvernLabs
 - [x] Profile: bio, header, profile pic
-- [ ] Demo video recorded and uploaded to YouTube
-- [ ] All launch tabs ready in browser
-- [ ] Send 3 fresh Stellar payments before recording so dashboard data is current
+- [x] Demo video recorded and uploaded to YouTube (unlisted)
+- [ ] kyvernlabs.com/pulse loads cleanly — open it once and verify
+- [ ] Dashboard has fresh data (Base + Stellar) — send 2-3 payments now if it looks stale
+- [ ] @KyvernLabs is following @CoinbaseDev @StellarOrg @SolanaFndn @base @stripe @googlecloud @Visa @Mastercard @x402 — mentions land cleanly when you tag them
 
 ---
 
@@ -17,13 +18,17 @@
 ---
 
 ### Title:
-**Introducing KyvernLabs — The Business Layer for x402**
+**Introducing KyvernLabs: The Bloomberg Terminal for the x402 Agent Economy**
+
+*Backup titles (if the first feels too metaphor-heavy):*
+- *"Introducing KyvernLabs — The Business Layer x402 Was Missing"*
+- *"$24M/Month Flows Through x402. Until Today, Nothing Was Tracking It."*
 
 ### Body:
 
 Last week, the x402 Foundation launched under the Linux Foundation. Coinbase, Cloudflare, Stripe, Google, Visa, Amazon, Microsoft, Solana Foundation, Mastercard, and Shopify are founding members.
 
-x402 is the protocol that lets AI agents pay for APIs with stablecoins over HTTP. It turns the 30-year-old "402 Payment Required" status code into a real payment rail. There are now 195+ services live across the ecosystem, processing $24M+ in monthly volume on Base and Stellar. The protocol infrastructure is ready.
+x402 is the protocol that lets AI agents pay for APIs with stablecoins over HTTP. It turns the 30-year-old "402 Payment Required" status code into a real payment rail for the machine economy. There are now 195+ services live across the ecosystem, processing $24M+ in monthly volume across multiple chains. The protocol infrastructure is ready.
 
 What's missing is the business layer. The analytics, the revenue intelligence, the tools that turn an x402 endpoint into a real company. Nobody has built it.
 
@@ -33,7 +38,7 @@ Until now.
 
 KyvernLabs Pulse is real-time revenue intelligence for x402 service providers. Multi-chain by default. Built for the agent economy.
 
-One middleware integration captures every payment that flows through your endpoint — payer wallet, USDC amount, blockchain transaction hash, latency, error rates. Everything is verified on-chain. Click any transaction in the dashboard and see it live on BaseScan or StellarChain.io. We support both Base and Stellar today, and the architecture extends to every chain x402 supports.
+One middleware integration captures every payment that flows through your endpoint — payer wallet, stablecoin amount, blockchain transaction hash, latency, error rates. Everything is verified on-chain. Click any transaction in the dashboard and see it live on the chain it settled on. The architecture is chain-agnostic and extends to every network x402 supports.
 
 The integration is one line of code:
 
@@ -48,10 +53,10 @@ The dashboard shows your revenue, your customers, your endpoints, and your growt
 **What's live today**
 
 - Pulse analytics dashboard at kyvernlabs.com/pulse — live, multi-chain, free tier included
-- Real Stellar testnet integration via @stellar/stellar-sdk and Horizon API. Every Stellar transaction in Pulse is a real on-chain transaction with a verifiable hash on StellarChain.io
-- @kyvernlabs/pulse npm package — one-line middleware for any x402 endpoint
+- Real on-chain transaction capture across every supported network. Every payment in Pulse links to its block explorer for verification
+- @kyvernlabs/pulse npm package — one-line middleware for any x402 endpoint, framework-agnostic
 - @kyvernlabs/mcp — an MCP server with 17 tools so AI agents can query your analytics directly from Claude, Cursor, or any MCP-compatible client
-- Pulse Copilot — ask "What's my Stellar revenue?" or "Compare Base vs Stellar" in plain English and get real answers from your data
+- Pulse Copilot — ask questions like "What's my revenue this week?" or "Which agents chain multiple services?" in plain English and get real answers from your data
 - Agent Persona Engine — automatic classification of your customers as Whales, Loyalists, Explorers, or At Risk
 - Smart Alerts with Slack and Discord notifications, Webhooks with HMAC signing, A/B Pricing Experiments, Revenue Forecasting, Public x402 Service Registry, Market Gap Finder, Market Data API
 - Two production x402 services running through our own Pulse middleware as proof
@@ -76,15 +81,13 @@ Each one makes the x402 economy more functional. Pulse tracks the money. Vault m
 
 We are not building another agent. We are the infrastructure layer that every agent and every service provider in this economy needs. During the California Gold Rush, the richest people were not the miners — they were the ones selling pickaxes. We are building the pickaxes for the x402 agent economy.
 
-**What's next**
-
-This is day one. Today we are also submitting Pulse to the Stellar Hacks: Agents hackathon and applying to the Elsa Agentic Fellowship. The Solana Frontier Hackathon and ETHGlobal Open Agents are next. Multi-chain is not a roadmap item — it is the foundation.
+**Who this is for**
 
 If you are building an x402 service on any chain, install Pulse. If you are building an agent that earns, our MCP tools let it track its own revenue. If you are an investor, builder, or operator who sees the agent economy coming, we are here to build the rails with you.
 
 The protocol is ready. The Foundation members are in place. The first wave of x402 services is live and earning. What was missing is the business layer.
 
-That is what we are building.
+That is what we are building. This is day one.
 
 kyvernlabs.com/pulse
 github.com/shariqazeem/kyvernlabs
@@ -100,15 +103,18 @@ npmjs.com/package/@kyvernlabs/pulse
 
 ---
 
-Today we're launching KyvernLabs.
+$24M flows through x402 every month.
+195+ services live. Zero analytics.
 
-The business layer for the x402 agent economy. Multi-chain — Stellar, Base, and every chain x402 supports. Real-time revenue intelligence. AI Copilot. 17 MCP tools. One line of middleware.
+Today, we changed that.
 
-195+ x402 services live. $24M+ monthly volume. Zero analytics — until now.
+Introducing KyvernLabs — the business layer for the x402 agent economy. Multi-chain. AI Copilot. 17 MCP tools. One line of middleware.
 
 Pulse is live → kyvernlabs.com/pulse
 
-Full launch story in the Article below ↓
+Full story in the Article below ↓
+
+@CoinbaseDev @StellarOrg @SolanaFndn @base
 
 ---
 
@@ -118,49 +124,53 @@ Full launch story in the Article below ↓
 
 ---
 
-Today I'm launching KyvernLabs.
+Solana Foundation, Coinbase, Stripe, Google, Visa, and Cloudflare just made x402 the official payment protocol for AI agents under the Linux Foundation.
 
-I've spent the last few weeks building the business infrastructure layer for x402 — the new internet-native payment protocol for AI agents. And today it's live.
+There's one problem: nobody built the business layer.
 
-I'm a 5x hackathon winner. Built ParallaxPay, TrendSurfer, and x402-Oracle. Every project taught me the same lesson — x402 is going to be massive, but nobody is building the tools that make it a real business.
+So I did.
 
-195+ services exist right now. They process $24M+ monthly across Stellar and Base. Agents pay for APIs autonomously. But every service provider is flying blind. No dashboard. No analytics. No way to know who's paying them.
+Today I'm launching KyvernLabs — real-time revenue intelligence for the entire x402 economy. Multi-chain by default. Built for Solana, Base, Stellar, and every chain x402 supports.
 
-That's what KyvernLabs solves.
+Before this, I shipped ParallaxPay, TrendSurfer, x402-Oracle, and several other x402 projects. Every one of them taught me the same lesson — x402 is about to be massive, but the tools to turn it into a real business don't exist yet.
 
-Our first product, Pulse, gives every x402 provider real-time revenue tracking, on-chain verified transactions, an AI Copilot that answers "What's my Stellar revenue?" with actual data, agent personas, churn prediction, pricing experiments, and 17 MCP tools so AI agents can track their own earnings.
+195+ services are live across the ecosystem right now. They process $24M+ in monthly volume. They earn from autonomous agents 24/7. None of them actually know who's paying them.
 
-I built deep Stellar integration with @stellar/stellar-sdk and real Horizon API. Not a badge. Real blockchain code. Every Stellar transaction in Pulse is a real testnet transaction verifiable on StellarChain.io.
+KyvernLabs Pulse fixes that.
 
-Today I'm also:
-- Submitting Pulse to the @StellarOrg Stellar Hacks: Agents hackathon
-- Applying to the @HeyElsaAI Agentic Fellowship
-- Registered for the @colosseum Solana Frontier hackathon (May 11)
+→ Real on-chain transaction capture across every chain x402 supports
+→ AI Copilot that answers your revenue questions in plain English
+→ 17 MCP tools so AI agents can track their own earnings from Claude or Cursor
+→ Agent personas, churn prediction, pricing experiments
+→ One line of middleware to integrate
 
-The x402 Foundation just launched under the Linux Foundation with Google, Amazon, Visa, Stripe, Coinbase, Microsoft, and Solana Foundation. The timing couldn't be better.
+Solana is core to x402. Pulse supports it on day one. So does Base, Stellar, and every chain that comes next.
 
-This isn't a side project. This is KyvernLabs — the business layer for the x402 economy.
+The protocol is ready. The Foundation members are in. The first wave of services is live and earning.
 
-Check it out: kyvernlabs.com/pulse
-Star us: github.com/shariqazeem/kyvernlabs
+What was missing is the business layer.
 
-Proud to ship this. Let's build.
+That's what we're building. Day one is today.
 
-@KyvernLabs
+→ kyvernlabs.com/pulse
+
+@KyvernLabs @SolanaFndn @CoinbaseDev @base @StellarOrg @x402
 
 ---
 
 ## EXECUTION ORDER (Today, April 7)
 
-1. **Record demo video** — follow `prompts/demo-video-script.md`. 6 scenes, 2:30 total.
-2. **Upload to YouTube** — unlisted is fine, you'll share the link in submissions.
-3. **Post @shariqshkt founder story** — gives the launch a human face first.
-4. **Post @KyvernLabs short launch post** (optional) — sets up the Article.
-5. **Post @KyvernLabs Article** — the main announcement. Pin it.
-6. **Submit to Stellar Hacks** on DoraHacks — paste video link, link the Article, link the GitHub.
-7. **Apply to Elsa Fellowship** on Tally — reference today's launch and submission as evidence of execution.
-8. **Post Stellar Hacks submission tweet** from @KyvernLabs.
-9. **Post Elsa Fellowship application tweet** from @KyvernLabs.
+1. ~~Record demo video~~ ✅ done
+2. ~~Upload to YouTube (unlisted)~~ ✅ done
+3. **Verify dashboard is live** — open kyvernlabs.com/pulse, send 2-3 fresh payments if data looks stale.
+4. **Post @KyvernLabs Article first** — copy the Article URL after posting. Pin it on the @KyvernLabs profile.
+5. **Post @KyvernLabs short launch post** — quote-tweet the Article (so the article auto-attaches as a card). Tags: @CoinbaseDev @StellarOrg @SolanaFndn @base
+6. **Post @shariqshkt founder story** — links to the Article. Personal angle. Then retweet from @KyvernLabs.
+7. **Submit to Stellar Hacks on DoraHacks** — paste video link, Article link, GitHub link.
+8. **Apply to Elsa Fellowship on Tally** — reference today's launch as proof of execution.
+9. **Post Stellar Hacks submission tweet** from @KyvernLabs — tag @StellarOrg @dorahacks #StellarHacks.
+10. **Post Elsa Fellowship tweet** from @KyvernLabs — tag @HeyElsaAI.
+11. **Quote tweet the Article every 2-3 hours** from @KyvernLabs with different foundation tags (see Tagging Strategy below). This is how you reach every x402 Foundation member without spamming any one post.
 
 ---
 
@@ -250,12 +260,68 @@ The agent economy needs a Bloomberg Terminal. We're building it.
 
 ---
 
-## TAGGING STRATEGY
+## TAGGING STRATEGY — Foundation Member Rotation
 
-**Always tag on launch:** @StellarOrg @HeyElsaAI @base @CoinbaseDev @colosseum
-**Technical posts:** Tag the relevant chain (@StellarOrg, @SolanaFndn, @base)
-**Hackathon submissions:** Tag the hackathon org and DoraHacks
-**Limit:** Max 3-4 tags per post. Never spam.
+The x402 Foundation includes Coinbase, Cloudflare, Stripe, Google, Visa, Amazon, Microsoft, Solana Foundation, Mastercard, and Shopify. Spread tags across multiple posts to hit every member without spamming any single one.
+
+**Launch day surfaces (different tags per post):**
+
+| Post | Tags (max 4) |
+|---|---|
+| @KyvernLabs Article (the main asset) | no inline tags — let the content speak |
+| @KyvernLabs short launch post | @CoinbaseDev @StellarOrg @SolanaFndn @base |
+| @shariqshkt founder story | @StellarOrg @HeyElsaAI @base @CoinbaseDev |
+| Stellar Hacks submission tweet | @StellarOrg @dorahacks #StellarHacks |
+| Elsa Fellowship tweet | @HeyElsaAI |
+
+**Quote tweet rotation (do this throughout launch day from @KyvernLabs):**
+
+Quote your own Article every 2-3 hours with a fresh angle and different foundation tags. Each quote is a new shot at virality with new accounts in the mention graph.
+
+- **2h later:** "For the payments incumbents — @stripe @Visa @Mastercard. We built the analytics layer x402 needs to grow into a real economy."
+- **4h later:** "@googlecloud @awscloud @Microsoft — your AI agents earn revenue on x402. We just made that revenue observable."
+- **6h later:** "@SolanaFndn @StellarOrg @base — multi-chain isn't a roadmap item. It's the foundation we built on."
+- **8h later:** "@x402 @linuxfoundation — the protocol is ready. The business layer is now live."
+
+**Day 2-7 follow-up tagging (rotate to keep hitting different members):**
+
+- Day 2 (Stellar deep dive): @StellarOrg
+- Day 3 (Copilot demo): @AnthropicAI @CoinbaseDev
+- Day 4 (MCP integration): @AnthropicAI @cursor_ai
+- Day 5 (Setup speed): @CoinbaseDev @base @stripe
+- Day 6 (Vision): @googlecloud @Visa @Mastercard
+- Day 7 (Recap): @x402 @SolanaFndn @StellarOrg @CoinbaseDev
+
+**Rules:**
+- Max 4 tags per post — never spam-tag
+- Quote tweets > replies for visibility
+- If a foundation account engages, retweet or respond within 30 minutes
+- @KyvernLabs follows all foundation accounts before launching (so mentions land cleanly)
+- Reply to recent foundation tweets with thoughtful value-adds throughout the week (be a real participant, not promotional)
+
+---
+
+## VIRAL AMPLIFICATION (Launch Day Tactics)
+
+**Pre-launch (next 10 minutes):**
+- Pin the Article to @KyvernLabs profile immediately after posting
+- DM 5-10 builder friends asking for retweets (warm requests, not blasts)
+- Open the x402 leaderboard tabs so you can DM providers right after launching
+
+**T+0 to T+30 min (the critical window):**
+- Reply to every comment within 2 minutes — the algo rewards fast engagement
+- Like every reply
+- Retweet from @shariqshkt within 5 minutes of posting
+- Drop the Article link in any x402 / Stellar / Coinbase Dev / Solana Discord or Telegram you're in
+
+**T+30 min to T+8 hours:**
+- Run the quote tweet rotation above (every 2-3 hours, different tags)
+- DM x402 service providers from the leaderboard with the launch link + offer to help integrate
+- Reply to any x402-related tweet you see with a value-add comment (don't paste your link — be a participant)
+
+**T+24 hours:**
+- Post a "thank you" tweet from @KyvernLabs acknowledging early supporters
+- Move into Day 2 follow-up posts
 
 ---
 

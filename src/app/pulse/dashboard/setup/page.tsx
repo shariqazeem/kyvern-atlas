@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Copy, Check, Terminal, Package, Code2, Bot, Cpu, Zap, Loader2, CheckCircle } from "lucide-react";
+import { Copy, Check, Terminal, Package, Code2, Bot, Cpu, Network, Key } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 
@@ -38,7 +38,7 @@ function CopyBlock({ code }: { code: string }) {
 const FRAMEWORKS = [
   {
     name: "Next.js",
-    label: "Next.js",
+    label: "Next.js (Base)",
     code: (key: string) => `// app/api/my-service/route.ts
 import { withX402 } from '@x402/next'
 import { withPulse } from '@kyvernlabs/pulse'
@@ -47,14 +47,22 @@ const handler = async (req) => {
   return Response.json({ data: "premium content" })
 }
 
-export const GET = withPulse(
-  withX402(handler, x402Config),
-  { apiKey: '${key}' }
-)`,
+const x402Handler = withX402(handler, {
+  accepts: {
+    scheme: 'exact',
+    price: '$0.01',
+    network: 'eip155:8453',     // Base mainnet
+    payTo: '0xYOUR_WALLET'
+  }
+}, server)
+
+export const GET = withPulse(x402Handler, {
+  apiKey: '${key}'
+})`,
   },
   {
     name: "Express",
-    label: "Express",
+    label: "Express (Base)",
     code: (key: string) => `// server.js
 import express from 'express'
 import { withPulse } from '@kyvernlabs/pulse'
@@ -67,11 +75,14 @@ const handler = (req, res) => {
 
 app.get('/api/my-service',
   withPulse(handler, { apiKey: '${key}' })
-)`,
+)
+
+// Pulse auto-detects the network from x402
+// payment headers — Base, Stellar, or Solana.`,
   },
   {
     name: "Hono",
-    label: "Hono",
+    label: "Hono (Workers/Bun)",
     code: (key: string) => `// src/index.ts (Cloudflare Workers / Bun)
 import { Hono } from 'hono'
 import { withPulse } from '@kyvernlabs/pulse'
@@ -79,7 +90,6 @@ import { withPulse } from '@kyvernlabs/pulse'
 const app = new Hono()
 
 app.get('/api/my-service', async (c) => {
-  // Pulse middleware wraps your handler
   return withPulse(
     async () => c.json({ data: "premium content" }),
     { apiKey: '${key}' }
@@ -90,32 +100,59 @@ export default app`,
   },
   {
     name: "Stellar",
-    label: "Stellar",
+    label: "Stellar (Mainnet)",
     code: (key: string) => `// Stellar x402 endpoint with Pulse analytics
-// Works with x402 on Stellar (Soroban + stablecoins)
-
 import { withPulse } from '@kyvernlabs/pulse'
 
-// Your Stellar x402 handler
 const handler = async (req) => {
-  // Pulse captures: payer (G... address), amount,
-  // Stellar tx hash, network (stellar:pubnet)
+  // Your endpoint logic — premium data,
+  // inference, market feed, etc.
   return Response.json({ data: "stellar data" })
 }
+
+// Pulse captures every Stellar payment automatically:
+//   payer:    G... address
+//   amount:   USDC or XLM
+//   tx_hash:  real Horizon hash
+//   network:  stellar:pubnet (mainnet)
+//   asset:    USDC
 
 export default withPulse(handler, {
   apiKey: '${key}'
 })
 
-// Pulse auto-detects Stellar network from
-// the x402 payment headers and displays
-// Stellar chain badges in your dashboard.`,
+// Verify any payment on stellar.expert/explorer/public
+// Use stellar:testnet for testnet integration.`,
+  },
+  {
+    name: "Solana",
+    label: "Solana (Mainnet)",
+    code: (key: string) => `// Solana x402 endpoint with Pulse analytics
+import { withPulse } from '@kyvernlabs/pulse'
+
+const handler = async (req) => {
+  return Response.json({ data: "solana data" })
+}
+
+// Pulse captures every Solana payment automatically:
+//   payer:    base58 address
+//   amount:   USDC or SOL
+//   tx_hash:  real Solana signature
+//   network:  solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp
+//   asset:    USDC
+
+export default withPulse(handler, {
+  apiKey: '${key}'
+})
+
+// Verify any payment on solscan.io
+// Use solana devnet chain id for devnet integration.`,
   },
   {
     name: "Direct",
     label: "Any Language",
-    code: (key: string) => `# Works with any language/chain — POST to the ingest API
-# Stellar Python example:
+    code: (key: string) => `# Works with any language/framework — POST to ingest API
+# Python example (Stellar mainnet):
 
 import requests
 
@@ -125,11 +162,11 @@ requests.post("https://kyvernlabs.com/api/pulse/ingest",
     "Content-Type": "application/json"
   },
   json={
-    "endpoint": "/api/stellar/data-feed",
+    "endpoint": "/api/your-service",
     "amount_usd": 0.01,
-    "payer_address": "GABCDEF...",
+    "payer_address": "GABCDEF...",   # G... for Stellar, 0x... for EVM, base58 for Solana
     "tx_hash": "abc123...",
-    "network": "stellar:pubnet",
+    "network": "stellar:pubnet",     # see Network Reference below
     "asset": "USDC",
     "status": "success"
   }
@@ -137,125 +174,55 @@ requests.post("https://kyvernlabs.com/api/pulse/ingest",
   },
 ];
 
-function TestPaymentButton({ apiKey }: { apiKey: string }) {
-  const [status, setStatus] = useState<"idle" | "sending" | "done" | "error">("idle");
-  const [eventId, setEventId] = useState<string | null>(null);
-  const [lastNetwork, setLastNetwork] = useState<string>("");
-  const { isAuthenticated } = useAuth();
-
-  async function sendTestPayment(chain: "base" | "stellar") {
-    if (!isAuthenticated || status === "sending") return;
-    setStatus("sending");
-    try {
-      if (chain === "stellar") {
-        // Use the Stellar demo endpoint
-        const res = await fetch("/api/x402/stellar-demo", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "X-API-Key": apiKey },
-          credentials: "include",
-          body: JSON.stringify({ endpoint: "/api/stellar/data-feed", amount_usd: 0.01 }),
-        });
-        const data = await res.json();
-        if (data.success) {
-          setEventId(data.event_id);
-          setLastNetwork("Stellar Testnet");
-          setStatus("done");
-        } else { setStatus("error"); }
-      } else {
-        const res = await fetch("/api/pulse/ingest", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "X-API-Key": apiKey },
-          body: JSON.stringify({
-            endpoint: "/api/test-payment",
-            amount_usd: 0.001,
-            payer_address: "0xTestAgent_" + Math.random().toString(36).slice(2, 10),
-            latency_ms: Math.floor(50 + Math.random() * 150),
-            status: "success",
-            network: "eip155:8453",
-            asset: "USDC",
-            scheme: "exact",
-          }),
-        });
-        const data = await res.json();
-        if (data.success) {
-          setEventId(data.event_id);
-          setLastNetwork("Base");
-          setStatus("done");
-        } else { setStatus("error"); }
-      }
-    } catch {
-      setStatus("error");
-    }
-  }
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay: 0.25, ease }}
-      className="rounded-xl border border-pulse/10 bg-pulse-50/30 p-5 space-y-3"
-    >
-      <div className="flex items-center gap-2">
-        <Zap className="w-4 h-4 text-pulse" />
-        <h3 className="text-[13px] font-semibold text-pulse-700">Test your integration</h3>
-      </div>
-      <p className="text-[12px] text-pulse-600">
-        Send a test payment event to verify everything is connected. It will appear in your dashboard instantly.
-      </p>
-      {status === "done" ? (
-        <div className="flex items-center gap-2 p-3 rounded-lg bg-emerald-50 border border-emerald-100">
-          <CheckCircle className="w-4 h-4 text-emerald-600" />
-          <div>
-            <p className="text-[12px] font-medium text-emerald-700">Test payment received on {lastNetwork}!</p>
-            <p className="text-[11px] text-emerald-600">
-              Event ID: <span className="font-mono">{eventId?.slice(0, 12)}...</span> — {" "}
-              <a href="/pulse/dashboard/transactions" className="underline">View in transactions</a>
-            </p>
-          </div>
-        </div>
-      ) : (
-        <div className="flex items-center gap-2">
-        <button
-          onClick={() => sendTestPayment("base")}
-          disabled={status === "sending" || !isAuthenticated}
-          className="inline-flex items-center gap-2 h-9 px-4 rounded-lg bg-pulse text-white text-[12px] font-medium hover:bg-pulse-700 disabled:opacity-50 transition-colors"
-        >
-          {status === "sending" ? (
-            <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Sending...</>
-          ) : status === "error" ? (
-            "Retry"
-          ) : (
-            <><Zap className="w-3.5 h-3.5" /> Test Base</>
-          )}
-        </button>
-        <button
-          onClick={() => sendTestPayment("stellar")}
-          disabled={status === "sending" || !isAuthenticated}
-          className="inline-flex items-center gap-2 h-9 px-4 rounded-lg bg-slate-900 text-white text-[12px] font-medium hover:bg-slate-800 disabled:opacity-50 transition-colors"
-        >
-          {status === "sending" ? (
-            <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Sending...</>
-          ) : (
-            <><Zap className="w-3.5 h-3.5" /> Test Stellar</>
-          )}
-        </button>
-        </div>
-      )}
-    </motion.div>
-  );
-}
+const NETWORKS = [
+  {
+    name: "Base Mainnet",
+    chainId: "eip155:8453",
+    explorer: "basescan.org",
+    asset: "USDC",
+    addressFormat: "0x...",
+  },
+  {
+    name: "Stellar Mainnet",
+    chainId: "stellar:pubnet",
+    explorer: "stellar.expert",
+    asset: "USDC / XLM",
+    addressFormat: "G...",
+  },
+  {
+    name: "Stellar Testnet",
+    chainId: "stellar:testnet",
+    explorer: "stellar.expert/testnet",
+    asset: "USDC / XLM",
+    addressFormat: "G...",
+  },
+  {
+    name: "Solana Mainnet",
+    chainId: "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
+    explorer: "solscan.io",
+    asset: "USDC / SOL",
+    addressFormat: "base58",
+  },
+  {
+    name: "Solana Devnet",
+    chainId: "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1",
+    explorer: "solscan.io?cluster=devnet",
+    asset: "USDC / SOL",
+    addressFormat: "base58",
+  },
+];
 
 function FrameworkTabs({ displayKey }: { displayKey: string }) {
   const [active, setActive] = useState(0);
 
   return (
     <div className="rounded-xl border border-black/[0.06] overflow-hidden">
-      <div className="flex border-b border-black/[0.04] bg-[#FAFAFA]">
+      <div className="flex border-b border-black/[0.04] bg-[#FAFAFA] overflow-x-auto">
         {FRAMEWORKS.map((fw, i) => (
           <button
             key={fw.name}
             onClick={() => setActive(i)}
-            className={`px-4 py-2.5 text-[12px] font-medium transition-colors ${
+            className={`px-4 py-2.5 text-[12px] font-medium transition-colors whitespace-nowrap ${
               active === i
                 ? "text-pulse border-b-2 border-pulse bg-white"
                 : "text-quaternary hover:text-secondary"
@@ -286,8 +253,33 @@ export default function SetupPage() {
         <h1 className="text-[18px] font-bold tracking-tight">Setup Guide</h1>
         <p className="text-[13px] text-tertiary mt-1">
           Integrate Pulse into your x402 endpoint in under 2 minutes.
-          Three ways: middleware, MCP server, or direct API.
+          Works on Base, Stellar, and Solana mainnet — automatically.
         </p>
+      </motion.div>
+
+      {/* Your API Key — moved to top for visibility */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.05, ease }}
+        className="rounded-xl bg-pulse-50 border border-pulse-200 p-5 space-y-3"
+      >
+        <div className="flex items-center gap-2">
+          <Key className="w-4 h-4 text-pulse-600" />
+          <h3 className="text-[14px] font-semibold text-pulse-700">Your API Key</h3>
+        </div>
+        <p className="text-[12px] text-pulse-600">
+          {isAuthenticated
+            ? "Use this in the middleware, MCP config, or direct API calls. Treat it like a password — never commit it to git."
+            : "Connect your wallet to get your kv_live_ API key."}
+        </p>
+        <CopyBlock code={displayKey} />
+        {isAuthenticated && (
+          <p className="text-[11px] text-pulse-500">
+            Manage all your keys on the{" "}
+            <a href="/pulse/dashboard/keys" className="underline">API Keys page</a>.
+          </p>
+        )}
       </motion.div>
 
       {/* Section: Middleware Integration */}
@@ -295,7 +287,7 @@ export default function SetupPage() {
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.05, ease }}
+          transition={{ duration: 0.5, delay: 0.1, ease }}
           className="flex items-center gap-2"
         >
           <Code2 className="w-4 h-4 text-pulse" />
@@ -307,21 +299,24 @@ export default function SetupPage() {
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.1, ease }}
+          transition={{ duration: 0.5, delay: 0.15, ease }}
           className="space-y-3"
         >
           <div className="flex items-center gap-3">
             <div className="w-6 h-6 rounded-full bg-foreground text-background flex items-center justify-center text-[11px] font-bold">1</div>
             <h3 className="text-[13px] font-semibold">Install</h3>
           </div>
-          <CopyBlock code="npm install @kyvernlabs/pulse @x402/core @x402/next @x402/evm" />
+          <CopyBlock code="npm install @kyvernlabs/pulse" />
+          <p className="text-[11px] text-quaternary">
+            Already using <code className="font-mono">@x402/next</code> or another x402 framework? Pulse wraps it without changing anything.
+          </p>
         </motion.div>
 
         {/* Step 2 */}
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.15, ease }}
+          transition={{ duration: 0.5, delay: 0.2, ease }}
           className="space-y-3"
         >
           <div className="flex items-center gap-3">
@@ -343,28 +338,28 @@ export const GET = withPulse(x402Handler, {
   apiKey: '${displayKey}'
 })`}
           />
+          <p className="text-[11px] text-quaternary">
+            Pulse reads the <code className="font-mono">payment-signature</code> and <code className="font-mono">payment-response</code> headers and captures every successful x402 payment to your dashboard. Fire-and-forget — zero impact on your endpoint latency.
+          </p>
         </motion.div>
 
         {/* Step 3 */}
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.2, ease }}
+          transition={{ duration: 0.5, delay: 0.25, ease }}
           className="space-y-3"
         >
           <div className="flex items-center gap-3">
             <div className="w-6 h-6 rounded-full bg-foreground text-background flex items-center justify-center text-[11px] font-bold">3</div>
-            <h3 className="text-[13px] font-semibold">See your revenue</h3>
+            <h3 className="text-[13px] font-semibold">Deploy & see your revenue</h3>
           </div>
           <p className="text-[13px] text-secondary leading-relaxed">
-            Every x402 payment is now captured with blockchain tx hash. Head to the{" "}
+            Deploy your endpoint. As soon as an agent pays, the transaction shows up in your{" "}
             <a href="/pulse/dashboard" className="text-pulse hover:underline font-medium">dashboard</a>{" "}
-            to see revenue, customers, and performance in real time.
+            — with the real on-chain hash, payer address, and a link to verify on the block explorer. No polling, no manual config.
           </p>
         </motion.div>
-
-        {/* Test Payment Button */}
-        <TestPaymentButton apiKey={displayKey} />
       </div>
 
       {/* Framework Templates */}
@@ -372,11 +367,54 @@ export const GET = withPulse(x402Handler, {
         initial={{ opacity: 0, y: 12 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
-        transition={{ duration: 0.5, delay: 0.25, ease }}
+        transition={{ duration: 0.5, delay: 0.3, ease }}
         className="space-y-4"
       >
-        <h3 className="text-[13px] font-semibold">Framework-specific examples</h3>
+        <h3 className="text-[13px] font-semibold">Framework & chain examples</h3>
+        <p className="text-[11px] text-quaternary -mt-2">
+          Pick your stack. Pulse works with all of them — no extra configuration per chain.
+        </p>
         <FrameworkTabs displayKey={displayKey} />
+      </motion.div>
+
+      {/* Network Reference */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.5, ease }}
+        className="space-y-4"
+      >
+        <div className="flex items-center gap-2">
+          <Network className="w-4 h-4 text-pulse" />
+          <h3 className="text-[14px] font-semibold tracking-tight">Supported Networks</h3>
+        </div>
+        <p className="text-[12px] text-secondary">
+          Pulse auto-detects the network from your x402 payment headers and stores it as a CAIP-2 chain ID. Use these values when sending events directly to the ingest API.
+        </p>
+        <div className="rounded-xl border border-black/[0.06] overflow-hidden">
+          <table className="w-full text-[12px]">
+            <thead>
+              <tr className="border-b border-black/[0.04] bg-[#FAFAFA]">
+                <th className="text-left px-4 py-2.5 font-medium text-quaternary uppercase tracking-wider text-[10px]">Network</th>
+                <th className="text-left px-4 py-2.5 font-medium text-quaternary uppercase tracking-wider text-[10px]">Chain ID</th>
+                <th className="text-left px-4 py-2.5 font-medium text-quaternary uppercase tracking-wider text-[10px]">Explorer</th>
+              </tr>
+            </thead>
+            <tbody>
+              {NETWORKS.map((net) => (
+                <tr key={net.chainId} className="border-b border-black/[0.03] last:border-0">
+                  <td className="px-4 py-2.5">
+                    <p className="font-medium text-primary">{net.name}</p>
+                    <p className="text-[10px] text-quaternary mt-0.5">{net.asset} • {net.addressFormat}</p>
+                  </td>
+                  <td className="px-4 py-2.5 font-mono text-[10px] text-pulse">{net.chainId}</td>
+                  <td className="px-4 py-2.5 text-quaternary text-[11px]">{net.explorer}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </motion.div>
 
       {/* Divider */}
@@ -393,7 +431,7 @@ export const GET = withPulse(x402Handler, {
         >
           <Bot className="w-4 h-4 text-pulse" />
           <h2 className="text-[15px] font-semibold tracking-tight">MCP Server — for AI Agents</h2>
-          <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-pulse-50 text-pulse-600 uppercase tracking-wider">New</span>
+          <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-pulse-50 text-pulse-600 uppercase tracking-wider">17 tools</span>
         </motion.div>
 
         <motion.p
@@ -523,7 +561,7 @@ export const GET = withPulse(x402Handler, {
           transition={{ duration: 0.5, delay: 0.05, ease }}
           className="text-[13px] text-secondary leading-relaxed"
         >
-          Send events directly to the Pulse ingest API from any language or framework.
+          Send events directly to the Pulse ingest API from any language or framework. Use this if you&apos;re not using the npm middleware — for example, from a Python service, a Rust worker, or a Solana program.
         </motion.p>
 
         <motion.div
@@ -542,6 +580,7 @@ export const GET = withPulse(x402Handler, {
     "payer_address": "0x...",
     "tx_hash": "0x...",
     "network": "eip155:8453",
+    "asset": "USDC",
     "status": "success"
   }'`}
           />
@@ -567,8 +606,8 @@ export const GET = withPulse(x402Handler, {
             { icon: Package, label: "Payment amount", desc: "USD value of x402 payment" },
             { icon: Code2, label: "Payer address", desc: "Agent wallet that paid" },
             { icon: Terminal, label: "Response latency", desc: "Time to process the request" },
-            { icon: Package, label: "Tx hash", desc: "Blockchain transaction proof" },
-            { icon: Code2, label: "Network", desc: "Which chain (Base, Ethereum, etc.)" },
+            { icon: Package, label: "Tx hash", desc: "Blockchain proof, links to explorer" },
+            { icon: Code2, label: "Network", desc: "Auto-detected from x402 headers" },
           ].map((item, i) => (
             <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-[#FAFAFA]">
               <item.icon className="w-4 h-4 text-quaternary mt-0.5" />
@@ -579,29 +618,6 @@ export const GET = withPulse(x402Handler, {
             </div>
           ))}
         </div>
-      </motion.div>
-
-      {/* Your API Key */}
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true }}
-        transition={{ duration: 0.5, ease }}
-        className="rounded-xl bg-pulse-50 border border-pulse-200 p-5 space-y-2"
-      >
-        <h3 className="text-[14px] font-semibold text-pulse-700">Your API Key</h3>
-        <p className="text-[12px] text-pulse-600">
-          {isAuthenticated
-            ? "This is your key. Use it in the middleware, MCP config, or API calls."
-            : "Connect your wallet to get your kv_live_ API key."}
-        </p>
-        <CopyBlock code={displayKey} />
-        {isAuthenticated && (
-          <p className="text-[11px] text-pulse-500">
-            Full key available on your{" "}
-            <a href="/pulse/dashboard/keys" className="underline">API Keys page</a>.
-          </p>
-        )}
       </motion.div>
 
       {/* npm links */}

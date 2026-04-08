@@ -117,8 +117,10 @@ export default function TransactionsPage() {
         <FilterDropdown label="Network" value={networkFilter} onChange={setNetworkFilter} options={[
           { value: "", label: "All networks" },
           { value: "eip155:8453", label: "Base" },
-          { value: "stellar:testnet", label: "Stellar Testnet" },
           { value: "stellar:pubnet", label: "Stellar" },
+          { value: "stellar:testnet", label: "Stellar Testnet" },
+          { value: "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp", label: "Solana" },
+          { value: "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1", label: "Solana Devnet" },
         ]} />
       </div>
 

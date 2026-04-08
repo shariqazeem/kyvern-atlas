@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import confetti from "canvas-confetti";
 import { Navbar } from "@/components/landing/navbar";
 import { Footer } from "@/components/landing/footer";
@@ -17,7 +17,9 @@ import {
   ArrowRight,
   Sparkles,
   Zap,
-  CreditCard,
+  Wallet,
+  Copy,
+  CheckCircle2,
 } from "lucide-react";
 import { getExplorerTxUrl, truncateTxHash, KYVERN_PAY_TO } from "@/lib/utils";
 
@@ -65,15 +67,21 @@ const PRO_FEATURES = [
   "Priority support",
 ];
 
+type Mode = "wallet" | "manual";
+type Status = "idle" | "paying" | "confirming" | "verifying" | "done";
+
 export default function UpgradePage() {
   const { isPro, expiresAt, isConnected } = useSubscription();
   const { wallets } = useWallets();
-  useAuth();
+  const { refreshSession } = useAuth();
   const [selectedPlan, setSelectedPlan] = useState<"growth" | "pro">("pro");
-  const [status, setStatus] = useState<"idle" | "paying" | "confirming" | "verifying" | "done">("idle");
+  const [mode, setMode] = useState<Mode>("wallet");
+  const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<string | undefined>();
+  const [manualTxInput, setManualTxInput] = useState("");
   const [subResult, setSubResult] = useState<{ expires_at?: string } | null>(null);
+  const [copiedAddress, setCopiedAddress] = useState(false);
 
   const address = wallets?.[0]?.address;
 
@@ -88,10 +96,19 @@ export default function UpgradePage() {
         if (Date.now() < end) requestAnimationFrame(frame);
       };
       frame();
+      // Refresh user session so the rest of the app sees Pro tier
+      refreshSession();
     }
-  }, [status]);
+  }, [status, refreshSession]);
 
-  async function handleUpgrade() {
+  function copyPayAddress() {
+    navigator.clipboard.writeText(PAYTO);
+    setCopiedAddress(true);
+    setTimeout(() => setCopiedAddress(false), 2000);
+  }
+
+  // --- Mode 1: One-click payment via connected (Privy) wallet ---
+  async function handleWalletUpgrade() {
     setError(null);
     setStatus("paying");
 
@@ -103,7 +120,6 @@ export default function UpgradePage() {
         return;
       }
 
-      // Encode the USDC transfer call
       const data = encodeFunctionData({
         abi: USDC_ABI,
         functionName: "transfer",
@@ -114,24 +130,23 @@ export default function UpgradePage() {
 
       // Switch wallet to Base mainnet if needed
       try {
-        await wallet.switchChain(8453); // Base mainnet chain ID
+        await wallet.switchChain(8453);
       } catch {
         // May already be on Base or wallet doesn't support switching
       }
 
-      // Use wallet provider directly
       const provider = await wallet.getEthereumProvider();
-      const hash = await provider.request({
+      const hash = (await provider.request({
         method: "eth_sendTransaction",
-        params: [{
-          from: wallet.address,
-          to: USDC_ADDRESS,
-          data,
-          chainId: "0x2105", // Base mainnet (8453 in hex)
-        }],
-      }) as string;
-      setTxHash(hash);
-
+        params: [
+          {
+            from: wallet.address,
+            to: USDC_ADDRESS,
+            data,
+            chainId: "0x2105", // Base mainnet
+          },
+        ],
+      })) as string;
       setTxHash(hash);
 
       // Verify on backend
@@ -139,6 +154,7 @@ export default function UpgradePage() {
       const res = await fetch("/api/x402/verify-upgrade", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ tx_hash: hash }),
       });
       const d = await res.json();
@@ -154,15 +170,58 @@ export default function UpgradePage() {
       const msg = String(err);
       if (msg.includes("user rejected") || msg.includes("denied") || msg.includes("User rejected")) {
         setError("Transaction cancelled.");
-      } else if (msg.includes("insufficient") || msg.includes("exceeds balance") || msg.includes("transfer amount exceeds")) {
-        setError("Insufficient USDC balance. You need " + PLANS[selectedPlan].amount + " USDC on Base to upgrade.");
+      } else if (
+        msg.includes("insufficient") ||
+        msg.includes("exceeds balance") ||
+        msg.includes("transfer amount exceeds")
+      ) {
+        setError(
+          "Insufficient USDC balance. You need " +
+            PLANS[selectedPlan].amount +
+            " USDC on Base. Switch to manual mode below to pay from another wallet."
+        );
       } else if (msg.includes("TransactionReceiptNotFound") || msg.includes("could not be found")) {
-        setError("Transaction is still processing. Please wait a moment and check your dashboard — it may have gone through.");
+        setError("Transaction is still processing. Wait a moment and refresh.");
       } else if (msg.includes("network") || msg.includes("chain")) {
         setError("Please switch your wallet to Base network and try again.");
       } else {
-        setError("Transaction failed. Please ensure you have " + PLANS[selectedPlan].amount + " USDC on Base mainnet.");
+        setError("Transaction failed. Try paying from another wallet using manual mode below.");
       }
+      setStatus("idle");
+    }
+  }
+
+  // --- Mode 2: Manual paste — user paid from any wallet, pastes the tx hash ---
+  async function handleManualVerify() {
+    setError(null);
+
+    const trimmed = manualTxInput.trim();
+    if (!trimmed.startsWith("0x") || trimmed.length !== 66) {
+      setError("Invalid transaction hash. It should start with 0x and be 66 characters long.");
+      return;
+    }
+
+    setStatus("verifying");
+    setTxHash(trimmed);
+
+    try {
+      const res = await fetch("/api/x402/verify-upgrade", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ tx_hash: trimmed }),
+      });
+      const d = await res.json();
+
+      if (d.success) {
+        setSubResult(d);
+        setStatus("done");
+      } else {
+        setError(d.error || "Verification failed");
+        setStatus("idle");
+      }
+    } catch {
+      setError("Network error. Try again in a moment.");
       setStatus("idle");
     }
   }
@@ -184,7 +243,7 @@ export default function UpgradePage() {
           >
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-pulse/20 bg-pulse-50 text-[11px] tracking-wide font-medium text-pulse-600 mb-6">
               <Shield className="w-3 h-3" />
-              One-click USDC payment
+              x402-native USDC payment
             </div>
             <h1 className="text-[clamp(2rem,5vw,3rem)] font-semibold leading-[1.08] tracking-[-0.04em]">
               Upgrade to{" "}
@@ -193,9 +252,9 @@ export default function UpgradePage() {
               </span>
             </h1>
             <p className="mt-4 text-[15px] text-secondary leading-relaxed">
-              Pay directly from your connected wallet.
+              Pay with USDC on Base — the same protocol your agents use.
               <br />
-              One click. No copy-pasting. No intermediaries.
+              From your connected wallet, or any external wallet.
             </p>
           </motion.div>
 
@@ -215,8 +274,10 @@ export default function UpgradePage() {
                   Active until {new Date(expiresAt).toLocaleDateString()}
                 </p>
               )}
-              <a href="/pulse/dashboard"
-                className="inline-flex items-center gap-2 mt-4 h-10 px-5 rounded-lg bg-emerald-600 text-white text-[13px] font-medium hover:bg-emerald-700 transition-colors">
+              <a
+                href="/pulse/dashboard"
+                className="inline-flex items-center gap-2 mt-4 h-10 px-5 rounded-lg bg-emerald-600 text-white text-[13px] font-medium hover:bg-emerald-700 transition-colors"
+              >
                 Open Dashboard <ArrowRight className="w-3.5 h-3.5" />
               </a>
             </motion.div>
@@ -225,186 +286,311 @@ export default function UpgradePage() {
           {/* Plan selector + pricing card */}
           {!isPro && (
             <>
-            {/* Plan tabs */}
-            <motion.div
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.1, ease: [0.25, 0.1, 0.25, 1] }}
-              className="flex items-center justify-center gap-2 mb-6"
-            >
-              <button
-                onClick={() => setSelectedPlan("growth")}
-                className={`px-5 py-2 rounded-lg text-[13px] font-medium transition-all ${
-                  selectedPlan === "growth"
-                    ? "bg-foreground text-white"
-                    : "bg-white border border-black/[0.08] text-secondary hover:bg-slate-50"
-                }`}
+              {/* Plan tabs */}
+              <motion.div
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.1, ease: [0.25, 0.1, 0.25, 1] }}
+                className="flex items-center justify-center gap-2 mb-6"
               >
-                Growth — $19/mo
-              </button>
-              <button
-                onClick={() => setSelectedPlan("pro")}
-                className={`px-5 py-2 rounded-lg text-[13px] font-medium transition-all ${
-                  selectedPlan === "pro"
-                    ? "bg-foreground text-white"
-                    : "bg-white border border-black/[0.08] text-secondary hover:bg-slate-50"
-                }`}
-              >
-                Pro — $49/mo
-              </button>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.15, ease: [0.25, 0.1, 0.25, 1] }}
-              className="rounded-xl border border-foreground bg-foreground text-background p-7 lg:p-8 shadow-premium-xl"
-            >
-              <div className="flex items-baseline gap-1 mb-1">
-                <span className="text-[36px] font-semibold tracking-[-0.03em] font-mono-numbers">
-                  ${PLANS[selectedPlan].amount}
-                </span>
-                <span className="text-white/40 text-[14px]">/month USDC</span>
-              </div>
-              <p className="text-[13px] text-white/50 mb-6">
-                {NETWORK_NAME} • {PLANS[selectedPlan].period} • Cancel anytime
-              </p>
-
-              <ul className="space-y-2.5 mb-8">
-                {(selectedPlan === "pro" ? PRO_FEATURES : GROWTH_FEATURES).map((f) => (
-                  <li key={f} className="flex items-center gap-2.5 text-[13px] text-white/75">
-                    <Check className="w-3.5 h-3.5 text-white/40 shrink-0" />
-                    {f}
-                  </li>
-                ))}
-              </ul>
-
-              {/* Payment states */}
-              {status === "done" ? (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ duration: 0.5, ease: [0.25, 0.1, 0.25, 1] }}
-                  className="space-y-4"
+                <button
+                  onClick={() => setSelectedPlan("growth")}
+                  className={`px-5 py-2 rounded-lg text-[13px] font-medium transition-all ${
+                    selectedPlan === "growth"
+                      ? "bg-foreground text-white"
+                      : "bg-white border border-black/[0.08] text-secondary hover:bg-slate-50"
+                  }`}
                 >
-                  <div className="text-center py-2">
-                    <motion.div
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      transition={{ type: "spring", stiffness: 200, delay: 0.2 }}
-                      className="w-16 h-16 rounded-full bg-emerald-500/20 flex items-center justify-center mx-auto mb-3"
-                    >
-                      <Check className="w-8 h-8 text-emerald-400" />
-                    </motion.div>
-                    <h3 className="text-[18px] font-bold text-white">Welcome to Pulse Pro!</h3>
-                    <p className="text-[13px] text-white/50 mt-1">Your business intelligence just leveled up.</p>
-                  </div>
-                  {subResult?.expires_at && (
-                    <p className="text-[12px] text-white/50">
-                      Active until {new Date(subResult.expires_at).toLocaleDateString()}
-                    </p>
-                  )}
-                  {txHash && (
-                    <a href={getExplorerTxUrl(txHash, "eip155:8453")} target="_blank" rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-[12px] font-mono text-pulse-300 hover:underline">
-                      {truncateTxHash(txHash)} <ExternalLink className="w-2.5 h-2.5" />
-                    </a>
-                  )}
-                  <a href="/pulse/dashboard"
-                    className="w-full inline-flex items-center justify-center gap-2 h-11 rounded-lg bg-white text-foreground text-[13px] font-medium hover:bg-white/90 transition-colors">
-                    Open Dashboard <ArrowRight className="w-3.5 h-3.5" />
-                  </a>
-                </motion.div>
-              ) : (
-                <div className="space-y-4">
-                  <button
-                    onClick={handleUpgrade}
-                    disabled={!isConnected || status !== "idle"}
-                    className="w-full inline-flex items-center justify-center gap-2 h-12 rounded-lg bg-white text-foreground text-[14px] font-semibold hover:bg-white/90 disabled:opacity-50 transition-colors duration-300"
+                  Growth — $19/mo
+                </button>
+                <button
+                  onClick={() => setSelectedPlan("pro")}
+                  className={`px-5 py-2 rounded-lg text-[13px] font-medium transition-all ${
+                    selectedPlan === "pro"
+                      ? "bg-foreground text-white"
+                      : "bg-white border border-black/[0.08] text-secondary hover:bg-slate-50"
+                  }`}
+                >
+                  Pro — $49/mo
+                </button>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.15, ease: [0.25, 0.1, 0.25, 1] }}
+                className="rounded-xl border border-foreground bg-foreground text-background p-7 lg:p-8 shadow-premium-xl"
+              >
+                <div className="flex items-baseline gap-1 mb-1">
+                  <span className="text-[36px] font-semibold tracking-[-0.03em] font-mono-numbers">
+                    ${PLANS[selectedPlan].amount}
+                  </span>
+                  <span className="text-white/40 text-[14px]">/month USDC</span>
+                </div>
+                <p className="text-[13px] text-white/50 mb-6">
+                  {NETWORK_NAME} • {PLANS[selectedPlan].period} • Cancel anytime
+                </p>
+
+                <ul className="space-y-2.5 mb-8">
+                  {(selectedPlan === "pro" ? PRO_FEATURES : GROWTH_FEATURES).map((f) => (
+                    <li key={f} className="flex items-center gap-2.5 text-[13px] text-white/75">
+                      <Check className="w-3.5 h-3.5 text-white/40 shrink-0" />
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+
+                {/* SUCCESS STATE */}
+                {status === "done" ? (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.5, ease: [0.25, 0.1, 0.25, 1] }}
+                    className="space-y-4"
                   >
-                    {status === "idle" && (
-                      <>
-                        <Zap className="w-4 h-4" />
-                        Pay ${PLANS[selectedPlan].amount} USDC — Upgrade Now
-                      </>
-                    )}
-                    {status === "paying" && (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Confirm in wallet...
-                      </>
-                    )}
-                    {status === "confirming" && (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Settling on-chain...
-                      </>
-                    )}
-                    {status === "verifying" && (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Verifying payment...
-                      </>
-                    )}
-                  </button>
-
-                  {/* Buy USDC with credit card option */}
-                  {isConnected && status === "idle" && address && (
-                    <>
-                      <div className="flex items-center gap-3">
-                        <div className="flex-1 h-px bg-white/10" />
-                        <span className="text-[11px] text-white/30 uppercase tracking-wider">or need USDC?</span>
-                        <div className="flex-1 h-px bg-white/10" />
-                      </div>
-                      <a
-                        href={`https://buy.moonpay.com?currencyCode=usdc_base&walletAddress=${address}&baseCurrencyAmount=${PLANS[selectedPlan].amount}&baseCurrencyCode=usd`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="w-full inline-flex items-center justify-center gap-2 h-11 rounded-lg border border-white/20 text-white/70 text-[13px] font-medium hover:bg-white/5 transition-colors"
+                    <div className="text-center py-2">
+                      <motion.div
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        transition={{ type: "spring", stiffness: 200, delay: 0.2 }}
+                        className="w-16 h-16 rounded-full bg-emerald-500/20 flex items-center justify-center mx-auto mb-3"
                       >
-                        <CreditCard className="w-4 h-4" />
-                        Buy ${PLANS[selectedPlan].amount} USDC with Card
-                      </a>
-                      <p className="text-[10px] text-white/30 text-center">
-                        Opens MoonPay. Buy USDC on Base with Visa, Mastercard, or Apple Pay. Then come back and pay above.
+                        <Check className="w-8 h-8 text-emerald-400" />
+                      </motion.div>
+                      <h3 className="text-[18px] font-bold text-white">Welcome to Pulse Pro!</h3>
+                      <p className="text-[13px] text-white/50 mt-1">
+                        Your business intelligence just leveled up.
                       </p>
-                    </>
-                  )}
-
-                  {!isConnected && (
-                    <p className="text-[12px] text-white/40 text-center">
-                      Connect your wallet first from the dashboard
-                    </p>
-                  )}
-
-                  {txHash && (status as string) !== "idle" && (status as string) !== "done" && (
-                    <div className="text-center">
-                      <a href={getExplorerTxUrl(txHash, "eip155:8453")} target="_blank" rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-[11px] font-mono text-white/40 hover:text-white/60">
-                        {truncateTxHash(txHash)} <ExternalLink className="w-2.5 h-2.5" />
-                      </a>
                     </div>
-                  )}
-
-                  {error && (
-                    <div className="space-y-2">
-                      <p className="text-[12px] text-red-300 bg-red-900/20 rounded-lg p-2.5">{error}</p>
-                      <button onClick={() => { setError(null); setStatus("idle"); }}
-                        className="text-[12px] text-white/40 hover:text-white/60">
-                        Try again
+                    {subResult?.expires_at && (
+                      <p className="text-[12px] text-white/50 text-center">
+                        Active until {new Date(subResult.expires_at).toLocaleDateString()}
+                      </p>
+                    )}
+                    {txHash && (
+                      <div className="text-center">
+                        <a
+                          href={getExplorerTxUrl(txHash, "eip155:8453")}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-[12px] font-mono text-pulse-300 hover:underline"
+                        >
+                          {truncateTxHash(txHash)} <ExternalLink className="w-2.5 h-2.5" />
+                        </a>
+                      </div>
+                    )}
+                    <a
+                      href="/pulse/dashboard"
+                      className="w-full inline-flex items-center justify-center gap-2 h-11 rounded-lg bg-white text-foreground text-[13px] font-medium hover:bg-white/90 transition-colors"
+                    >
+                      Open Dashboard <ArrowRight className="w-3.5 h-3.5" />
+                    </a>
+                  </motion.div>
+                ) : (
+                  <div className="space-y-4">
+                    {/* Mode tabs — connected wallet vs manual */}
+                    <div className="flex items-center gap-1 p-1 rounded-lg bg-white/[0.04]">
+                      <button
+                        onClick={() => setMode("wallet")}
+                        className={`flex-1 inline-flex items-center justify-center gap-1.5 h-8 rounded-md text-[11px] font-medium transition-colors ${
+                          mode === "wallet"
+                            ? "bg-white text-foreground"
+                            : "text-white/50 hover:text-white/80"
+                        }`}
+                      >
+                        <Wallet className="w-3 h-3" />
+                        Connected wallet
+                      </button>
+                      <button
+                        onClick={() => setMode("manual")}
+                        className={`flex-1 inline-flex items-center justify-center gap-1.5 h-8 rounded-md text-[11px] font-medium transition-colors ${
+                          mode === "manual"
+                            ? "bg-white text-foreground"
+                            : "text-white/50 hover:text-white/80"
+                        }`}
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                        External wallet
                       </button>
                     </div>
-                  )}
 
-                  <div className="pt-2 border-t border-white/[0.06]">
-                    <p className="text-[11px] text-white/30 text-center">
-                      USDC will be sent from your connected wallet ({address ? `${address.slice(0, 6)}...${address.slice(-4)}` : "not connected"}) to {PAYTO.slice(0, 6)}...{PAYTO.slice(-4)} on {NETWORK_NAME}
-                    </p>
+                    <AnimatePresence mode="wait">
+                      {mode === "wallet" ? (
+                        <motion.div
+                          key="wallet-mode"
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          exit={{ opacity: 0, x: 10 }}
+                          transition={{ duration: 0.2 }}
+                          className="space-y-3"
+                        >
+                          <button
+                            onClick={handleWalletUpgrade}
+                            disabled={!isConnected || status !== "idle"}
+                            className="w-full inline-flex items-center justify-center gap-2 h-12 rounded-lg bg-white text-foreground text-[14px] font-semibold hover:bg-white/90 disabled:opacity-50 transition-colors duration-300"
+                          >
+                            {status === "idle" && (
+                              <>
+                                <Zap className="w-4 h-4" />
+                                Pay ${PLANS[selectedPlan].amount} USDC — Upgrade Now
+                              </>
+                            )}
+                            {status === "paying" && (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                Confirm in wallet...
+                              </>
+                            )}
+                            {status === "confirming" && (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                Settling on-chain...
+                              </>
+                            )}
+                            {status === "verifying" && (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                Verifying payment...
+                              </>
+                            )}
+                          </button>
+                          {!isConnected && (
+                            <p className="text-[11px] text-white/40 text-center">
+                              Connect your wallet first from the dashboard
+                            </p>
+                          )}
+                          {address && (
+                            <p className="text-[10px] text-white/30 text-center">
+                              From {address.slice(0, 6)}...{address.slice(-4)} → {PAYTO.slice(0, 6)}
+                              ...{PAYTO.slice(-4)}
+                            </p>
+                          )}
+                        </motion.div>
+                      ) : (
+                        <motion.div
+                          key="manual-mode"
+                          initial={{ opacity: 0, x: 10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          exit={{ opacity: 0, x: -10 }}
+                          transition={{ duration: 0.2 }}
+                          className="space-y-3"
+                        >
+                          {/* Step 1: payment instructions */}
+                          <div className="rounded-lg bg-white/[0.04] border border-white/[0.08] p-3 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] uppercase tracking-wider text-white/40">
+                                Step 1 — Send payment
+                              </span>
+                              <span className="text-[11px] font-semibold text-white">
+                                ${PLANS[selectedPlan].amount} USDC on Base
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <code className="flex-1 text-[10px] font-mono text-white/70 bg-black/20 px-2 py-1.5 rounded truncate">
+                                {PAYTO}
+                              </code>
+                              <button
+                                onClick={copyPayAddress}
+                                className="shrink-0 p-1.5 rounded bg-white/[0.06] hover:bg-white/[0.12] transition-colors"
+                                title="Copy address"
+                              >
+                                {copiedAddress ? (
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                                ) : (
+                                  <Copy className="w-3 h-3 text-white/60" />
+                                )}
+                              </button>
+                            </div>
+                            <p className="text-[10px] text-white/40 leading-relaxed">
+                              Send exactly ${PLANS[selectedPlan].amount} USDC (or more) on Base mainnet
+                              from any wallet — MetaMask, Coinbase Wallet, Phantom, hardware wallet,
+                              or directly via x402 from an agent.
+                            </p>
+                          </div>
+
+                          {/* Step 2: paste tx hash */}
+                          <div className="space-y-2">
+                            <label className="text-[10px] uppercase tracking-wider text-white/40 block">
+                              Step 2 — Paste your transaction hash
+                            </label>
+                            <input
+                              type="text"
+                              value={manualTxInput}
+                              onChange={(e) => setManualTxInput(e.target.value)}
+                              placeholder="0x..."
+                              disabled={status === "verifying"}
+                              className="w-full h-10 px-3 rounded-lg bg-white/[0.04] border border-white/[0.08] text-[12px] font-mono text-white placeholder:text-white/30 focus:outline-none focus:border-white/30 disabled:opacity-50"
+                            />
+                          </div>
+
+                          <button
+                            onClick={handleManualVerify}
+                            disabled={!manualTxInput || status === "verifying" || !isConnected}
+                            className="w-full inline-flex items-center justify-center gap-2 h-11 rounded-lg bg-white text-foreground text-[13px] font-semibold hover:bg-white/90 disabled:opacity-50 transition-colors"
+                          >
+                            {status === "verifying" ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                Verifying on-chain...
+                              </>
+                            ) : (
+                              <>
+                                <Check className="w-4 h-4" />
+                                Verify & Activate Pro
+                              </>
+                            )}
+                          </button>
+                          {!isConnected && (
+                            <p className="text-[11px] text-white/40 text-center">
+                              Sign in first — your authenticated account is the one that gets
+                              upgraded.
+                            </p>
+                          )}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
+                    {txHash && status !== "idle" && (status as Status) !== "done" && (
+                      <div className="text-center">
+                        <a
+                          href={getExplorerTxUrl(txHash, "eip155:8453")}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-[11px] font-mono text-white/40 hover:text-white/60"
+                        >
+                          {truncateTxHash(txHash)} <ExternalLink className="w-2.5 h-2.5" />
+                        </a>
+                      </div>
+                    )}
+
+                    {error && (
+                      <div className="space-y-2">
+                        <p className="text-[12px] text-red-300 bg-red-900/20 rounded-lg p-2.5">
+                          {error}
+                        </p>
+                        <button
+                          onClick={() => {
+                            setError(null);
+                            setStatus("idle");
+                          }}
+                          className="text-[12px] text-white/40 hover:text-white/60"
+                        >
+                          Try again
+                        </button>
+                      </div>
+                    )}
+
+                    <div className="pt-2 border-t border-white/[0.06]">
+                      <p className="text-[11px] text-white/30 text-center leading-relaxed">
+                        Payment is a real USDC transfer on Base mainnet, verified directly on-chain
+                        — no intermediaries, no escrow. Your authenticated account gets activated
+                        regardless of which wallet pays.
+                      </p>
+                    </div>
                   </div>
-                </div>
-              )}
-            </motion.div>
-          </>
+                )}
+              </motion.div>
+            </>
           )}
 
           <motion.p
@@ -413,7 +599,7 @@ export default function UpgradePage() {
             transition={{ delay: 0.4 }}
             className="mt-6 text-center text-[12px] text-quaternary"
           >
-            Payment is a direct USDC transfer on {NETWORK_NAME}. Verified on-chain.
+            Pulse Pro is paid with x402 USDC — the same protocol your agents use to pay for APIs.
           </motion.p>
         </div>
       </section>

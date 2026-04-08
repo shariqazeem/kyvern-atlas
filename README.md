@@ -64,7 +64,21 @@ x402 Agent → HTTP 402 → Your Endpoint
 | Database | SQLite (better-sqlite3, WAL mode) |
 | Auth | Privy (email, Google, wallet), session cookies |
 | Payments | USDC on Base via x402 protocol |
+| Stellar | `@stellar/stellar-sdk` v15 — mainnet (`horizon.stellar.org`) + testnet, USDC, Soroban-aware |
+| Solana | `@solana/web3.js` v1.98 — mainnet-beta + devnet, USDC, native SOL transfers |
 | AI | MCP server (17 tools), AI Copilot, heuristic insights |
+
+### Multi-chain support
+
+Pulse is chain-agnostic by design. Each network has its own adapter library and a single `network` field in the `events` table — every transaction in the dashboard links to the right block explorer for verification.
+
+| Chain | Networks supported | Explorer | USDC |
+|---|---|---|---|
+| Base | mainnet | basescan.org | ✅ |
+| Stellar | mainnet + testnet | stellar.expert | ✅ |
+| Solana | mainnet-beta + devnet | solscan.io | ✅ |
+
+Default network selection happens automatically — if `STELLAR_MAINNET_*` is set, Stellar mainnet is used; otherwise testnet. Same pattern for `SOLANA_MAINNET_*`.
 
 ---
 

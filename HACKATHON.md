@@ -12,7 +12,7 @@ Every x402 service on Stellar is flying blind.
 
 ### The Solution
 
-Pulse is the revenue intelligence layer for x402 on Stellar. One line of middleware captures every payment — real-time, blockchain-verified, multi-chain.
+Pulse is the revenue intelligence layer for x402 on Stellar. One line of middleware captures every payment — real-time, blockchain-verified, multi-network.
 
 ```typescript
 import { withPulse } from '@kyvernlabs/pulse'
@@ -20,58 +20,78 @@ import { withPulse } from '@kyvernlabs/pulse'
 export default withPulse(handler, { apiKey: 'kv_live_...' })
 ```
 
-Agent pays → Stellar settles → Pulse captures → dashboard shows verified tx → StellarChain.io confirms.
+Agent pays → Stellar settles → Pulse captures → dashboard shows verified tx → stellar.expert confirms.
 
 ### How It Uses Stellar (Deep Integration)
 
-**Real Stellar SDK Integration (`@stellar/stellar-sdk` v15):**
-- `src/lib/stellar.ts` — core library with 5 Horizon API functions
-- `createTestnetKeypair()` — generates real keypairs, funds via Friendbot
-- `submitPayment()` — builds, signs, and submits real `PaymentOperation` to Horizon testnet
-- `getTransactionDetails()` — fetches full tx details from Horizon for verification
-- `getAccountBalance()` — fetches real XLM + USDC balances from Horizon
-- `getRecentTransactions()` — fetches account transaction history
+**Real Stellar SDK Integration (`@stellar/stellar-sdk` v15) — Mainnet AND Testnet:**
 
-**Real Stellar Testnet Transactions:**
-- Every Stellar transaction in Pulse is submitted via `horizon-testnet.stellar.org`
+`src/lib/stellar.ts` is a chain-agnostic library that works across both Stellar networks with a single network parameter. Every function accepts a `StellarNetwork` argument (`"mainnet"` or `"testnet"`) and routes to the correct Horizon endpoint, USDC issuer, and explorer.
+
+**Core Functions:**
+- `createKeypair(network)` — generates real keypairs. Auto-funds via Friendbot on testnet; mainnet returns the keypair for manual funding with real XLM.
+- `submitPayment(secret, to, amount, asset, memo, network)` — builds, signs, and submits real `PaymentOperation` to the right Horizon endpoint (mainnet or testnet).
+- `getTransactionDetails(txHash, network)` — fetches full tx details from Horizon for verification on either network.
+- `getAccountBalance(publicKey, network)` — fetches real XLM + USDC balances from the correct Horizon.
+- `getRecentTransactions(publicKey, limit, network)` — fetches account transaction history.
+- `resolveDefaultNetwork()` — picks mainnet automatically if `STELLAR_MAINNET_*` env is set, otherwise testnet.
+
+**Network Configuration:**
+| | Mainnet | Testnet |
+|---|---|---|
+| Horizon | `horizon.stellar.org` | `horizon-testnet.stellar.org` |
+| Network Passphrase | `Networks.PUBLIC` | `Networks.TESTNET` |
+| USDC Issuer | Circle's official `GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN` | Demo issuer |
+| Explorer | `stellar.expert/explorer/public` | `stellar.expert/explorer/testnet` |
+| Account Funding | Real XLM from any wallet | Friendbot auto-funded with 10K XLM |
+| Chain ID (CAIP-2) | `stellar:pubnet` | `stellar:testnet` |
+
+**Real Stellar Transactions on Both Networks:**
+- Every Stellar transaction in Pulse is a real on-chain payment, verifiable on stellar.expert
 - Real G-addresses (Stellar public keys)
-- Real transaction hashes verifiable at `testnet.stellarchain.io/transactions/{hash}`
+- Real transaction hashes — click any one in the dashboard to verify
 - x402 memo field for payment reconciliation (`x402:/api/endpoint`)
-- Source labeled as `"horizon"` — honest, verifiable
+- Source labeled as `"horizon"` — honest, verifiable, never simulated
+- Mainnet support is the default for production accounts; testnet for demos and Hacks
 
-**How to Verify:**
-Click any Stellar transaction hash in the Pulse dashboard → opens StellarChain.io → shows real testnet transaction with real G-addresses, real amounts, real ledger numbers.
+**How to Verify Right Now:**
+1. Open the Pulse dashboard at https://kyvernlabs.com/pulse/dashboard
+2. Filter the transactions table by network: Stellar (mainnet) or Stellar Testnet
+3. Click any transaction hash → opens stellar.expert → shows the real on-chain payment with real G-addresses, real amounts, real ledger numbers
+4. Same flow works on both networks
 
 **Soroban-Aware Architecture:**
-Chain-agnostic event schema designed to support Soroban contract invocations and authorization tracking when the x402 Stellar SDK adds Soroban support.
+The events table schema (`network`, `asset`, `tx_hash`, `scheme`, `source`) is designed to support Soroban contract invocations and authorization tracking when the x402 Stellar SDK adds Soroban support. Adding Soroban will be a chain-adapter addition, not a rewrite.
 
 ### How It Uses x402
 
 - Native x402 middleware (`@kyvernlabs/pulse` on npm)
 - Captures `PAYMENT-SIGNATURE` and `PAYMENT-RESPONSE` headers
-- Per-payment tracking: amount, payer, endpoint, latency, tx hash, network
-- On-chain verification via block explorer links
+- Per-payment tracking: amount, payer, endpoint, latency, tx hash, network, asset
+- On-chain verification via block explorer links for every supported network
 - Fire-and-forget analytics — zero impact on the x402 payment flow
+- KyvernLabs Pro subscriptions are paid via x402 USDC — we eat our own dog food
 
 ### Why This Matches the Hackathon Vision
 
 The video describes agents that *"discover, pay, and continue quickly and efficiently."* Pulse makes this observable:
 
-- **Discovery**: Our x402 Service Registry lists every known endpoint
-- **Payment**: Our middleware captures every x402 payment on Stellar
-- **Continue**: Our AI Copilot helps agents and providers analyze revenue patterns
+- **Discovery**: Our public x402 Service Registry lists every known endpoint with on-chain verification
+- **Payment**: Our middleware captures every x402 payment on Stellar (mainnet or testnet)
+- **Continue**: Our AI Copilot helps agents and providers analyze revenue patterns across chains
 
-The video says *"MCP servers"* let agents make payments. Pulse ships **17 MCP tools** that let any Claude agent query its own x402 revenue on Stellar. The video says *"payment verified on chain."* Every Pulse transaction links to StellarChain.io with a green "Verified" badge.
+The video says *"MCP servers"* let agents make payments. Pulse ships **17 MCP tools** that let any Claude or Cursor agent query its own x402 revenue on Stellar. The video says *"payment verified on chain."* Every Pulse transaction links directly to stellar.expert with a green "Verified" badge.
 
 We're not building another agent. We're building the financial infrastructure that every agent and every x402 provider on Stellar needs.
 
 ### AI / Agent Features
 
-- **Pulse Copilot** — natural language revenue queries: "What's my Stellar revenue?" / "Compare Base vs Stellar"
-- **17 MCP tools** — Claude Desktop / Cursor integration for AI agents to query analytics
+- **Pulse Copilot** — natural language revenue queries: "What's my Stellar revenue?" / "Compare Base vs Stellar" / "Which agents chain multiple services?"
+- **17 MCP tools** — Claude Desktop / Cursor integration for AI agents to query their own analytics programmatically
 - **Agent Persona Engine** — classifies agent wallets by behavior (Whale, Loyalist, Explorer, At Risk)
 - **Revenue Forecast** — 7-day projection with confidence bands
 - **Smart Alerts** — Slack/Discord notifications on revenue changes
+- **A/B Pricing Experiments** — test different prices and measure agent response
 
 ### Tech Stack
 
@@ -81,27 +101,37 @@ We're not building another agent. We're building the financial infrastructure th
 | Backend | Next.js API routes, 40+ endpoints |
 | Database | SQLite (better-sqlite3, WAL mode) |
 | Auth | Privy (email, Google, wallet) |
-| Stellar | `@stellar/stellar-sdk` v15, Horizon testnet API |
-| Chain Support | Base (EVM), Stellar (testnet + Horizon API) |
+| Stellar | `@stellar/stellar-sdk` v15, Horizon API (mainnet + testnet) |
+| Solana | `@solana/web3.js` v1.98, RPC (mainnet + devnet) |
+| Chain Support | Base (EVM), Stellar (mainnet + testnet), Solana (mainnet + devnet) |
 | AI | MCP server (17 tools), Copilot, heuristic insights |
 | Packages | `@kyvernlabs/pulse` (middleware), `@kyvernlabs/mcp` (AI tools) |
+| Billing | x402-native USDC subscriptions on Base mainnet |
 
 ### Demo
 
 - **Live product**: https://kyvernlabs.com/pulse
 - **Dashboard**: https://kyvernlabs.com/pulse/dashboard
-- **API Docs**: https://kyvernlabs.com/docs/api
+- **Setup guide (3 chains)**: https://kyvernlabs.com/pulse/dashboard/setup
 - **Service Registry**: https://kyvernlabs.com/registry
+- **API Docs**: https://kyvernlabs.com/docs/api
 - **npm middleware**: https://www.npmjs.com/package/@kyvernlabs/pulse
 - **npm MCP tools**: https://www.npmjs.com/package/@kyvernlabs/mcp
-- **Video**: [Demo video link — to be added]
+- **Video**: see DoraHacks submission
+
+### What's New Since Initial Submission
+
+- ✅ **Stellar Mainnet support** — chain-agnostic library refactor, mainnet is now the default for production accounts
+- ✅ **Solana integration** — `@solana/web3.js` integration with same depth as Stellar (mainnet + devnet)
+- ✅ **x402-native subscription billing** — replaced credit-card flow with USDC-only Pulse Pro that supports both connected wallets and external wallets via tx-hash verification
+- ✅ **Multi-tenant production hardening** — session-authenticated subscription endpoint, session-wallet attribution on upgrade verify, refresh-on-success in upgrade flow
+- ✅ **Updated explorer URLs** to stellar.expert (covers both networks under one domain)
 
 ### Team
 
 **Shariq Azeem** (@shariqshkt) — Solo founder, KyvernLabs
-- 5 hackathon wins ($4,250 total)
-- Built 3 x402 projects: ParallaxPay ($1,500 win), TrendSurfer, x402-Oracle
-- Deep x402 protocol expertise across Base and Stellar
+
+Before KyvernLabs, shipped multiple production x402 projects: ParallaxPay, TrendSurfer, x402-Oracle, and several others. Among the very few builders with deep, hands-on x402 experience across Base, Stellar, and Solana. Building KyvernLabs full-time as the sole engineer.
 
 ### The Positioning
 
