@@ -1,15 +1,29 @@
 {
   "name": "@kyvernlabs/pulse",
-  "version": "0.1.0",
-  "description": "x402 analytics middleware — capture every payment, see every customer, blockchain-verified",
+  "version": "0.2.0",
+  "description": "x402 analytics middleware — multi-chain (Base, Stellar, Solana), blockchain-verified, one line of code",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "files": ["dist"],
+  "files": ["dist", "README.md"],
   "scripts": {
     "build": "tsc",
     "prepublishOnly": "npm run build"
   },
-  "keywords": ["x402", "analytics", "middleware", "payments", "blockchain", "USDC", "Base"],
+  "keywords": [
+    "x402",
+    "analytics",
+    "middleware",
+    "payments",
+    "blockchain",
+    "USDC",
+    "Base",
+    "Stellar",
+    "Solana",
+    "Soroban",
+    "ai-agents",
+    "agent-economy",
+    "x402-foundation"
+  ],
   "author": "KyvernLabs <hello@kyvernlabs.com>",
   "license": "MIT",
   "repository": {
