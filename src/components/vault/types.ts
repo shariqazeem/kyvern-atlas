@@ -81,6 +81,68 @@ export const ATLAS_TEMPLATE: VaultConfig = {
   network: "devnet",
 };
 
+/* ════════════════════════════════════════════════════════════════════
+   Shared dashboard types — live vault, payment history, budget +
+   velocity snapshots. Previously these were inline in
+   src/app/vault/[id]/page.tsx which meant every component that needed
+   to render a vault redeclared them. One source now.
+   ════════════════════════════════════════════════════════════════════ */
+
+export interface Vault {
+  id: string;
+  ownerWallet: string;
+  name: string;
+  emoji: string;
+  purpose: string;
+  dailyLimitUsd: number;
+  weeklyLimitUsd: number;
+  perTxMaxUsd: number;
+  maxCallsPerWindow: number;
+  velocityWindow: "1h" | "1d" | "1w";
+  allowedMerchants: string[];
+  requireMemo: boolean;
+  squadsAddress: string;
+  network: "devnet" | "mainnet";
+  vaultPda: string | null;
+  spendingLimitPda: string | null;
+  pausedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Payment {
+  id: string;
+  vaultId: string;
+  agentKeyId: string | null;
+  merchant: string;
+  amountUsd: number;
+  memo: string | null;
+  status: "allowed" | "blocked" | "settled" | "failed";
+  reason: string | null;
+  txSignature: string | null;
+  latencyMs: number | null;
+  createdAt: string;
+}
+
+export interface BudgetSnapshot {
+  dailyLimitUsd: number;
+  weeklyLimitUsd: number;
+  perTxMaxUsd: number;
+  spentToday: number;
+  spentThisWeek: number;
+  dailyRemaining: number;
+  weeklyRemaining: number;
+  dailyUtilization: number;
+  weeklyUtilization: number;
+}
+
+export interface VelocitySnapshot {
+  callsInWindow: number;
+  maxCallsPerWindow: number;
+  velocityWindow: "1h" | "1d" | "1w";
+  windowStart: string;
+}
+
 export const PURPOSE_PRESETS: Record<
   AgentPurpose,
   { label: string; emoji: string; description: string }
