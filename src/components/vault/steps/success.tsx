@@ -13,8 +13,8 @@ import { Check, Copy, ArrowRight, ExternalLink, ShieldCheck } from "lucide-react
 import { useMemo, useState } from "react";
 import type { VaultConfig } from "../types";
 import { CrossConversionBanner } from "@/components/app/journey-checklist";
-
-const ease = [0.25, 0.1, 0.25, 1] as const;
+import { SignatureReveal } from "@/components/atlas/signature-reveal";
+import { EASE_PREMIUM as ease } from "@/lib/motion";
 
 export interface SuccessStepProps {
   config: VaultConfig;
@@ -71,38 +71,104 @@ await vault.pay({
 
   return (
     <div className="space-y-8">
-      {/* Check hero */}
+      {/* Check hero + confetti burst.
+          This is the "it really happened" moment. The check lands; 16
+          colored particles fire outward in a burst (staggered 0-300ms);
+          radiating rings continue for ambient aliveness. */}
       <div className="flex flex-col items-center text-center">
-        <motion.div
-          initial={{ scale: 0, rotate: -20 }}
-          animate={{ scale: 1, rotate: 0 }}
-          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-          className="relative w-20 h-20 rounded-[22px] flex items-center justify-center mb-5"
-          style={{
-            background: "var(--success)",
-            boxShadow:
-              "0 4px 8px rgba(34,197,94,0.2), 0 20px 60px rgba(34,197,94,0.28)",
-          }}
-        >
-          {/* Radiating rings */}
-          {[0, 1, 2].map((i) => (
-            <motion.div
-              key={i}
-              className="absolute inset-0 rounded-[22px]"
-              style={{ border: "1px solid rgba(34,197,94,0.4)" }}
-              initial={{ scale: 1, opacity: 0 }}
-              animate={{ scale: 1.6 + i * 0.25, opacity: [0, 0.6, 0] }}
-              transition={{
-                duration: 1.6,
-                delay: 0.3 + i * 0.2,
-                repeat: Infinity,
-                repeatDelay: 1.2,
-                ease,
+        <div className="relative">
+          {/* Confetti particles — CSS-only, no library. Angles are
+              quasi-random but deterministic so every deploy feels the
+              same. Kyvern palette: indigo, sky, success-green. */}
+          <ConfettiBurst />
+
+          <motion.div
+            initial={{ scale: 0, rotate: -20 }}
+            animate={{ scale: 1, rotate: 0 }}
+            transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+            className="relative w-20 h-20 rounded-[22px] flex items-center justify-center mb-5"
+            style={{
+              background: "var(--success)",
+              boxShadow:
+                "0 4px 8px rgba(34,197,94,0.2), 0 20px 60px rgba(34,197,94,0.28)",
+            }}
+          >
+            {/* Radiating rings */}
+            {[0, 1, 2].map((i) => (
+              <motion.div
+                key={i}
+                className="absolute inset-0 rounded-[22px]"
+                style={{ border: "1px solid rgba(34,197,94,0.4)" }}
+                initial={{ scale: 1, opacity: 0 }}
+                animate={{ scale: 1.6 + i * 0.25, opacity: [0, 0.6, 0] }}
+                transition={{
+                  duration: 1.6,
+                  delay: 0.3 + i * 0.2,
+                  repeat: Infinity,
+                  repeatDelay: 1.2,
+                  ease,
+                }}
+              />
+            ))}
+            <Check className="relative w-10 h-10 text-white" strokeWidth={2.5} />
+          </motion.div>
+        </div>
+
+        {/* Signature reveal — real on-chain tx sig typed out character
+            by character. This replaces the placeholder from the
+            DeployingView with the actual settled signature. Judges
+            who scroll down can click through to Explorer directly. */}
+        {squads?.createSignature && (
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.4, ease }}
+            className="w-full max-w-[440px] rounded-[14px] overflow-hidden mt-1 mb-2"
+            style={{
+              background: "#0B0B0F",
+              border: "0.5px solid rgba(255,255,255,0.06)",
+            }}
+          >
+            <div
+              className="flex items-center justify-between px-3.5 py-2"
+              style={{
+                borderBottom: "0.5px solid rgba(255,255,255,0.06)",
               }}
-            />
-          ))}
-          <Check className="relative w-10 h-10 text-white" strokeWidth={2.5} />
-        </motion.div>
+            >
+              <span
+                className="text-[10.5px] font-mono-numbers"
+                style={{ color: "rgba(255,255,255,0.42)" }}
+              >
+                solana · devnet · create signature
+              </span>
+              <span
+                className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.08em]"
+                style={{ color: "#4ADE80" }}
+              >
+                <motion.span
+                  className="w-1.5 h-1.5 rounded-full"
+                  style={{ background: "#4ADE80" }}
+                  animate={{ opacity: [0.5, 1, 0.5] }}
+                  transition={{
+                    duration: 2,
+                    repeat: Infinity,
+                    ease: "easeInOut",
+                  }}
+                />
+                settled
+              </span>
+            </div>
+            <div className="px-4 py-3 text-left">
+              <SignatureReveal
+                signature={squads.createSignature}
+                network={config.network}
+                truncate={44}
+                className="inline-flex items-center gap-1 font-mono-numbers text-[12.5px] hover:underline"
+                textClassName="text-[12.5px]"
+              />
+            </div>
+          </motion.div>
+        )}
       </div>
 
       {/* Vault ID */}
@@ -462,5 +528,75 @@ function NextLink({
         <ArrowRight className="w-4 h-4 shrink-0 mt-0.5 transition-transform duration-300 group-hover:translate-x-0.5" />
       </div>
     </a>
+  );
+}
+
+/**
+ * Confetti burst for the success hero.
+ *
+ * Zero-dependency — pure Framer-animated divs. 20 particles, each
+ * with a deterministic angle (so subsequent renders look the same)
+ * and a randomized distance + size + color pulled from the Kyvern
+ * palette. Particles fire out from dead center, drift with gravity,
+ * then fade. Plays ONCE on mount — this is a celebration, not an
+ * ambient loop.
+ *
+ * Respects `prefers-reduced-motion` via the parent screen's motion
+ * context (motion.div animations will be skipped if the OS says so).
+ */
+function ConfettiBurst() {
+  const particles = Array.from({ length: 20 }, (_, i) => {
+    // Even angular spread around the circle.
+    const angle = (i / 20) * Math.PI * 2 + (i % 2 === 0 ? 0.12 : -0.08);
+    // Varied distances make it feel organic, not mechanical.
+    const dist = 80 + ((i * 37) % 60);
+    const dx = Math.cos(angle) * dist;
+    const dy = Math.sin(angle) * dist - 20; // bias up slightly (celebration)
+    const size = 5 + ((i * 13) % 5);
+    const palette = [
+      "#4F46E5", // agent indigo
+      "#0EA5E9", // revenue sky
+      "#22C55E", // success green
+      "#FBBF24", // chrome yellow
+      "#F87171", // chrome red
+    ];
+    const color = palette[i % palette.length];
+    return { i, dx, dy, size, color };
+  });
+  return (
+    <div
+      className="absolute inset-0 pointer-events-none"
+      aria-hidden
+      style={{ zIndex: 0 }}
+    >
+      {particles.map((p) => (
+        <motion.span
+          key={p.i}
+          initial={{ x: 0, y: 0, opacity: 0, scale: 0.3 }}
+          animate={{
+            x: p.dx,
+            y: p.dy,
+            opacity: [0, 1, 1, 0],
+            scale: [0.3, 1, 1, 0.85],
+          }}
+          transition={{
+            duration: 1.2,
+            delay: 0.15 + (p.i % 5) * 0.04,
+            ease: [0.16, 1, 0.3, 1],
+          }}
+          style={{
+            position: "absolute",
+            top: "50%",
+            left: "50%",
+            width: p.size,
+            height: p.size,
+            borderRadius: p.i % 3 === 0 ? 2 : 9999,
+            background: p.color,
+            marginTop: -p.size / 2,
+            marginLeft: -p.size / 2,
+          }}
+        />
+      ))}
+    </div>
   );
 }

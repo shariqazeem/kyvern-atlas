@@ -6,8 +6,7 @@
    ════════════════════════════════════════════════════════════════════ */
 
 import { motion } from "framer-motion";
-
-const ease = [0.25, 0.1, 0.25, 1] as const;
+import { EASE_PREMIUM as ease } from "@/lib/motion";
 
 const STATS = [
   { value: "$0.00025", label: "Avg Solana tx fee" },

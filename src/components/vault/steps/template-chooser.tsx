@@ -34,8 +34,9 @@ import {
   Sparkles,
   Wand2,
 } from "lucide-react";
-
-const EASE = [0.25, 0.1, 0.25, 1] as const;
+import { AtlasRunningStrip } from "@/components/vault/atlas-running-strip";
+import { KyvernMark } from "@/components/brand/kyvern-mark";
+import { EASE_PREMIUM as EASE } from "@/lib/motion";
 
 export interface TemplateChooserProps {
   onCloneAtlas: () => void;
@@ -68,14 +69,10 @@ export function TemplateChooser({
             aria-label="Back to app"
           >
             <ArrowLeft className="w-3.5 h-3.5" style={{ color: "var(--text-tertiary)" }} />
-            <div
-              className="w-7 h-7 rounded-[8px] flex items-center justify-center"
-              style={{ background: "var(--text-primary)" }}
-            >
-              <span className="text-white text-[13px] font-bold tracking-tight">
-                K
-              </span>
-            </div>
+            {/* Same KyvernMark instance the landing navbar renders.
+                Browsers with View Transitions support morph the tile
+                between positions as the user navigates in. */}
+            <KyvernMark size={28} />
             <span
               className="hidden sm:inline text-[14.5px] font-semibold"
               style={{
@@ -96,6 +93,12 @@ export function TemplateChooser({
           </Link>
         </div>
       </header>
+
+      {/* Cinematic bridge — the live Atlas state travels with the user
+          from the landing page into the wizard. Same chrome, same mono,
+          same "live" pill. Sets the frame: "the network is running while
+          you set this up; in a minute you'll be part of it." */}
+      <AtlasRunningStrip />
 
       {/* Body */}
       <main className="flex-1 w-full flex items-center">

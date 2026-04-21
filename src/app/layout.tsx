@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { Providers } from "@/components/providers";
+import { FloatingLiveBadge } from "@/components/atlas/floating-live-badge";
 import "./globals.css";
 
 const inter = Inter({
@@ -131,7 +132,15 @@ export default function RootLayout({
         />
       </head>
       <body className="font-sans antialiased">
-        <Providers>{children}</Providers>
+        <Providers>
+          {children}
+          {/* Global floating "Atlas is live" badge — bottom-right FAB.
+              Self-hides on /atlas, /tour, /embed, /vault, /app, /pulse,
+              /login where it would be redundant or in the way. Renders
+              everywhere else (landing, marketing pages) as a persistent
+              "the reference agent is alive" cue. */}
+          <FloatingLiveBadge />
+        </Providers>
       </body>
     </html>
   );

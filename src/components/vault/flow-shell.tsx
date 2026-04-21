@@ -14,6 +14,7 @@ import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, ArrowRight, Check } from "lucide-react";
 import { useEffect, type ReactNode } from "react";
+import { KyvernMark } from "@/components/brand/kyvern-mark";
 
 const ease = [0.25, 0.1, 0.25, 1] as const;
 
@@ -91,14 +92,7 @@ export function FlowShell({
             className="group flex items-center gap-2 transition-opacity hover:opacity-80"
             aria-label="Back to app"
           >
-            <div
-              className="w-7 h-7 rounded-[8px] flex items-center justify-center"
-              style={{ background: "var(--text-primary)" }}
-            >
-              <span className="text-white text-[13px] font-bold tracking-tight">
-                K
-              </span>
-            </div>
+            <KyvernMark size={28} />
             <span
               className="hidden sm:inline text-[14.5px] font-semibold"
               style={{

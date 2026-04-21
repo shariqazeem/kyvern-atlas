@@ -23,11 +23,11 @@
  * ════════════════════════════════════════════════════════════════════
  */
 
-import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowUpRight, Shield } from "lucide-react";
-
-const EASE = [0.25, 0.1, 0.25, 1] as const;
+import { EASE_PREMIUM as EASE } from "@/lib/motion";
+import { fmtAgo } from "@/lib/format";
+import { LiveTimer } from "@/components/atlas/live-timer";
 
 export interface AgentObservatoryStripProps {
   agentName: string;
@@ -49,27 +49,8 @@ export interface AgentObservatoryStripProps {
   } | null;
 }
 
-function fmtUptime(ms: number): string {
-  if (ms <= 0) return "00d 00h 00m 00s";
-  const total = Math.floor(ms / 1000);
-  const d = Math.floor(total / 86400);
-  const h = Math.floor((total % 86400) / 3600);
-  const m = Math.floor((total % 3600) / 60);
-  const s = total % 60;
-  return `${String(d).padStart(2, "0")}d ${String(h).padStart(2, "0")}h ${String(m).padStart(2, "0")}m ${String(s).padStart(2, "0")}s`;
-}
-
-function fmtAgo(iso: string): string {
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const s = Math.floor(diffMs / 1000);
-  if (s < 60) return `${s}s ago`;
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  const d = Math.floor(h / 24);
-  return `${d}d ago`;
-}
+// fmtUptime + fmtAgo now imported from @/lib/format — the shared
+// formatters used across every observatory surface.
 
 /**
  * Translate a payment outcome into a first-person sentence the agent
@@ -90,13 +71,8 @@ function reasoningFor(p: AgentObservatoryStripProps["lastPayment"]): string {
 }
 
 export function AgentObservatoryStrip(props: AgentObservatoryStripProps) {
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    const t = setInterval(() => setTick((x) => x + 1), 1000);
-    return () => clearInterval(t);
-  }, []);
-
-  const uptimeMs = Date.now() - new Date(props.createdAt).getTime();
+  // Uptime ticking moved to <LiveTimer/> — one re-render source of truth
+  // for any live clock across the observatory surfaces.
   const utilization =
     props.dailyLimit > 0
       ? Math.min(100, (props.spentToday / props.dailyLimit) * 100)
@@ -127,15 +103,15 @@ export function AgentObservatoryStrip(props: AgentObservatoryStripProps) {
         <div className="flex items-center gap-1.5">
           <span
             className="w-2.5 h-2.5 rounded-full"
-            style={{ background: "#F87171" }}
+            style={{ background: "var(--chrome-red)" }}
           />
           <span
             className="w-2.5 h-2.5 rounded-full"
-            style={{ background: "#FBBF24" }}
+            style={{ background: "var(--chrome-yellow)" }}
           />
           <span
             className="w-2.5 h-2.5 rounded-full"
-            style={{ background: "#4ADE80" }}
+            style={{ background: "var(--chrome-green)" }}
           />
         </div>
         <div
@@ -147,13 +123,13 @@ export function AgentObservatoryStrip(props: AgentObservatoryStripProps) {
         <div className="flex items-center gap-1.5">
           <motion.span
             className="w-1.5 h-1.5 rounded-full"
-            style={{ background: "#22C55E" }}
+            style={{ background: "var(--success)" }}
             animate={{ opacity: [0.5, 1, 0.5] }}
             transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
           />
           <span
             className="text-[10.5px] font-semibold uppercase tracking-[0.08em]"
-            style={{ color: "#15803D" }}
+            style={{ color: "var(--success-deep)" }}
           >
             live
           </span>
@@ -192,22 +168,21 @@ export function AgentObservatoryStrip(props: AgentObservatoryStripProps) {
             >
               Uptime
             </p>
-            <p
-              className="text-[15px] font-mono-numbers tabular-nums tracking-tight"
+            <LiveTimer
+              since={props.createdAt}
+              className="text-[15px] font-mono-numbers tabular-nums tracking-tight block"
               style={{ color: "var(--text-primary)", fontWeight: 500 }}
-            >
-              {fmtUptime(uptimeMs)}
-            </p>
+            />
           </div>
         </div>
 
         {/* Last decision — first-person reasoning, same voice as Atlas */}
         <div className="mb-4">
           <div className="flex items-center gap-1.5 mb-1.5">
-            <Shield className="w-3 h-3" style={{ color: "#4F46E5" }} />
+            <Shield className="w-3 h-3" style={{ color: "var(--agent)" }} />
             <span
               className="text-[10px] font-semibold uppercase tracking-[0.08em]"
-              style={{ color: "#4F46E5" }}
+              style={{ color: "var(--agent)" }}
             >
               Last decision
             </span>
@@ -255,14 +230,14 @@ export function AgentObservatoryStrip(props: AgentObservatoryStripProps) {
             value={`$${props.spentToday.toFixed(2)}`}
             limit={`/ $${props.dailyLimit.toFixed(0)}`}
             pct={utilization}
-            color="#4F46E5"
+            color="var(--agent)"
           />
           <MiniBar
             label="Calls this hour"
             value={String(props.callsInWindow)}
             limit={`/ ${props.maxCallsPerWindow}`}
             pct={velocity}
-            color="#0EA5E9"
+            color="var(--revenue)"
           />
         </div>
       </div>

@@ -6,6 +6,13 @@ import { StackSection } from "@/components/landing/stack-section";
 import { WhySolana } from "@/components/landing/why-solana";
 import { FinalCTA } from "@/components/landing/final-cta";
 import { Footer } from "@/components/landing/footer";
+import { readInitialAtlasSnapshot } from "@/lib/atlas/ssr";
+
+// Don't cache this route — Atlas state changes every cycle. We want
+// each visitor to see the latest snapshot in the initial HTML so the
+// Twitter unfurl / LinkedIn preview / first-paint hero all ship real
+// numbers. SSR is our first-impression weapon.
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Kyvern — Let your AI agents run free.",
@@ -15,13 +22,20 @@ export const metadata: Metadata = {
 };
 
 export default function Home() {
+  // Read Atlas state synchronously from the server-side SQLite. The
+  // client observatory receives this as a prop and starts with real
+  // values instead of "awaiting ignition" placeholders. Every social
+  // unfurl and every slow-network visitor now sees "7h 21m · 135 txs
+  // · 39 attacks blocked" in the initial HTML.
+  const initialAtlas = readInitialAtlasSnapshot();
+
   return (
     <div
       className="min-h-screen overflow-x-hidden"
       style={{ background: "var(--background)" }}
     >
       <Navbar />
-      <HeroVault />
+      <HeroVault initialAtlasState={initialAtlas} />
       <MoatSection />
       <StackSection />
       <WhySolana />

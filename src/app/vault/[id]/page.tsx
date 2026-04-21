@@ -39,8 +39,9 @@ import {
 import { AgentSnippetCard } from "@/components/vault/agent-snippet-card";
 import { VaultPlayground } from "@/components/vault/playground";
 import { AgentObservatoryStrip } from "@/components/vault/agent-observatory-strip";
-
-const EASE = [0.25, 0.1, 0.25, 1] as const;
+import { NumberScramble } from "@/components/atlas/number-scramble";
+import { EASE_PREMIUM as EASE } from "@/lib/motion";
+import { fmtUsd, fmtInt } from "@/lib/format";
 
 /* ─── Types that match the API response ─── */
 
@@ -733,7 +734,7 @@ function BudgetCard({
           className="text-[34px] font-semibold leading-none tracking-tight"
           style={{ fontVariantNumeric: "tabular-nums" }}
         >
-          ${spent.toFixed(2)}
+          <NumberScramble value={spent} format={fmtUsd} />
         </span>
         <span className="mb-1 text-[13px] text-[#8E8E93]">
           / ${limit.toFixed(0)}
@@ -741,7 +742,7 @@ function BudgetCard({
       </div>
 
       <p className="mt-1 text-[12px] text-[#6E6E73]">
-        ${remaining.toFixed(2)} remaining
+        <NumberScramble value={remaining} format={fmtUsd} /> remaining
       </p>
 
       <div className="mt-5 h-2 w-full overflow-hidden rounded-full bg-[#F0F0F0]">
@@ -798,7 +799,7 @@ function VelocityCard({
           className="text-[34px] font-semibold leading-none tracking-tight"
           style={{ fontVariantNumeric: "tabular-nums" }}
         >
-          {calls}
+          <NumberScramble value={calls} format={fmtInt} />
         </span>
         <span className="mb-1 text-[13px] text-[#8E8E93]">/ {cap}</span>
       </div>
@@ -867,9 +868,22 @@ function ActivityFeed({
             {payments.map((p, i) => (
               <motion.li
                 key={p.id}
-                initial={i < 5 ? { opacity: 0, y: 6 } : false}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.35, ease: EASE }}
+                layout
+                initial={
+                  i < 5
+                    ? { opacity: 0, y: -8, backgroundColor: "rgba(79,70,229,0.08)" }
+                    : false
+                }
+                animate={{
+                  opacity: 1,
+                  y: 0,
+                  backgroundColor: "rgba(79,70,229,0)",
+                }}
+                transition={{
+                  duration: 0.55,
+                  ease: EASE,
+                  backgroundColor: { duration: 1.6, ease: EASE },
+                }}
                 className="grid grid-cols-[auto_1fr_auto] items-center gap-4 px-6 py-3 hover:bg-[#FAFAFA]"
               >
                 <PaymentIcon status={p.status} />

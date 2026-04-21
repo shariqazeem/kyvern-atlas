@@ -16,8 +16,7 @@
 
 import { motion } from "framer-motion";
 import { ArrowDownUp, Check, Sparkles } from "lucide-react";
-
-const ease = [0.25, 0.1, 0.25, 1] as const;
+import { EASE_PREMIUM as ease } from "@/lib/motion";
 
 export function StackSection() {
   return (
@@ -98,7 +97,8 @@ export function StackSection() {
           {/* Policy PDA · autonomy primitive */}
           <PrimitiveCard
             index={0}
-            accent="#4F46E5"
+            accent="var(--agent)"
+            accentBg="var(--agent-bg)"
             chip="Kyvern · policy program"
             title="Your agent is a program. Give it boundaries."
             subtitle="Every agent gets a policy PDA on Solana: budgets, allowlist, velocity, memo, kill-switch. Over-budget or off-allowlist calls revert as real failed transactions before a single token moves."
@@ -127,7 +127,8 @@ const res = await vault.pay({
           {/* Pulse · reputation layer — a consequence of Kyvern, not a sibling product */}
           <PrimitiveCard
             index={1}
-            accent="#0EA5E9"
+            accent="var(--revenue)"
+            accentBg="var(--revenue-bg)"
             chip="Kyvern · reputation layer"
             title="Every paying agent carries its history."
             subtitle="When a Kyvern-protected agent pays your service, you see more than an address. You see its policy, its uptime, its on-chain track record — the first reputation primitive for autonomous software."
@@ -189,6 +190,7 @@ export const GET = withPulse(
 function PrimitiveCard({
   index,
   accent,
+  accentBg,
   chip,
   title,
   subtitle,
@@ -197,6 +199,7 @@ function PrimitiveCard({
 }: {
   index: number;
   accent: string;
+  accentBg: string;
   chip: string;
   title: string;
   subtitle: string;
@@ -229,7 +232,7 @@ function PrimitiveCard({
         <div
           className="mb-4 inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-[10.5px] font-semibold uppercase tracking-[0.08em]"
           style={{
-            background: `${accent}14`,
+            background: accentBg,
             color: accent,
           }}
         >
@@ -285,7 +288,7 @@ function PrimitiveCard({
           >
             <span
               className="mt-[2px] inline-flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full"
-              style={{ background: `${accent}14` }}
+              style={{ background: accentBg }}
             >
               <Check
                 className="h-2.5 w-2.5"

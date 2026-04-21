@@ -20,8 +20,7 @@
 import { useRef } from "react";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { ExternalLink, X } from "lucide-react";
-
-const ease = [0.25, 0.1, 0.25, 1] as const;
+import { EASE_PREMIUM as ease } from "@/lib/motion";
 
 // The real blocked transaction from our devnet run — pinned in
 // SUBMISSION.md. This is the shot.
@@ -157,14 +156,14 @@ export function MoatSection() {
                 transition={{ duration: 0.5, delay: 0.6, ease }}
                 className="inline-flex items-center gap-1.5 h-7 px-3 rounded-full text-[11.5px] font-semibold mb-6"
                 style={{
-                  background: "#FEF2F2",
-                  color: "#B91C1C",
+                  background: "var(--attack-bg)",
+                  color: "var(--attack)",
                   border: "0.5px solid rgba(185,28,28,0.20)",
                 }}
               >
                 <span
                   className="inline-flex h-4 w-4 items-center justify-center rounded-full"
-                  style={{ background: "#B91C1C", color: "white" }}
+                  style={{ background: "var(--attack)", color: "white" }}
                 >
                   <X className="w-2.5 h-2.5" strokeWidth={3} />
                 </span>
@@ -183,7 +182,7 @@ export function MoatSection() {
                 </Fact>
 
                 <Fact label="Result">
-                  <span style={{ color: "#B91C1C", fontWeight: 600 }}>
+                  <span style={{ color: "var(--attack)", fontWeight: 600 }}>
                     Err · Custom(12003)
                   </span>
                 </Fact>
@@ -198,8 +197,8 @@ export function MoatSection() {
                   <span
                     className="ml-1 text-[11.5px] px-1.5 py-0 rounded-[5px] font-semibold uppercase tracking-wider"
                     style={{
-                      background: "#EEF0FF",
-                      color: "#4F46E5",
+                      background: "var(--agent-bg)",
+                      color: "var(--agent)",
                     }}
                   >
                     kyvern_policy
@@ -213,46 +212,164 @@ export function MoatSection() {
                 </Fact>
               </div>
 
-              {/* The program log — the money shot */}
+              {/* Terminal receipt — the money shot.
+                  Reads as a shell invocation rather than raw program log.
+                  Prompt-timestamp-stdout-exit scaffolding is what makes
+                  judges immediately grok "this is a real, on-chain, non-
+                  reversible refusal." Classical log block is still there
+                  — this is the same data, dressed for the hero.              */}
               <motion.div
                 initial={{ opacity: 0, y: 8 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-120px" }}
                 transition={{ duration: 0.6, delay: 0.9, ease }}
-                className="mt-8 rounded-[14px] p-5 font-mono-numbers text-[12.5px] leading-[1.7] overflow-x-auto"
+                className="mt-8 rounded-[14px] overflow-hidden"
                 style={{
                   background: "#0B0B0F",
                   border: "0.5px solid rgba(255,255,255,0.06)",
                   color: "#E4E4E7",
                 }}
               >
-                <span style={{ color: "#6E7681" }}>Program log:</span>{" "}
-                <span style={{ color: "#E4E4E7" }}>
-                  AnchorError thrown in
-                </span>{" "}
-                <span style={{ color: "#6E7681" }}>
-                  programs/kyvern-policy/src/lib.rs:180
-                </span>
-                {"\n"}
-                <span style={{ color: "#6E7681" }}>Program log:</span>{" "}
-                <span style={{ color: "#E4E4E7" }}>Error Code:</span>{" "}
-                <span style={{ color: "#F97583", fontWeight: 700 }}>
-                  MerchantNotAllowlisted
-                </span>
-                {"\n"}
-                <span style={{ color: "#6E7681" }}>Program log:</span>{" "}
-                <span style={{ color: "#E4E4E7" }}>Error Number:</span>{" "}
-                <span style={{ color: "#79B8FF" }}>12003</span>
-                {"\n"}
-                <span style={{ color: "#6E7681" }}>Program log:</span>{" "}
-                <span style={{ color: "#E4E4E7" }}>Error Message:</span>{" "}
-                <span style={{ color: "#E4E4E7" }}>
-                  Merchant hash is not on this vault&apos;s allowlist.
-                </span>
-                {"\n\n"}
-                <span style={{ color: "#6E7681" }}>
-                  # whole tx reverts. no USDC moves. no off-chain trust.
-                </span>
+                {/* Tiny terminal chrome: three dots + window title */}
+                <div
+                  className="flex items-center gap-2 px-3.5 py-2"
+                  style={{ borderBottom: "0.5px solid rgba(255,255,255,0.06)" }}
+                >
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full" style={{ background: "rgba(255,255,255,0.14)" }} />
+                    <span className="w-2 h-2 rounded-full" style={{ background: "rgba(255,255,255,0.14)" }} />
+                    <span className="w-2 h-2 rounded-full" style={{ background: "rgba(255,255,255,0.14)" }} />
+                  </span>
+                  <span
+                    className="ml-1 text-[10.5px] font-mono-numbers tracking-tight"
+                    style={{ color: "rgba(255,255,255,0.42)" }}
+                  >
+                    solana-cli · devnet · confirm
+                  </span>
+                </div>
+
+                {/* Receipt body — monospace, timestamped, stdout/stderr */}
+                <div
+                  className="px-5 py-5 font-mono-numbers text-[12.5px] leading-[1.7] overflow-x-auto"
+                >
+                  {/* Shell prompt line */}
+                  <div>
+                    <span style={{ color: "#7FDBCA" }}>~/kyvern</span>
+                    <span style={{ color: "rgba(255,255,255,0.28)" }}>{" "}❯{" "}</span>
+                    <span style={{ color: "#E4E4E7" }}>
+                      solana confirm -v --cluster devnet{" "}
+                      <span style={{ color: "rgba(255,255,255,0.42)" }}>\</span>
+                    </span>
+                    {"\n"}
+                    <span style={{ color: "rgba(255,255,255,0.28)" }}>{"  "}</span>
+                    <span style={{ color: "#E4E4E7" }}>
+                      3KgiZm4ychChRKQGz3YaUgquyRKk7jrTpjPYvaPGSdxps18e…yk1b
+                    </span>
+                  </div>
+
+                  {/* Streaming stderr — bracketed timestamps + program trace */}
+                  <div className="mt-3">
+                    <TerminalLine
+                      t="00:00:00.014"
+                      body={
+                        <>
+                          Program <Addr>PpmZErWfT5zpeo1f…WViaMSqc</Addr> invoke [1]
+                        </>
+                      }
+                    />
+                    <TerminalLine
+                      t="00:00:00.047"
+                      body={
+                        <>
+                          Program log: <Dim>Instruction:</Dim>{" "}
+                          <span style={{ color: "#E4E4E7" }}>execute_payment</span>
+                        </>
+                      }
+                    />
+                    <TerminalLine
+                      t="00:00:00.083"
+                      body={
+                        <>
+                          Program log: <Dim>AnchorError thrown in</Dim>{" "}
+                          <Dim>programs/kyvern-policy/src/lib.rs:180</Dim>
+                        </>
+                      }
+                    />
+                    <TerminalLine
+                      t="00:00:00.091"
+                      body={
+                        <>
+                          Program log: <Dim>Error Code:</Dim>{" "}
+                          <span style={{ color: "#F97583", fontWeight: 700 }}>
+                            MerchantNotAllowlisted
+                          </span>
+                        </>
+                      }
+                    />
+                    <TerminalLine
+                      t="00:00:00.092"
+                      body={
+                        <>
+                          Program log: <Dim>Error Number:</Dim>{" "}
+                          <span style={{ color: "#79B8FF" }}>12003</span>{" "}
+                          <Dim>·</Dim>{" "}
+                          <Dim>Merchant hash is not on this vault&apos;s allowlist.</Dim>
+                        </>
+                      }
+                    />
+                    <TerminalLine
+                      t="00:00:00.094"
+                      body={
+                        <>
+                          Program <Addr>PpmZErWfT5zpeo1f…WViaMSqc</Addr>{" "}
+                          <span style={{ color: "#F97583", fontWeight: 700 }}>
+                            failed
+                          </span>
+                          : custom program error: <Addr>0x2ee3</Addr>
+                        </>
+                      }
+                    />
+                  </div>
+
+                  {/* Exit receipt */}
+                  <div
+                    className="mt-4 pt-3 flex items-center justify-between gap-4"
+                    style={{ borderTop: "0.5px dashed rgba(255,255,255,0.08)" }}
+                  >
+                    <span style={{ color: "#F97583", fontWeight: 700 }}>
+                      ✗ transaction reverted · 0 USDC moved
+                    </span>
+                    <span style={{ color: "rgba(255,255,255,0.42)" }}>
+                      exit 1
+                    </span>
+                  </div>
+
+                  {/* Return to prompt with blinking cursor */}
+                  <div className="mt-3">
+                    <span style={{ color: "#7FDBCA" }}>~/kyvern</span>
+                    <span style={{ color: "rgba(255,255,255,0.28)" }}>{" "}❯{" "}</span>
+                    <motion.span
+                      aria-hidden
+                      className="inline-block align-middle"
+                      style={{
+                        width: "8px",
+                        height: "14px",
+                        background: "#E4E4E7",
+                        marginLeft: "2px",
+                      }}
+                      // Steps-style blink: hold 1 for half the cycle, 0
+                      // for the rest. Framer's ease typings don't accept
+                      // CSS `steps(1, end)`, so we approximate with
+                      // `easeInOut` times on the keyframes array.
+                      animate={{ opacity: [1, 1, 0, 0] }}
+                      transition={{
+                        duration: 1.05,
+                        repeat: Infinity,
+                        times: [0, 0.5, 0.5, 1],
+                      }}
+                    />
+                  </div>
+                </div>
               </motion.div>
 
               {/* Clickable link to the real tx */}
@@ -308,5 +425,40 @@ function Fact({
       </div>
       <div className="min-w-0">{children}</div>
     </>
+  );
+}
+
+/**
+ * One line of terminal stderr — bracketed timestamp, then the message.
+ * The timestamp is just decorative (this is a screenshot-in-code, not a
+ * live session) but it does the work of making the block read as
+ * time-ordered output rather than a bullet list.
+ */
+function TerminalLine({
+  t,
+  body,
+}: {
+  t: string;
+  body: React.ReactNode;
+}) {
+  return (
+    <div className="whitespace-pre-wrap">
+      <span style={{ color: "rgba(255,255,255,0.28)" }}>[{t}]</span>{" "}
+      <span style={{ color: "#E4E4E7" }}>{body}</span>
+    </div>
+  );
+}
+
+/** Inline dim — secondary text inside a terminal line. */
+function Dim({ children }: { children: React.ReactNode }) {
+  return (
+    <span style={{ color: "rgba(255,255,255,0.42)" }}>{children}</span>
+  );
+}
+
+/** Inline address/hex — treated with the "identifier" mint color. */
+function Addr({ children }: { children: React.ReactNode }) {
+  return (
+    <span style={{ color: "#79B8FF", fontWeight: 500 }}>{children}</span>
   );
 }

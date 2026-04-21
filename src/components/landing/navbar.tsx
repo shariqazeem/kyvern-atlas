@@ -9,8 +9,8 @@ import { motion } from "framer-motion";
 import { ArrowRight, Menu, X } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
-
-const ease = [0.25, 0.1, 0.25, 1] as const;
+import { KyvernMark } from "@/components/brand/kyvern-mark";
+import { EASE_PREMIUM as ease } from "@/lib/motion";
 
 /**
  * Nav structure deliberately shows NO product names.
@@ -55,16 +55,11 @@ export function Navbar() {
                 "0 1px 2px rgba(0,0,0,0.03), 0 10px 32px -14px rgba(0,0,0,0.06)",
             }}
           >
-            {/* Logo */}
+            {/* Logo — KyvernMark is the shared-element tile. Gets a
+                stable view-transition-name and layoutId so supporting
+                browsers morph it between routes. */}
             <Link href="/" className="flex items-center gap-2">
-              <div
-                className="w-7 h-7 rounded-[8px] flex items-center justify-center"
-                style={{ background: "var(--text-primary)" }}
-              >
-                <span className="text-white text-[13px] font-bold tracking-tight">
-                  K
-                </span>
-              </div>
+              <KyvernMark size={28} />
               <span
                 className="text-[15px] font-semibold"
                 style={{

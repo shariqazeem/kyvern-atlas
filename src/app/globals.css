@@ -38,11 +38,39 @@
 
   /* ─── Status ─── */
   --success: #22C55E;
+  --success-deep: #15803D; /* ink-weight success — for "live" / "settled" labels next to counters */
   --success-bg: #ECFDF5;
   --warning: #F59E0B;
   --warning-bg: #FFFBEB;
   --destructive: #EF4444;
   --destructive-bg: #FEF2F2;
+
+  /* ─── Observatory semantics ─── */
+  /* The dashboard surfaces (Atlas observatory, vault observatory strip,
+     /atlas deep page) speak in three accent dialects. These are the
+     single source of truth — no raw hex in component files. */
+
+  /* AGENT — indigo — "policy", "last decision", "what Atlas just did" */
+  --agent: #4F46E5;
+  --agent-bg: #EEF2FF;
+  --agent-glow: rgba(79, 70, 229, 0.18);
+
+  /* ATTACK — deep red — "refused", "blocked", "nothing moved". Darker
+     than --destructive because it's the label of a GOOD outcome (we
+     stopped it), not an alert. */
+  --attack: #B91C1C;
+  --attack-bg: #FEF2F2;
+
+  /* REVENUE — sky — "earned", "settled volume", reputation. A cooler
+     blue than --agent so spent vs earned read at a glance. */
+  --revenue: #0EA5E9;
+  --revenue-bg: #F0F9FF;
+
+  /* Browser-chrome traffic lights. Literal macOS dot colors — these
+     are identity, not theme. Kept here so components don't hard-code. */
+  --chrome-red: #F87171;
+  --chrome-yellow: #FBBF24;
+  --chrome-green: #4ADE80;
 
   /* ─── Radius ─── */
   --radius-sm: 12px;
@@ -506,6 +534,50 @@
     }
     .shimmer-line {
       animation: none;
+    }
+  }
+
+  /* ─── View Transitions ───
+     Supporting browsers (Chrome 111+, Edge 111+, Safari 18+) will morph
+     an element with a stable `view-transition-name` across route
+     changes. We give the Kyvern "K" tile that name — so navigating
+     from / → /vault/new → /vault/[id] physically moves the K between
+     positions. Non-supporting browsers see a clean fade-in via the
+     motion.div `initial/animate` props on <KyvernMark/>. */
+  @media (prefers-reduced-motion: no-preference) {
+    ::view-transition-old(root),
+    ::view-transition-new(root) {
+      animation-duration: 0.45s;
+      animation-timing-function: cubic-bezier(0.25, 0.1, 0.25, 1);
+    }
+    ::view-transition-old(kyvern-mark),
+    ::view-transition-new(kyvern-mark) {
+      animation-duration: 0.6s;
+      animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+    }
+  }
+
+  /* ─── Server-log table (Atlas activity feed) ───
+     Used on /atlas activity rows. Desktop: 5-column tabulated layout.
+     Mobile (<640px): collapses into two lines so the event column can
+     actually breathe at 375px. Header row reuses the same grid so
+     columns align. */
+  .log-row {
+    display: grid;
+    gap: 0.6rem;
+    grid-template-columns: 58px 64px minmax(0, 1fr) 46px;
+  }
+  .log-row > *:nth-child(5) {
+    display: none;
+  }
+  @media (min-width: 640px) {
+    .log-row {
+      gap: 0.75rem;
+      grid-template-columns: 80px 80px minmax(0, 1fr) 84px 58px;
+    }
+    .log-row > *:nth-child(5) {
+      display: inline-flex;
+      justify-content: flex-end;
     }
   }
 

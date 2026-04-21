@@ -76,6 +76,13 @@ export interface AtlasAttack {
    * refused at the policy layer before tx sign — those have null sig.
    */
   failedTxSignature: string | null;
+  /**
+   * Where this attack came from:
+   *   · "scheduled" — the PM2 attacker process, firing on its ~22 min cadence.
+   *   · "public" — a real visitor clicked "Attack Atlas yourself" on /atlas.
+   * Defaults to "scheduled" for attacks written before this column existed.
+   */
+  source?: "scheduled" | "public";
 }
 
 /** One full cycle — observe → decide → act → log. */
@@ -122,6 +129,33 @@ export interface AtlasState {
   lastAttack: AtlasAttack | null;
   /** Next scheduled decision's ISO timestamp. */
   nextCycleAt: string | null;
+  /**
+   * Next scheduled attack's ISO timestamp. The attacker writes this
+   * when it schedules its next probe so the UI can show a
+   * "defending · next probe in 4:32" countdown band. null if the
+   * attacker hasn't armed a next cycle yet (cold start or crash).
+   */
+  nextAttackAt: string | null;
+
+  /**
+   * Live policy window — how close Atlas is to its own spending caps
+   * in the last 24 hours. Drives the "policy window healthy /
+   * nearing limit / exhausted" narrative on the observatory.
+   */
+  policy: {
+    /** Configured daily spend cap in USD (from ATLAS_DAILY_CAP_USD env). */
+    dailyCapUsd: number;
+    /** Sum of `settled` amounts in the rolling 24h window. */
+    spentTodayUsd: number;
+    /** 0–1 ratio. `> 1` means we're over cap — should never happen because Kyvern refuses. */
+    spendUtilization: number;
+    /** Convenience flag — `>= 0.80`. Matches UI "near cap" banner. */
+    nearCap: boolean;
+    /** `>= 1.0` — the window is fully consumed. */
+    exhausted: boolean;
+    /** ISO of when the oldest counted payment rolls off (24h boundary). */
+    windowResetsAt: string | null;
+  };
 
   /** Atlas's own vault id (for deep-linking to its dashboard). */
   vaultId: string | null;

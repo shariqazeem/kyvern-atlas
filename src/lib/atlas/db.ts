@@ -42,8 +42,14 @@ export function getAtlasDb(): Database.Database {
       total_spent_usd REAL NOT NULL DEFAULT 0,
       total_earned_usd REAL NOT NULL DEFAULT 0,
       funds_lost_usd REAL NOT NULL DEFAULT 0,
-      last_heartbeat_at TEXT
+      last_heartbeat_at TEXT,
+      /* next_attack_at — written by attacker at schedule time so the
+         observatory can render a 'defending · next probe in N:NN'
+         countdown. nullable for cold start / no attacker running. */
+      next_attack_at TEXT
     );
+    /* Lightweight migration: older atlas.db files didn't have this
+       column. Adding it idempotently via PRAGMA-safe ALTER. */
 
     CREATE TABLE IF NOT EXISTS atlas_decisions (
       id TEXT PRIMARY KEY,
@@ -69,10 +75,15 @@ export function getAtlasDb(): Database.Database {
       type TEXT NOT NULL,
       description TEXT NOT NULL,
       blocked_reason TEXT NOT NULL,
-      failed_tx_signature TEXT
+      failed_tx_signature TEXT,
+      /* source — "scheduled" (PM2 attacker) or "public" (visitor probe).
+         Nullable for legacy rows; readers default missing → "scheduled". */
+      source TEXT
     );
     CREATE INDEX IF NOT EXISTS idx_atlas_attacks_attempted_at
       ON atlas_attacks(attempted_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_atlas_attacks_source
+      ON atlas_attacks(source);
 
     CREATE TABLE IF NOT EXISTS atlas_cycles (
       id INTEGER PRIMARY KEY,
@@ -87,6 +98,18 @@ export function getAtlasDb(): Database.Database {
   db.prepare(
     `INSERT OR IGNORE INTO atlas_state (id, network) VALUES (1, 'devnet')`,
   ).run();
+
+  // Idempotent column additions — safe on fresh and legacy DBs.
+  // SQLite raises if the column already exists; we swallow that.
+  const tryAlter = (sql: string) => {
+    try {
+      db.exec(sql);
+    } catch {
+      /* already applied */
+    }
+  };
+  tryAlter(`ALTER TABLE atlas_state ADD COLUMN next_attack_at TEXT`);
+  tryAlter(`ALTER TABLE atlas_attacks ADD COLUMN source TEXT`);
 
   _db = db;
   return db;
@@ -116,6 +139,18 @@ export function heartbeat() {
   getAtlasDb()
     .prepare(`UPDATE atlas_state SET last_heartbeat_at = ? WHERE id = 1`)
     .run(new Date().toISOString());
+}
+
+/**
+ * Attacker calls this right after it queues its next `setTimeout`.
+ * The observatory polls the state endpoint, sees the ISO, and the
+ * `<LiveTimer/>`-style countdown band fills in. Pass `null` to clear
+ * the schedule (e.g. attacker shutting down cleanly).
+ */
+export function setNextAttackAt(iso: string | null) {
+  getAtlasDb()
+    .prepare(`UPDATE atlas_state SET next_attack_at = ? WHERE id = 1`)
+    .run(iso);
 }
 
 export function nextCycleId(): number {
@@ -185,8 +220,8 @@ export function recordAttack(a: AtlasAttack): void {
   const db = getAtlasDb();
   db.prepare(
     `INSERT INTO atlas_attacks
-     (id, attempted_at, type, description, blocked_reason, failed_tx_signature)
-     VALUES (?, ?, ?, ?, ?, ?)`,
+     (id, attempted_at, type, description, blocked_reason, failed_tx_signature, source)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     a.id,
     a.attemptedAt,
@@ -194,6 +229,7 @@ export function recordAttack(a: AtlasAttack): void {
     a.description,
     a.blockedReason,
     a.failedTxSignature,
+    a.source ?? "scheduled",
   );
 }
 
@@ -220,6 +256,7 @@ export function readState(): AtlasState {
     total_earned_usd: number;
     funds_lost_usd: number;
     last_heartbeat_at: string | null;
+    next_attack_at: string | null;
   };
 
   const lastDecisionRow = db
@@ -265,6 +302,33 @@ export function readState(): AtlasState {
     ? now - new Date(firstIgnitionAt).getTime()
     : 0;
 
+  // ─── Policy window — rolling 24h spend vs configured cap ───────────
+  // Matches how per-vault budgets work so the observatory narrative
+  // ("policy window healthy / near cap / exhausted") is consistent
+  // across the public Atlas card and user vaults. Defaults to $5/day
+  // which is what Atlas ships with on devnet; override via env to
+  // track a richer cap without code changes.
+  const dailyCapUsd = Number(process.env.ATLAS_DAILY_CAP_USD ?? 5);
+  const windowStart = new Date(now - 24 * 60 * 60 * 1000).toISOString();
+  const win = db
+    .prepare(
+      `SELECT
+         COALESCE(SUM(amount_usd), 0) as spent,
+         MIN(decided_at) as oldest
+       FROM atlas_decisions
+       WHERE outcome = 'settled' AND decided_at >= ?`,
+    )
+    .get(windowStart) as { spent: number; oldest: string | null };
+  const spentTodayUsd = Number(win.spent ?? 0);
+  const spendUtilization =
+    dailyCapUsd > 0 ? spentTodayUsd / dailyCapUsd : 0;
+  const oldestInWindow = win.oldest
+    ? new Date(win.oldest).getTime()
+    : null;
+  const windowResetsAt = oldestInWindow
+    ? new Date(oldestInWindow + 24 * 60 * 60 * 1000).toISOString()
+    : null;
+
   return {
     running,
     totalCycles: s.total_cycles,
@@ -281,6 +345,15 @@ export function readState(): AtlasState {
       : null,
     lastAttack: lastAttackRow ? rowToAttack(lastAttackRow) : null,
     nextCycleAt: nextCycleRow?.next_cycle_at ?? null,
+    nextAttackAt: s.next_attack_at,
+    policy: {
+      dailyCapUsd,
+      spentTodayUsd,
+      spendUtilization,
+      nearCap: spendUtilization >= 0.8,
+      exhausted: spendUtilization >= 1.0,
+      windowResetsAt,
+    },
     vaultId: s.vault_id,
     network: (s.network as "devnet" | "mainnet") ?? "devnet",
   };
@@ -304,6 +377,100 @@ export function readRecentAttacks(limit = 20): AtlasAttack[] {
     )
     .all(limit) as Record<string, unknown>[];
   return rows.map(rowToAttack);
+}
+
+/**
+ * Leaderboard read — aggregated counts powering /atlas and the landing
+ * page ticker. Does everything in SQL so we can afford to hit this
+ * endpoint from every client poll (500ms-level SQLite work).
+ */
+export interface LeaderboardData {
+  weekly: {
+    total: number;
+    byType: Record<string, number>;
+    bySource: Record<string, number>;
+  };
+  allTime: {
+    total: number;
+    byType: Record<string, number>;
+    bySource: Record<string, number>;
+  };
+  recent: AtlasAttack[];
+  fundsLostUsd: number;
+  /** Rough estimate of what was "protected" — $0.50 per scheduled attack +
+   * amountUsd on blocked decisions (conservative; real value is often higher). */
+  fundsProtectedUsd: number;
+}
+
+export function readLeaderboard(): LeaderboardData {
+  const db = getAtlasDb();
+  const now = Date.now();
+  const weekAgoIso = new Date(now - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+  const countRows = (since?: string) => {
+    const rows = (since
+      ? db
+          .prepare(
+            `SELECT type, source, COUNT(*) as n
+             FROM atlas_attacks
+             WHERE attempted_at >= ?
+             GROUP BY type, source`,
+          )
+          .all(since)
+      : db
+          .prepare(
+            `SELECT type, source, COUNT(*) as n
+             FROM atlas_attacks
+             GROUP BY type, source`,
+          )
+          .all()) as Array<{
+      type: string;
+      source: string | null;
+      n: number;
+    }>;
+    let total = 0;
+    const byType: Record<string, number> = {};
+    const bySource: Record<string, number> = {};
+    for (const r of rows) {
+      total += r.n;
+      byType[r.type] = (byType[r.type] ?? 0) + r.n;
+      const src = r.source ?? "scheduled";
+      bySource[src] = (bySource[src] ?? 0) + r.n;
+    }
+    return { total, byType, bySource };
+  };
+
+  const weekly = countRows(weekAgoIso);
+  const allTime = countRows();
+
+  const recentRows = db
+    .prepare(
+      `SELECT * FROM atlas_attacks ORDER BY attempted_at DESC LIMIT 8`,
+    )
+    .all() as Record<string, unknown>[];
+  const recent = recentRows.map(rowToAttack);
+
+  const state = db
+    .prepare(`SELECT funds_lost_usd FROM atlas_state WHERE id = 1`)
+    .get() as { funds_lost_usd: number };
+
+  const blockedDecisionsTotal = db
+    .prepare(
+      `SELECT COALESCE(SUM(amount_usd), 0) as total
+       FROM atlas_decisions
+       WHERE outcome = 'blocked'`,
+    )
+    .get() as { total: number };
+  const fundsProtectedUsd =
+    (allTime.total * 0.5) + (blockedDecisionsTotal.total ?? 0);
+
+  return {
+    weekly,
+    allTime,
+    recent,
+    fundsLostUsd: state?.funds_lost_usd ?? 0,
+    fundsProtectedUsd,
+  };
 }
 
 function rowToDecision(r: Record<string, unknown>): AtlasDecision {
@@ -330,5 +497,7 @@ function rowToAttack(r: Record<string, unknown>): AtlasAttack {
     description: String(r.description),
     blockedReason: String(r.blocked_reason),
     failedTxSignature: (r.failed_tx_signature as string | null) ?? null,
+    source:
+      (r.source as AtlasAttack["source"] | null | undefined) ?? "scheduled",
   };
 }

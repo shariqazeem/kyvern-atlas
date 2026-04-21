@@ -30,9 +30,12 @@
  * ════════════════════════════════════════════════════════════════════
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowUpRight, Shield, XOctagon } from "lucide-react";
+import { Shield, XOctagon } from "lucide-react";
+import { SignatureReveal } from "@/components/atlas/signature-reveal";
+import { LiveTimer } from "@/components/atlas/live-timer";
+import { NumberScramble } from "@/components/atlas/number-scramble";
 
 interface AtlasState {
   running: boolean;
@@ -66,31 +69,23 @@ interface AtlasState {
     failedTxSignature: string | null;
   } | null;
   nextCycleAt: string | null;
+  /** Attacker's next-probe ETA — drives the 'defending' countdown band. */
+  nextAttackAt: string | null;
+  /** Rolling 24h policy window — drives "healthy / near cap / exhausted" UI. */
+  policy: {
+    dailyCapUsd: number;
+    spentTodayUsd: number;
+    spendUtilization: number;
+    nearCap: boolean;
+    exhausted: boolean;
+    windowResetsAt: string | null;
+  };
   vaultId: string | null;
   network: "devnet" | "mainnet";
 }
 
-const EASE = [0.25, 0.1, 0.25, 1] as const;
-
-function fmtUptime(ms: number): string {
-  if (ms <= 0) return "00d 00h 00m";
-  const totalSeconds = Math.floor(ms / 1000);
-  const days = Math.floor(totalSeconds / 86400);
-  const hours = Math.floor((totalSeconds % 86400) / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  return `${String(days).padStart(2, "0")}d ${String(hours).padStart(2, "0")}h ${String(minutes).padStart(2, "0")}m`;
-}
-
-function fmtNextCycle(iso: string | null): string {
-  if (!iso) return "scheduling…";
-  const diffMs = new Date(iso).getTime() - Date.now();
-  if (diffMs <= 0) return "deciding now";
-  const totalSeconds = Math.floor(diffMs / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  // Ticks down every second — anticipation fuels attention.
-  return `next action in ${minutes}:${String(seconds).padStart(2, "0")}`;
-}
+import { EASE_PREMIUM as EASE } from "@/lib/motion";
+import { fmtNextCycle, fmtAgo, fmtInt, fmtUsd } from "@/lib/format";
 
 /**
  * If there's no dedicated attack record yet (attack simulator lands in a
@@ -174,22 +169,17 @@ function whyThisMatters(d: {
   return `Atlas paid ${m} within its on-chain policy. Kyvern verified the rule, Squads v4 signed, Solana settled — all in under two seconds.`;
 }
 
-function fmtAgo(iso: string): string {
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const s = Math.floor(diffMs / 1000);
-  if (s < 60) return `${s}s ago`;
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  const d = Math.floor(h / 24);
-  return `${d}d ago`;
-}
-
-export function AtlasObservatory() {
-  const [state, setState] = useState<AtlasState | null>(null);
-  const [tick, setTick] = useState(0); // forces uptime + next-cycle re-render
-  const mountedAt = useRef(Date.now());
+export function AtlasObservatory({
+  initialState = null,
+}: {
+  /**
+   * SSR'd snapshot of Atlas state. When provided, skips the initial
+   * fetch flicker — first paint ships real numbers. Passed down from
+   * the server component in src/app/page.tsx.
+   */
+  initialState?: AtlasState | null;
+} = {}) {
+  const [state, setState] = useState<AtlasState | null>(initialState);
 
   const load = useCallback(async () => {
     try {
@@ -205,26 +195,17 @@ export function AtlasObservatory() {
   useEffect(() => {
     load();
     const poll = setInterval(load, 3500);
-    const uptimeTick = setInterval(() => setTick((t) => t + 1), 1000);
-    return () => {
-      clearInterval(poll);
-      clearInterval(uptimeTick);
-    };
+    return () => clearInterval(poll);
   }, [load]);
+
+  // Uptime ticking + next-cycle countdown are driven by <LiveTimer/>
+  // internally — no local setTick plumbing needed.
 
   // While we're waiting for the first-ever response, render an outlined
   // placeholder so layout doesn't shift.
   const loading = state === null;
   const awaitingIgnition =
     !loading && (!state?.firstIgnitionAt || state?.running === false);
-
-  // Compute live values off the last snapshot we have.
-  const uptimeMs = state?.firstIgnitionAt
-    ? Date.now() -
-      new Date(state.firstIgnitionAt).getTime()
-    : Date.now() - mountedAt.current;
-  // Touch `tick` so effect re-runs and the minute counter increments.
-  void tick;
 
   return (
     <motion.div
@@ -248,9 +229,9 @@ export function AtlasObservatory() {
           style={{ borderBottom: "0.5px solid var(--border-subtle)" }}
         >
           <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full" style={{ background: "#F87171" }} />
-            <span className="w-2.5 h-2.5 rounded-full" style={{ background: "#FBBF24" }} />
-            <span className="w-2.5 h-2.5 rounded-full" style={{ background: "#4ADE80" }} />
+            <span className="w-2.5 h-2.5 rounded-full" style={{ background: "var(--chrome-red)" }} />
+            <span className="w-2.5 h-2.5 rounded-full" style={{ background: "var(--chrome-yellow)" }} />
+            <span className="w-2.5 h-2.5 rounded-full" style={{ background: "var(--chrome-green)" }} />
           </div>
           <a
             href="/atlas"
@@ -264,9 +245,9 @@ export function AtlasObservatory() {
               className="w-1.5 h-1.5 rounded-full"
               style={{
                 background: state?.running
-                  ? "#22C55E"
+                  ? "var(--success)"
                   : awaitingIgnition
-                    ? "#FBBF24"
+                    ? "var(--chrome-yellow)"
                     : "var(--text-quaternary)",
               }}
             />
@@ -274,7 +255,7 @@ export function AtlasObservatory() {
               className="text-[10.5px] font-semibold uppercase tracking-[0.08em]"
               style={{
                 color: state?.running
-                  ? "#15803D"
+                  ? "var(--success-deep)"
                   : "var(--text-tertiary)",
               }}
             >
@@ -282,6 +263,14 @@ export function AtlasObservatory() {
             </span>
           </div>
         </div>
+
+        {/* Status band — the single most important "this is live" cue.
+            One line, one color, tells the judge what Atlas is doing RIGHT
+            NOW: defending against an imminent probe, nearing its daily
+            cap, exhausted, or quietly healthy. See <StatusBand/> for the
+            precedence rules. Hidden during ignition so it doesn't compete
+            with the "awaiting" state in the chrome row. */}
+        {state?.running && <StatusBand state={state} />}
 
         {/* Header: Atlas identity + uptime */}
         <div className="px-7 pt-7 pb-5">
@@ -318,15 +307,25 @@ export function AtlasObservatory() {
               >
                 Uptime
               </p>
-              <p
-                className="mt-0.5 text-[22px] font-mono-numbers tabular-nums tracking-tight"
-                style={{
-                  color: "var(--text-primary)",
-                  fontWeight: 500,
-                }}
-              >
-                {awaitingIgnition ? "— — —" : fmtUptime(uptimeMs)}
-              </p>
+              {/* Uptime — number first, label ceded to the eyebrow above.
+                  Larger typographic weight matches the stat-row below so
+                  the hero card reads as "data leading, label trailing".
+                  <LiveTimer/> internally ticks the 1Hz clock — we just
+                  feed it the ignition timestamp. */}
+              {awaitingIgnition || !state?.firstIgnitionAt ? (
+                <p
+                  className="mt-0.5 text-[28px] md:text-[32px] font-mono-numbers tabular-nums tracking-[-0.02em] leading-none"
+                  style={{ color: "var(--text-primary)", fontWeight: 500 }}
+                >
+                  just now
+                </p>
+              ) : (
+                <LiveTimer
+                  since={state.firstIgnitionAt}
+                  className="mt-0.5 block text-[28px] md:text-[32px] font-mono-numbers tabular-nums tracking-[-0.02em] leading-none"
+                  style={{ color: "var(--text-primary)", fontWeight: 500 }}
+                />
+              )}
             </div>
           </div>
 
@@ -354,12 +353,14 @@ export function AtlasObservatory() {
             />
             <Stat
               label="Spent within policy"
-              value={`$${(state?.totalSpentUsd ?? 0).toFixed(2)}`}
+              value={state?.totalSpentUsd ?? 0}
+              format={fmtUsd}
               loading={loading}
             />
             <Stat
               label="Lost to exploits"
-              value={`$${(state?.fundsLostUsd ?? 0).toFixed(2)}`}
+              value={state?.fundsLostUsd ?? 0}
+              format={fmtUsd}
               loading={loading}
               tone={
                 (state?.fundsLostUsd ?? 0) === 0 ? "success" : "warn"
@@ -370,10 +371,10 @@ export function AtlasObservatory() {
           {/* Last decision — the "thinking out loud" moment + narrative */}
           <div className="pt-5 pb-1">
             <div className="flex items-center gap-1.5 mb-2">
-              <Shield className="w-3 h-3" style={{ color: "#4F46E5" }} />
+              <Shield className="w-3 h-3" style={{ color: "var(--agent)" }} />
               <span
                 className="text-[10px] font-semibold uppercase tracking-[0.08em]"
-                style={{ color: "#4F46E5" }}
+                style={{ color: "var(--agent)" }}
               >
                 Last decision
               </span>
@@ -385,7 +386,7 @@ export function AtlasObservatory() {
                 {/* Pulsing dot — signals "something is coming". */}
                 <motion.span
                   className="w-1 h-1 rounded-full"
-                  style={{ background: "#4F46E5" }}
+                  style={{ background: "var(--agent)" }}
                   animate={{ opacity: [0.3, 1, 0.3] }}
                   transition={{
                     duration: 2,
@@ -398,19 +399,23 @@ export function AtlasObservatory() {
                 </span>
               </span>
             </div>
+            {/* "Last decision" — the typographic star of the card.
+                Promoted from 15.5px italic body to 18/20px primary-color
+                statement. Quotation marks via CSS ::before/::after kept
+                as subtle accent, not wrapping text. This is the line
+                that ends up on X — make it earn its fame. */}
             <p
-              className="text-[15.5px] leading-[1.55] text-balance"
+              className="text-[18px] md:text-[20px] leading-[1.4] text-balance tracking-[-0.01em]"
               style={{
                 color: "var(--text-primary)",
-                fontWeight: 400,
-                fontStyle: "italic",
+                fontWeight: 500,
               }}
             >
               {state?.lastDecision
                 ? `“${state.lastDecision.reasoning}”`
                 : awaitingIgnition
                   ? "Atlas ignites on hackathon day one. The first decision lands here."
-                  : "Loading last decision…"}
+                  : "Atlas is thinking about its next move…"}
             </p>
 
             {/* Why this matters — narrative translation of what just happened. */}
@@ -442,9 +447,9 @@ export function AtlasObservatory() {
                   style={{
                     color:
                       state.lastDecision.outcome === "settled"
-                        ? "#15803D"
+                        ? "var(--success-deep)"
                         : state.lastDecision.outcome === "blocked"
-                          ? "#B91C1C"
+                          ? "var(--attack)"
                           : "var(--text-tertiary)",
                     fontWeight: 600,
                   }}
@@ -454,16 +459,13 @@ export function AtlasObservatory() {
                 {state.lastDecision.txSignature && (
                   <>
                     <span style={{ color: "var(--text-quaternary)" }}>·</span>
-                    <a
-                      href={`https://explorer.solana.com/tx/${state.lastDecision.txSignature}?cluster=${state.network}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <SignatureReveal
+                      signature={state.lastDecision.txSignature}
+                      network={state.network}
+                      truncate={18}
                       className="inline-flex items-center gap-0.5 hover:underline"
-                      style={{ color: "var(--text-secondary)" }}
-                    >
-                      verify on explorer
-                      <ArrowUpRight className="w-3 h-3" />
-                    </a>
+                      textClassName="text-[11.5px]"
+                    />
                   </>
                 )}
               </div>
@@ -483,19 +485,19 @@ export function AtlasObservatory() {
           <div
             className="px-7 py-5 flex items-start gap-3"
             style={{
-              background: "rgba(239,68,68,0.04)",
+              background: "var(--attack-bg)",
               borderTop: "0.5px solid var(--border-subtle)",
             }}
           >
             <XOctagon
               className="w-4 h-4 shrink-0 mt-0.5"
-              style={{ color: "#B91C1C" }}
+              style={{ color: "var(--attack)" }}
             />
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <span
                   className="text-[10px] font-semibold uppercase tracking-[0.08em]"
-                  style={{ color: "#B91C1C" }}
+                  style={{ color: "var(--attack)" }}
                 >
                   🚫 Blocked on-chain
                 </span>
@@ -530,7 +532,7 @@ export function AtlasObservatory() {
                   <span style={{ color: "var(--text-quaternary)" }}>
                     Policy:&nbsp;
                   </span>
-                  <span style={{ color: "#B91C1C", fontWeight: 600 }}>
+                  <span style={{ color: "var(--attack)", fontWeight: 600 }}>
                     {blockedReason(state)}
                   </span>
                 </div>
@@ -538,7 +540,7 @@ export function AtlasObservatory() {
                   <span style={{ color: "var(--text-quaternary)" }}>
                     Result:&nbsp;
                   </span>
-                  <span style={{ color: "#15803D", fontWeight: 600 }}>
+                  <span style={{ color: "var(--success-deep)", fontWeight: 600 }}>
                     Prevented by Kyvern — no funds moved
                   </span>
                 </div>
@@ -551,40 +553,298 @@ export function AtlasObservatory() {
   );
 }
 
+/**
+ * Stat — number-first hierarchy.
+ *
+ * Old layout: tiny uppercase label on top, medium number beneath.
+ * That made labels compete with values and read as spreadsheet chrome.
+ *
+ * New layout (Apple/Stripe/Linear pattern): massive mono numeral leads,
+ * tiny uppercase label cedes to it below. On a first-impression pass,
+ * the judge reads the NUMBER, not the word "TRANSACTIONS". The label
+ * is there only to confirm what they're looking at.
+ *
+ * Loading state is a subtle width-100% skeleton pulse rather than a
+ * literal em-dash — dashes read as broken data, not loading.
+ */
 function Stat({
   label,
   value,
   loading,
   tone,
+  format,
 }: {
   label: string;
-  value: string | number;
+  value: number;
   loading?: boolean;
   tone?: "success" | "warn";
+  /** Optional formatter — defaults to `fmtInt` (thousands separators). */
+  format?: (n: number) => string;
 }) {
+  const color =
+    tone === "success"
+      ? "var(--success-deep)"
+      : tone === "warn"
+        ? "var(--attack)"
+        : "var(--text-primary)";
+  const fmt = format ?? fmtInt;
   return (
     <div>
+      {loading ? (
+        <div
+          className="h-[30px] w-20 rounded-[6px] animate-pulse"
+          style={{ background: "var(--surface-2)" }}
+          aria-hidden
+        />
+      ) : (
+        <p
+          className="text-[26px] md:text-[30px] font-mono-numbers tabular-nums tracking-[-0.02em] leading-none"
+          style={{ color, fontWeight: 500 }}
+        >
+          <NumberScramble value={value} format={fmt} />
+        </p>
+      )}
       <p
-        className="text-[10px] font-semibold uppercase tracking-[0.08em]"
+        className="mt-1.5 text-[10px] font-semibold uppercase tracking-[0.08em]"
         style={{ color: "var(--text-quaternary)" }}
       >
         {label}
       </p>
-      <p
-        className="mt-0.5 text-[22px] font-mono-numbers tabular-nums tracking-tight"
-        style={{
-          color: loading
-            ? "var(--text-quaternary)"
-            : tone === "success"
-              ? "#15803D"
-              : tone === "warn"
-                ? "#B91C1C"
-                : "var(--text-primary)",
-          fontWeight: 500,
-        }}
-      >
-        {loading ? "—" : typeof value === "number" ? value.toLocaleString() : value}
-      </p>
     </div>
+  );
+}
+
+/**
+ * ─── Status band ──────────────────────────────────────────────────
+ * One-line narrator above the counters. Picks ONE story to tell —
+ * whichever is loudest right now — so the hero never competes with
+ * itself:
+ *
+ *   1. policy.exhausted  → red    "policy window exhausted · resets in 3h 12m"
+ *   2. policy.nearCap    → amber  "nearing daily cap · $4.12 / $5.00 today"
+ *   3. nextAttackAt soon → indigo "defending · next adversarial probe in 4:32"
+ *   4. healthy + spend   → green  "policy window healthy · $0.80 / $5.00 today"
+ *   5. healthy + idle    → gray   "policy window idle · no payments today"
+ *
+ * The precedence reads the product's priorities: alarm states eclipse
+ * defense chatter, defense chatter eclipses calm, calm is minimal.
+ */
+function StatusBand({ state }: { state: AtlasState }) {
+  const p = state.policy;
+  const exhausted = p?.exhausted ?? false;
+  const near = p?.nearCap ?? false;
+  const nextAttackSoon =
+    !!state.nextAttackAt &&
+    new Date(state.nextAttackAt).getTime() - Date.now() < 30 * 60_000;
+
+  // Pick the loudest story.
+  let tone: "attack" | "warn" | "agent" | "success" | "muted" = "muted";
+  let label = "";
+  let body: React.ReactNode = null;
+
+  if (exhausted) {
+    tone = "attack";
+    label = "exhausted";
+    body = (
+      <>
+        policy window consumed · spent{" "}
+        <strong>{fmtUsd(p.spentTodayUsd)}</strong> of{" "}
+        <strong>{fmtUsd(p.dailyCapUsd)}</strong>
+        {p.windowResetsAt ? (
+          <>
+            {" "}
+            · resets in <CountdownLive until={p.windowResetsAt} mode="hms" />
+          </>
+        ) : null}
+      </>
+    );
+  } else if (near) {
+    tone = "warn";
+    label = "near cap";
+    body = (
+      <>
+        nearing daily cap · <strong>{fmtUsd(p.spentTodayUsd)}</strong> /{" "}
+        {fmtUsd(p.dailyCapUsd)}
+        {p.windowResetsAt ? (
+          <>
+            {" "}
+            · window rolls in{" "}
+            <CountdownLive until={p.windowResetsAt} mode="hms" />
+          </>
+        ) : null}
+      </>
+    );
+  } else if (nextAttackSoon && state.nextAttackAt) {
+    tone = "agent";
+    label = "defending";
+    body = (
+      <>
+        next adversarial probe in{" "}
+        <CountdownLive until={state.nextAttackAt} mode="mss" />
+      </>
+    );
+  } else if ((p?.spentTodayUsd ?? 0) > 0) {
+    tone = "success";
+    label = "healthy";
+    body = (
+      <>
+        policy window healthy ·{" "}
+        <strong>{fmtUsd(p.spentTodayUsd)}</strong> of{" "}
+        {fmtUsd(p.dailyCapUsd)} in last 24h
+      </>
+    );
+  } else {
+    tone = "muted";
+    label = "idle";
+    body = (
+      <>
+        policy window idle · no payments in the last 24h
+      </>
+    );
+  }
+
+  // Tone → CSS variable pair. Stays within our semantic palette — no
+  // one-off hex, respects dark-mode if we ever introduce it.
+  const toneMap: Record<typeof tone, { fg: string; bg: string; dot: string }> = {
+    attack: {
+      fg: "var(--attack)",
+      bg: "var(--attack-bg)",
+      dot: "var(--attack)",
+    },
+    warn: {
+      fg: "var(--warning)",
+      bg: "var(--warning-bg)",
+      dot: "var(--warning)",
+    },
+    agent: {
+      fg: "var(--agent)",
+      bg: "var(--agent-bg)",
+      dot: "var(--agent)",
+    },
+    success: {
+      fg: "var(--success-deep)",
+      bg: "var(--success-bg)",
+      dot: "var(--success)",
+    },
+    muted: {
+      fg: "var(--text-tertiary)",
+      bg: "var(--surface-2)",
+      dot: "var(--text-quaternary)",
+    },
+  };
+  const t = toneMap[tone];
+
+  return (
+    <div
+      className="flex items-center gap-2 px-5 py-2 text-[11.5px] tracking-tight"
+      style={{
+        background: t.bg,
+        borderBottom: "0.5px solid var(--border-subtle)",
+        color: t.fg,
+      }}
+    >
+      <motion.span
+        aria-hidden
+        className="w-1.5 h-1.5 rounded-full shrink-0"
+        style={{ background: t.dot }}
+        animate={{ opacity: [0.4, 1, 0.4] }}
+        transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+      />
+      <span
+        className="font-semibold uppercase tracking-[0.1em] text-[10px] shrink-0"
+        style={{ color: t.fg }}
+      >
+        {label}
+      </span>
+      <span
+        className="flex-1 text-[11.5px] font-mono-numbers truncate"
+        style={{ color: "var(--text-secondary)" }}
+      >
+        {body}
+      </span>
+      {/* Persistent right-rail — "N attacks survived this week". Always
+          present (not tied to the alarm story) because it IS the product
+          claim; dimmer color so it reads as a supporting stat, not a
+          competing narrative. Links to /atlas#attack-atlas. */}
+      <AttacksThisWeekRail />
+    </div>
+  );
+}
+
+/**
+ * Tiny ticker at the right edge of the status band. Polls the
+ * leaderboard endpoint every 15s (slower than the main observatory
+ * poll — this is ambient, not a headline). On click, anchors to
+ * /atlas#attack-atlas so the visitor can go fire their own probe.
+ */
+function AttacksThisWeekRail() {
+  const [weekly, setWeekly] = useState<number | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const r = await fetch("/api/atlas/leaderboard");
+        if (!r.ok) return;
+        const j = (await r.json()) as { weekly?: { total?: number } };
+        if (!cancelled) setWeekly(j.weekly?.total ?? 0);
+      } catch {
+        /* silent */
+      }
+    };
+    load();
+    const id = setInterval(load, 15_000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, []);
+
+  if (weekly === null) return null;
+  return (
+    <a
+      href="/atlas#attack-atlas"
+      className="ml-2 hidden sm:inline-flex items-center gap-1 font-mono-numbers text-[11px] shrink-0 transition-opacity hover:opacity-80"
+      style={{ color: "var(--text-tertiary)" }}
+    >
+      <span style={{ color: "var(--text-quaternary)" }}>survived</span>
+      <strong style={{ color: "var(--success-deep)", fontWeight: 700 }}>
+        <NumberScramble value={weekly} format={fmtInt} />
+      </strong>
+      <span style={{ color: "var(--text-quaternary)" }}>this week</span>
+    </a>
+  );
+}
+
+/**
+ * Countdown clock that ticks once per second and renders either
+ * `m:ss` or `Xh Ym` until the `until` ISO. Swaps to "now" when
+ * the deadline is in the past, so callers never flash negative
+ * numbers. We reuse `<LiveTimer/>` internally for the 1Hz tick.
+ */
+function CountdownLive({
+  until,
+  mode,
+}: {
+  until: string;
+  mode: "mss" | "hms";
+}) {
+  const target = new Date(until).getTime();
+  return (
+    <LiveTimer
+      since={new Date().toISOString()}
+      render={() => {
+        const diffMs = target - Date.now();
+        if (diffMs <= 0) return "now";
+        const s = Math.floor(diffMs / 1000);
+        if (mode === "hms") {
+          const h = Math.floor(s / 3600);
+          const m = Math.floor((s % 3600) / 60);
+          if (h > 0) return `${h}h ${String(m).padStart(2, "0")}m`;
+          return `${m}m ${String(s % 60).padStart(2, "0")}s`;
+        }
+        const m = Math.floor(s / 60);
+        return `${m}:${String(s % 60).padStart(2, "0")}`;
+      }}
+    />
   );
 }
