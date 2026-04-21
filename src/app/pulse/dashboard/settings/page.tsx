@@ -119,13 +119,13 @@ export default function SettingsPage() {
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.2, ease }}
-        className="rounded-xl border border-red-200 dark:border-red-900/30 bg-red-50/50 dark:bg-red-900/10 p-6"
+        className="rounded-xl border border-red-200 bg-red-50/50 p-6"
       >
         <div className="flex items-center gap-2 mb-3">
           <AlertTriangle className="w-4 h-4 text-red-500" />
-          <h3 className="text-[14px] font-semibold tracking-tight text-red-700 dark:text-red-400">Danger Zone</h3>
+          <h3 className="text-[14px] font-semibold tracking-tight text-red-700">Danger Zone</h3>
         </div>
-        <p className="text-[12px] text-red-600/70 dark:text-red-400/70 mb-4 leading-relaxed">
+        <p className="text-[12px] text-red-600/70 mb-4 leading-relaxed">
           Deleting your account will permanently remove all your data: events, endpoints, customers, API keys, webhooks, alerts, and subscriptions. This cannot be undone.
         </p>
         <div className="flex items-center gap-3">
@@ -134,7 +134,7 @@ export default function SettingsPage() {
             value={deleteConfirm}
             onChange={(e) => setDeleteConfirm(e.target.value)}
             placeholder='Type "DELETE" to confirm'
-            className="h-9 px-3 rounded-lg border border-red-200 dark:border-red-800 dark:bg-red-900/20 text-[13px] placeholder:text-red-300 focus:outline-none focus:ring-2 focus:ring-red-200 w-48"
+            className="h-9 px-3 rounded-lg border border-red-200 text-[13px] placeholder:text-red-300 focus:outline-none focus:ring-2 focus:ring-red-200 w-48"
           />
           <button
             onClick={deleteAccount}

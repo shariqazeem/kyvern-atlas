@@ -106,7 +106,7 @@ function MomentCard({ moment, index }: { moment: Moment; index: number }) {
         moment.type === "record_payment" ? "bg-amber-50 text-amber-500" :
         moment.type === "hot_endpoint" ? "bg-orange-50 text-orange-500" :
         moment.type === "whale_alert" ? "bg-purple-50 text-purple-500" :
-        "bg-slate-50 text-slate-400"
+        "bg-[var(--surface-2)] text-[var(--text-tertiary)]"
       }`}>
         {moment.type === "new_agent" ? "NEW" :
          moment.type === "milestone" ? "GOAL" :

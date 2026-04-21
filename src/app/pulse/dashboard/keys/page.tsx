@@ -73,13 +73,37 @@ export default function KeysPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-[18px] font-semibold tracking-tight">API Keys</h1>
-        <p className="text-[13px] text-tertiary mt-0.5">
-          Use these keys in your <code className="text-[12px] font-mono bg-[#F0F0F0] px-1 py-0.5 rounded">withPulse()</code> middleware configuration.
+    <div className="space-y-8 pb-16">
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, ease: [0.25, 0.1, 0.25, 1] }}
+        className="pt-2"
+      >
+        <p
+          className="text-[11px] font-semibold uppercase tracking-[0.1em] mb-1.5"
+          style={{ color: "#0EA5E9" }}
+        >
+          Earn · service keys
         </p>
-      </div>
+        <h1
+          className="tracking-[-0.035em] text-balance"
+          style={{
+            fontSize: "clamp(30px, 4.2vw, 42px)",
+            lineHeight: 1.02,
+            fontWeight: 600,
+            color: "var(--text-primary)",
+          }}
+        >
+          Service API keys.
+        </h1>
+        <p
+          className="mt-2 text-[14.5px] leading-[1.55] max-w-[580px]"
+          style={{ color: "var(--text-tertiary)" }}
+        >
+          Use these keys in your <code className="code-inline">withPulse()</code> middleware configuration.
+        </p>
+      </motion.div>
 
       {/* New key banner (shown once for new users) */}
       {showNewKey && apiKey && (

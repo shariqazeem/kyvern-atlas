@@ -1,27 +1,59 @@
 "use client";
 
+/**
+ * OnboardingChecklist — "Get started with Pulse" panel.
+ *
+ * Apple-grade rewrite. Fixes two real issues:
+ *
+ *   1. The copy-key button only copied the *prefix* (`kv_live_LjlC`) because
+ *      the full key is shown ONCE at creation and not persisted. When the
+ *      user came back later and clicked "Copy key", the clipboard got the
+ *      truncated preview. We now only show the copy button when the full
+ *      key is actually in memory; otherwise we send them to the keys page
+ *      where they can rotate and see a fresh full key.
+ *
+ *   2. The visual language didn't match the /app design system. Rewritten
+ *      with token-driven colors, consistent spacing with /app/*, and
+ *      staggered enters that feel like the rest of the product.
+ */
+
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { motion } from "framer-motion";
-import { Check, Copy, Terminal, X } from "lucide-react";
+import {
+  ArrowRight,
+  ArrowUpRight,
+  Check,
+  Copy,
+  Key,
+  Terminal,
+  X,
+} from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+
+const ease = [0.25, 0.1, 0.25, 1] as const;
 
 interface OnboardingChecklistProps {
   hasEvents: boolean;
 }
 
+// Quick sanity check — a real kv_live key is ~40+ chars. Anything shorter
+// is almost certainly the masked prefix.
+function looksLikeFullKey(k: string | null | undefined): boolean {
+  return typeof k === "string" && k.startsWith("kv_live_") && k.length >= 24;
+}
+
 export function OnboardingChecklist({ hasEvents }: OnboardingChecklistProps) {
-  const { apiKey, apiKeyPrefix } = useAuth();
-  const fullKey = apiKey || apiKeyPrefix;
+  const { apiKey } = useAuth();
   const [dismissed, setDismissed] = useState(false);
-  const [copiedKey, setCopiedKey] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [steps, setSteps] = useState({
-    account: true, // always done if they see this
+    account: true,
     copyKey: false,
     integrate: false,
     firstEvent: false,
   });
 
-  // Load progress from localStorage
   useEffect(() => {
     const saved = localStorage.getItem("pulse-onboarding");
     if (saved) {
@@ -30,12 +62,11 @@ export function OnboardingChecklist({ hasEvents }: OnboardingChecklistProps) {
         setSteps((prev) => ({ ...prev, ...parsed }));
         if (parsed.dismissed) setDismissed(true);
       } catch {
-        // ignore
+        /* ignore */
       }
     }
   }, []);
 
-  // Auto-complete step 4 when events arrive
   useEffect(() => {
     if (hasEvents && !steps.firstEvent) {
       setSteps((prev) => {
@@ -56,133 +87,210 @@ export function OnboardingChecklist({ hasEvents }: OnboardingChecklistProps) {
 
   function dismiss() {
     setDismissed(true);
-    localStorage.setItem("pulse-onboarding", JSON.stringify({ ...steps, dismissed: true }));
+    localStorage.setItem(
+      "pulse-onboarding",
+      JSON.stringify({ ...steps, dismissed: true }),
+    );
   }
 
-  function copyKey() {
-    if (fullKey) {
-      navigator.clipboard.writeText(fullKey);
-      setCopiedKey(true);
+  async function copyKey() {
+    if (!looksLikeFullKey(apiKey)) return;
+    try {
+      await navigator.clipboard.writeText(apiKey!);
+      setCopied(true);
       markStep("copyKey");
-      setTimeout(() => setCopiedKey(false), 2000);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* noop */
     }
   }
 
-  const allDone = steps.account && steps.copyKey && steps.integrate && steps.firstEvent;
-
+  const allDone =
+    steps.account && steps.copyKey && steps.integrate && steps.firstEvent;
   if (dismissed || allDone) return null;
 
-  const completedCount = [steps.account, steps.copyKey, steps.integrate, steps.firstEvent].filter(Boolean).length;
+  const done = [steps.account, steps.copyKey, steps.integrate, steps.firstEvent].filter(Boolean).length;
+  const fullKeyAvailable = looksLikeFullKey(apiKey);
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 12 }}
+      initial={{ opacity: 0, y: 14 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, ease: [0.25, 0.1, 0.25, 1] }}
-      className="rounded-xl border border-black/[0.06] bg-white p-5 shadow-premium"
+      transition={{ duration: 0.6, ease }}
+      className="rounded-[20px] overflow-hidden"
+      style={{
+        background: "var(--surface)",
+        border: "0.5px solid var(--border-subtle)",
+        boxShadow:
+          "0 1px 2px rgba(0,0,0,0.03), 0 20px 60px -36px rgba(14,165,233,0.14)",
+      }}
     >
-      <div className="flex items-center justify-between mb-4">
+      <div className="px-6 pt-5 pb-4 flex items-start justify-between gap-4">
         <div>
-          <h3 className="text-[14px] font-semibold tracking-tight">Get started with Pulse</h3>
-          <p className="text-[12px] text-tertiary mt-0.5">
-            {completedCount}/4 steps completed
+          <p
+            className="text-[10.5px] font-semibold uppercase tracking-[0.08em]"
+            style={{ color: "#0EA5E9" }}
+          >
+            Get started · {done}/4
           </p>
+          <h3
+            className="text-[17px] font-semibold tracking-[-0.015em] mt-0.5"
+            style={{ color: "var(--text-primary)" }}
+          >
+            Four steps to your first on-chain payment.
+          </h3>
         </div>
-        <button onClick={dismiss} className="p-1 text-quaternary hover:text-primary transition-colors">
+        <button
+          onClick={dismiss}
+          aria-label="Dismiss onboarding"
+          className="p-1.5 rounded-[8px] transition-colors hover:bg-[var(--surface-2)]"
+          style={{ color: "var(--text-quaternary)" }}
+        >
           <X className="w-4 h-4" />
         </button>
       </div>
 
-      {/* Progress bar */}
-      <div className="h-1 bg-[#F0F0F0] rounded-full mb-5 overflow-hidden">
+      {/* Progress rail */}
+      <div
+        className="mx-6 h-[2px] rounded-full overflow-hidden"
+        style={{ background: "var(--surface-2)" }}
+      >
         <motion.div
-          initial={{ width: 0 }}
-          animate={{ width: `${(completedCount / 4) * 100}%` }}
-          className="h-full bg-pulse rounded-full"
-          transition={{ duration: 0.5 }}
+          initial={false}
+          animate={{ width: `${(done / 4) * 100}%` }}
+          transition={{ duration: 0.7, ease }}
+          className="h-full rounded-full"
+          style={{ background: "#0EA5E9" }}
         />
       </div>
 
-      <div className="space-y-3">
-        {/* Step 1: Account created */}
-        <StepItem done={steps.account} label="Account created" icon={Check} />
+      <ul className="px-6 py-5 space-y-3">
+        <StepRow done={steps.account} label="Account created" />
 
-        {/* Step 2: Copy API key */}
-        <div className="flex items-center gap-3">
-          <StepCircle done={steps.copyKey} />
-          <div className="flex-1 flex items-center justify-between">
-            <span className={`text-[13px] ${steps.copyKey ? "text-tertiary line-through" : "text-primary font-medium"}`}>
-              Copy your API key
-            </span>
-            {!steps.copyKey && (
+        <StepRow
+          done={steps.copyKey}
+          label="Copy your API key"
+          action={
+            fullKeyAvailable ? (
               <button
                 onClick={copyKey}
-                className="inline-flex items-center gap-1.5 text-[11px] font-medium text-pulse hover:underline"
+                className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-[8px] text-[11.5px] font-semibold transition-colors hover:bg-[var(--surface-2)]"
+                style={{ color: "var(--text-primary)" }}
               >
-                {copiedKey ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                {copiedKey ? "Copied" : "Copy key"}
+                {copied ? (
+                  <Check
+                    className="w-3 h-3"
+                    style={{ color: "var(--success)" }}
+                  />
+                ) : (
+                  <Copy className="w-3 h-3" />
+                )}
+                {copied ? "Copied" : "Copy key"}
               </button>
-            )}
-          </div>
-        </div>
-
-        {/* Step 3: Integrate middleware */}
-        <div className="flex items-center gap-3">
-          <StepCircle done={steps.integrate} />
-          <div className="flex-1 flex items-center justify-between">
-            <span className={`text-[13px] ${steps.integrate ? "text-tertiary line-through" : "text-primary font-medium"}`}>
-              Integrate the middleware
-            </span>
-            {!steps.integrate && (
-              <a
-                href="/pulse/dashboard/setup"
-                onClick={() => markStep("integrate")}
-                className="inline-flex items-center gap-1.5 text-[11px] font-medium text-pulse hover:underline"
+            ) : (
+              <Link
+                href="/pulse/dashboard/keys"
+                onClick={() => markStep("copyKey")}
+                className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-[8px] text-[11.5px] font-semibold transition-colors hover:bg-[var(--surface-2)]"
+                style={{ color: "var(--text-primary)" }}
               >
-                <Terminal className="w-3 h-3" />
-                Setup guide
-              </a>
-            )}
-          </div>
-        </div>
+                <Key className="w-3 h-3" />
+                Reveal or rotate
+                <ArrowUpRight className="w-3 h-3" />
+              </Link>
+            )
+          }
+          hint={
+            !fullKeyAvailable && !steps.copyKey
+              ? "Full keys are shown once at creation. Rotate to see a fresh one."
+              : undefined
+          }
+        />
 
-        {/* Step 4: First event */}
-        <div className="flex items-center gap-3">
-          <StepCircle done={steps.firstEvent} />
-          <div className="flex-1">
-            <span className={`text-[13px] ${steps.firstEvent ? "text-tertiary line-through" : "text-primary font-medium"}`}>
-              Receive your first x402 payment
-            </span>
-            {!steps.firstEvent && steps.integrate && (
-              <div className="flex items-center gap-1.5 mt-1">
-                <div className="w-1.5 h-1.5 rounded-full bg-pulse animate-pulse" />
-                <span className="text-[11px] text-tertiary">Waiting for first event...</span>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+        <StepRow
+          done={steps.integrate}
+          label="Integrate the middleware"
+          action={
+            <Link
+              href="/pulse/dashboard/setup"
+              onClick={() => markStep("integrate")}
+              className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-[8px] text-[11.5px] font-semibold transition-colors hover:bg-[var(--surface-2)]"
+              style={{ color: "var(--text-primary)" }}
+            >
+              <Terminal className="w-3 h-3" />
+              Setup guide
+              <ArrowRight className="w-3 h-3" />
+            </Link>
+          }
+        />
+
+        <StepRow
+          done={steps.firstEvent}
+          label="Receive your first x402 payment"
+          hint={
+            !steps.firstEvent && steps.integrate
+              ? "Waiting for first event…"
+              : undefined
+          }
+        />
+      </ul>
     </motion.div>
   );
 }
 
-function StepItem({ done, label }: { done: boolean; label: string; icon: React.ElementType }) {
+function StepRow({
+  done,
+  label,
+  action,
+  hint,
+}: {
+  done: boolean;
+  label: string;
+  action?: React.ReactNode;
+  hint?: string;
+}) {
   return (
-    <div className="flex items-center gap-3">
+    <li className="flex items-start gap-3">
       <StepCircle done={done} />
-      <span className={`text-[13px] ${done ? "text-tertiary line-through" : "text-primary font-medium"}`}>
-        {label}
-      </span>
-    </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between gap-2">
+          <span
+            className="text-[13.5px]"
+            style={{
+              color: done ? "var(--text-tertiary)" : "var(--text-primary)",
+              fontWeight: done ? 400 : 500,
+              textDecoration: done ? "line-through" : "none",
+            }}
+          >
+            {label}
+          </span>
+          {!done && action}
+        </div>
+        {hint && !done && (
+          <p
+            className="mt-1 text-[11.5px]"
+            style={{ color: "var(--text-tertiary)" }}
+          >
+            {hint}
+          </p>
+        )}
+      </div>
+    </li>
   );
 }
 
 function StepCircle({ done }: { done: boolean }) {
   return (
-    <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${
-      done ? "bg-emerald-500" : "border-2 border-black/[0.1]"
-    }`}>
-      {done && <Check className="w-3 h-3 text-white" />}
-    </div>
+    <span
+      className="inline-flex w-5 h-5 rounded-full items-center justify-center shrink-0 mt-[1px]"
+      style={{
+        background: done ? "var(--success)" : "transparent",
+        border: done ? "none" : "1.5px solid var(--border-2)",
+      }}
+    >
+      {done && (
+        <Check className="w-3 h-3" color="white" strokeWidth={3} />
+      )}
+    </span>
   );
 }

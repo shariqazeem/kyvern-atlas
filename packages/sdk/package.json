@@ -1,0 +1,66 @@
+{
+  "name": "@kyvernlabs/sdk",
+  "version": "0.4.0",
+  "description": "Give your AI agent a Visa with a daily cap. One import. Enforced on-chain by the Kyvern policy program + Squads v4 on Solana.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist", "README.md"],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./adapters/langchain": {
+      "types": "./dist/adapters/langchain.d.ts",
+      "default": "./dist/adapters/langchain.js"
+    },
+    "./adapters/eliza": {
+      "types": "./dist/adapters/eliza.d.ts",
+      "default": "./dist/adapters/eliza.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "solana",
+    "squads",
+    "squads-v4",
+    "ai-agents",
+    "agent-wallet",
+    "agent-visa",
+    "spending-limit",
+    "x402",
+    "kyvernlabs",
+    "langchain",
+    "eliza"
+  ],
+  "author": "KyvernLabs <hello@kyvernlabs.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/shariqazeem/kyvernlabs"
+  },
+  "homepage": "https://kyvernlabs.com",
+  "peerDependencies": {
+    "@coral-xyz/anchor": "^0.31.0",
+    "@langchain/core": "^0.3.0",
+    "@solana/spl-token": "^0.4.0",
+    "@solana/web3.js": "^1.95.0",
+    "@sqds/multisig": "^2.1.0",
+    "zod": "^3.22.0"
+  },
+  "peerDependenciesMeta": {
+    "@coral-xyz/anchor": { "optional": true },
+    "@langchain/core": { "optional": true },
+    "@solana/spl-token": { "optional": true },
+    "@solana/web3.js": { "optional": true },
+    "@sqds/multisig": { "optional": true },
+    "zod": { "optional": true }
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "@types/node": "^20.0.0"
+  }
+}

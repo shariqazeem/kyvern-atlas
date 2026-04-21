@@ -1,5 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Transpile ESM-only deep deps that otherwise trip Next.js's server bundler.
+  transpilePackages: ["@coinbase/wallet-sdk"],
+
   headers: async () => [
     {
       source: "/(.*)",
@@ -11,23 +14,21 @@ const nextConfig = {
       ],
     },
   ],
+
   webpack: (config) => {
     config.resolve.fallback = { ...config.resolve.fallback };
     config.externals = [...(Array.isArray(config.externals) ? config.externals : [])];
+
+    // Only alias to `false` the truly-missing optional peers that Privy/wagmi
+    // try to probe. Packages that ARE installed must load normally —
+    // including @coinbase/wallet-sdk (Privy wallet provider) and
+    // @solana/web3.js (our Squads integration).
     config.resolve.alias = {
       ...config.resolve.alias,
-      "@base-org/account": false,
       "@metamask/connect-evm": false,
-      "@safe-global/safe-apps-sdk": false,
-      "@safe-global/safe-apps-provider": false,
-      "@walletconnect/ethereum-provider": false,
       "@walletconnect/modal": false,
-      "porto": false,
-      "porto/internal": false,
-      "@coinbase/wallet-sdk": false,
       "@farcaster/mini-app-solana": false,
       "@farcaster/mini-app": false,
-      "@solana/web3.js": false,
     };
     return config;
   },

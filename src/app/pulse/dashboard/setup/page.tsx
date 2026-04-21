@@ -212,7 +212,7 @@ const NETWORKS = [
   },
 ];
 
-function FrameworkTabs({ displayKey }: { displayKey: string }) {
+function FrameworkTabs({ snippetKey }: { snippetKey: string }) {
   const [active, setActive] = useState(0);
 
   return (
@@ -233,51 +233,154 @@ function FrameworkTabs({ displayKey }: { displayKey: string }) {
         ))}
       </div>
       <div className="p-0">
-        <CopyBlock code={FRAMEWORKS[active].code(displayKey)} />
+        <CopyBlock code={FRAMEWORKS[active].code(snippetKey)} />
       </div>
     </div>
   );
 }
 
+/**
+ * A kv_live key is typically ~40+ chars. If we only have the `apiKeyPrefix`
+ * (what's persisted after the one-time reveal), we should NEVER show it
+ * as a copyable code block — copying `kv_live_XXXX...` would give the
+ * user a broken half-key. We render a placeholder + a link to rotate.
+ */
+function isFullKey(k: string | null | undefined): k is string {
+  return typeof k === "string" && k.startsWith("kv_live_") && k.length >= 24;
+}
+
 export default function SetupPage() {
   const { apiKey, apiKeyPrefix, isAuthenticated } = useAuth();
-  const displayKey = isAuthenticated ? (apiKey || apiKeyPrefix + "...") : "kv_live_your_key_here";
+
+  // The placeholder used INSIDE the snippet examples. We never want the
+  // snippets to contain a garbled partial key, so always fall back to a
+  // clearly-named placeholder.
+  const snippetKey = isFullKey(apiKey)
+    ? apiKey
+    : "kv_live_YOUR_KEY";
+  const keyIsReal = isFullKey(apiKey);
 
   return (
-    <div className="max-w-2xl space-y-10">
+    <div className="max-w-2xl space-y-10 pb-16">
       <motion.div
-        initial={{ opacity: 0, y: 15 }}
+        initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease }}
+        transition={{ duration: 0.6, ease }}
+        className="pt-2"
       >
-        <h1 className="text-[18px] font-bold tracking-tight">Setup Guide</h1>
-        <p className="text-[13px] text-tertiary mt-1">
-          Integrate Pulse into your x402 endpoint in under 2 minutes.
-          Works on Base, Stellar, and Solana mainnet — automatically.
+        <p
+          className="text-[11px] font-semibold uppercase tracking-[0.1em] mb-1.5"
+          style={{ color: "#0EA5E9" }}
+        >
+          Earn · setup
+        </p>
+        <h1
+          className="tracking-[-0.035em] text-balance"
+          style={{
+            fontSize: "clamp(30px, 4.2vw, 42px)",
+            lineHeight: 1.02,
+            fontWeight: 600,
+            color: "var(--text-primary)",
+          }}
+        >
+          Capture every agent payment.
+        </h1>
+        <p
+          className="mt-2 text-[14.5px] leading-[1.55] max-w-[580px]"
+          style={{ color: "var(--text-tertiary)" }}
+        >
+          Two minutes. One line of middleware. Every inbound x402 payment to
+          your service shows up in your Pulse dashboard, verified on-chain.
         </p>
       </motion.div>
 
-      {/* Your API Key — moved to top for visibility */}
+      {/* Your API Key */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.05, ease }}
-        className="rounded-xl bg-pulse-50 border border-pulse-200 p-5 space-y-3"
+        transition={{ duration: 0.55, delay: 0.08, ease }}
+        className="rounded-[18px] p-5 space-y-4"
+        style={{
+          background: "var(--surface)",
+          border: "0.5px solid var(--border-subtle)",
+          boxShadow: "0 1px 2px rgba(0,0,0,0.03)",
+        }}
       >
         <div className="flex items-center gap-2">
-          <Key className="w-4 h-4 text-pulse-600" />
-          <h3 className="text-[14px] font-semibold text-pulse-700">Your API Key</h3>
+          <div
+            className="w-7 h-7 rounded-[9px] flex items-center justify-center"
+            style={{ background: "#E8F4FE" }}
+          >
+            <Key className="w-3.5 h-3.5" style={{ color: "#0EA5E9" }} />
+          </div>
+          <div>
+            <p
+              className="text-[10.5px] font-semibold uppercase tracking-[0.08em]"
+              style={{ color: "#0EA5E9" }}
+            >
+              Your API key
+            </p>
+            <h3
+              className="text-[15px] font-semibold tracking-tight"
+              style={{ color: "var(--text-primary)" }}
+            >
+              {keyIsReal ? "Reveal and store safely" : "Generate or rotate to reveal"}
+            </h3>
+          </div>
         </div>
-        <p className="text-[12px] text-pulse-600">
-          {isAuthenticated
-            ? "Use this in the middleware, MCP config, or direct API calls. Treat it like a password — never commit it to git."
-            : "Connect your wallet to get your kv_live_ API key."}
+        <p
+          className="text-[12.5px] leading-[1.55]"
+          style={{ color: "var(--text-tertiary)" }}
+        >
+          {!isAuthenticated
+            ? "Sign in to generate a kv_live_ API key."
+            : keyIsReal
+              ? "Copy this into the middleware below. Treat it like a password — never commit it to git."
+              : "Full API keys are shown ONCE at creation. For security we persist only the prefix. Rotate below to reveal a fresh full key."}
         </p>
-        <CopyBlock code={displayKey} />
+        {keyIsReal ? (
+          <CopyBlock code={apiKey!} />
+        ) : (
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 px-4 py-3 rounded-[12px]"
+            style={{
+              background: "var(--surface-2)",
+              border: "0.5px solid var(--border-subtle)",
+            }}
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <span
+                className="font-mono text-[12.5px] truncate"
+                style={{ color: "var(--text-tertiary)" }}
+              >
+                {apiKeyPrefix
+                  ? `${apiKeyPrefix}••••••••••••••••••••`
+                  : "kv_live_••••••••••••••••"}
+              </span>
+            </div>
+            <a
+              href="/pulse/dashboard/keys"
+              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-[10px] text-[12px] font-semibold whitespace-nowrap transition-opacity hover:opacity-90"
+              style={{ background: "#0EA5E9", color: "white" }}
+            >
+              <Key className="w-3.5 h-3.5" />
+              Rotate to reveal
+            </a>
+          </div>
+        )}
         {isAuthenticated && (
-          <p className="text-[11px] text-pulse-500">
+          <p
+            className="text-[11.5px]"
+            style={{ color: "var(--text-quaternary)" }}
+          >
             Manage all your keys on the{" "}
-            <a href="/pulse/dashboard/keys" className="underline">API Keys page</a>.
+            <a
+              href="/pulse/dashboard/keys"
+              className="underline"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              API keys page
+            </a>
+            .
           </p>
         )}
       </motion.div>
@@ -335,7 +438,7 @@ const x402Handler = withX402(handler, {
 
 // One line — that's the entire integration
 export const GET = withPulse(x402Handler, {
-  apiKey: '${displayKey}'
+  apiKey: '${snippetKey}'
 })`}
           />
           <p className="text-[11px] text-quaternary">
@@ -374,7 +477,7 @@ export const GET = withPulse(x402Handler, {
         <p className="text-[11px] text-quaternary -mt-2">
           Pick your stack. Pulse works with all of them — no extra configuration per chain.
         </p>
-        <FrameworkTabs displayKey={displayKey} />
+        <FrameworkTabs snippetKey={snippetKey} />
       </motion.div>
 
       {/* Network Reference */}
@@ -474,7 +577,7 @@ export const GET = withPulse(x402Handler, {
       "command": "npx",
       "args": ["@kyvernlabs/mcp"],
       "env": {
-        "KYVERNLABS_API_KEY": "${displayKey}"
+        "KYVERNLABS_API_KEY": "${snippetKey}"
       }
     }
   }
@@ -573,7 +676,7 @@ export const GET = withPulse(x402Handler, {
           <CopyBlock
             code={`curl -X POST https://kyvernlabs.com/api/pulse/ingest \\
   -H "Content-Type: application/json" \\
-  -H "X-API-Key: ${displayKey}" \\
+  -H "X-API-Key: ${snippetKey}" \\
   -d '{
     "endpoint": "/api/your-service",
     "amount_usd": 0.01,

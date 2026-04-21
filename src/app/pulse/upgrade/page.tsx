@@ -298,7 +298,7 @@ export default function UpgradePage() {
                   className={`px-5 py-2 rounded-lg text-[13px] font-medium transition-all ${
                     selectedPlan === "growth"
                       ? "bg-foreground text-white"
-                      : "bg-white border border-black/[0.08] text-secondary hover:bg-slate-50"
+                      : "bg-white border border-black/[0.08] text-secondary hover:bg-[var(--surface-2)]"
                   }`}
                 >
                   Growth — $19/mo
@@ -308,7 +308,7 @@ export default function UpgradePage() {
                   className={`px-5 py-2 rounded-lg text-[13px] font-medium transition-all ${
                     selectedPlan === "pro"
                       ? "bg-foreground text-white"
-                      : "bg-white border border-black/[0.08] text-secondary hover:bg-slate-50"
+                      : "bg-white border border-black/[0.08] text-secondary hover:bg-[var(--surface-2)]"
                   }`}
                 >
                   Pro — $49/mo

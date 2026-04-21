@@ -1,291 +1,798 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { motion } from "framer-motion";
+/* ════════════════════════════════════════════════════════════════════
+   /vault — Your KyvernLabs vaults
+
+   Lists every vault owned by the signed-in wallet, with a budget
+   utilization bar, status pill, and last-activity preview. Card per
+   vault, clickable straight into /vault/[id]. Premium empty state
+   with a single primary "Create your first vault" CTA.
+
+   Wiring:
+   · Auth → useAuth() → wallet (or devFallbackWallet for local demo)
+   · Data → GET /api/vault/list?ownerWallet=<pubkey>
+   · Nav  → each card links to /vault/[id]
+   ════════════════════════════════════════════════════════════════════ */
+
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
-  Wallet, Plus, Trash2, RefreshCw, ExternalLink, AlertCircle, Loader2,
-  DollarSign, Coins, Eye,
+  ArrowRight,
+  ArrowUpRight,
+  Copy,
+  Pause,
+  Plus,
+  ShieldCheck,
+  Sparkles,
+  Wallet as WalletIcon,
 } from "lucide-react";
-import { ConnectGate } from "@/components/dashboard/connect-gate";
-import { ConfirmModal } from "@/components/dashboard/confirm-modal";
-import { truncateAddress } from "@/lib/utils";
-import { cn } from "@/lib/utils";
+import { Navbar } from "@/components/landing/navbar";
+import { useAuth } from "@/hooks/use-auth";
 
-const ease = [0.25, 0.1, 0.25, 1] as const;
+const EASE = [0.25, 0.1, 0.25, 1] as const;
 
-interface WalletData {
-  id: string;
-  address: string;
-  label: string;
-  network: string;
-  purpose: string;
-  endpoint: string | null;
-  balance_eth: number | null;
-  balance_usdc: number | null;
-  last_synced: string | null;
+/* ─── Types (mirror /api/vault/list) ─── */
+
+interface VaultSummary {
+  vault: {
+    id: string;
+    ownerWallet: string;
+    name: string;
+    emoji: string;
+    purpose: string;
+    dailyLimitUsd: number;
+    weeklyLimitUsd: number;
+    perTxMaxUsd: number;
+    maxCallsPerWindow: number;
+    velocityWindow: "1h" | "1d" | "1w";
+    allowedMerchants: string[];
+    requireMemo: boolean;
+    squadsAddress: string;
+    network: "devnet" | "mainnet";
+    pausedAt: string | null;
+    createdAt: string;
+    updatedAt: string;
+  };
+  budget: {
+    dailyLimitUsd: number;
+    weeklyLimitUsd: number;
+    spentToday: number;
+    spentThisWeek: number;
+    dailyUtilization: number;
+    weeklyUtilization: number;
+  };
+  lastPayment: {
+    merchant: string;
+    amountUsd: number;
+    status: "allowed" | "blocked" | "settled" | "failed";
+    createdAt: string;
+  } | null;
 }
 
-function AddWalletForm({ onAdded }: { onAdded: () => void }) {
-  const [address, setAddress] = useState("");
-  const [label, setLabel] = useState("");
-  const [purpose, setPurpose] = useState("receivable");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [open, setOpen] = useState(false);
+/* ─── Dev fallback owner wallet (mirrors /vault/new) ─── */
 
-  async function add() {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/vault/wallets", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ address, label, purpose }),
-      });
-      const d = await res.json();
-      if (d.wallet) { setAddress(""); setLabel(""); setOpen(false); onAdded(); }
-      else setError(d.error || d.details?.[0]?.message || "Failed");
-    } catch (e) { setError(String(e)); }
-    finally { setLoading(false); }
+function devFallbackWallet(): string {
+  if (typeof window === "undefined") return "DevPlaceholderWallet11111111111111111111111";
+  const KEY = "kyvern:dev-wallet";
+  const existing = window.localStorage.getItem(KEY);
+  if (existing) return existing;
+  const alphabet =
+    "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+  let s = "";
+  for (let i = 0; i < 44; i++) {
+    s += alphabet[Math.floor(Math.random() * alphabet.length)];
   }
+  window.localStorage.setItem(KEY, s);
+  return s;
+}
 
-  if (!open) {
+/* ─── Formatting helpers ─── */
+
+function fmtUsd(n: number): string {
+  if (n >= 1000) return `$${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k`;
+  return `$${n.toFixed(n < 10 ? 2 : 0)}`;
+}
+
+function fmtRelative(iso: string): string {
+  const then = new Date(iso).getTime();
+  const diff = Date.now() - then;
+  if (Number.isNaN(then)) return "—";
+  if (diff < 60_000) return "just now";
+  const m = Math.floor(diff / 60_000);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  if (d < 30) return `${d}d ago`;
+  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function truncate(s: string, head = 4, tail = 4): string {
+  if (!s || s.length <= head + tail + 2) return s;
+  return `${s.slice(0, head)}…${s.slice(-tail)}`;
+}
+
+/* ═══════════════════════════════════════════════════════════════════ */
+/*                                Page                                */
+/* ═══════════════════════════════════════════════════════════════════ */
+
+export default function VaultListPage() {
+  const { wallet, isLoading: authLoading } = useAuth();
+
+  const [ownerWallet, setOwnerWallet] = useState<string | null>(null);
+  const [entries, setEntries] = useState<VaultSummary[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  // Resolve effective owner wallet (Privy-connected OR dev-fallback)
+  useEffect(() => {
+    if (authLoading) return;
+    setOwnerWallet(wallet ?? devFallbackWallet());
+  }, [wallet, authLoading]);
+
+  // Fetch vault list
+  useEffect(() => {
+    if (!ownerWallet) return;
+    let cancelled = false;
+    setEntries(null);
+    setError(null);
+    fetch(`/api/vault/list?ownerWallet=${encodeURIComponent(ownerWallet)}`)
+      .then(async (r) => {
+        const data = await r.json();
+        if (!r.ok) throw new Error(data?.message ?? "failed to load vaults");
+        return data as { vaults: VaultSummary[]; total: number };
+      })
+      .then((data) => {
+        if (cancelled) return;
+        setEntries(data.vaults);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setError(err instanceof Error ? err.message : "failed to load vaults");
+        setEntries([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [ownerWallet]);
+
+  const totals = useMemo(() => {
+    if (!entries) return null;
+    const active = entries.filter((e) => e.vault.pausedAt == null).length;
+    const paused = entries.length - active;
+    const spentToday = entries.reduce((a, e) => a + e.budget.spentToday, 0);
+    const dailyCap = entries.reduce((a, e) => a + e.budget.dailyLimitUsd, 0);
+    return { active, paused, spentToday, dailyCap };
+  }, [entries]);
+
+  const copyOwner = async () => {
+    if (!ownerWallet) return;
+    try {
+      await navigator.clipboard.writeText(ownerWallet);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1400);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  return (
+    <main
+      className="relative min-h-screen"
+      style={{ background: "var(--background)" }}
+    >
+      <Navbar />
+
+      {/* Soft dot-grid backdrop, mirrors login page */}
+      <div
+        aria-hidden
+        className="absolute inset-0 -z-10 bg-dot-grid opacity-60"
+        style={{
+          maskImage:
+            "radial-gradient(ellipse 80% 45% at 50% 0%, black 35%, transparent 100%)",
+          WebkitBackdropFilter:
+            "radial-gradient(ellipse 80% 45% at 50% 0%, black 35%, transparent 100%)",
+        }}
+      />
+
+      <div className="mx-auto max-w-6xl px-6 pt-28 pb-24">
+        {/* ─── Header row ─── */}
+        <motion.div
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, ease: EASE }}
+          className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-6 mb-10"
+        >
+          <div>
+            <span
+              className="inline-flex items-center gap-1.5 h-7 px-3 rounded-full text-[11px] font-semibold tracking-[0.02em] mb-4"
+              style={{
+                background: "var(--surface-2)",
+                color: "var(--text-secondary)",
+                border: "0.5px solid var(--border-subtle)",
+              }}
+            >
+              <Sparkles className="w-3 h-3" />
+              YOUR VAULTS
+            </span>
+            <h1
+              className="text-[34px] sm:text-[38px] font-semibold tracking-[-0.028em]"
+              style={{ color: "var(--text-primary)", lineHeight: 1.05 }}
+            >
+              Budgets for every agent you run.
+            </h1>
+            <p
+              className="mt-2.5 text-[15px] max-w-[560px] leading-[1.55]"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              Each vault is a Squads v4 smart account with a policy layer:
+              daily cap, per-transaction max, merchant allowlist, kill
+              switch. Agents get keys with budgets — not keys with blanks.
+            </p>
+
+            {/* Owner wallet pill */}
+            {ownerWallet && (
+              <button
+                onClick={copyOwner}
+                className="group mt-5 inline-flex items-center gap-2 h-8 pl-2 pr-3 rounded-full text-[12px] font-medium transition-colors"
+                style={{
+                  background: "var(--surface-2)",
+                  color: "var(--text-tertiary)",
+                  border: "0.5px solid var(--border-subtle)",
+                }}
+                aria-label="Copy owner wallet"
+              >
+                <span
+                  className="w-5 h-5 rounded-full inline-flex items-center justify-center"
+                  style={{ background: "var(--text-primary)" }}
+                >
+                  <WalletIcon
+                    className="w-2.5 h-2.5"
+                    style={{ color: "var(--background)" }}
+                  />
+                </span>
+                <span className="font-mono tracking-tight">
+                  {truncate(ownerWallet, 6, 6)}
+                </span>
+                <Copy
+                  className="w-3 h-3 opacity-60 group-hover:opacity-100 transition-opacity"
+                />
+                {copied && (
+                  <span
+                    className="text-[11px] font-semibold"
+                    style={{ color: "var(--text-primary)" }}
+                  >
+                    copied
+                  </span>
+                )}
+              </button>
+            )}
+          </div>
+
+          <Link
+            href="/vault/new"
+            className="group inline-flex items-center gap-2 h-11 px-5 rounded-[12px] text-[14px] font-semibold transition-opacity duration-200 hover:opacity-90 self-start sm:self-auto"
+            style={{
+              background: "var(--text-primary)",
+              color: "var(--background)",
+              boxShadow:
+                "0 1px 2px rgba(0,0,0,0.04), 0 10px 28px rgba(0,0,0,0.10)",
+            }}
+          >
+            <Plus className="w-4 h-4" />
+            Create vault
+            <ArrowRight className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-0.5" />
+          </Link>
+        </motion.div>
+
+        {/* ─── Summary strip (only when we have vaults) ─── */}
+        {entries && entries.length > 0 && totals && (
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.55, ease: EASE, delay: 0.05 }}
+            className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8"
+          >
+            <StatTile label="Vaults" value={entries.length.toString()} />
+            <StatTile label="Active" value={totals.active.toString()} />
+            <StatTile
+              label="Paused"
+              value={totals.paused.toString()}
+              muted
+            />
+            <StatTile
+              label="Spent today"
+              value={fmtUsd(totals.spentToday)}
+              sub={totals.dailyCap > 0 ? `of ${fmtUsd(totals.dailyCap)} cap` : undefined}
+            />
+          </motion.div>
+        )}
+
+        {/* ─── Body ─── */}
+        {entries === null ? (
+          <LoadingGrid />
+        ) : entries.length === 0 ? (
+          <EmptyState />
+        ) : (
+          <motion.div
+            layout
+            className="grid grid-cols-1 md:grid-cols-2 gap-4"
+          >
+            <AnimatePresence initial={false}>
+              {entries.map((entry, i) => (
+                <VaultCard key={entry.vault.id} entry={entry} index={i} />
+              ))}
+            </AnimatePresence>
+          </motion.div>
+        )}
+
+        {error && (
+          <p
+            className="mt-6 text-[13px]"
+            style={{ color: "var(--text-tertiary)" }}
+          >
+            Couldn&apos;t load vaults: {error}. Try refreshing.
+          </p>
+        )}
+      </div>
+    </main>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════ */
+/*                            Sub-components                          */
+/* ═══════════════════════════════════════════════════════════════════ */
+
+function StatTile({
+  label,
+  value,
+  sub,
+  muted,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  muted?: boolean;
+}) {
+  return (
+    <div
+      className="px-4 py-3.5 rounded-[14px]"
+      style={{
+        background: "var(--surface)",
+        border: "0.5px solid var(--border-subtle)",
+        boxShadow: "0 1px 2px rgba(0,0,0,0.03)",
+      }}
+    >
+      <div
+        className="text-[10.5px] font-semibold uppercase tracking-[0.08em]"
+        style={{ color: "var(--text-tertiary)" }}
+      >
+        {label}
+      </div>
+      <div
+        className="mt-1 text-[22px] font-semibold tracking-[-0.02em] font-mono-numbers"
+        style={{
+          color: muted ? "var(--text-tertiary)" : "var(--text-primary)",
+        }}
+      >
+        {value}
+      </div>
+      {sub && (
+        <div
+          className="text-[11.5px] mt-0.5"
+          style={{ color: "var(--text-tertiary)" }}
+        >
+          {sub}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function VaultCard({
+  entry,
+  index,
+}: {
+  entry: VaultSummary;
+  index: number;
+}) {
+  const { vault, budget, lastPayment } = entry;
+  const paused = vault.pausedAt !== null;
+  const util = Math.round(budget.dailyUtilization * 100);
+  const isMainnet = vault.network === "mainnet";
+
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 14, scale: 0.985 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -8, scale: 0.985 }}
+      transition={{ duration: 0.55, ease: EASE, delay: Math.min(index * 0.045, 0.25) }}
+    >
+      <Link
+        href={`/vault/${vault.id}`}
+        className="group block p-5 sm:p-6 rounded-[20px] transition-all duration-300 hover:-translate-y-0.5"
+        style={{
+          background: "var(--surface)",
+          border: "0.5px solid var(--border-subtle)",
+          boxShadow:
+            "0 1px 2px rgba(0,0,0,0.03), 0 10px 28px rgba(0,0,0,0.04)",
+        }}
+      >
+        {/* Row 1 — identity + status */}
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-start gap-3 min-w-0">
+            <div
+              className="w-11 h-11 rounded-[14px] flex items-center justify-center text-[22px] flex-shrink-0"
+              style={{
+                background: "var(--surface-2)",
+                border: "0.5px solid var(--border-subtle)",
+              }}
+            >
+              <span aria-hidden>{vault.emoji || "🧭"}</span>
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3
+                  className="text-[16.5px] font-semibold tracking-[-0.015em] truncate"
+                  style={{ color: "var(--text-primary)" }}
+                >
+                  {vault.name}
+                </h3>
+                <NetworkPill mainnet={isMainnet} />
+              </div>
+              <p
+                className="mt-0.5 text-[12.5px] truncate"
+                style={{ color: "var(--text-tertiary)" }}
+              >
+                {vault.purpose || "research agent"} ·{" "}
+                <span className="font-mono">
+                  {truncate(vault.squadsAddress, 4, 4)}
+                </span>
+              </p>
+            </div>
+          </div>
+
+          <StatusPill paused={paused} />
+        </div>
+
+        {/* Row 2 — daily budget meter */}
+        <div className="mt-5">
+          <div className="flex items-baseline justify-between mb-1.5">
+            <span
+              className="text-[10.5px] font-semibold uppercase tracking-[0.08em]"
+              style={{ color: "var(--text-tertiary)" }}
+            >
+              Daily budget
+            </span>
+            <span
+              className="text-[12px] font-mono-numbers font-medium tabular-nums"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              <span style={{ color: "var(--text-primary)" }}>
+                {fmtUsd(budget.spentToday)}
+              </span>{" "}
+              / {fmtUsd(budget.dailyLimitUsd)}
+            </span>
+          </div>
+          <div
+            className="h-1.5 rounded-full overflow-hidden"
+            style={{ background: "var(--surface-2)" }}
+          >
+            <motion.div
+              initial={{ width: 0 }}
+              animate={{ width: `${util}%` }}
+              transition={{ duration: 0.9, ease: EASE, delay: 0.1 }}
+              className="h-full rounded-full"
+              style={{
+                background:
+                  util >= 90
+                    ? "linear-gradient(90deg, #f59e0b, #dc2626)"
+                    : "var(--text-primary)",
+              }}
+            />
+          </div>
+          <div className="flex items-center justify-between mt-2">
+            <span
+              className="text-[11px]"
+              style={{ color: "var(--text-tertiary)" }}
+            >
+              {util}% used · {fmtUsd(Math.max(0, budget.dailyLimitUsd - budget.spentToday))} left
+            </span>
+            <span
+              className="text-[11px]"
+              style={{ color: "var(--text-tertiary)" }}
+            >
+              Weekly {fmtUsd(budget.spentThisWeek)} / {fmtUsd(budget.weeklyLimitUsd)}
+            </span>
+          </div>
+        </div>
+
+        {/* Row 3 — last activity + policy badges */}
+        <div
+          className="mt-5 pt-4 border-t flex items-center justify-between gap-3"
+          style={{ borderColor: "var(--border-subtle)" }}
+        >
+          <LastActivity payment={lastPayment} />
+          <div
+            className="inline-flex items-center gap-1.5 text-[12px] font-semibold group-hover:gap-2 transition-all"
+            style={{ color: "var(--text-primary)" }}
+          >
+            Open
+            <ArrowUpRight className="w-3.5 h-3.5 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+          </div>
+        </div>
+      </Link>
+    </motion.div>
+  );
+}
+
+function NetworkPill({ mainnet }: { mainnet: boolean }) {
+  return (
+    <span
+      className="inline-flex items-center h-5 px-1.5 rounded-[5px] text-[9.5px] font-semibold uppercase tracking-[0.06em]"
+      style={{
+        background: mainnet ? "rgba(16,185,129,0.08)" : "var(--surface-2)",
+        color: mainnet ? "#047857" : "var(--text-tertiary)",
+        border: mainnet ? "0.5px solid rgba(16,185,129,0.25)" : "0.5px solid var(--border-subtle)",
+      }}
+    >
+      {mainnet ? "Mainnet" : "Devnet"}
+    </span>
+  );
+}
+
+function StatusPill({ paused }: { paused: boolean }) {
+  return (
+    <span
+      className="inline-flex items-center gap-1 h-6 px-2 rounded-full text-[10.5px] font-semibold tracking-[0.02em] whitespace-nowrap"
+      style={{
+        background: paused ? "rgba(245,158,11,0.10)" : "rgba(16,185,129,0.10)",
+        color: paused ? "#b45309" : "#047857",
+        border: paused
+          ? "0.5px solid rgba(245,158,11,0.28)"
+          : "0.5px solid rgba(16,185,129,0.28)",
+      }}
+    >
+      {paused ? (
+        <>
+          <Pause className="w-2.5 h-2.5" /> Paused
+        </>
+      ) : (
+        <>
+          <ShieldCheck className="w-2.5 h-2.5" /> Live
+        </>
+      )}
+    </span>
+  );
+}
+
+function LastActivity({
+  payment,
+}: {
+  payment: VaultSummary["lastPayment"];
+}) {
+  if (!payment) {
     return (
-      <button onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-2 h-9 px-4 rounded-lg bg-foreground text-background text-[12px] font-medium hover:bg-foreground/90 transition-colors">
-        <Plus className="w-3.5 h-3.5" /> Add Wallet
-      </button>
+      <div
+        className="text-[12px]"
+        style={{ color: "var(--text-tertiary)" }}
+      >
+        No activity yet
+      </div>
     );
   }
 
+  const statusColor: Record<"allowed" | "settled" | "blocked" | "failed", string> = {
+    allowed: "#047857",
+    settled: "#047857",
+    blocked: "#b45309",
+    failed: "#b91c1c",
+  };
+
   return (
-    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}
-      className="rounded-xl border border-black/[0.06] bg-white p-5 space-y-3" style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.02)" }}>
-      <h3 className="text-[14px] font-semibold tracking-tight">Add Wallet to Monitor</h3>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div className="sm:col-span-2">
-          <label className="block text-[12px] text-tertiary font-medium mb-1">Wallet Address</label>
-          <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="0x..."
-            className="w-full h-9 px-3 rounded-lg border border-black/[0.08] text-[13px] font-mono placeholder:text-quaternary focus:outline-none focus:ring-2 focus:ring-pulse/20" />
+    <div className="min-w-0 flex-1">
+      <div className="flex items-center gap-2 text-[12px]">
+        <span
+          className="inline-block w-1.5 h-1.5 rounded-full flex-shrink-0"
+          style={{ background: statusColor[payment.status] ?? "var(--text-primary)" }}
+        />
+        <span
+          className="font-medium truncate"
+          style={{ color: "var(--text-secondary)" }}
+        >
+          {payment.merchant}
+        </span>
+        <span
+          className="font-mono-numbers tabular-nums flex-shrink-0"
+          style={{ color: "var(--text-primary)" }}
+        >
+          {fmtUsd(payment.amountUsd)}
+        </span>
+      </div>
+      <div
+        className="text-[11px] mt-0.5 capitalize"
+        style={{ color: "var(--text-tertiary)" }}
+      >
+        {payment.status} · {fmtRelative(payment.createdAt)}
+      </div>
+    </div>
+  );
+}
+
+function LoadingGrid() {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {[0, 1, 2, 3].map((i) => (
+        <div
+          key={i}
+          className="p-6 rounded-[20px] animate-pulse"
+          style={{
+            background: "var(--surface)",
+            border: "0.5px solid var(--border-subtle)",
+          }}
+        >
+          <div className="flex items-start gap-3">
+            <div
+              className="w-11 h-11 rounded-[14px]"
+              style={{ background: "var(--surface-2)" }}
+            />
+            <div className="flex-1 space-y-2">
+              <div
+                className="h-4 w-1/2 rounded"
+                style={{ background: "var(--surface-2)" }}
+              />
+              <div
+                className="h-3 w-2/3 rounded"
+                style={{ background: "var(--surface-2)" }}
+              />
+            </div>
+          </div>
+          <div
+            className="mt-6 h-1.5 w-full rounded-full"
+            style={{ background: "var(--surface-2)" }}
+          />
+          <div
+            className="mt-6 h-3 w-3/4 rounded"
+            style={{ background: "var(--surface-2)" }}
+          />
         </div>
-        <div>
-          <label className="block text-[12px] text-tertiary font-medium mb-1">Label</label>
-          <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Main Revenue"
-            className="w-full h-9 px-3 rounded-lg border border-black/[0.08] text-[13px] placeholder:text-quaternary focus:outline-none focus:ring-2 focus:ring-pulse/20" />
+      ))}
+    </div>
+  );
+}
+
+function EmptyState() {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 14, scale: 0.99 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.6, ease: EASE }}
+      className="relative overflow-hidden rounded-[24px] p-10 sm:p-14 text-center"
+      style={{
+        background: "var(--surface)",
+        border: "0.5px solid var(--border-subtle)",
+        boxShadow:
+          "0 1px 2px rgba(0,0,0,0.03), 0 18px 40px rgba(0,0,0,0.05)",
+      }}
+    >
+      {/* Backdrop glow */}
+      <div
+        aria-hidden
+        className="absolute inset-0 -z-10 opacity-80"
+        style={{
+          background:
+            "radial-gradient(ellipse 60% 50% at 50% 0%, rgba(0,0,0,0.04), transparent 70%)",
+        }}
+      />
+
+      {/* Icon stack */}
+      <div className="flex justify-center mb-5">
+        <div className="relative">
+          <div
+            className="w-14 h-14 rounded-[18px] flex items-center justify-center"
+            style={{
+              background: "var(--text-primary)",
+              boxShadow:
+                "0 1px 2px rgba(0,0,0,0.08), 0 12px 28px rgba(0,0,0,0.12)",
+            }}
+          >
+            <ShieldCheck
+              className="w-6 h-6"
+              style={{ color: "var(--background)" }}
+            />
+          </div>
+          <motion.div
+            aria-hidden
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.7, ease: EASE, delay: 0.15 }}
+            className="absolute -right-3 -top-3 w-7 h-7 rounded-full flex items-center justify-center"
+            style={{
+              background: "var(--surface)",
+              border: "0.5px solid var(--border-subtle)",
+              boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
+            }}
+          >
+            <Sparkles
+              className="w-3.5 h-3.5"
+              style={{ color: "var(--text-primary)" }}
+            />
+          </motion.div>
         </div>
       </div>
-      <div>
-        <label className="block text-[12px] text-tertiary font-medium mb-1">Purpose</label>
-        <select value={purpose} onChange={(e) => setPurpose(e.target.value)}
-          className="h-9 px-3 rounded-lg border border-black/[0.08] text-[12px] bg-white focus:outline-none focus:ring-2 focus:ring-pulse/20">
-          <option value="receivable">Receivable (x402 payments)</option>
-          <option value="gas">Gas (transaction fees)</option>
-          <option value="operational">Operational</option>
-        </select>
+
+      <h2
+        className="text-[26px] font-semibold tracking-[-0.02em]"
+        style={{ color: "var(--text-primary)" }}
+      >
+        No vaults yet.
+      </h2>
+      <p
+        className="mt-2 max-w-[460px] mx-auto text-[14.5px] leading-[1.55]"
+        style={{ color: "var(--text-secondary)" }}
+      >
+        A vault is a Squads v4 smart account with a policy layer. Set
+        limits, pick allowed merchants, and hand the agent a key that
+        carries budgets — not bearer power.
+      </p>
+
+      <div className="mt-7 flex flex-col sm:flex-row items-center justify-center gap-3">
+        <Link
+          href="/vault/new"
+          className="group inline-flex items-center gap-2 h-12 px-6 rounded-[14px] text-[14.5px] font-semibold transition-opacity duration-200 hover:opacity-90"
+          style={{
+            background: "var(--text-primary)",
+            color: "var(--background)",
+            boxShadow:
+              "0 1px 2px rgba(0,0,0,0.04), 0 10px 28px rgba(0,0,0,0.10)",
+          }}
+        >
+          Create your first vault
+          <ArrowRight className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-0.5" />
+        </Link>
+        <Link
+          href="/docs"
+          className="inline-flex items-center gap-1.5 h-12 px-5 rounded-[14px] text-[13.5px] font-semibold transition-colors duration-200"
+          style={{
+            background: "var(--surface-2)",
+            color: "var(--text-secondary)",
+            border: "0.5px solid var(--border-subtle)",
+          }}
+        >
+          Read the docs
+        </Link>
       </div>
-      {error && <p className="text-[12px] text-red-600 bg-red-50 dark:bg-red-900/20 rounded-lg p-2">{error}</p>}
-      <div className="flex items-center gap-2">
-        <button onClick={add} disabled={loading || !address || !label}
-          className="inline-flex items-center gap-2 h-9 px-4 rounded-lg bg-foreground text-background text-[12px] font-medium hover:bg-foreground/90 disabled:opacity-50 transition-colors">
-          {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
-          {loading ? "Adding..." : "Add Wallet"}
-        </button>
-        <button onClick={() => setOpen(false)} className="text-[12px] text-tertiary hover:text-primary transition-colors">Cancel</button>
+
+      {/* Micro-stat row (conceptual — matches the product's pitch) */}
+      <div
+        className="mt-9 pt-6 border-t grid grid-cols-3 gap-4 max-w-[520px] mx-auto"
+        style={{ borderColor: "var(--border-subtle)" }}
+      >
+        <MiniFact top="Squads v4" bottom="Smart account" />
+        <MiniFact top="Policy-first" bottom="Budgets, not keys" />
+        <MiniFact top="< 2 min" bottom="To first vault" />
       </div>
     </motion.div>
   );
 }
 
-function VaultContent() {
-  const [wallets, setWallets] = useState<WalletData[]>([]);
-  const [totalUsdc, setTotalUsdc] = useState(0);
-  const [totalEth, setTotalEth] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [syncing, setSyncing] = useState(false);
-  const [removeTarget, setRemoveTarget] = useState<string | null>(null);
-
-  const load = useCallback(() => {
-    fetch("/api/vault/wallets", { credentials: "include" })
-      .then((r) => r.json())
-      .then((d) => {
-        setWallets(d.wallets || []);
-        setTotalUsdc(d.total_balance_usdc || 0);
-        setTotalEth(d.total_balance_eth || 0);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
-
-  useEffect(() => { load(); }, [load]);
-
-  async function syncAll() {
-    setSyncing(true);
-    await fetch("/api/vault/wallets/sync", { method: "POST", credentials: "include" });
-    load();
-    setSyncing(false);
-  }
-
-  async function remove(id: string) {
-    await fetch(`/api/vault/wallets?id=${id}`, { method: "DELETE", credentials: "include" });
-    load();
-    setRemoveTarget(null);
-  }
-
-  if (loading) {
-    return (
-      <div className="space-y-6">
-        <div className="h-8 w-40 bg-[#F0F0F0] rounded animate-pulse" />
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {[...Array(3)].map((_, i) => <div key={i} className="h-24 bg-[#F0F0F0] rounded-xl animate-pulse" />)}
-        </div>
-      </div>
-    );
-  }
-
-  const lowFundsCount = wallets.filter((w) => (w.balance_usdc || 0) < 0.01 && w.balance_usdc !== null).length;
-
+function MiniFact({ top, bottom }: { top: string; bottom: string }) {
   return (
-    <div className="space-y-8">
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-[22px] font-bold tracking-tight">Vault</h1>
-          <p className="text-[13px] text-tertiary mt-1">Monitor your x402 wallets. Track balances. Stay funded.</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button onClick={syncAll} disabled={syncing}
-            className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg border border-black/[0.08] text-[12px] font-medium text-secondary hover:text-primary disabled:opacity-50 transition-colors">
-            <RefreshCw className={cn("w-3.5 h-3.5", syncing && "animate-spin")} />
-            {syncing ? "Syncing..." : "Sync All"}
-          </button>
-          <AddWalletForm onAdded={load} />
-        </div>
+    <div>
+      <div
+        className="text-[14px] font-semibold tracking-[-0.01em]"
+        style={{ color: "var(--text-primary)" }}
+      >
+        {top}
       </div>
-
-      {/* Portfolio cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {[
-          { icon: DollarSign, label: "USDC Balance", value: `$${totalUsdc.toFixed(2)}`, sub: "Across all wallets" },
-          { icon: Coins, label: "ETH Balance", value: `${totalEth.toFixed(4)} ETH`, sub: "Across all wallets" },
-          { icon: Eye, label: "Wallets Monitored", value: wallets.length.toString(), sub: lowFundsCount > 0 ? `${lowFundsCount} low funds` : "All healthy" },
-        ].map((card, i) => (
-          <motion.div
-            key={card.label}
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: i * 0.08, ease }}
-            className="rounded-xl border border-black/[0.06] bg-white p-5"
-            style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.02)" }}
-          >
-            <div className="flex items-center gap-2 mb-2">
-              <card.icon className="w-4 h-4 text-quaternary" />
-              <span className="text-[11px] text-quaternary font-medium uppercase tracking-wider">{card.label}</span>
-            </div>
-            <p className="text-[22px] font-bold font-mono-numbers tracking-tight">{card.value}</p>
-            <p className="text-[11px] text-quaternary mt-0.5">{card.sub}</p>
-          </motion.div>
-        ))}
+      <div
+        className="text-[11.5px] mt-0.5"
+        style={{ color: "var(--text-tertiary)" }}
+      >
+        {bottom}
       </div>
-
-      {/* Wallet list */}
-      {wallets.length > 0 ? (
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.3, ease }}
-          className="rounded-xl border border-black/[0.06] bg-white overflow-hidden"
-          style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.02)" }}
-        >
-          <div className="px-5 py-4 border-b border-black/[0.04]">
-            <h3 className="text-[14px] font-semibold tracking-tight">Your Wallets</h3>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[700px]">
-              <thead>
-                <tr className="border-b border-black/[0.04]">
-                  <th className="text-left text-[10px] font-medium text-quaternary uppercase tracking-wider px-5 py-3">Address</th>
-                  <th className="text-left text-[10px] font-medium text-quaternary uppercase tracking-wider px-3 py-3">Label</th>
-                  <th className="text-left text-[10px] font-medium text-quaternary uppercase tracking-wider px-3 py-3">Purpose</th>
-                  <th className="text-right text-[10px] font-medium text-quaternary uppercase tracking-wider px-3 py-3">USDC</th>
-                  <th className="text-right text-[10px] font-medium text-quaternary uppercase tracking-wider px-3 py-3">ETH</th>
-                  <th className="text-right text-[10px] font-medium text-quaternary uppercase tracking-wider px-3 py-3">Status</th>
-                  <th className="text-right text-[10px] font-medium text-quaternary uppercase tracking-wider px-5 py-3">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {wallets.map((w) => {
-                  const isLow = (w.balance_usdc || 0) < 0.01 && w.balance_usdc !== null;
-                  return (
-                    <tr key={w.id} className={cn(
-                      "border-b border-black/[0.03]/50 last:border-0 transition-colors",
-                      isLow ? "bg-amber-50/50 dark:bg-amber-900/10" : "hover:bg-[#FAFAFA]"
-                    )}>
-                      <td className="px-5 py-3">
-                        <a href={`https://basescan.org/address/${w.address}`} target="_blank" rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 font-mono text-[12px] text-pulse hover:underline">
-                          {truncateAddress(w.address, 8)}
-                          <ExternalLink className="w-2.5 h-2.5" />
-                        </a>
-                      </td>
-                      <td className="px-3 py-3 text-[13px] font-medium">{w.label}</td>
-                      <td className="px-3 py-3">
-                        <span className={cn("text-[10px] font-semibold px-2 py-0.5 rounded-full uppercase tracking-wider",
-                          w.purpose === "receivable" ? "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600" :
-                          w.purpose === "gas" ? "bg-amber-50 dark:bg-amber-900/30 text-amber-600" :
-                          "bg-blue-50 dark:bg-blue-900/30 text-blue-600"
-                        )}>{w.purpose}</span>
-                      </td>
-                      <td className="px-3 py-3 text-right font-mono-numbers text-[12px] font-medium">
-                        ${(w.balance_usdc || 0).toFixed(2)}
-                      </td>
-                      <td className="px-3 py-3 text-right font-mono-numbers text-[12px] text-tertiary">
-                        {(w.balance_eth || 0).toFixed(4)}
-                      </td>
-                      <td className="px-3 py-3 text-right">
-                        {isLow ? (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-600">
-                            <AlertCircle className="w-3 h-3" /> Low
-                          </span>
-                        ) : (
-                          <span className="text-[10px] font-semibold text-emerald-600">Active</span>
-                        )}
-                      </td>
-                      <td className="px-5 py-3 text-right">
-                        <button onClick={() => setRemoveTarget(w.id)} className="p-1.5 rounded hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
-                          <Trash2 className="w-3 h-3 text-red-400" />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </motion.div>
-      ) : (
-        <div className="rounded-xl border border-black/[0.06] bg-white p-8 text-center">
-          <Wallet className="w-10 h-10 text-quaternary mx-auto mb-3" />
-          <p className="text-[14px] font-medium">No wallets monitored</p>
-          <p className="text-[12px] text-tertiary mt-1">Add your x402 payment wallets to track balances and get low-funds alerts.</p>
-        </div>
-      )}
-      <ConfirmModal
-        open={!!removeTarget}
-        title="Remove Wallet"
-        description="This wallet will be removed from monitoring. Balance history will be deleted."
-        confirmLabel="Remove"
-        variant="danger"
-        onConfirm={() => removeTarget && remove(removeTarget)}
-        onCancel={() => setRemoveTarget(null)}
-      />
     </div>
-  );
-}
-
-export default function VaultPage() {
-  return (
-    <ConnectGate>
-      <VaultContent />
-    </ConnectGate>
   );
 }

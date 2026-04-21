@@ -1,48 +1,85 @@
 import Link from "next/link";
-import Image from "next/image";
 
+/* ════════════════════════════════════════════════════════════════════
+   Footer — minimalist. Brand, three columns, fine print.
+   ════════════════════════════════════════════════════════════════════ */
+
+/**
+ * Footer link groups — simplified after the reframe.
+ *
+ * Before: two "product" columns ("Pay side · Vault" / "Earn side · Pulse")
+ * that made Kyvern look like two separate companies. After: one "Product"
+ * column that describes WHAT Kyvern does, a "Developers" column with the
+ * technical surfaces, and a "Company" column. No more brand splitting.
+ */
 const LINKS = {
   Product: [
-    { label: "Pulse", href: "/pulse" },
-    { label: "Dashboard", href: "/pulse/dashboard" },
-    { label: "x402 Services", href: "/services" },
-    { label: "Pricing", href: "/pulse#pricing" },
+    { label: "Start free", href: "/app" },
+    { label: "How it works", href: "/#stack" },
+    { label: "Live demo", href: "/demo" },
   ],
   Developers: [
-    { label: "Setup Guide", href: "/pulse/dashboard/setup" },
-    { label: "npm @kyvernlabs/pulse", href: "https://www.npmjs.com/package/@kyvernlabs/pulse" },
-    { label: "npm @kyvernlabs/mcp", href: "https://www.npmjs.com/package/@kyvernlabs/mcp" },
-    { label: "GitHub", href: "https://github.com/shariqazeem/kyvernlabs" },
+    { label: "Documentation", href: "/docs" },
+    { label: "SDK on npm", href: "https://www.npmjs.com/package/@kyvernlabs/sdk" },
+    { label: "Pulse middleware", href: "https://www.npmjs.com/package/@kyvernlabs/pulse" },
+    { label: "Kyvern program", href: "https://explorer.solana.com/address/PpmZErWfT5zpeo1fJtTbpqezFGbRUamaNNRWViaMSqc?cluster=devnet" },
+    { label: "Built on Squads v4", href: "https://squads.so" },
   ],
-  Ecosystem: [
-    { label: "x402 Protocol", href: "https://x402.org" },
-    { label: "x402 Foundation", href: "https://x402.org" },
-    { label: "Base", href: "https://base.org" },
+  Company: [
+    { label: "GitHub", href: "https://github.com/shariqazeem/kyvernlabs" },
+    { label: "Contact", href: "mailto:hi@kyvernlabs.com" },
+    { label: "Privacy", href: "/privacy" },
+    { label: "Terms", href: "/terms" },
   ],
 };
 
 export function Footer() {
   return (
-    <footer className="border-t border-black/[0.04] py-16 lg:py-20 px-6">
-      <div className="max-w-5xl mx-auto">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-10 lg:gap-16">
+    <footer
+      className="relative pt-20 pb-10 px-6"
+      style={{ borderTop: "0.5px solid var(--border)" }}
+    >
+      <div className="max-w-6xl mx-auto">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-12 lg:gap-16">
           {/* Brand */}
           <div className="col-span-2 md:col-span-1">
-            <div className="flex items-center gap-2.5 mb-4">
-              <Image src="/og-image.jpg" alt="KyvernLabs" width={24} height={24} className="rounded-md" />
-              <span className="text-[13px] font-semibold tracking-tight">KyvernLabs</span>
-            </div>
-            <p className="text-[13px] text-quaternary leading-relaxed">
-              The infrastructure company
-              <br />
-              for the x402 economy.
+            <Link
+              href="/"
+              className="inline-flex items-center gap-2 mb-5"
+            >
+              <div
+                className="w-7 h-7 rounded-[8px] flex items-center justify-center"
+                style={{ background: "var(--text-primary)" }}
+              >
+                <span className="text-white text-[13px] font-bold tracking-tight">
+                  K
+                </span>
+              </div>
+              <span
+                className="text-[15px] font-semibold tracking-tight"
+                style={{
+                  color: "var(--text-primary)",
+                  letterSpacing: "-0.01em",
+                }}
+              >
+                Kyvern
+              </span>
+            </Link>
+            <p
+              className="text-[13px] leading-[1.6] max-w-[240px]"
+              style={{ color: "var(--text-tertiary)" }}
+            >
+              Agent commerce on Solana. Spend within limits the chain enforces,
+              earn every payment verified on-chain.
             </p>
           </div>
 
-          {/* Link columns */}
           {Object.entries(LINKS).map(([category, links]) => (
             <div key={category}>
-              <p className="text-[11px] uppercase tracking-[0.15em] font-medium text-quaternary mb-4">
+              <p
+                className="text-[11px] font-medium uppercase tracking-[0.08em] mb-4"
+                style={{ color: "var(--text-quaternary)" }}
+              >
                 {category}
               </p>
               <div className="space-y-2.5">
@@ -50,7 +87,8 @@ export function Footer() {
                   <Link
                     key={link.label}
                     href={link.href}
-                    className="block text-[13px] text-tertiary hover:text-primary transition-colors duration-300"
+                    className="block text-[13.5px] transition-colors duration-200"
+                    style={{ color: "var(--text-secondary)" }}
                   >
                     {link.label}
                   </Link>
@@ -60,14 +98,28 @@ export function Footer() {
           ))}
         </div>
 
-        <div className="mt-16 pt-8 border-t border-black/[0.04] flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p className="text-[12px] text-quaternary">
-            &copy; {new Date().getFullYear()} KyvernLabs. All rights reserved.
+        <div
+          className="mt-20 mb-8 h-px"
+          style={{ background: "var(--border)" }}
+        />
+
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <p
+            className="text-[12px]"
+            style={{ color: "var(--text-quaternary)" }}
+          >
+            &copy; {new Date().getFullYear()} Kyvern · Kyvern policy program + Squads v4 · Solana devnet · pre-alpha
           </p>
-          <p className="text-[12px] text-quaternary">
-            Built by{" "}
-            <span className="text-tertiary font-medium">@shariqshkt</span>
-          </p>
+          {/* Bottom-bar kept intentionally minimal — just the builder's
+              signature. Privacy + Terms live in the Company column above. */}
+          <Link
+            href="https://x.com/shariqshkt"
+            target="_blank"
+            className="text-[12px] transition-colors"
+            style={{ color: "var(--text-quaternary)" }}
+          >
+            Built by @shariqshkt
+          </Link>
         </div>
       </div>
     </footer>

@@ -20,24 +20,20 @@ const SITE_URL = "https://kyvernlabs.com";
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "KyvernLabs — The Business Layer for the x402 Economy",
-    template: "%s | KyvernLabs",
+    default: "Kyvern — Let your AI agents run free.",
+    template: "%s · Kyvern",
   },
   description:
-    "Revenue analytics, wallet-native auth, and on-chain verification for x402 service providers. One line of code turns any x402 endpoint into a real company. Built for the x402 Foundation ecosystem.",
+    "Kyvern is the Solana program that replaces private keys with budgets enforced by consensus. Deploy an AI agent, set the rules on-chain, let it run. Atlas — our reference agent — is live on devnet now.",
   keywords: [
-    "x402", "x402 analytics", "x402 dashboard", "x402 revenue",
-    "x402 middleware", "x402 payments", "x402 protocol",
-    "x402 foundation", "x402 infrastructure", "x402 business layer",
-    "HTTP 402", "micropayments", "agent payments", "AI agent commerce",
-    "agentic finance", "agentic economy", "agent-to-agent payments",
-    "USDC payments", "Base blockchain", "blockchain analytics",
-    "crypto payments dashboard", "web3 analytics", "DeFi analytics",
-    "payment protocol", "API monetization", "API analytics",
-    "KyvernLabs", "Pulse analytics", "withPulse middleware",
-    "x402 service provider", "x402 endpoint analytics",
-    "Coinbase x402", "Cloudflare x402", "Stripe x402",
-    "on-chain verification", "SIWE authentication",
+    "autonomous AI agent", "agent autonomy", "AI agent wallet",
+    "on-chain authorization", "agent authorization layer",
+    "agent policy program", "Solana agent infrastructure",
+    "Squads Protocol", "Squads v4", "Squads spending limits",
+    "Solana smart account", "Solana multisig", "agent commerce on Solana",
+    "x402 Solana", "x402 payments", "USDC Solana",
+    "Kyvern", "KyvernLabs", "Atlas autonomous agent",
+    "Shariq Azeem",
   ],
   authors: [{ name: "KyvernLabs", url: SITE_URL }],
   creator: "KyvernLabs",
@@ -47,23 +43,23 @@ export const metadata: Metadata = {
     locale: "en_US",
     url: SITE_URL,
     siteName: "KyvernLabs",
-    title: "KyvernLabs — The Business Layer for x402",
+    title: "Kyvern — Let your AI agents run free.",
     description:
-      "Revenue analytics and on-chain verification for every x402 service provider. Wallet-native auth. One-line middleware. Built for the x402 Foundation ecosystem.",
+      "The Solana program that lets AI agents operate real money autonomously. Budgets enforced by consensus. Watch Atlas run live on devnet.",
     images: [
       {
         url: "/og-image.jpg",
-        width: 512,
-        height: 512,
-        alt: "KyvernLabs — The Business Layer for x402",
+        width: 1200,
+        height: 630,
+        alt: "Kyvern — Let your AI agents run free.",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "KyvernLabs — The Business Layer for x402",
+    title: "Kyvern — Let your AI agents run free.",
     description:
-      "Revenue analytics and on-chain verification for every x402 service provider. Built for the x402 Foundation ecosystem.",
+      "Solana-native authorization for autonomous AI agents. Atlas — our reference agent — is operating real money on devnet right now.",
     images: ["/og-image.jpg"],
     creator: "@shariqshkt",
   },
@@ -95,7 +91,6 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`}>
       <head>
-        {/* Structured data — Organization */}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
@@ -105,27 +100,31 @@ export default function RootLayout({
               name: "KyvernLabs",
               url: SITE_URL,
               logo: `${SITE_URL}/og-image.jpg`,
-              description: "The business layer for the x402 economy. Revenue analytics, wallet-native auth, and on-chain verification for x402 service providers.",
+              description:
+                "Kyvern is the Solana program that gives AI agents real economic autonomy. Replaces private keys with budgets, allowlists, and velocity caps enforced by consensus. Atlas — our reference agent — operates autonomously on devnet.",
               founder: { "@type": "Person", name: "Shariq Azeem" },
-              sameAs: ["https://x.com/shariqshkt", "https://github.com/shariqazeem/kyvernlabs"],
+              sameAs: [
+                "https://x.com/shariqshkt",
+                "https://github.com/shariqazeem/kyvernlabs",
+              ],
             }),
           }}
         />
-        {/* Structured data — SoftwareApplication */}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
             __html: JSON.stringify({
               "@context": "https://schema.org",
               "@type": "SoftwareApplication",
-              name: "Pulse by KyvernLabs",
-              applicationCategory: "BusinessApplication",
+              name: "KyvernLabs Vault",
+              applicationCategory: "FinanceApplication",
               operatingSystem: "Web",
-              url: `${SITE_URL}/pulse`,
-              description: "Real-time revenue intelligence for x402 service providers. One-line middleware integration with on-chain verification.",
+              url: `${SITE_URL}/vault`,
+              description:
+                "Per-agent smart wallets on Solana with hard budgets, merchant allowlists, velocity caps, and a one-click kill switch. Built on Squads Protocol.",
               offers: [
                 { "@type": "Offer", price: "0", priceCurrency: "USD", name: "Free" },
-                { "@type": "Offer", price: "49", priceCurrency: "USD", name: "Pro" },
+                { "@type": "Offer", price: "99", priceCurrency: "USD", name: "Team" },
               ],
             }),
           }}

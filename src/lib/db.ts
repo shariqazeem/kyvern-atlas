@@ -95,9 +95,9 @@ function migrate(db: Database.Database) {
   db.exec("CREATE INDEX IF NOT EXISTS idx_events_source ON events(source)");
 
   // Composite indexes for query performance
+  // (idx_snapshots_wallet_ts is created further down, after wallet_snapshots exists)
   db.exec("CREATE INDEX IF NOT EXISTS idx_events_apikey_ts ON events(api_key_id, timestamp DESC)");
   db.exec("CREATE INDEX IF NOT EXISTS idx_daily_stats_lookup ON daily_stats(api_key_id, date)");
-  db.exec("CREATE INDEX IF NOT EXISTS idx_snapshots_wallet_ts ON wallet_snapshots(wallet_id, fetched_at DESC)");
 
   // Waitlist table
   db.exec(`
@@ -245,7 +245,121 @@ function migrate(db: Database.Database) {
       fetched_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
     CREATE INDEX IF NOT EXISTS idx_snapshots_wallet ON wallet_snapshots(wallet_id);
+    CREATE INDEX IF NOT EXISTS idx_snapshots_wallet_ts ON wallet_snapshots(wallet_id, fetched_at DESC);
   `);
+
+  // ─── KyvernLabs Vault (Solana + Squads v4 — the Visa for every AI agent) ───
+  //
+  // Core tables for the agent-wallet product. A `vault` is a Squads v4 smart
+  // account delegated to a single AI agent with a hard spending limit, a
+  // merchant allowlist, a velocity cap, and a kill switch. Every payment
+  // attempt — allowed or blocked — is logged to `vault_payments` for audit.
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS vaults (
+      id                    TEXT PRIMARY KEY,
+      owner_wallet          TEXT NOT NULL,
+      name                  TEXT NOT NULL,
+      emoji                 TEXT NOT NULL DEFAULT '🧭',
+      purpose               TEXT NOT NULL DEFAULT 'research',
+
+      -- Budgets, denominated in USD (USDC 1:1)
+      daily_limit_usd       REAL NOT NULL DEFAULT 50,
+      weekly_limit_usd      REAL NOT NULL DEFAULT 250,
+      per_tx_max_usd        REAL NOT NULL DEFAULT 5,
+
+      -- Velocity policy
+      max_calls_per_window  INTEGER NOT NULL DEFAULT 60,
+      velocity_window       TEXT NOT NULL DEFAULT '1h',  -- '1h' | '1d' | '1w'
+
+      -- Merchant allowlist: JSON array of normalized hosts, [] = any host
+      allowed_merchants     TEXT NOT NULL DEFAULT '[]',
+      require_memo          INTEGER NOT NULL DEFAULT 1,
+
+      -- Squads smart account
+      squads_address        TEXT NOT NULL,
+      network               TEXT NOT NULL DEFAULT 'devnet',  -- 'devnet' | 'mainnet'
+
+      -- Kill switch
+      paused_at             TEXT,
+
+      created_at            TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at            TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_vaults_owner    ON vaults(owner_wallet);
+    CREATE INDEX IF NOT EXISTS idx_vaults_squads   ON vaults(squads_address);
+    CREATE INDEX IF NOT EXISTS idx_vaults_created  ON vaults(created_at DESC);
+  `);
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS vault_agent_keys (
+      id             TEXT PRIMARY KEY,
+      vault_id       TEXT NOT NULL,
+      key_hash       TEXT NOT NULL UNIQUE,
+      key_prefix     TEXT NOT NULL,           -- first 14 chars for UI, e.g. 'kv_live_abc123'
+      label          TEXT NOT NULL DEFAULT 'primary',
+      created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+      last_used_at   TEXT,
+      revoked_at     TEXT,
+      FOREIGN KEY (vault_id) REFERENCES vaults(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_agent_keys_vault ON vault_agent_keys(vault_id);
+    CREATE INDEX IF NOT EXISTS idx_agent_keys_hash  ON vault_agent_keys(key_hash);
+  `);
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS vault_payments (
+      id             TEXT PRIMARY KEY,
+      vault_id       TEXT NOT NULL,
+      agent_key_id   TEXT,
+      merchant       TEXT NOT NULL,
+      amount_usd     REAL NOT NULL,
+      memo           TEXT,
+      status         TEXT NOT NULL,           -- 'allowed' | 'blocked' | 'settled' | 'failed'
+      reason         TEXT,                    -- policy-engine block reason or settle tx
+      tx_signature   TEXT,                    -- Squads v4 tx sig when settled
+      latency_ms     INTEGER,
+      created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (vault_id) REFERENCES vaults(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_payments_vault     ON vault_payments(vault_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_payments_status    ON vault_payments(status);
+    CREATE INDEX IF NOT EXISTS idx_payments_merchant  ON vault_payments(merchant);
+    CREATE INDEX IF NOT EXISTS idx_payments_ts        ON vault_payments(created_at DESC);
+  `);
+
+  // ─── Real Squads v4 on-chain storage ────────────────────────────────
+  // When running in real mode we need to remember two things per vault:
+  //   · spending_limit_pda      — the Squads SpendingLimit account
+  //   · spending_limit_create_key — the random pubkey used to derive that PDA
+  //                                  (re-deriving requires this seed)
+  // And two things per agent key:
+  //   · solana_pubkey           — the delegate pubkey on the spending limit
+  //   · solana_secret_b58       — base58 secret key; server-side only
+  //                               (never leaves the server)
+  //
+  // These columns are ALTER-added so existing DBs migrate in place.
+  {
+    const vCols = db.pragma("table_info(vaults)") as Array<{ name: string }>;
+    const v = new Set(vCols.map((c) => c.name));
+    if (!v.has("spending_limit_pda"))
+      db.exec("ALTER TABLE vaults ADD COLUMN spending_limit_pda TEXT");
+    if (!v.has("spending_limit_create_key"))
+      db.exec("ALTER TABLE vaults ADD COLUMN spending_limit_create_key TEXT");
+    if (!v.has("vault_pda"))
+      db.exec("ALTER TABLE vaults ADD COLUMN vault_pda TEXT");
+    if (!v.has("create_signature"))
+      db.exec("ALTER TABLE vaults ADD COLUMN create_signature TEXT");
+    if (!v.has("set_spending_limit_signature"))
+      db.exec("ALTER TABLE vaults ADD COLUMN set_spending_limit_signature TEXT");
+
+    const akCols = db.pragma("table_info(vault_agent_keys)") as Array<{ name: string }>;
+    const ak = new Set(akCols.map((c) => c.name));
+    if (!ak.has("solana_pubkey"))
+      db.exec("ALTER TABLE vault_agent_keys ADD COLUMN solana_pubkey TEXT");
+    if (!ak.has("solana_secret_b58"))
+      db.exec("ALTER TABLE vault_agent_keys ADD COLUMN solana_secret_b58 TEXT");
+  }
 
   // Ensure demo API key exists (needed for middleware ingest + demo endpoint)
   db.prepare(`

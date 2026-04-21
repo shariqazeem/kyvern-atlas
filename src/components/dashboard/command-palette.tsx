@@ -24,26 +24,44 @@ import {
   DollarSign,
   Activity,
   Hash,
+  Wallet,
+  Plus,
+  Home,
+  Zap,
 } from "lucide-react";
 
-/* ── Navigation items (mirrors sidebar) ────────────────────────── */
+/* ── Navigation items (mirrors sidebar) ──────────────────────────
+   Grouped so users can reason about pay-side vs earn-side. Cmd+K is a
+   power-user tool — label groups explicitly so it's obvious where
+   each destination lives in the unified Kyvern app. */
 const NAV_ITEMS = [
-  { label: "Overview", href: "/pulse/dashboard", icon: LayoutDashboard, keywords: ["home", "dashboard", "main"] },
-  { label: "Transactions", href: "/pulse/dashboard/transactions", icon: ArrowLeftRight, keywords: ["payments", "history", "tx"] },
-  { label: "Endpoints", href: "/pulse/dashboard/endpoints", icon: Globe, keywords: ["apis", "routes", "urls"] },
-  { label: "Customers", href: "/pulse/dashboard/customers", icon: Users, keywords: ["agents", "payers", "wallets"] },
-  { label: "Benchmarks", href: "/pulse/dashboard/benchmarks", icon: BarChart3, keywords: ["compare", "pricing", "competitors"] },
-  { label: "Cohorts", href: "/pulse/dashboard/cohorts", icon: Users, keywords: ["segments", "groups", "retention"] },
-  { label: "Intelligence", href: "/pulse/dashboard/intelligence", icon: TrendingUp, keywords: ["insights", "ai", "trends"] },
-  { label: "API Keys", href: "/pulse/dashboard/keys", icon: Key, keywords: ["tokens", "auth", "credentials"] },
-  { label: "Webhooks", href: "/pulse/dashboard/webhooks", icon: Webhook, keywords: ["hooks", "notifications", "events"] },
-  { label: "Alerts", href: "/pulse/dashboard/alerts", icon: Bell, keywords: ["notifications", "warnings", "monitors"] },
-  { label: "Setup Guide", href: "/pulse/dashboard/setup", icon: Code2, keywords: ["install", "integration", "docs", "middleware"] },
-  { label: "Billing", href: "/pulse/dashboard/billing", icon: CreditCard, keywords: ["plan", "subscription", "invoice", "payment"] },
-  { label: "Settings", href: "/pulse/dashboard/settings", icon: Settings, keywords: ["preferences", "config", "account"] },
+  // Home
+  { label: "Home", href: "/app", icon: Home, keywords: ["dashboard", "start", "overview", "app"], group: "Home" },
+  // Pay side — Vault
+  { label: "Vaults", href: "/app/vaults", icon: Wallet, keywords: ["pay", "agent", "spending"], group: "Spend" },
+  { label: "Create vault", href: "/vault/new", icon: Plus, keywords: ["new vault", "add vault", "agent visa"], group: "Spend" },
+  // Earn side — Pulse
+  { label: "Services", href: "/app/services", icon: Zap, keywords: ["earn", "pulse", "endpoints"], group: "Earn" },
+  { label: "Overview", href: "/pulse/dashboard", icon: LayoutDashboard, keywords: ["pulse home", "dashboard", "main"], group: "Earn" },
+  { label: "Transactions", href: "/pulse/dashboard/transactions", icon: ArrowLeftRight, keywords: ["payments", "history", "tx"], group: "Earn" },
+  { label: "Endpoints", href: "/pulse/dashboard/endpoints", icon: Globe, keywords: ["apis", "routes", "urls"], group: "Earn" },
+  { label: "Customers", href: "/pulse/dashboard/customers", icon: Users, keywords: ["agents", "payers", "wallets"], group: "Earn" },
+  { label: "Benchmarks", href: "/pulse/dashboard/benchmarks", icon: BarChart3, keywords: ["compare", "pricing", "competitors"], group: "Earn" },
+  { label: "Cohorts", href: "/pulse/dashboard/cohorts", icon: Users, keywords: ["segments", "groups", "retention"], group: "Earn" },
+  { label: "Intelligence", href: "/pulse/dashboard/intelligence", icon: TrendingUp, keywords: ["insights", "ai", "trends"], group: "Earn" },
+  { label: "Webhooks", href: "/pulse/dashboard/webhooks", icon: Webhook, keywords: ["hooks", "notifications", "events"], group: "Earn" },
+  { label: "Alerts", href: "/pulse/dashboard/alerts", icon: Bell, keywords: ["notifications", "warnings", "monitors"], group: "Earn" },
+  { label: "Setup Guide", href: "/pulse/dashboard/setup", icon: Code2, keywords: ["install", "integration", "docs", "middleware"], group: "Earn" },
+  // Shared
+  { label: "Payments", href: "/app/payments", icon: ArrowLeftRight, keywords: ["history", "feed", "activity", "tx"], group: "Shared" },
+  { label: "API Keys", href: "/app/keys", icon: Key, keywords: ["tokens", "auth", "credentials"], group: "Shared" },
+  { label: "Settings", href: "/app/settings", icon: Settings, keywords: ["preferences", "config", "account"], group: "Shared" },
+  { label: "Billing", href: "/pulse/dashboard/billing", icon: CreditCard, keywords: ["plan", "subscription", "invoice", "payment"], group: "Shared" },
 ];
 
 const ACTION_ITEMS = [
+  { label: "Create a new vault", href: "/vault/new", icon: Plus, keywords: ["new vault", "agent visa", "start"] },
+  { label: "Run earn-side simulator", href: "/app/services", icon: Sparkles, keywords: ["demo data", "seed", "try earn"] },
   { label: "Create Alert", href: "/pulse/dashboard/alerts", icon: Bell, keywords: ["new alert", "monitor", "notification"] },
   { label: "Export CSV", action: "export", icon: Download, keywords: ["download", "data", "spreadsheet"] },
   { label: "Rotate API Key", href: "/pulse/dashboard/keys", icon: RotateCw, keywords: ["regenerate", "new key", "reset"] },
@@ -143,14 +161,14 @@ export function CommandPalette() {
               >
                 {/* ── Search input ──────────────────────────────── */}
                 <div className="flex items-center gap-2.5 px-4 h-12 border-b border-black/[0.06]">
-                  <Search className="w-4 h-4 text-slate-400 shrink-0" />
+                  <Search className="w-4 h-4 text-[var(--text-tertiary)] shrink-0" />
                   <CommandRoot.Input
                     value={search}
                     onValueChange={setSearch}
                     placeholder="Search pages, actions, stats..."
-                    className="flex-1 bg-transparent text-[13px] font-medium text-slate-900 placeholder:text-slate-400 outline-none"
+                    className="flex-1 bg-transparent text-[13px] font-medium text-slate-900 placeholder:text-[var(--text-tertiary)] outline-none"
                   />
-                  <kbd className="hidden sm:inline-flex items-center gap-0.5 text-[10px] font-medium text-slate-400 bg-[#F5F5F5] border border-black/[0.06] rounded px-1.5 py-0.5 font-mono">
+                  <kbd className="hidden sm:inline-flex items-center gap-0.5 text-[10px] font-medium text-[var(--text-tertiary)] bg-[#F5F5F5] border border-black/[0.06] rounded px-1.5 py-0.5 font-mono">
                     ESC
                   </kbd>
                 </div>
@@ -158,7 +176,7 @@ export function CommandPalette() {
                 {/* ── Results list ──────────────────────────────── */}
                 <CommandRoot.List className="max-h-[min(60vh,380px)] overflow-y-auto overscroll-contain p-2 scroll-py-2">
                   <CommandRoot.Empty className="flex flex-col items-center justify-center py-10 text-[13px] text-[hsl(var(--text-tertiary))]">
-                    <Search className="w-5 h-5 mb-2 text-slate-400" />
+                    <Search className="w-5 h-5 mb-2 text-[var(--text-tertiary)]" />
                     No results found.
                   </CommandRoot.Empty>
 
@@ -166,7 +184,7 @@ export function CommandPalette() {
                   {showStats && stats && (
                     <CommandRoot.Group
                       heading={
-                        <span className="text-[10px] font-medium text-slate-400 uppercase tracking-[0.1em] px-2">
+                        <span className="text-[10px] font-medium text-[var(--text-tertiary)] uppercase tracking-[0.1em] px-2">
                           Quick Stats (7d)
                         </span>
                       }
@@ -222,36 +240,44 @@ export function CommandPalette() {
                     </CommandRoot.Group>
                   )}
 
-                  {/* ── Navigation ─────────────────────────────── */}
-                  <CommandRoot.Group
-                    heading={
-                      <span className="text-[10px] font-medium text-slate-400 uppercase tracking-[0.1em] px-2">
-                        Navigation
-                      </span>
-                    }
-                  >
-                    {NAV_ITEMS.map((item) => (
-                      <CommandRoot.Item
-                        key={item.href}
-                        value={item.label}
-                        keywords={item.keywords}
-                        onSelect={() => navigate(item.href)}
-                        className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] cursor-pointer transition-colors data-[selected=true]:bg-[#F5F5F5]"
+                  {/* ── Navigation — grouped by side so Cmd+K reads like
+                      the sidebar (Home / Pay / Earn / Shared) ────── */}
+                  {["Home", "Spend", "Earn", "Shared"].map((groupName) => {
+                    const items = NAV_ITEMS.filter((i) => i.group === groupName);
+                    if (items.length === 0) return null;
+                    return (
+                      <CommandRoot.Group
+                        key={groupName}
+                        heading={
+                          <span className="text-[10px] font-medium text-[var(--text-tertiary)] uppercase tracking-[0.1em] px-2">
+                            {groupName}
+                          </span>
+                        }
                       >
-                        <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-[#F5F5F5] data-[selected=true]:bg-[#EBEBEB] transition-colors">
-                          <item.icon className="w-3.5 h-3.5 text-[hsl(var(--text-tertiary))]" />
-                        </div>
-                        <span className="text-[13px] font-medium text-[hsl(var(--text-secondary))]">
-                          {item.label}
-                        </span>
-                      </CommandRoot.Item>
-                    ))}
-                  </CommandRoot.Group>
+                        {items.map((item) => (
+                          <CommandRoot.Item
+                            key={item.href}
+                            value={item.label}
+                            keywords={item.keywords}
+                            onSelect={() => navigate(item.href)}
+                            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] cursor-pointer transition-colors data-[selected=true]:bg-[#F5F5F5]"
+                          >
+                            <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-[#F5F5F5] data-[selected=true]:bg-[#EBEBEB] transition-colors">
+                              <item.icon className="w-3.5 h-3.5 text-[hsl(var(--text-tertiary))]" />
+                            </div>
+                            <span className="text-[13px] font-medium text-[hsl(var(--text-secondary))]">
+                              {item.label}
+                            </span>
+                          </CommandRoot.Item>
+                        ))}
+                      </CommandRoot.Group>
+                    );
+                  })}
 
                   {/* ── Actions ─────────────────────────────────── */}
                   <CommandRoot.Group
                     heading={
-                      <span className="text-[10px] font-medium text-slate-400 uppercase tracking-[0.1em] px-2">
+                      <span className="text-[10px] font-medium text-[var(--text-tertiary)] uppercase tracking-[0.1em] px-2">
                         Actions
                       </span>
                     }
@@ -284,7 +310,7 @@ export function CommandPalette() {
                 {/* ── Footer ───────────────────────────────────── */}
                 <div className="flex items-center justify-between px-4 py-2.5 border-t border-black/[0.06] bg-[#FAFAFA]">
                   <div className="flex items-center gap-3">
-                    <span className="flex items-center gap-1 text-[10px] text-slate-400">
+                    <span className="flex items-center gap-1 text-[10px] text-[var(--text-tertiary)]">
                       <kbd className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 bg-white border border-black/[0.08] rounded text-[10px] font-mono font-medium text-[hsl(var(--text-tertiary))]">
                         &uarr;
                       </kbd>
@@ -293,15 +319,15 @@ export function CommandPalette() {
                       </kbd>
                       Navigate
                     </span>
-                    <span className="flex items-center gap-1 text-[10px] text-slate-400">
+                    <span className="flex items-center gap-1 text-[10px] text-[var(--text-tertiary)]">
                       <kbd className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 bg-white border border-black/[0.08] rounded text-[10px] font-mono font-medium text-[hsl(var(--text-tertiary))]">
                         &crarr;
                       </kbd>
                       Select
                     </span>
                   </div>
-                  <span className="text-[10px] text-slate-400">
-                    Pulse Command Palette
+                  <span className="text-[10px] text-[var(--text-tertiary)]">
+                    Kyvern Command Palette
                   </span>
                 </div>
               </CommandRoot>

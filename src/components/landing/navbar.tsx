@@ -1,54 +1,185 @@
 "use client";
 
+/* ════════════════════════════════════════════════════════════════════
+   Navbar — single product. KyvernLabs mark, three links, one CTA.
+   ════════════════════════════════════════════════════════════════════ */
+
 import Link from "next/link";
-import Image from "next/image";
 import { motion } from "framer-motion";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Menu, X } from "lucide-react";
+import { useState } from "react";
+import { useAuth } from "@/hooks/use-auth";
+
+const ease = [0.25, 0.1, 0.25, 1] as const;
+
+/**
+ * Nav structure deliberately shows NO product names.
+ *
+ * Previously this listed "Vault" and "Pulse" as sibling navigation
+ * items — which forced visitors to pick-a-product before they even
+ * understood what Kyvern was. Billion-dollar products never put the
+ * user in that position (Stripe doesn't show "Payments · Atlas ·
+ * Connect" as top nav — it shows "Products · Developers · Company").
+ *
+ * Kyvern is ONE product with two sides (spend, earn). Both sides live
+ * inside the app — the marketing site just sells "Kyvern" itself.
+ */
+const NAV_LINKS = [
+  { label: "How it works", href: "#stack" },
+  { label: "Developers", href: "#developers" },
+  { label: "Docs", href: "/docs" },
+];
 
 export function Navbar() {
-  return (
-    <motion.nav
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.8, ease: [0.25, 0.1, 0.25, 1] }}
-      className="fixed top-0 left-0 right-0 z-50"
-    >
-      <div className="mx-auto max-w-7xl px-6 lg:px-10">
-        <div className="flex items-center justify-between h-16 border-b border-black/[0.04]">
-          <Link href="/" className="flex items-center gap-2.5">
-            <Image src="/og-image.jpg" alt="KyvernLabs" width={24} height={24} className="rounded-md" />
-            <span className="text-[13px] font-semibold tracking-tight text-primary">
-              KyvernLabs
-            </span>
-          </Link>
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const { isAuthenticated, wallet } = useAuth();
+  const loggedIn = isAuthenticated && !!wallet;
 
-          <div className="flex items-center gap-8">
-            <div className="hidden sm:flex items-center gap-7">
-              {[
-                { label: "Products", href: "#products" },
-                { label: "Developers", href: "#developers" },
-                { label: "Services", href: "/services" },
-                { label: "Vault", href: "/vault" },
-              ].map((item) => (
+  return (
+    <>
+      <motion.nav
+        initial={{ opacity: 0, y: -8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, ease }}
+        className="fixed top-0 left-0 right-0 z-50"
+      >
+        <div className="mx-auto max-w-6xl px-6 pt-4">
+          <div
+            className="flex items-center justify-between h-[50px] pl-3.5 pr-2.5 rounded-[14px]"
+            style={{
+              background: "rgba(255,255,255,0.78)",
+              backdropFilter: "saturate(180%) blur(22px)",
+              WebkitBackdropFilter: "saturate(180%) blur(22px)",
+              border: "0.5px solid var(--border-subtle)",
+              boxShadow:
+                "0 1px 2px rgba(0,0,0,0.03), 0 10px 32px -14px rgba(0,0,0,0.06)",
+            }}
+          >
+            {/* Logo */}
+            <Link href="/" className="flex items-center gap-2">
+              <div
+                className="w-7 h-7 rounded-[8px] flex items-center justify-center"
+                style={{ background: "var(--text-primary)" }}
+              >
+                <span className="text-white text-[13px] font-bold tracking-tight">
+                  K
+                </span>
+              </div>
+              <span
+                className="text-[15px] font-semibold"
+                style={{
+                  color: "var(--text-primary)",
+                  letterSpacing: "-0.01em",
+                }}
+              >
+                Kyvern
+              </span>
+            </Link>
+
+            {/* Desktop links */}
+            <div className="hidden md:flex items-center gap-1 absolute left-1/2 -translate-x-1/2">
+              {NAV_LINKS.map((item) => (
                 <a
                   key={item.label}
                   href={item.href}
-                  className="text-[13px] text-tertiary hover:text-primary transition-colors duration-300"
+                  className="h-9 px-3.5 inline-flex items-center rounded-[10px] text-[13.5px] font-medium transition-colors duration-200"
+                  style={{ color: "var(--text-secondary)" }}
                 >
                   {item.label}
                 </a>
               ))}
             </div>
-            <Link
-              href="/pulse/dashboard"
-              className="group inline-flex items-center gap-1.5 h-8 px-3.5 rounded-md bg-foreground text-background text-[12px] font-medium hover:bg-foreground/90 transition-colors duration-300"
-            >
-              Open Pulse
-              <ArrowRight className="w-3 h-3 transition-transform duration-300 group-hover:translate-x-0.5" />
-            </Link>
+
+            {/* CTA + mobile toggle */}
+            <div className="flex items-center gap-1.5">
+              {!loggedIn && (
+                <Link
+                  href="/login"
+                  className="hidden sm:inline-flex items-center h-9 px-3.5 rounded-[10px] text-[13.5px] font-medium transition-colors duration-200"
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  Log in
+                </Link>
+              )}
+              <Link
+                href="/app"
+                className="group hidden sm:inline-flex items-center gap-1.5 h-9 px-3.5 rounded-[10px] text-[13px] font-semibold transition-opacity duration-200 hover:opacity-90"
+                style={{
+                  background: "var(--text-primary)",
+                  color: "var(--background)",
+                }}
+              >
+                {loggedIn ? "Open Kyvern" : "Start free"}
+                <ArrowRight className="w-3.5 h-3.5 transition-transform duration-300 group-hover:translate-x-0.5" />
+              </Link>
+              <button
+                onClick={() => setMobileOpen(!mobileOpen)}
+                className="md:hidden w-9 h-9 flex items-center justify-center rounded-[10px] transition-colors"
+                style={{ color: "var(--text-primary)" }}
+                aria-label="Toggle menu"
+              >
+                {mobileOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-    </motion.nav>
+
+        {/* Mobile menu */}
+        {mobileOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.25, ease }}
+            className="md:hidden mx-6 mt-2 p-3 rounded-[16px]"
+            style={{
+              background: "rgba(255,255,255,0.92)",
+              backdropFilter: "saturate(180%) blur(20px)",
+              WebkitBackdropFilter: "saturate(180%) blur(20px)",
+              border: "0.5px solid var(--border-subtle)",
+              boxShadow:
+                "0 1px 2px rgba(0,0,0,0.04), 0 16px 40px rgba(0,0,0,0.08)",
+            }}
+          >
+            {NAV_LINKS.map((item) => (
+              <a
+                key={item.label}
+                href={item.href}
+                onClick={() => setMobileOpen(false)}
+                className="block py-3 px-4 text-[15px] font-medium rounded-[10px] transition-colors"
+                style={{ color: "var(--text-primary)" }}
+              >
+                {item.label}
+              </a>
+            ))}
+            <div
+              className="my-2 h-px"
+              style={{ background: "var(--border)" }}
+            />
+            {!loggedIn && (
+              <Link
+                href="/login"
+                onClick={() => setMobileOpen(false)}
+                className="block py-3 px-4 text-[15px] font-medium rounded-[10px]"
+                style={{ color: "var(--text-secondary)" }}
+              >
+                Log in
+              </Link>
+            )}
+            <Link
+              href="/app"
+              onClick={() => setMobileOpen(false)}
+              className="mt-2 flex items-center justify-center gap-1.5 h-12 rounded-[12px] text-[15px] font-semibold"
+              style={{
+                background: "var(--text-primary)",
+                color: "var(--background)",
+              }}
+            >
+              {loggedIn ? "Open Kyvern" : "Start free"}
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+          </motion.div>
+        )}
+      </motion.nav>
+    </>
   );
 }

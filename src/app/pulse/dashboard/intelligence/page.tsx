@@ -45,7 +45,7 @@ function CompetitivePosition({ data, userEndpoints }: { data: IntelData; userEnd
 
   if (userEndpoints.length === 0) {
     return (
-      <div className="rounded-xl border border-black/[0.06] bg-gradient-to-br from-pulse-50 to-white dark:from-gray-900 dark:to-gray-900 p-5">
+      <div className="rounded-xl border border-black/[0.06] bg-gradient-to-br from-pulse-50 to-white p-5">
         <h3 className="text-[14px] font-semibold tracking-tight mb-2">Your Competitive Position</h3>
         <p className="text-[13px] text-secondary leading-relaxed">
           Start receiving payments to see how you compare to the market. Your endpoints will be highlighted across all charts.
@@ -63,7 +63,7 @@ function CompetitivePosition({ data, userEndpoints }: { data: IntelData; userEnd
   const percentile = rank >= 0 ? Math.round(((data.top_by_revenue.length - rank) / data.top_by_revenue.length) * 100) : null;
 
   return (
-    <div className="rounded-xl border border-pulse/20 bg-gradient-to-br from-pulse-50 to-white dark:from-gray-900 dark:to-gray-900 p-5">
+    <div className="rounded-xl border border-pulse/20 bg-gradient-to-br from-pulse-50 to-white p-5">
       <div className="flex items-center gap-2 mb-3">
         <Star className="w-4 h-4 text-pulse" />
         <h3 className="text-[14px] font-semibold tracking-tight">Your Competitive Position</h3>
@@ -224,7 +224,7 @@ function IntelligenceContent() {
                 return (
                   <tr key={ep.endpoint} className={cn(
                     "border-b border-black/[0.03]/50 last:border-0 transition-colors",
-                    isUser ? "bg-pulse-50/50 dark:bg-pulse-900/10" : "hover:bg-[#FAFAFA]"
+                    isUser ? "bg-pulse-50/50" : "hover:bg-[#FAFAFA]"
                   )}>
                     <td className="px-5 py-2.5 text-[12px] text-quaternary font-mono">{i + 1}</td>
                     <td className="px-3 py-2.5">
@@ -297,7 +297,7 @@ function IntelligenceContent() {
               return (
                 <div key={g.endpoint} className={cn(
                   "flex items-center justify-between p-3 rounded-lg border border-black/[0.04]",
-                  isUser ? "bg-pulse-50/50 dark:bg-pulse-900/10" : "bg-[#FAFAFA]"
+                  isUser ? "bg-pulse-50/50" : "bg-[#FAFAFA]"
                 )}>
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="font-mono text-[11px] truncate">{g.endpoint}</span>

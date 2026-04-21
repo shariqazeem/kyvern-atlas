@@ -44,7 +44,7 @@ export function ConfirmModal({
                   <AlertTriangle className={`w-5 h-5 ${isDanger ? "text-red-500" : "text-amber-500"}`} />
                 </div>
                 <button onClick={onCancel} className="p-1 rounded-lg hover:bg-black/[0.04] transition-colors">
-                  <X className="w-4 h-4 text-slate-400" />
+                  <X className="w-4 h-4 text-[var(--text-tertiary)]" />
                 </button>
               </div>
               <h3 className="text-[15px] font-semibold mb-1">{title}</h3>
@@ -52,7 +52,7 @@ export function ConfirmModal({
               <div className="flex items-center gap-3">
                 <button
                   onClick={onCancel}
-                  className="flex-1 h-9 rounded-lg border border-black/[0.08] text-[13px] font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+                  className="flex-1 h-9 rounded-lg border border-black/[0.08] text-[13px] font-medium text-slate-600 hover:bg-[var(--surface-2)] transition-colors"
                 >
                   {cancelLabel}
                 </button>

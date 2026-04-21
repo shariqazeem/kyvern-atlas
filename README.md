@@ -1,216 +1,123 @@
-# Pulse by KyvernLabs
+# Kyvern — Let your AI agents run free.
 
-### Revenue intelligence for the x402 protocol
+> **Kyvern is the on-chain policy layer that gives AI agents real economic autonomy on Solana.**
+> Replace the private key with a budget the chain enforces. Deploy an agent. Set the rules. Let it run for days. If it tries anything outside the policy, Solana itself refuses — before the tx ever lands.
 
-[![npm @kyvernlabs/pulse](https://img.shields.io/npm/v/@kyvernlabs/pulse?label=%40kyvernlabs%2Fpulse&color=blue)](https://www.npmjs.com/package/@kyvernlabs/pulse)
-[![npm @kyvernlabs/mcp](https://img.shields.io/npm/v/@kyvernlabs/mcp?label=%40kyvernlabs%2Fmcp&color=blue)](https://www.npmjs.com/package/@kyvernlabs/mcp)
+[![Live](https://img.shields.io/badge/live-app.kyvernlabs.com-22c55e)](https://app.kyvernlabs.com)
+[![Solana devnet](https://img.shields.io/badge/Solana-devnet_live-14F195)](https://explorer.solana.com/address/PpmZErWfT5zpeo1fJtTbpqezFGbRUamaNNRWViaMSqc?cluster=devnet)
+[![Built on Squads v4](https://img.shields.io/badge/Built_on-Squads_v4-4F46E5)](https://squads.so)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![x402 Foundation](https://img.shields.io/badge/x402-Foundation-black)](https://x402.org)
-
-Track every x402 micropayment, every AI agent customer, every endpoint — blockchain-verified, real-time, multi-tenant isolated. One line of middleware.
-
-[Live Dashboard](https://kyvernlabs.com/pulse/dashboard) | [API Docs](https://kyvernlabs.com/docs/api) | [npm](https://www.npmjs.com/package/@kyvernlabs/pulse) | [Changelog](https://kyvernlabs.com/changelog)
 
 ---
 
-## How it works
+## This repo
 
-```
-1. Connect wallet → get kv_live_ API key (12 seconds)
-2. npm install @kyvernlabs/pulse
-3. Wrap your x402 endpoint → see every payment in your dashboard
-```
+Entry for the **Colosseum Solana Frontier Hackathon**. Contains:
 
-```typescript
-import { withPulse } from '@kyvernlabs/pulse'
-import { withX402 } from '@x402/next'
+- A Next.js 14 app (`src/app`) — landing, authenticated app, `/atlas` public observatory
+- The **Kyvern policy program** (`anchor/programs/kyvern-policy`) — Rust / Anchor, deployed to devnet at `PpmZErWfT5zpeo1fJtTbpqezFGbRUamaNNRWViaMSqc`
+- A **TypeScript SDK** (`packages/sdk`) — `vault.pay()` wraps Squads v4 behind our policy engine
+- **Atlas** — a standalone autonomous agent (`scripts/atlas-runner.ts` + `src/lib/atlas`) running 24/7 on devnet
+- An **attack simulator** (`scripts/atlas-attacker.ts`) continuously probing Atlas with prompt-injection, over-cap, rogue-merchant, and drain attacks
 
-// One line. That's the entire integration.
-export const GET = withPulse(
-  withX402(handler, x402Config),
-  { apiKey: 'kv_live_your_key' }
-)
-```
+## The live proof
 
-Every x402 payment captured: endpoint, amount (USDC), payer wallet, latency, tx hash, network, status. On-chain verified via BaseScan.
+Visit [app.kyvernlabs.com](https://app.kyvernlabs.com). The landing hero **is** the observatory — Atlas's live state, not marketing copy.
 
----
+As of this README's last update: **7h 21m uptime · 135 transactions · 39 attacks blocked · $5.72 spent within policy · $0.00 lost to exploits.**
+
+Every row on [app.kyvernlabs.com/atlas](https://app.kyvernlabs.com/atlas) links to a verifiable transaction on Solana Explorer. Example real settled payment: `4YmhrgysrkRjyTdkCotJ7yjUhRucNwj4kA25btGcvLQD9ntvoiZeLVkBi1iQDb9TrrqCxwvePywK1wteQitekJP2`.
 
 ## Architecture
 
 ```
-x402 Agent → HTTP 402 → Your Endpoint
-                              │
-                    withPulse() middleware
-                         │          │
-                 Captures payment   x402 settles
-                    headers         on-chain
-                         │
-                 POST /api/pulse/ingest
-                    (fire-and-forget)
-                         │
-            ┌────────────┼────────────┐
-            │            │            │
-        Dashboard    Webhooks     Alerts
-        (real-time)  (HMAC-SHA256) (Slack/Discord)
+Landing (/)
+  · Hero = live Atlas observatory
+  · Moat section (real failed-tx card, program logs visible)
+  · Stack (Kyvern policy · Pulse reputation)
+  · Final CTA → Deploy your first agent
+        │
+        ▼
+/atlas — the public deep page
+  · Live counters (uptime, txs, attacks, protected value)
+  · "What Atlas is doing right now" card
+  · Full timeline (100+ decisions + attacks, every row → Solana Explorer)
+        │
+        ▼
+/vault/new — deploy wizard
+  · TemplateChooser: "Clone Atlas" (60s) or "Build from scratch" (3 min)
+  · Clone Atlas → one-click deploy with Atlas's policy shape
+        │
+        ▼
+/vault/[id] — user's agent dashboard
+  · AgentObservatoryStrip (mini-Atlas: live chrome, uptime, "Last decision")
+  · FundWidget → Circle faucet
+  · Playground → 4 real test-payment scenarios
+  · Budget / velocity / policy / activity feed
+
+On-chain flow
+  User call → /api/vault/pay → Kyvern policy evaluation (server) →
+    if allowed → Squads v4 SpendingLimitUse via CPI → Solana devnet
+    if blocked → never touches chain; logged as failed
+
+Atlas runner (PM2 process)
+  every ~3 min → decide() → pay via /api/vault/pay → record to atlas.db
+  (observatory polls status endpoint every 3s)
+
+Attacker runner (PM2 process)
+  every ~22 min → pick adversarial scenario → fire at /api/vault/pay →
+    Kyvern refuses → log to atlas_attacks → surfaces as "Last blocked"
 ```
 
-### Tech Stack
+## Tech stack
 
-| Layer | Technology |
-|-------|-----------|
-| Frontend | Next.js 14, TypeScript, Tailwind CSS, Framer Motion |
-| Backend | Next.js API routes, 40+ endpoints |
-| Database | SQLite (better-sqlite3, WAL mode) |
-| Auth | Privy (email, Google, wallet), session cookies |
-| Payments | USDC on Base via x402 protocol |
-| Stellar | `@stellar/stellar-sdk` v15 — mainnet (`horizon.stellar.org`) + testnet, USDC, Soroban-aware |
-| Solana | `@solana/web3.js` v1.98 — mainnet-beta + devnet, USDC, native SOL transfers |
-| AI | MCP server (17 tools), AI Copilot, heuristic insights |
+- **Frontend**: Next.js 14 (App Router), Tailwind, Framer Motion, Inter + JetBrains Mono
+- **Auth**: Privy (Solana-native, `ethereum-and-solana` chain type)
+- **On-chain**: Anchor + Squads v4. Kyvern program wraps Squads' `SpendingLimitUse` via CPI *after* policy evaluation — if policy fails, the whole tx reverts and nothing moves.
+- **Storage**: SQLite (better-sqlite3) — `pulse.db` for Pulse events, `atlas.db` for Atlas cycles
+- **Deployment**: Oracle Ubuntu VM + PM2 (3 live processes for the new product, nginx fronting via Let's Encrypt TLS)
 
-### Multi-chain support
-
-Pulse is chain-agnostic by design. Each network has its own adapter library and a single `network` field in the `events` table — every transaction in the dashboard links to the right block explorer for verification.
-
-| Chain | Networks supported | Explorer | USDC |
-|---|---|---|---|
-| Base | mainnet | basescan.org | ✅ |
-| Stellar | mainnet + testnet | stellar.expert | ✅ |
-| Solana | mainnet-beta + devnet | solscan.io | ✅ |
-
-Default network selection happens automatically — if `STELLAR_MAINNET_*` is set, Stellar mainnet is used; otherwise testnet. Same pattern for `SOLANA_MAINNET_*`.
-
----
-
-## What Pulse tracks per transaction
-
-- Endpoint path called
-- Payment amount (USDC)
-- Payer wallet address (AI agent)
-- Response latency (ms)
-- Transaction hash (on-chain proof, links to BaseScan)
-- Network (Base, Stellar, Solana, Polygon, Ethereum, Arbitrum, Optimism)
-- Success / error / timeout status
-
----
-
-## Dashboard features
-
-**Free tier:**
-- Revenue dashboard with real-time stats and charts
-- Transactions with on-chain verification badges
-- Endpoint analytics (health score, calls, revenue, latency, error rate)
-- Customer intelligence (agent personas, churn risk)
-- Market intelligence (ecosystem-wide data)
-- 5,000 events/day, 14-day retention
-
-**Growth tier ($19/mo):**
-- Pricing benchmarks vs market
-- 50,000 events/day, 30-day retention
-- CSV export, 3 API keys
-
-**Pro tier ($49/mo USDC):**
-- AI Copilot (natural language revenue queries)
-- A/B pricing experiments
-- Smart alerts with Slack/Discord
-- Webhooks (HMAC-SHA256 signed)
-- Revenue forecast with confidence bands
-- Agent persona engine, cohort analysis
-- Unlimited everything, 90-day retention
-
----
-
-## npm packages
-
-### @kyvernlabs/pulse — Middleware
-
-Wraps any x402 endpoint. Captures every payment. Zero impact on your payment flow.
+## Running locally
 
 ```bash
-npm install @kyvernlabs/pulse
-```
-
-Works with: Next.js, Express, Hono, Cloudflare Workers, or any framework via direct API.
-
-### @kyvernlabs/mcp — AI Agent Tools
-
-17 MCP tools for Claude Desktop, Cursor, and any MCP-compatible AI assistant.
-
-```bash
-npm install -g @kyvernlabs/mcp
-```
-
-```json
-{
-  "mcpServers": {
-    "kyvernlabs-pulse": {
-      "command": "npx",
-      "args": ["@kyvernlabs/mcp"],
-      "env": { "KYVERNLABS_API_KEY": "kv_live_..." }
-    }
-  }
-}
-```
-
-Your AI can ask: "What's my x402 revenue this week?" and get real answers from your Pulse data.
-
----
-
-## Ecosystem positioning
-
-```
-x402 Protocol (Linux Foundation)
-├── Payment rails (Coinbase, Stripe, Cloudflare)
-├── x402 Services (195+ endpoints)
-└── KyvernLabs Pulse ← you are here
-    ├── Revenue analytics (real-time, per-endpoint)
-    ├── Customer intelligence (agent wallets, personas, churn)
-    ├── On-chain verification (BaseScan links)
-    ├── Market intelligence (ecosystem benchmarks)
-    ├── AI Copilot (natural language queries)
-    ├── MCP tools (17 tools for AI assistants)
-    └── One-line middleware (@kyvernlabs/pulse)
-```
-
-Compatible with all x402 ecosystem projects: HeyAnna, FateFi, ClawBet, ValidFi, and every x402 service provider.
-
----
-
-## Public tools (no login required)
-
-- [x402 Service Registry](https://kyvernlabs.com/registry) — directory of every x402 endpoint
-- [Market Gap Finder](https://kyvernlabs.com/tools/gaps) — find high-demand, low-supply categories
-- [State of x402 Report](https://kyvernlabs.com/reports) — monthly ecosystem analysis
-- [Market Data API](https://kyvernlabs.com/docs/api) — programmatic access to ecosystem data
-- [Public Leaderboard](https://kyvernlabs.com) — top endpoints by volume and revenue
-
----
-
-## Self-hosting
-
-```bash
-git clone https://github.com/shariqazeem/kyvernlabs.git
-cd kyvernlabs
-cp .env.example .env.local
 npm install --legacy-peer-deps
+cp .env.example .env.local   # fill in NEXT_PUBLIC_PRIVY_APP_ID
 npm run dev
 ```
 
-See `.env.example` for required environment variables.
+For the full Atlas loop you'd need a funded devnet keystore (`.kyvern/server-signer.json`) — see `scripts/bootstrap-solana-signer.ts`.
 
----
+## Design system
 
-## Links
+- **Light theme, non-negotiable.** (Dark mode reads as generic crypto — not the Apple-minimal energy we're going for.)
+- Inter for prose, JetBrains Mono for all numerics, tx signatures, and code blocks
+- **No gradients.** Gradient-heavy UI reads "AI-generated" to our eye — we want quiet authority.
+- Subtle motion only (`cubic-bezier(0.25, 0.1, 0.25, 1)`, 400-600ms), blur-in headlines, fade-through page transitions
+- Hairline borders (0.5px), generous spacing, Apple-like breathing room
+- Accent colors used sparingly: indigo `#4F46E5` for agent/policy moments, sky `#0EA5E9` for revenue/reputation moments
 
-- **Website**: [kyvernlabs.com](https://kyvernlabs.com)
-- **Dashboard**: [kyvernlabs.com/pulse/dashboard](https://kyvernlabs.com/pulse/dashboard)
-- **API Docs**: [kyvernlabs.com/docs/api](https://kyvernlabs.com/docs/api)
-- **Changelog**: [kyvernlabs.com/changelog](https://kyvernlabs.com/changelog)
-- **npm pulse**: [@kyvernlabs/pulse](https://www.npmjs.com/package/@kyvernlabs/pulse)
-- **npm mcp**: [@kyvernlabs/mcp](https://www.npmjs.com/package/@kyvernlabs/mcp)
-- **x402 Protocol**: [x402.org](https://x402.org)
-- **Twitter**: [@KyvernLabs](https://x.com/KyvernLabs)
+## Where things live
 
-## License
+- `src/app` — routes (landing, `/atlas`, `/app/*`, `/vault/*`, `/pulse/dashboard/*`, all `/api/*` endpoints)
+- `src/components/landing` — hero, observatory, moat, stack, final CTA
+- `src/components/vault` — wizard steps, playground, observatory strip for user agents
+- `src/components/app` — sidebar, topbar, AuthShell, journey checklist, command palette
+- `src/lib/atlas` — Atlas runner, decide logic, attacker scenarios, SQLite schema
+- `src/lib/squads-v4.ts` — Kyvern + Squads helpers (`createSmartAccount`, `setSpendingLimit`, `coSignPayment`, `ensureVaultUsdcAta`)
+- `anchor/programs/kyvern-policy/src/lib.rs` — the on-chain policy program
+- `packages/sdk` — public TypeScript SDK (`@kyvernlabs/sdk`)
 
-MIT — see [LICENSE](LICENSE)
+## Explicitly not finished (for AI reviewers)
+
+- Cinematic page transitions between landing → wizard → dashboard (currently hard navigation)
+- Post-deploy "ignition sequence" that auto-fires 5 scripted payments on a new clone so the dashboard lights up before the first user action
+- LLM-powered `decide()` is behind an `ANTHROPIC_API_KEY` flag — currently runs scripted to keep recurring spend at $0
+- Some legacy Pulse deep pages (`cohorts`, `experiments`, `webhooks`) render but are intentionally NOT in primary nav
+- Mobile responsiveness of the Atlas observatory (~90% there; some stat tiles collapse awkwardly at <375px)
+- `/atlas` deep page typography could stand another pass
+
+## Author
+
+Shariq Azeem — [@shariqshkt](https://x.com/shariqshkt)
+
+MIT licensed.

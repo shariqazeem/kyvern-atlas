@@ -1,31 +1,30 @@
 import type { Metadata } from "next";
 import { Navbar } from "@/components/landing/navbar";
-
-export const metadata: Metadata = {
-  title: "KyvernLabs — The Business Layer for the x402 Economy",
-  description:
-    "Revenue analytics, smart routing, and business tools for x402 service providers. 195+ services, $600M+ volume. Built for the x402 Foundation ecosystem with Coinbase, Stripe, Google, Visa.",
-  alternates: { canonical: "https://kyvernlabs.com" },
-};
-import { Hero } from "@/components/landing/hero";
-import { ProblemSection } from "@/components/landing/problem-section";
-import { SocialProof } from "@/components/landing/social-proof";
-import { Leaderboard } from "@/components/landing/leaderboard";
-import { ProductsSection } from "@/components/landing/products-section";
-import { DevelopersSection } from "@/components/landing/developers-section";
+import { Hero as HeroVault } from "@/components/landing/hero-vault";
+import { MoatSection } from "@/components/landing/moat-section";
+import { StackSection } from "@/components/landing/stack-section";
+import { WhySolana } from "@/components/landing/why-solana";
 import { FinalCTA } from "@/components/landing/final-cta";
 import { Footer } from "@/components/landing/footer";
 
+export const metadata: Metadata = {
+  title: "Kyvern — Let your AI agents run free.",
+  description:
+    "Kyvern replaces the private key with a budget Solana enforces. Deploy an AI agent, set the rules on-chain, watch it run autonomously. Atlas — our reference agent — is live on devnet right now.",
+  alternates: { canonical: "https://kyvernlabs.com" },
+};
+
 export default function Home() {
   return (
-    <div className="min-h-screen bg-white">
+    <div
+      className="min-h-screen overflow-x-hidden"
+      style={{ background: "var(--background)" }}
+    >
       <Navbar />
-      <Hero />
-      <ProblemSection />
-      <SocialProof />
-      <Leaderboard />
-      <DevelopersSection />
-      <ProductsSection />
+      <HeroVault />
+      <MoatSection />
+      <StackSection />
+      <WhySolana />
       <FinalCTA />
       <Footer />
     </div>

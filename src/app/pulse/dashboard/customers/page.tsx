@@ -144,7 +144,7 @@ export default function CustomersPage() {
             <div className="flex flex-wrap gap-2">
               {atRisk.slice(0, 5).map((c) => (
                 <span key={c.address} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white border border-amber-200 text-[11px]">
-                  <span className="w-4 h-4 rounded bg-slate-100 flex items-center justify-center text-[9px] font-bold text-slate-400">?</span>
+                  <span className="w-4 h-4 rounded bg-[var(--surface-3)] flex items-center justify-center text-[9px] font-bold text-[var(--text-tertiary)]">?</span>
                   <span className="font-mono">{truncateAddress(c.address)}</span>
                   <span className="text-amber-600 font-medium">{formatCurrency(c.total_spent)}</span>
                 </span>

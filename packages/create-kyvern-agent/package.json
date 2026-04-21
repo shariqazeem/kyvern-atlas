@@ -1,0 +1,29 @@
+{
+  "name": "create-kyvern-agent",
+  "version": "0.1.0",
+  "description": "Scaffold a Solana agent wired to a Kyvern vault — one command, working out of the box.",
+  "bin": {
+    "create-kyvern-agent": "bin/cli.mjs"
+  },
+  "files": [
+    "bin",
+    "dist",
+    "templates",
+    "README.md"
+  ],
+  "keywords": [
+    "solana",
+    "ai-agents",
+    "kyvern",
+    "squads",
+    "scaffold",
+    "cli"
+  ],
+  "author": "KyvernLabs <hello@kyvernlabs.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/shariqazeem/kyvernlabs"
+  },
+  "homepage": "https://kyvernlabs.com"
+}

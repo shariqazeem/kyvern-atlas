@@ -1,93 +1,172 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Shield, Zap, Globe, Users } from "lucide-react";
+import {
+  BarChart3, Brain, Layers, Wallet, Store,
+  Zap, Clock, DollarSign, Cpu,
+} from "lucide-react";
 
 const ease = [0.25, 0.1, 0.25, 1] as const;
 
+/* ── Platform Layer Card ── */
+function LayerCard({
+  layer,
+  title,
+  tagline,
+  features,
+  delay,
+}: {
+  layer: string;
+  title: string;
+  tagline: string;
+  features: { icon: React.ElementType; text: string }[];
+  delay: number;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-60px" }}
+      transition={{ duration: 0.6, delay, ease }}
+      className="card-interactive p-7"
+    >
+      <div className="flex items-center gap-3 mb-5">
+        <span className="w-8 h-8 rounded-[10px] flex items-center justify-center text-[12px] font-bold bg-[var(--text-primary)] text-white">
+          {layer}
+        </span>
+        <div>
+          <p className="text-[15px] font-semibold tracking-tight">{title}</p>
+          <p className="text-[12px] text-[var(--text-tertiary)]">{tagline}</p>
+        </div>
+      </div>
+      <div className="space-y-3">
+        {features.map((f, i) => (
+          <div key={i} className="flex items-center gap-2.5 text-[13px] text-[var(--text-secondary)]">
+            <f.icon className="w-4 h-4 text-[var(--text-quaternary)] flex-shrink-0" />
+            {f.text}
+          </div>
+        ))}
+      </div>
+    </motion.div>
+  );
+}
+
+/* ── Why Solana ── */
+function SolanaComparison() {
+  const rows = [
+    { metric: "Finality", solana: "400ms", other: "12s", icon: Clock },
+    { metric: "Cost / tx", solana: "$0.00025", other: "$0.50+", icon: DollarSign },
+    { metric: "Throughput", solana: "65K TPS", other: "~1K TPS", icon: Zap },
+    { metric: "Wallet UX", solana: "Phantom", other: "MetaMask", icon: Wallet },
+  ];
+
+  return (
+    <div className="card p-6">
+      <div className="grid grid-cols-3 gap-4 mb-3">
+        <div />
+        <p className="text-center text-[12px] font-semibold text-[var(--text-primary)]">Solana</p>
+        <p className="text-center text-[12px] text-[var(--text-quaternary)]">Other chains</p>
+      </div>
+      {rows.map((row, i) => (
+        <motion.div
+          key={row.metric}
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.3, delay: i * 0.06, ease }}
+          className="grid grid-cols-3 gap-4 py-3.5 border-t border-[var(--border-subtle)]"
+        >
+          <div className="flex items-center gap-2.5 text-[13px] text-[var(--text-secondary)]">
+            <row.icon className="w-3.5 h-3.5 text-[var(--text-quaternary)]" />
+            {row.metric}
+          </div>
+          <p className="text-center text-[14px] font-semibold font-mono-numbers text-[var(--text-primary)]">
+            {row.solana}
+          </p>
+          <p className="text-center text-[14px] font-mono-numbers text-[var(--text-quaternary)]">
+            {row.other}
+          </p>
+        </motion.div>
+      ))}
+    </div>
+  );
+}
+
 export function SocialProof() {
   return (
-    <section className="py-28 lg:py-36 px-6">
-      <div className="max-w-4xl mx-auto">
+    <section id="platform" className="py-28 lg:py-36 px-6" style={{ background: "var(--surface-2)" }}>
+      <div className="max-w-5xl mx-auto">
+        {/* Platform Vision */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-80px" }}
           transition={{ duration: 0.7, ease }}
+          className="text-center mb-16"
         >
-          {/* Header */}
-          <div className="text-center mb-14">
-            <p className="text-[12px] uppercase tracking-[0.2em] font-medium text-quaternary mb-5">
-              x402 Ecosystem
-            </p>
-            <h2 className="text-[clamp(1.75rem,4vw,2.75rem)] font-bold tracking-[-0.04em] leading-[0.95]">
-              A protocol already at scale.
-              <br />
-              <span className="text-tertiary">Pulse brings the business layer.</span>
-            </h2>
-          </div>
-
-          {/* Ecosystem Stats */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
-            {[
-              { icon: Zap, value: "$24M+", label: "Monthly volume", detail: "Across the x402 ecosystem", color: "text-amber-600", bg: "bg-amber-50" },
-              { icon: Globe, value: "75M+", label: "Transactions processed", detail: "On-chain verified payments", color: "text-pulse-600", bg: "bg-pulse-50" },
-              { icon: Shield, value: "195+", label: "Active services", detail: "Live x402 endpoints", color: "text-emerald-600", bg: "bg-emerald-50" },
-              { icon: Users, value: "20+", label: "Foundation members", detail: "Including Coinbase, Stripe, Visa", color: "text-indigo-600", bg: "bg-indigo-50" },
-            ].map((stat, i) => (
-              <motion.div
-                key={stat.label}
-                initial={{ opacity: 0, y: 16 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                whileHover={{ y: -4, transition: { duration: 0.2 } }}
-                transition={{ duration: 0.5, delay: 0.1 + i * 0.1, ease }}
-                className="rounded-2xl border border-black/[0.06] bg-white p-6 text-center cursor-default"
-                style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.02)" }}
-              >
-                <div className={`w-10 h-10 rounded-xl ${stat.bg} flex items-center justify-center mx-auto mb-4`}>
-                  <stat.icon className={`w-5 h-5 ${stat.color}`} />
-                </div>
-                <p className="text-[28px] font-bold font-mono-numbers tracking-tight">{stat.value}</p>
-                <p className="text-[13px] font-medium text-primary mt-1">{stat.label}</p>
-                <p className="text-[11px] text-quaternary mt-0.5">{stat.detail}</p>
-              </motion.div>
-            ))}
-          </div>
-
-          <p className="text-center text-[11px] text-quaternary">
-            Ecosystem data from the x402 Foundation leaderboard. These are protocol-wide metrics — not KyvernLabs metrics.
-          </p>
-
-          {/* How It Works mini */}
-          <div className="mt-14">
-            <p className="text-[11px] uppercase tracking-[0.2em] font-medium text-quaternary text-center mb-6">
-              How it works
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {[
-                { step: "1", title: "Install middleware", desc: "npm install @kyvernlabs/pulse and wrap your handler" },
-                { step: "2", title: "Receive a payment", desc: "An agent pays your x402 endpoint — Pulse captures it" },
-                { step: "3", title: "See your revenue", desc: "Dashboard shows revenue and tx hashes in real time" },
-              ].map((s, i) => (
-                <motion.div
-                  key={s.step}
-                  initial={{ opacity: 0, y: 12 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.4, delay: 0.5 + i * 0.1, ease }}
-                  className="text-center p-5 rounded-2xl border border-black/[0.04] bg-[#FAFAFA]"
-                >
-                  <div className="w-8 h-8 rounded-full bg-foreground text-background flex items-center justify-center text-[12px] font-bold mx-auto mb-3">
-                    {s.step}
-                  </div>
-                  <p className="text-[13px] font-semibold tracking-tight">{s.title}</p>
-                  <p className="text-[11px] text-tertiary mt-1 leading-relaxed">{s.desc}</p>
-                </motion.div>
-              ))}
-            </div>
-          </div>
+          <p className="section-label mb-5">The platform</p>
+          <h2 className="text-[clamp(1.75rem,4vw,2.75rem)] font-bold tracking-[-0.04em] leading-[0.95]">
+            Not just analytics.
+            <br />
+            <span className="text-[var(--text-tertiary)]">A complete business OS.</span>
+          </h2>
         </motion.div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-28">
+          <LayerCard
+            layer="1"
+            title="The Wedge"
+            tagline="npm install & see revenue"
+            delay={0}
+            features={[
+              { icon: BarChart3, text: "Revenue dashboard & trends" },
+              { icon: Cpu, text: "One-line middleware integration" },
+              { icon: Zap, text: "Real-time payment capture" },
+            ]}
+          />
+          <LayerCard
+            layer="2"
+            title="The Platform"
+            tagline="Launch APIs in 60 seconds"
+            delay={0.08}
+            features={[
+              { icon: Wallet, text: "Managed Solana wallets" },
+              { icon: Store, text: "x402 service marketplace" },
+              { icon: Layers, text: "Shareable payment links" },
+            ]}
+          />
+          <LayerCard
+            layer="3"
+            title="The Intelligence"
+            tagline="Your AI-powered CFO"
+            delay={0.16}
+            features={[
+              { icon: Brain, text: "AI pricing copilot" },
+              { icon: Layers, text: "Agent personas & cohorts" },
+              { icon: BarChart3, text: "Market gap analysis" },
+            ]}
+          />
+        </div>
+
+        {/* Why Solana */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-80px" }}
+          transition={{ duration: 0.7, ease }}
+          className="text-center mb-12"
+        >
+          <p className="section-label mb-5">Why Solana</p>
+          <h2 className="text-[clamp(1.5rem,3.5vw,2.25rem)] font-bold tracking-[-0.04em] leading-[0.95]">
+            x402 was born on EVM.
+            <br />
+            <span className="text-[var(--text-tertiary)]">It scales on Solana.</span>
+          </h2>
+        </motion.div>
+
+        <div className="max-w-xl mx-auto">
+          <SolanaComparison />
+        </div>
       </div>
     </section>
   );

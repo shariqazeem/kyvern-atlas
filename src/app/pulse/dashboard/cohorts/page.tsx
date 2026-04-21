@@ -48,9 +48,9 @@ function RetentionCell({ value }: { value: number | undefined }) {
     <td className="px-3 py-2.5 text-center">
       <span className={cn(
         "text-[11px] font-semibold font-mono-numbers px-2 py-0.5 rounded",
-        value >= 60 ? "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600" :
-        value >= 30 ? "bg-amber-50 dark:bg-amber-900/30 text-amber-600" :
-        "bg-red-50 dark:bg-red-900/30 text-red-600"
+        value >= 60 ? "bg-emerald-50 text-emerald-600" :
+        value >= 30 ? "bg-amber-50 text-amber-600" :
+        "bg-red-50 text-red-600"
       )}>
         {value}%
       </span>
@@ -100,7 +100,7 @@ function CohortChart({ cohorts }: { cohorts: CohortData[] }) {
     <div className="h-[320px]">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={chartData} margin={{ top: 5, right: 10, left: -15, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="text-black/[0.04] dark:text-white/[0.06]" vertical={false} />
+          <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="text-black/[0.04]" vertical={false} />
           <XAxis
             dataKey="name"
             tick={{ fontSize: 11, fill: "#94a3b8" }}

@@ -44,3 +44,12 @@ next-env.d.ts
 # packages build artifacts
 packages/*/node_modules
 packages/*/dist
+
+# kyvern server keystore (auto-bootstrapped Solana signer)
+.kyvern/
+
+# anchor rust build artifacts
+anchor/target/
+
+# local Claude Code worktrees
+.claude/

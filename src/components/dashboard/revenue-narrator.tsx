@@ -37,9 +37,9 @@ const TYPE_STYLES: Record<
     badgeText: "text-pulse-700",
   },
   info: {
-    bg: "bg-slate-50/50",
+    bg: "bg-[var(--surface-2)]/50",
     border: "border-slate-100",
-    badge: "bg-slate-50",
+    badge: "bg-[var(--surface-2)]",
     badgeText: "text-slate-700",
   },
 };

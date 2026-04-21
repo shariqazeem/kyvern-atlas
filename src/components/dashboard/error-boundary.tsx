@@ -27,7 +27,7 @@ export class DashboardErrorBoundary extends React.Component<Props, State> {
       return (
         <div className="flex items-center justify-center min-h-[40vh] px-4">
           <div className="text-center max-w-sm">
-            <div className="w-12 h-12 rounded-2xl bg-red-50 dark:bg-red-900/20 flex items-center justify-center mx-auto mb-4">
+            <div className="w-12 h-12 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-4">
               <AlertCircle className="w-6 h-6 text-red-500" />
             </div>
             <h3 className="text-[15px] font-semibold mb-1">Something went wrong</h3>

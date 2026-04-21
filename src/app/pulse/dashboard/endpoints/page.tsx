@@ -131,8 +131,8 @@ export default function EndpointsPage() {
                   <td className="px-5 py-3 text-right font-mono-numbers text-sm text-muted-foreground">{ep.avg_latency}ms</td>
                   <td className="px-5 py-3 text-right">
                     <span className={`inline-flex items-center text-xs font-medium px-1.5 py-0.5 rounded ${
-                      ep.error_rate < 2 ? "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600" :
-                      ep.error_rate < 5 ? "bg-amber-50 dark:bg-amber-900/30 text-amber-600" : "bg-red-50 dark:bg-red-900/30 text-red-600"
+                      ep.error_rate < 2 ? "bg-emerald-50 text-emerald-600" :
+                      ep.error_rate < 5 ? "bg-amber-50 text-amber-600" : "bg-red-50 text-red-600"
                     }`}>{ep.error_rate}%</span>
                   </td>
                 </tr>

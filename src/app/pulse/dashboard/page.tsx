@@ -24,12 +24,10 @@ function DashboardContent() {
       <div className="space-y-6">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[...Array(4)].map((_, i) => (
-            <div key={i} className="bg-white rounded-xl border border-black/[0.06] p-5 h-[120px] animate-pulse">
-              <div className="h-3 w-20 bg-[#F0F0F0] rounded mb-3" />
-              <div className="h-6 w-28 bg-[#F0F0F0] rounded" />
-            </div>
+            <div key={i} className="skeleton h-[120px]" />
           ))}
         </div>
+        <div className="skeleton h-[300px]" />
       </div>
     );
   }
@@ -37,21 +35,39 @@ function DashboardContent() {
   const hasData = data && data.calls > 0;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 pb-16">
       <div>
-        <h1 className="text-[18px] font-semibold tracking-tight">Overview</h1>
-        <p className="text-[13px] text-tertiary mt-0.5">
-          Revenue intelligence for your x402 endpoints
+        <p
+          className="text-[10.5px] font-semibold uppercase tracking-[0.08em] mb-1"
+          style={{ color: "#0EA5E9" }}
+        >
+          Earn · overview
+        </p>
+        <h1
+          className="tracking-[-0.025em]"
+          style={{
+            fontSize: "clamp(28px, 3.6vw, 36px)",
+            lineHeight: 1.05,
+            fontWeight: 600,
+            color: "var(--text-primary)",
+          }}
+        >
+          Overview
+        </h1>
+        <p
+          className="mt-1.5 text-[14px] leading-[1.55]"
+          style={{ color: "var(--text-tertiary)" }}
+        >
+          Revenue intelligence for your x402 endpoints on Solana. Every row
+          links to a real Explorer transaction.
         </p>
       </div>
 
-      {/* AI Revenue Insights — the first thing users see */}
       {hasData && <RevenueNarrator />}
 
-      {/* Onboarding checklist — shows until first event */}
       <OnboardingChecklist hasEvents={!!hasData} />
 
-      {/* Stat cards — always show, with zeros if no data */}
+      {/* Stat cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="Total Revenue"
@@ -83,7 +99,6 @@ function DashboardContent() {
         />
       </div>
 
-      {/* Revenue chart — shows skeleton when empty */}
       <RevenueChart />
 
       {hasData && (
@@ -95,7 +110,6 @@ function DashboardContent() {
 
           <RecentTransactions limit={10} />
 
-          {/* Money Moments — social-style feed of revenue events */}
           <MoneyMoments limit={5} showViewAll />
         </>
       )}
