@@ -24,6 +24,7 @@ import type { VaultConfig } from "../types";
 import { EASE_PREMIUM as ease } from "@/lib/motion";
 import { NumberScramble } from "@/components/atlas/number-scramble";
 import { fmtInt, fmtUsd } from "@/lib/format";
+import { WizardPreviewDrawer } from "../wizard-preview-drawer";
 
 export interface BudgetsStepProps {
   config: VaultConfig;
@@ -197,8 +198,10 @@ export function BudgetsStep({ config, setConfig }: BudgetsStepProps) {
         </motion.div>
       </div>
 
-      {/* RIGHT — live 24-hour simulation */}
-      <LiveSimulation config={config} />
+      {/* RIGHT — live 24-hour simulation. Mobile: drawer. */}
+      <WizardPreviewDrawer label="24-hour simulation">
+        <LiveSimulation config={config} />
+      </WizardPreviewDrawer>
     </div>
   );
 }

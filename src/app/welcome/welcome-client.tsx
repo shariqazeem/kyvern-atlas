@@ -17,13 +17,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowRight, Pause, Play, X } from "lucide-react";
+import { ArrowRight, Pause, Play, Sparkles } from "lucide-react";
 import { EASE_PREMIUM as EASE, EASE_SPRING as SPRING } from "@/lib/motion";
 import { LiveTimer } from "@/components/atlas/live-timer";
 import { NumberScramble } from "@/components/atlas/number-scramble";
 import { fmtInt, fmtUsd } from "@/lib/format";
 
 const SCENE_MS = 4_000;
+/** Last scene (deploy CTA) gets extra time so users can read + click. */
+const FINAL_SCENE_MS = 6_000;
 const WELCOME_SEEN_KEY = "kyvern:welcomeSeen";
 
 interface AtlasLite {
@@ -58,6 +60,16 @@ export function WelcomeClient({
     router.replace("/app");
   }, [router]);
 
+  // Hand-off to the deploy flow — same flag write, different destination.
+  const goDeploy = useCallback(() => {
+    try {
+      window.localStorage.setItem(WELCOME_SEEN_KEY, "1");
+    } catch {
+      /* ignore */
+    }
+    router.replace("/vault/new");
+  }, [router]);
+
   // Keyboard shortcut — space to pause.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -73,16 +85,19 @@ export function WelcomeClient({
     return () => window.removeEventListener("keydown", onKey);
   }, [finish]);
 
-  // Auto-advance loop.
+  // Auto-advance loop. Final scene runs for FINAL_SCENE_MS so the
+  // user has extra time to read + click the deploy CTA before we
+  // auto-bounce them to /app.
   useEffect(() => {
     if (!playing) return;
     const id = setInterval(() => {
       setNow(Date.now());
-      if (Date.now() - startRef.current >= SCENE_MS) {
-        if (idx >= scenes.length - 1) {
+      const isFinal = idx >= scenes.length - 1;
+      const sceneDuration = isFinal ? FINAL_SCENE_MS : SCENE_MS;
+      if (Date.now() - startRef.current >= sceneDuration) {
+        if (isFinal) {
           clearInterval(id);
-          // Small beat so the last scene's copy fully reads before exit.
-          setTimeout(finish, 600);
+          setTimeout(finish, 400);
           return;
         }
         setIdx((i) => Math.min(scenes.length - 1, i + 1));
@@ -97,10 +112,9 @@ export function WelcomeClient({
   }, [idx]);
 
   const scene = scenes[idx];
-  const progress = Math.min(
-    1,
-    (Date.now() - startRef.current) / SCENE_MS,
-  );
+  const isFinal = idx >= scenes.length - 1;
+  const sceneDuration = isFinal ? FINAL_SCENE_MS : SCENE_MS;
+  const progress = Math.min(1, (Date.now() - startRef.current) / sceneDuration);
 
   return (
     <div
@@ -165,7 +179,12 @@ export function WelcomeClient({
             transition={{ duration: 0.7, ease: SPRING }}
             className="flex flex-col items-center w-full max-w-4xl"
           >
-            <div className="w-full mb-8">{scene.visual}</div>
+            <div className="w-full mb-8">
+              {scene.visual({
+                onDeploy: goDeploy,
+                onOpenWorkspace: finish,
+              })}
+            </div>
 
             <motion.p
               initial={{ opacity: 0 }}
@@ -182,6 +201,40 @@ export function WelcomeClient({
             >
               {scene.narration}
             </motion.p>
+
+            {/* CTA row — only rendered by the final scene's visual,
+                which returns null for the button slot on earlier scenes.
+                Caption beneath advises autoplay will end on its own. */}
+            {scene.cta && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8, delay: 0.45, ease: EASE }}
+                className="mt-8 flex flex-col items-center gap-2"
+              >
+                <button
+                  onClick={goDeploy}
+                  className="inline-flex items-center gap-2 h-12 px-6 rounded-[16px] text-[14px] font-semibold transition-transform active:scale-95"
+                  style={{
+                    background: "var(--text-primary)",
+                    color: "var(--background)",
+                    boxShadow:
+                      "0 1px 2px rgba(0,0,0,0.04), 0 16px 40px -16px rgba(0,0,0,0.35)",
+                  }}
+                >
+                  <Sparkles className="w-4 h-4" />
+                  Deploy your first agent
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={finish}
+                  className="text-[11.5px] font-semibold"
+                  style={{ color: "var(--text-tertiary)" }}
+                >
+                  Or keep looking around →
+                </button>
+              </motion.div>
+            )}
           </motion.div>
         </AnimatePresence>
       </div>
@@ -263,13 +316,29 @@ export function WelcomeClient({
 }
 
 /* ────────────────────────────────────────────────────────────────
-   Scene factory — 3 acts with real Atlas numbers.
+   Scene factory — 4 acts with real Atlas numbers.
+
+   Scenes 1-3 are orientation beats. Scene 4 is the "hand-off" — it
+   carries a prominent deploy CTA so users ready to start get a
+   first-class path out. Autoplay still exits to /app if they don't
+   click (respects the "just show me around" flow).
+
+   Each scene's `visual` is now a FUNCTION so scene 4 can access the
+   goDeploy / finish callbacks from the parent component (CTA wiring).
+   Scenes that don't need callbacks ignore the argument.
    ──────────────────────────────────────────────────────────────── */
+
+interface SceneVisualContext {
+  onDeploy: () => void;
+  onOpenWorkspace: () => void;
+}
 
 interface Scene {
   key: string;
   narration: React.ReactNode;
-  visual: React.ReactNode;
+  visual: (ctx: SceneVisualContext) => React.ReactNode;
+  /** Scenes with a CTA row rendered below the visual. */
+  cta?: boolean;
 }
 
 function makeScenes(s: AtlasLite | null): Scene[] {
@@ -284,7 +353,7 @@ function makeScenes(s: AtlasLite | null): Scene[] {
           on Solana.
         </>
       ),
-      visual: <JoinVisual />,
+      visual: () => <JoinVisual />,
     },
     {
       key: "atlas",
@@ -296,7 +365,7 @@ function makeScenes(s: AtlasLite | null): Scene[] {
           attacks refused, {fmtUsd(s?.fundsLostUsd ?? 0)} lost.
         </>
       ),
-      visual: <AtlasVisual state={s} attacks={attacks} />,
+      visual: () => <AtlasVisual state={s} attacks={attacks} />,
     },
     {
       key: "yours",
@@ -308,7 +377,25 @@ function makeScenes(s: AtlasLite | null): Scene[] {
           </span>
         </>
       ),
-      visual: <YoursVisual />,
+      visual: () => <YoursVisual />,
+    },
+    {
+      key: "deploy",
+      narration: (
+        <>
+          Your first agent is{" "}
+          <span style={{ fontWeight: 700 }}>one click away.</span>
+          <br />
+          <span
+            className="text-[14px] md:text-[16px]"
+            style={{ color: "var(--text-tertiary)", fontWeight: 400 }}
+          >
+            Sixty seconds from here to your own live vault on devnet.
+          </span>
+        </>
+      ),
+      visual: () => <DeployVisual />,
+      cta: true,
     },
   ];
 }
@@ -548,8 +635,86 @@ function YoursVisual() {
           />
         </span>
       </motion.div>
-      {/* Suppress unused X import — saved for future skip-button variants */}
-      {false && <X />}
+    </div>
+  );
+}
+
+/**
+ * Scene 4 visual — mini preview of a deployed agent card with an
+ * "armed · ready" indicator. Hints at what the user is about to
+ * build without showing a full wizard screenshot.
+ */
+function DeployVisual() {
+  return (
+    <div className="flex items-center justify-center h-[200px]">
+      <motion.div
+        initial={{ scale: 0.92, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ duration: 0.8, ease: SPRING }}
+        className="relative"
+      >
+        {/* Glow behind the card */}
+        <motion.div
+          aria-hidden
+          className="absolute inset-0 rounded-[22px] -z-10"
+          style={{
+            background: "var(--agent-bg)",
+            filter: "blur(36px)",
+          }}
+          animate={{ opacity: [0.4, 0.75, 0.4] }}
+          transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+        />
+
+        <div
+          className="rounded-[20px] px-6 py-5 inline-flex items-center gap-4"
+          style={{
+            background: "var(--surface)",
+            border: "0.5px solid var(--border-subtle)",
+            boxShadow:
+              "0 1px 2px rgba(0,0,0,0.04), 0 24px 64px -20px rgba(79,70,229,0.28)",
+          }}
+        >
+          <div
+            className="w-14 h-14 rounded-[14px] flex items-center justify-center text-[28px]"
+            style={{ background: "var(--agent)" }}
+          >
+            🧭
+          </div>
+          <div className="text-left">
+            <p
+              className="text-[10px] font-semibold uppercase tracking-[0.08em]"
+              style={{ color: "var(--text-quaternary)" }}
+            >
+              You are moments away from
+            </p>
+            <p
+              className="text-[17px] font-semibold tracking-tight"
+              style={{ color: "var(--text-primary)" }}
+            >
+              Your first live agent.
+            </p>
+            <div
+              className="mt-2 inline-flex items-center gap-1.5 h-5 px-2 rounded-full text-[10px] font-semibold"
+              style={{
+                background: "var(--success-bg)",
+                color: "var(--success-deep)",
+              }}
+            >
+              <motion.span
+                className="w-1 h-1 rounded-full"
+                style={{ background: "var(--success)" }}
+                animate={{ opacity: [0.5, 1, 0.5] }}
+                transition={{
+                  duration: 1.6,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }}
+              />
+              Armed · ready to deploy
+            </div>
+          </div>
+        </div>
+      </motion.div>
     </div>
   );
 }

@@ -20,6 +20,7 @@
 import { motion } from "framer-motion";
 import { PURPOSE_PRESETS, type AgentPurpose, type VaultConfig } from "../types";
 import { EASE_PREMIUM as ease } from "@/lib/motion";
+import { WizardPreviewDrawer } from "../wizard-preview-drawer";
 
 export interface IdentityStepProps {
   config: VaultConfig;
@@ -157,8 +158,13 @@ export function IdentityStep({ config, setConfig }: IdentityStepProps) {
         </div>
       </div>
 
-      {/* RIGHT — live nameplate preview */}
-      <LiveNameplate config={config} />
+      {/* RIGHT — live nameplate preview.
+          Desktop: inline right column. Mobile: floating "Preview"
+          button that opens a bottom sheet — keeps the form above
+          the fold on small screens. */}
+      <WizardPreviewDrawer label="Agent nameplate">
+        <LiveNameplate config={config} />
+      </WizardPreviewDrawer>
     </div>
   );
 }

@@ -39,6 +39,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { JourneyChecklist } from "@/components/app/journey-checklist";
 import { AtlasRunningStrip } from "@/components/vault/atlas-running-strip";
 import { AttackLeaderboard } from "@/components/atlas/attack-leaderboard";
+import { NumberScramble } from "@/components/atlas/number-scramble";
 import { EASE_PREMIUM as EASE } from "@/lib/motion";
 
 /* ─── Fallback dev wallet (mirrors /vault/new) ─── */
@@ -344,41 +345,17 @@ export default function AppHomePage() {
             }}
           />
 
-          {/* ── Top stat row ── */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <TotalTile
-              label="Spent today"
-              value={fmtUsd(spentToday)}
-              sub={`${activeVaults} active vault${activeVaults === 1 ? "" : "s"}`}
-              icon={Wallet}
-              delay={0}
-              tone="indigo"
-            />
-            <TotalTile
-              label="Earned today"
-              value={fmtUsd(pulseStats?.revenue ?? 0)}
-              sub={`${pulseStats?.calls ?? 0} call${(pulseStats?.calls ?? 0) === 1 ? "" : "s"}`}
-              icon={TrendingUp}
-              delay={0.05}
-              tone="sky"
-            />
-            <TotalTile
-              label="Unique agents"
-              value={(pulseStats?.customers ?? 0).toString()}
-              sub="paying your services"
-              icon={Globe}
-              delay={0.1}
-              tone="plain"
-            />
-            <TotalTile
-              label="Net flow"
-              value={fmtUsd((pulseStats?.revenue ?? 0) - spentToday)}
-              sub="today · earn − pay"
-              icon={ArrowLeftRight}
-              delay={0.15}
-              tone="plain"
-            />
-          </div>
+          {/* ── Day at a glance — one hero card replaces the 4-stat row.
+               Chrome bar + huge net-flow number + a supporting row of
+               mini-stats. Mirrors the observatory's visual language so
+               /app reads as an operator cockpit, not a SaaS grid. ── */}
+          <DayAtAGlance
+            spentToday={spentToday}
+            earnedToday={pulseStats?.revenue ?? 0}
+            calls={pulseStats?.calls ?? 0}
+            customers={pulseStats?.customers ?? 0}
+            activeVaults={activeVaults}
+          />
 
           {/* ── Two-column: Pay side + Earn side ── */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -415,59 +392,246 @@ export default function AppHomePage() {
 /*                              Sub-cards                             */
 /* ═══════════════════════════════════════════════════════════════════ */
 
-function TotalTile({
-  label,
-  value,
-  sub,
-  icon: Icon,
-  tone,
-  delay,
+/**
+ * DayAtAGlance — hero card replacing the 4-stat row.
+ *
+ * Old layout: 4 equal-weight tiles (spent / earned / agents / net).
+ * Problem: no hierarchy — the user had to read four numbers to
+ * understand today. Felt like a QBR dashboard, not a cockpit.
+ *
+ * New: one premium card with the observatory's visual language.
+ *   · Chrome bar with traffic lights + date + live pill
+ *   · Huge NET-FLOW number (the one metric that answers "how are we
+ *     doing today?") with a breathing ambient halo
+ *   · Supporting row of 4 micro-stats beneath — still visible, but
+ *     cedes focus to the headline
+ *   · NumberScramble on every digit so polling refreshes visibly land
+ *
+ * Net flow flips color: green when positive, neutral when zero, red
+ * when negative (agents outspent revenue today).
+ */
+function DayAtAGlance({
+  spentToday,
+  earnedToday,
+  calls,
+  customers,
+  activeVaults,
 }: {
-  label: string;
-  value: string;
-  sub: string;
-  icon: React.ComponentType<{ className?: string }>;
-  tone: "indigo" | "sky" | "plain";
-  delay: number;
+  spentToday: number;
+  earnedToday: number;
+  calls: number;
+  customers: number;
+  activeVaults: number;
 }) {
-  const accent =
-    tone === "indigo" ? "#4F46E5" : tone === "sky" ? "#0EA5E9" : "#8E8E93";
+  const net = earnedToday - spentToday;
+  const netTone =
+    net > 0.005
+      ? "var(--success-deep)"
+      : net < -0.005
+        ? "var(--attack)"
+        : "var(--text-primary)";
+  const netSign = net > 0 ? "+" : net < 0 ? "−" : "";
+  const netAbs = Math.abs(net);
+
+  const today = new Date().toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+
   return (
-    <motion.div
+    <motion.section
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay, ease: EASE }}
-      className="p-5 rounded-[18px]"
+      transition={{ duration: 0.55, ease: EASE }}
+      className="rounded-[20px] overflow-hidden"
       style={{
         background: "var(--surface)",
         border: "0.5px solid var(--border-subtle)",
-        boxShadow: "0 1px 2px rgba(0,0,0,0.03)",
+        boxShadow:
+          "0 1px 2px rgba(0,0,0,0.03), 0 20px 60px -30px rgba(0,0,0,0.10)",
       }}
     >
-      <div className="flex items-center gap-1.5 mb-2">
-        <span style={{ color: accent }} className="inline-flex">
+      {/* Chrome bar */}
+      <div
+        className="flex items-center justify-between px-5 py-2.5"
+        style={{ borderBottom: "0.5px solid var(--border-subtle)" }}
+      >
+        <div className="flex items-center gap-1.5">
+          <span
+            className="w-2 h-2 rounded-full"
+            style={{ background: "var(--chrome-red)" }}
+          />
+          <span
+            className="w-2 h-2 rounded-full"
+            style={{ background: "var(--chrome-yellow)" }}
+          />
+          <span
+            className="w-2 h-2 rounded-full"
+            style={{ background: "var(--chrome-green)" }}
+          />
+          <span
+            className="ml-2 text-[10.5px] font-mono-numbers"
+            style={{ color: "var(--text-quaternary)" }}
+          >
+            today · {today}
+          </span>
+        </div>
+        <div className="flex items-center gap-1">
+          <motion.span
+            className="w-1.5 h-1.5 rounded-full"
+            style={{ background: "var(--success)" }}
+            animate={{ opacity: [0.5, 1, 0.5] }}
+            transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+          />
+          <span
+            className="text-[10px] font-semibold uppercase tracking-[0.08em]"
+            style={{ color: "var(--success-deep)" }}
+          >
+            live
+          </span>
+        </div>
+      </div>
+
+      {/* Hero row */}
+      <div className="relative px-6 md:px-8 pt-6 pb-5">
+        {/* Breathing halo behind the big number — same treatment as
+            the Budget tab's spend ring. Keeps the "this is alive"
+            signal consistent across surfaces. */}
+        <motion.div
+          aria-hidden
+          className="absolute left-6 top-4 w-[180px] h-[80px] rounded-full -z-0"
+          style={{
+            background:
+              net >= 0 ? "var(--success-bg)" : "var(--attack-bg)",
+            filter: "blur(32px)",
+            opacity: 0.55,
+          }}
+          animate={{ opacity: [0.4, 0.7, 0.4] }}
+          transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
+        />
+
+        <div className="relative">
+          <p
+            className="text-[10.5px] font-semibold uppercase tracking-[0.1em]"
+            style={{ color: "var(--text-quaternary)" }}
+          >
+            Net flow today
+          </p>
+          <p
+            className="mt-1 text-[52px] md:text-[60px] font-semibold leading-none tracking-[-0.025em]"
+            style={{
+              color: netTone,
+              fontVariantNumeric: "tabular-nums",
+            }}
+          >
+            {netSign}
+            <NumberScramble value={netAbs} format={fmtUsd} />
+          </p>
+          <p
+            className="mt-2 text-[13px]"
+            style={{ color: "var(--text-tertiary)" }}
+          >
+            {net >= 0
+              ? "Your agents are paying their way — revenue beats spend."
+              : "Your agents have spent more than they earned today. Still well inside policy caps."}
+          </p>
+        </div>
+      </div>
+
+      {/* Supporting row — 4 mini-stats with subtle separators */}
+      <div
+        className="grid grid-cols-2 md:grid-cols-4"
+        style={{ borderTop: "0.5px solid var(--border-subtle)" }}
+      >
+        <DayStat
+          label="Spent today"
+          icon={Wallet}
+          value={<NumberScramble value={spentToday} format={fmtUsd} />}
+          sub={`${activeVaults} active ${activeVaults === 1 ? "vault" : "vaults"}`}
+          accent="var(--agent)"
+          divider
+        />
+        <DayStat
+          label="Earned today"
+          icon={TrendingUp}
+          value={<NumberScramble value={earnedToday} format={fmtUsd} />}
+          sub={`${calls} call${calls === 1 ? "" : "s"}`}
+          accent="var(--revenue)"
+          divider
+        />
+        <DayStat
+          label="Unique agents"
+          icon={Globe}
+          value={<NumberScramble value={customers} format={(n) => String(n)} />}
+          sub="paying your services"
+          accent="var(--text-tertiary)"
+          divider
+        />
+        <DayStat
+          label="Calls"
+          icon={ArrowLeftRight}
+          value={<NumberScramble value={calls} format={(n) => String(n)} />}
+          sub="inbound x402 today"
+          accent="var(--text-tertiary)"
+        />
+      </div>
+    </motion.section>
+  );
+}
+
+/** One cell in the day-at-a-glance supporting row. */
+function DayStat({
+  label,
+  icon: Icon,
+  value,
+  sub,
+  accent,
+  divider,
+}: {
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  value: React.ReactNode;
+  sub: string;
+  accent: string;
+  divider?: boolean;
+}) {
+  return (
+    <div
+      className="px-5 py-4 md:py-5"
+      style={
+        divider
+          ? { borderRight: "0.5px solid var(--border-subtle)" }
+          : undefined
+      }
+    >
+      <div className="flex items-center gap-1.5 mb-1.5">
+        <span style={{ color: accent }}>
           <Icon className="w-3 h-3" />
         </span>
         <span
-          className="text-[10.5px] font-semibold uppercase tracking-[0.08em]"
+          className="text-[10px] font-semibold uppercase tracking-[0.08em]"
           style={{ color: "var(--text-quaternary)" }}
         >
           {label}
         </span>
       </div>
       <p
-        className="text-[26px] font-semibold tracking-[-0.02em] leading-none"
-        style={{ color: "var(--text-primary)", fontVariantNumeric: "tabular-nums" }}
+        className="text-[22px] font-semibold leading-none tracking-tight"
+        style={{
+          color: "var(--text-primary)",
+          fontVariantNumeric: "tabular-nums",
+        }}
       >
         {value}
       </p>
       <p
-        className="mt-1.5 text-[11.5px]"
+        className="mt-1 text-[11px]"
         style={{ color: "var(--text-tertiary)" }}
       >
         {sub}
       </p>
-    </motion.div>
+    </div>
   );
 }
 

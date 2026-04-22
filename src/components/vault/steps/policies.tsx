@@ -22,6 +22,7 @@ import { Check, Plus, ShieldAlert, Timer, X } from "lucide-react";
 import { useState } from "react";
 import type { VaultConfig, VelocityWindow } from "../types";
 import { EASE_PREMIUM as ease } from "@/lib/motion";
+import { WizardPreviewDrawer } from "../wizard-preview-drawer";
 
 const WINDOW_OPTIONS: { value: VelocityWindow; label: string }[] = [
   { value: "1h", label: "per hour" },
@@ -323,8 +324,10 @@ export function PoliciesStep({ config, setConfig }: PoliciesStepProps) {
         </label>
       </div>
 
-      {/* RIGHT — live policy wall */}
-      <LivePolicyWall config={config} />
+      {/* RIGHT — live policy wall. Mobile: drawer. */}
+      <WizardPreviewDrawer label="Policy wall">
+        <LivePolicyWall config={config} />
+      </WizardPreviewDrawer>
     </div>
   );
 }
