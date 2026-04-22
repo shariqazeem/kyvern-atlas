@@ -1,0 +1,20 @@
+diff --git a/node_modules/@sqds/multisig/lib/index.js b/node_modules/@sqds/multisig/lib/index.js
+index 24968a4..b7ca078 100644
+--- a/node_modules/@sqds/multisig/lib/index.js
++++ b/node_modules/@sqds/multisig/lib/index.js
+@@ -5077,7 +5077,14 @@ function translateAndThrowAnchorError(err) {
+   if (typeof Error.captureStackTrace === "function") {
+     Error.captureStackTrace(translatedError, translateAndThrowAnchorError);
+   }
+-  translatedError.logs = err.logs;
++  // KYVERN PATCH: if cusper returned the same err object (no translation),
++  // `err.logs = err.logs` throws under @solana/web3.js >=1.98 because
++  // SendTransactionError exposes `logs` as a read-only getter. Only assign
++  // when we actually have a translated error, and swallow the set if the
++  // target object ever re-appears with a getter-only `logs`.
++  if (translatedError !== err) {
++    try { translatedError.logs = err.logs; } catch { /* read-only logs getter */ }
++  }
+   throw translatedError;
+ }
+ var isErrorWithLogs = (err) => {
