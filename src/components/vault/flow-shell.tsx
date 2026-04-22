@@ -156,8 +156,10 @@ export function FlowShell({
       </header>
 
       {/* ─── Step content ─── */}
+      {/* Wider container (880px) so each step can render a 2-column
+          edit-then-preview layout on desktop. Mobile stacks naturally. */}
       <main className="flex-1 w-full">
-        <div className="max-w-[620px] mx-auto px-6 lg:px-8 pt-20 lg:pt-28 pb-32">
+        <div className="max-w-[880px] mx-auto px-6 lg:px-8 pt-20 lg:pt-28 pb-32">
           <AnimatePresence mode="wait">
             <motion.div
               key={stepIndex}

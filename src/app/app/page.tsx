@@ -23,6 +23,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
   ArrowRight,
@@ -36,8 +37,9 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { JourneyChecklist } from "@/components/app/journey-checklist";
-
-const EASE = [0.25, 0.1, 0.25, 1] as const;
+import { AtlasRunningStrip } from "@/components/vault/atlas-running-strip";
+import { AttackLeaderboard } from "@/components/atlas/attack-leaderboard";
+import { EASE_PREMIUM as EASE } from "@/lib/motion";
 
 /* ─── Fallback dev wallet (mirrors /vault/new) ─── */
 function devFallbackWallet(): string {
@@ -148,12 +150,29 @@ function greeting(): string {
 /* ═══════════════════════════════════════════════════════════════════ */
 
 export default function AppHomePage() {
+  const router = useRouter();
   const { wallet, isLoading: authLoading } = useAuth();
 
   const [owner, setOwner] = useState<string | null>(null);
   const [vaults, setVaults] = useState<VaultBrief[] | null>(null);
   const [pulseStats, setPulseStats] = useState<PulseStats | null>(null);
   const [pulseKeyCount, setPulseKeyCount] = useState<number>(0);
+
+  // First-time visitor → redirect to /welcome for a 12s cinematic
+  // orientation. The welcome page sets localStorage.welcomeSeen=1
+  // on exit so this redirect stops firing for returning users.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (authLoading) return;
+    try {
+      const seen = window.localStorage.getItem("kyvern:welcomeSeen");
+      if (!seen) {
+        router.replace("/welcome");
+      }
+    } catch {
+      /* storage unavailable — silently skip welcome. Better than never landing. */
+    }
+  }, [authLoading, router]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -274,13 +293,18 @@ export default function AppHomePage() {
   }, [vaults]);
 
   return (
-    <div className="space-y-8 pb-16">
+    <div className="space-y-10 pb-16">
+      {/* ── Network pulse — the live Atlas network sits above every
+           user surface so "you are inside a running network" reads
+           on first paint. Self-hides on /atlas / /tour. ── */}
+      <AtlasRunningStrip />
+
       {/* ── Hello row ── */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, ease: EASE }}
-        className="flex flex-col gap-1.5 pt-2"
+        className="flex flex-col gap-1.5"
       >
         <p
           className="text-[11px] font-semibold uppercase tracking-[0.1em]"
@@ -367,6 +391,20 @@ export default function AppHomePage() {
 
           {/* ── Unified activity feed ── */}
           <ActivityCard items={activity} />
+
+          {/* ── Network presence — the Atlas attack leaderboard
+               appears here so the user sees the live network
+               around them, not just their own numbers. "You're
+               in a network that survived 184 attacks this week." ── */}
+          <div className="pt-4">
+            <h3
+              className="text-[11px] font-semibold uppercase tracking-[0.1em] mb-3"
+              style={{ color: "var(--text-quaternary)" }}
+            >
+              The network around your agents
+            </h3>
+            <AttackLeaderboard />
+          </div>
         </>
       )}
     </div>
