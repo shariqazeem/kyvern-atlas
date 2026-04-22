@@ -26,7 +26,6 @@ import { motion } from "framer-motion";
 import {
   ArrowRight,
   ArrowUpRight,
-  Check,
   OctagonAlert,
   ShieldCheck,
   Zap,
