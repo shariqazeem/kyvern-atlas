@@ -93,10 +93,10 @@ const TABS: TabDef[] = [
   },
   {
     key: "integrate",
-    label: "Integrate",
+    label: "Playground",
     icon: Code2,
     accent: "var(--text-primary)",
-    hint: "SDK snippet + live playground.",
+    hint: "Fire real test payments. SDK snippet for when you're ready to wire it into your own agent.",
   },
 ];
 

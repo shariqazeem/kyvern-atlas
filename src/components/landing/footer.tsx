@@ -21,7 +21,6 @@ const LINKS = {
   Developers: [
     { label: "Documentation", href: "/docs" },
     { label: "SDK on npm", href: "https://www.npmjs.com/package/@kyvernlabs/sdk" },
-    { label: "Pulse middleware", href: "https://www.npmjs.com/package/@kyvernlabs/pulse" },
     { label: "Kyvern program", href: "https://explorer.solana.com/address/PpmZErWfT5zpeo1fJtTbpqezFGbRUamaNNRWViaMSqc?cluster=devnet" },
     { label: "Built on Squads v4", href: "https://squads.so" },
   ],
@@ -69,8 +68,8 @@ export function Footer() {
               className="text-[13px] leading-[1.6] max-w-[240px]"
               style={{ color: "var(--text-tertiary)" }}
             >
-              Agent commerce on Solana. Spend within limits the chain enforces,
-              earn every payment verified on-chain.
+              Per-agent vaults on Solana. Budgets, allowlists, and a kill
+              switch the chain itself enforces.
             </p>
           </div>
 

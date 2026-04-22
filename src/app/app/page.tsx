@@ -1,24 +1,29 @@
 "use client";
 
 /* ════════════════════════════════════════════════════════════════════
-   /app — the unified Kyvern home.
+   /app — the Kyvern operator home.
 
-   One screen. Both sides of agent commerce. Clean flow to everything.
+   One screen, pay-side focused. Single-brand Kyvern (the Frontier
+   reframe): every agent the signed-in user owns, what it did today,
+   how much it spent, how many attempts the policy refused on-chain.
 
    Sections (top to bottom):
-     1. Welcome + two stat totals (spent / earned today)
-     2. Two-column "Pay side" + "Earn side" summary cards
-     3. Unified recent activity feed (outgoing + inbound in one stream)
-     4. Quickstart checklist for brand-new accounts
+     1. Welcome headline
+     2. Journey checklist (3-step, auto-dismisses once running)
+     3. "Today" card — spent / active agents / decisions / $0 lost
+     4. Agents card (full width) — every vault, click through to /vault/[id]
+     5. Unified recent activity feed
+     6. "The network around your agents" — Atlas attack leaderboard
 
    Data sources:
-     · /api/vault/list?ownerWallet=…      (the pay side)
-     · /api/pulse/stats?range=1d          (the earn side aggregate)
-     · /api/pulse/recent?limit=10         (inbound events)
+     · /api/vault/list?ownerWallet=…      (vaults + last payment)
+     · /api/vault/[id]/funding             (lazy, first vault only)
 
-   Note: for the brand-new case (no vaults, no keys yet) the layout
-   collapses to a single onboarding block that leads to /vault/new or
-   /app/services. No empty-state dead-ends.
+   Historical note: this page used to render an EarnSideCard + PulseStats
+   in a 2-column grid alongside a "net flow today" hero metric. That
+   architecture dated to the dual-brand era (Vault + Pulse). Pay-side
+   focus for Frontier. Earn surfaces can come back when an earn product
+   exists as its own brand.
    ════════════════════════════════════════════════════════════════════ */
 
 import { useEffect, useMemo, useState } from "react";
@@ -32,8 +37,6 @@ import {
   Wallet,
   Globe,
   Plus,
-  TrendingUp,
-  ArrowLeftRight,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { JourneyChecklist } from "@/components/app/journey-checklist";
@@ -82,13 +85,6 @@ interface VaultBrief {
     status: "allowed" | "blocked" | "settled" | "failed";
     createdAt: string;
   } | null;
-}
-
-interface PulseStats {
-  revenue: number;
-  calls: number;
-  customers: number;
-  avg_price: number;
 }
 
 interface ActivityItem {
@@ -156,8 +152,6 @@ export default function AppHomePage() {
 
   const [owner, setOwner] = useState<string | null>(null);
   const [vaults, setVaults] = useState<VaultBrief[] | null>(null);
-  const [pulseStats, setPulseStats] = useState<PulseStats | null>(null);
-  const [pulseKeyCount, setPulseKeyCount] = useState<number>(0);
 
   // First-time visitor → redirect to /welcome for a 12s cinematic
   // orientation. The welcome page sets localStorage.welcomeSeen=1
@@ -196,45 +190,9 @@ export default function AppHomePage() {
     };
   }, [owner]);
 
-  // Earn side — stats + keys (best-effort; Pulse endpoints may 401 for
-  // un-paying users; we treat that as "no data yet").
-  useEffect(() => {
-    let cancelled = false;
-    Promise.allSettled([
-      fetch("/api/pulse/stats?range=1d", { credentials: "include" }).then(
-        (r) => (r.ok ? r.json() : null),
-      ),
-      // Pulse keys live behind /api/auth/keys (our unified key store for
-      // both agent-side and service-side credentials). There is no
-      // /api/pulse/keys — that was a 404 in production console.
-      fetch("/api/auth/keys", { credentials: "include" }).then((r) =>
-        r.ok ? r.json() : null,
-      ),
-    ]).then(([statsRes, keysRes]) => {
-      if (cancelled) return;
-      if (statsRes.status === "fulfilled" && statsRes.value) {
-        setPulseStats({
-          revenue: Number(statsRes.value.revenue ?? 0),
-          calls: Number(statsRes.value.calls ?? 0),
-          customers: Number(statsRes.value.customers ?? 0),
-          avg_price: Number(statsRes.value.avg_price ?? 0),
-        });
-      } else {
-        setPulseStats({ revenue: 0, calls: 0, customers: 0, avg_price: 0 });
-      }
-      if (keysRes.status === "fulfilled" && keysRes.value) {
-        const n = Array.isArray(keysRes.value?.keys)
-          ? keysRes.value.keys.length
-          : 0;
-        setPulseKeyCount(n);
-      } else {
-        setPulseKeyCount(0);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  // Earn-side fetches removed — single-brand Kyvern for the Frontier
+  // reframe. If an earn product returns, its API calls belong in its
+  // own component, not cross-fetched from the pay-side home.
 
   // Derived totals
   const spentToday = useMemo(
@@ -251,8 +209,7 @@ export default function AppHomePage() {
   const activity = useUnifiedActivity(vaults);
 
   const hasVaults = (vaults ?? []).length > 0;
-  const hasServices = pulseKeyCount > 0 || (pulseStats?.calls ?? 0) > 0;
-  const brandNew = vaults !== null && !hasVaults && !hasServices;
+  const brandNew = vaults !== null && !hasVaults;
 
   // Journey checklist — live state across BOTH sides of the product.
   // Powers the top-of-page "take your agent all the way" card which
@@ -339,32 +296,21 @@ export default function AppHomePage() {
               hasVault: hasVaults,
               vaultUsdcBalance: firstVaultBalance,
               hasSettledPayment,
-              hasPulseKey: pulseKeyCount > 0,
-              hasPulseEvent: (pulseStats?.calls ?? 0) > 0,
               firstVaultId,
             }}
           />
 
-          {/* ── Day at a glance — one hero card replaces the 4-stat row.
-               Chrome bar + huge net-flow number + a supporting row of
-               mini-stats. Mirrors the observatory's visual language so
-               /app reads as an operator cockpit, not a SaaS grid. ── */}
+          {/* ── Today card — one hero for pay-side. Chrome bar, huge
+               Spent-Today number, supporting mini-stats (active agents,
+               $0 lost indicator). Mirrors the Atlas observatory's visual
+               language so /app reads as an operator cockpit. ── */}
           <DayAtAGlance
             spentToday={spentToday}
-            earnedToday={pulseStats?.revenue ?? 0}
-            calls={pulseStats?.calls ?? 0}
-            customers={pulseStats?.customers ?? 0}
             activeVaults={activeVaults}
           />
 
-          {/* ── Two-column: Pay side + Earn side ── */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <PaySideCard vaults={vaults} />
-            <EarnSideCard
-              pulseStats={pulseStats}
-              pulseKeyCount={pulseKeyCount}
-            />
-          </div>
+          {/* ── Your agents (full width) ── */}
+          <PaySideCard vaults={vaults} />
 
           {/* ── Unified activity feed ── */}
           <ActivityCard items={activity} />
@@ -393,46 +339,23 @@ export default function AppHomePage() {
 /* ═══════════════════════════════════════════════════════════════════ */
 
 /**
- * DayAtAGlance — hero card replacing the 4-stat row.
+ * DayAtAGlance — today's operator snapshot for the signed-in user.
  *
- * Old layout: 4 equal-weight tiles (spent / earned / agents / net).
- * Problem: no hierarchy — the user had to read four numbers to
- * understand today. Felt like a QBR dashboard, not a cockpit.
+ * One hero number — Spent today — with the Atlas observatory's visual
+ * language (chrome bar, live pill, JetBrains Mono). Supporting row:
+ * active agents, lost-to-exploits.
  *
- * New: one premium card with the observatory's visual language.
- *   · Chrome bar with traffic lights + date + live pill
- *   · Huge NET-FLOW number (the one metric that answers "how are we
- *     doing today?") with a breathing ambient halo
- *   · Supporting row of 4 micro-stats beneath — still visible, but
- *     cedes focus to the headline
- *   · NumberScramble on every digit so polling refreshes visibly land
- *
- * Net flow flips color: green when positive, neutral when zero, red
- * when negative (agents outspent revenue today).
+ * This replaced an earlier "net flow today" hero that subtracted
+ * earn-side revenue from pay-side spend. That was a dual-brand metric;
+ * single-brand Kyvern shows pay-side only.
  */
 function DayAtAGlance({
   spentToday,
-  earnedToday,
-  calls,
-  customers,
   activeVaults,
 }: {
   spentToday: number;
-  earnedToday: number;
-  calls: number;
-  customers: number;
   activeVaults: number;
 }) {
-  const net = earnedToday - spentToday;
-  const netTone =
-    net > 0.005
-      ? "var(--success-deep)"
-      : net < -0.005
-        ? "var(--attack)"
-        : "var(--text-primary)";
-  const netSign = net > 0 ? "+" : net < 0 ? "−" : "";
-  const netAbs = Math.abs(net);
-
   const today = new Date().toLocaleDateString("en-US", {
     weekday: "short",
     month: "short",
@@ -493,17 +416,13 @@ function DayAtAGlance({
         </div>
       </div>
 
-      {/* Hero row */}
+      {/* Hero row — Spent today */}
       <div className="relative px-6 md:px-8 pt-6 pb-5">
-        {/* Breathing halo behind the big number — same treatment as
-            the Budget tab's spend ring. Keeps the "this is alive"
-            signal consistent across surfaces. */}
         <motion.div
           aria-hidden
           className="absolute left-6 top-4 w-[180px] h-[80px] rounded-full -z-0"
           style={{
-            background:
-              net >= 0 ? "var(--success-bg)" : "var(--attack-bg)",
+            background: "var(--agent-bg)",
             filter: "blur(32px)",
             opacity: 0.55,
           }}
@@ -516,64 +435,48 @@ function DayAtAGlance({
             className="text-[10.5px] font-semibold uppercase tracking-[0.1em]"
             style={{ color: "var(--text-quaternary)" }}
           >
-            Net flow today
+            Spent today · across your agents
           </p>
           <p
             className="mt-1 text-[52px] md:text-[60px] font-semibold leading-none tracking-[-0.025em]"
             style={{
-              color: netTone,
+              color: "var(--text-primary)",
               fontVariantNumeric: "tabular-nums",
             }}
           >
-            {netSign}
-            <NumberScramble value={netAbs} format={fmtUsd} />
+            <NumberScramble value={spentToday} format={fmtUsd} />
           </p>
           <p
             className="mt-2 text-[13px]"
             style={{ color: "var(--text-tertiary)" }}
           >
-            {net >= 0
-              ? "Your agents are paying their way — revenue beats spend."
-              : "Your agents have spent more than they earned today. Still well inside policy caps."}
+            Every dollar stayed inside the policies you set. $0 lost to
+            anything the chain refused to sign.
           </p>
         </div>
       </div>
 
-      {/* Supporting row — 4 mini-stats with subtle separators */}
+      {/* Supporting row — pay-side stats only */}
       <div
-        className="grid grid-cols-2 md:grid-cols-4"
+        className="grid grid-cols-2"
         style={{ borderTop: "0.5px solid var(--border-subtle)" }}
       >
         <DayStat
-          label="Spent today"
+          label="Active agents"
           icon={Wallet}
-          value={<NumberScramble value={spentToday} format={fmtUsd} />}
-          sub={`${activeVaults} active ${activeVaults === 1 ? "vault" : "vaults"}`}
+          value={
+            <NumberScramble value={activeVaults} format={(n) => String(n)} />
+          }
+          sub={activeVaults === 1 ? "one vault running" : "vaults running"}
           accent="var(--agent)"
           divider
         />
         <DayStat
-          label="Earned today"
-          icon={TrendingUp}
-          value={<NumberScramble value={earnedToday} format={fmtUsd} />}
-          sub={`${calls} call${calls === 1 ? "" : "s"}`}
-          accent="var(--revenue)"
-          divider
-        />
-        <DayStat
-          label="Unique agents"
+          label="Lost to exploits"
           icon={Globe}
-          value={<NumberScramble value={customers} format={(n) => String(n)} />}
-          sub="paying your services"
-          accent="var(--text-tertiary)"
-          divider
-        />
-        <DayStat
-          label="Calls"
-          icon={ArrowLeftRight}
-          value={<NumberScramble value={calls} format={(n) => String(n)} />}
-          sub="inbound x402 today"
-          accent="var(--text-tertiary)"
+          value={<NumberScramble value={0} format={fmtUsd} />}
+          sub="Solana refused every blocked tx"
+          accent="var(--success-deep)"
         />
       </div>
     </motion.section>
@@ -808,136 +711,11 @@ function PaySideCard({ vaults }: { vaults: VaultBrief[] | null }) {
   );
 }
 
-function EarnSideCard({
-  pulseStats,
-  pulseKeyCount,
-}: {
-  pulseStats: PulseStats | null;
-  pulseKeyCount: number;
-}) {
-  const empty = pulseKeyCount === 0 && (pulseStats?.calls ?? 0) === 0;
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 14 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6, delay: 0.2, ease: EASE }}
-      className="rounded-[20px] overflow-hidden"
-      style={{
-        background: "var(--surface)",
-        border: "0.5px solid var(--border-subtle)",
-        boxShadow: "0 1px 2px rgba(0,0,0,0.03)",
-      }}
-    >
-      <div className="px-6 pt-5 pb-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div
-            className="w-7 h-7 rounded-[8px] flex items-center justify-center"
-            style={{ background: "#E8F4FE" }}
-          >
-            <Globe className="w-3.5 h-3.5" style={{ color: "#0EA5E9" }} />
-          </div>
-          <div>
-            <p
-              className="text-[10.5px] font-semibold uppercase tracking-[0.08em]"
-              style={{ color: "#0EA5E9" }}
-            >
-              Revenue
-            </p>
-            <h3
-              className="text-[16px] font-semibold tracking-tight"
-              style={{ color: "var(--text-primary)" }}
-            >
-              Payments from agents
-            </h3>
-          </div>
-        </div>
-        <Link
-          href="/pulse/dashboard/keys"
-          className="inline-flex items-center gap-1 h-7 px-2.5 rounded-[8px] text-[11.5px] font-semibold transition-colors hover:bg-[var(--surface-2)]"
-          style={{ color: "var(--text-primary)" }}
-        >
-          <Plus className="w-3 h-3" strokeWidth={2.5} />
-          Key
-        </Link>
-      </div>
-
-      <div
-        className="px-6 py-4"
-        style={{ borderTop: "0.5px solid var(--border-subtle)" }}
-      >
-        {empty ? (
-          <EmptyBlock
-            label="No services wrapped yet"
-            copy="One line of middleware and every agent payment shows up here, verified on-chain."
-            ctaLabel="Set up Pulse"
-            ctaHref="/pulse/dashboard/setup"
-            tone="sky"
-          />
-        ) : (
-          <div className="grid grid-cols-3 gap-3">
-            <MiniStat
-              label="Revenue (24h)"
-              value={fmtUsd(pulseStats?.revenue ?? 0)}
-            />
-            <MiniStat
-              label="Calls"
-              value={(pulseStats?.calls ?? 0).toLocaleString()}
-            />
-            <MiniStat
-              label="Agents"
-              value={(pulseStats?.customers ?? 0).toString()}
-            />
-          </div>
-        )}
-      </div>
-
-      {!empty && (
-        <div
-          className="px-6 py-3 text-right"
-          style={{ borderTop: "0.5px solid var(--border-subtle)" }}
-        >
-          <Link
-            href="/pulse/dashboard"
-            className="text-[12px] font-medium inline-flex items-center gap-1"
-            style={{ color: "var(--text-secondary)" }}
-          >
-            Open full dashboard
-            <ArrowRight className="w-3 h-3" />
-          </Link>
-        </div>
-      )}
-    </motion.div>
-  );
-}
-
-function MiniStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div
-      className="p-3 rounded-[12px]"
-      style={{
-        background: "var(--surface-2)",
-        border: "0.5px solid var(--border-subtle)",
-      }}
-    >
-      <p
-        className="text-[10px] font-semibold uppercase tracking-[0.08em]"
-        style={{ color: "var(--text-quaternary)" }}
-      >
-        {label}
-      </p>
-      <p
-        className="mt-1 text-[18px] font-semibold tracking-tight"
-        style={{
-          color: "var(--text-primary)",
-          fontVariantNumeric: "tabular-nums",
-        }}
-      >
-        {value}
-      </p>
-    </div>
-  );
-}
+/*
+ * EarnSideCard + MiniStat removed — they were the legacy Pulse earn-side
+ * surface on /app home. When an earn product returns it should live in
+ * its own component, not cross-rendered from the pay-side home.
+ */
 
 function EmptyBlock({
   label,

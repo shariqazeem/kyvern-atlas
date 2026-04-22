@@ -1,12 +1,14 @@
 "use client";
 
 /* ════════════════════════════════════════════════════════════════════
-   StackSection — the visual moment. Two primitives side-by-side.
+   StackSection — the visual moment. Two sides of one Kyvern vault.
    This is where a judge "gets it" in 5 seconds:
 
-     LEFT   VAULT  · agents pay safely      · @kyvernlabs/sdk
-     RIGHT  PULSE · services see revenue   · @kyvernlabs/pulse
-     BOTH   enforced by the same Kyvern + Squads v4 programs on Solana
+     LEFT   POLICY · agent-side spending rules
+     RIGHT  PAUSE  · owner-side kill switch
+     BOTH   enforced by the Kyvern + Squads v4 programs on Solana
+
+   One SDK. One product. Two surfaces that live on the same policy PDA.
 
    Design cues from Linear's feature grids, Stripe's api-overview, Vercel's
    typography system. White surface, 0.5px borders, soft shadows, mono
@@ -82,14 +84,15 @@ export function StackSection() {
           whileInView={{ opacity: 1 }}
           viewport={{ once: true, margin: "-100px" }}
           transition={{ duration: 0.6, delay: 0.12, ease }}
-          className="mx-auto mt-4 max-w-[620px] text-center text-[15px] leading-[1.55]"
-          style={{ color: "var(--text-tertiary)" }}
+          className="mx-auto mt-4 max-w-[620px] text-center text-[16px] leading-[1.6]"
+          style={{ color: "var(--text-secondary)" }}
         >
           Deploy an agent once and let it operate real money on Solana
           autonomously for days. Kyvern replaces the private key with a policy
-          PDA — budgets, allowlists, velocity, memo requirements — all enforced
-          by consensus before a tx ever signs. Every inbound payment a Kyvern
-          agent makes is also verifiable at the service on the other side.
+          PDA — budgets, allowlists, velocity caps, memo requirements — all
+          enforced by consensus before a transaction ever signs. And when
+          something goes wrong, one call pauses every future transaction at
+          the program level.
         </motion.p>
 
         {/* The two cards */}
@@ -124,29 +127,33 @@ const res = await vault.pay({
             ]}
           />
 
-          {/* Pulse · reputation layer — a consequence of Kyvern, not a sibling product */}
+          {/* Pause instruction — the owner's brake, enforced on-chain */}
           <PrimitiveCard
             index={1}
             accent="var(--revenue)"
             accentBg="var(--revenue-bg)"
-            chip="Kyvern · reputation layer"
-            title="Every paying agent carries its history."
-            subtitle="When a Kyvern-protected agent pays your service, you see more than an address. You see its policy, its uptime, its on-chain track record — the first reputation primitive for autonomous software."
-            code={`import { withPulse } from "@kyvernlabs/pulse";
-import { withX402 } from "@x402/next";
+            chip="Kyvern · kill switch"
+            title="One call. Every future tx reverts."
+            subtitle="If the agent goes off the rails, you flip a bool on the policy PDA. From that block forward, every pay attempt fails with VaultPaused — not because our server said no, but because Solana consensus did. Resume just as quickly when it's safe."
+            code={`import { Vault } from "@kyvernlabs/sdk";
 
-export const GET = withPulse(
-  withX402(handler, priceConfig),
-  { apiKey: "kv_live_..." }
-);
+const vault = new Vault({
+  apiBase: "https://kyvernlabs.com",
+  agentKey: process.env.KYVERN_AGENT_KEY!,
+  ownerWallet: ownerSigner,
+});
 
-// Your agent customers show up in the dashboard
-// seconds after they pay. Every row linked to Explorer.`}
+// Brake
+await vault.pause({ vaultId });
+
+// Every subsequent pay() from any agent on
+// this vault reverts on-chain:
+//   AnchorError: VaultPaused (12000)`}
             bullets={[
-              "Real-time inbound payment feed",
-              "Per-agent identity + policy context",
-              "Uptime + reliability score per payer",
-              "Every row linked to Solana Explorer",
+              "Pause flag lives on the policy PDA",
+              "Enforced by our program before any CPI",
+              "Halts every agent on the vault atomically",
+              "Owner-authority only — agent cannot override",
             ]}
           />
         </div>
@@ -168,16 +175,16 @@ export const GET = withPulse(
             }}
           >
             <ArrowDownUp className="h-3 w-3" />
-            Both primitives resolve to the same Solana transaction
+            One policy PDA. Two surfaces that can&apos;t lie to each other.
           </div>
           <p
-            className="max-w-[520px] text-center text-[13px] leading-[1.6]"
-            style={{ color: "var(--text-tertiary)" }}
+            className="max-w-[520px] text-center text-[14px] leading-[1.6]"
+            style={{ color: "var(--text-secondary)" }}
           >
-            When an agent with a Kyvern vault pays a service wrapped in Kyvern
-            Pulse, both the payer dashboard and the merchant dashboard show the
-            exact same Solana signature. That&apos;s the full loop — on-chain,
-            end-to-end, verifiable.
+            The agent&apos;s spending rules and the owner&apos;s kill switch
+            live in the same on-chain account. The agent can&apos;t override
+            the owner. The owner can&apos;t be lied to by the agent. Solana
+            consensus arbitrates — not our server.
           </p>
         </motion.div>
       </div>

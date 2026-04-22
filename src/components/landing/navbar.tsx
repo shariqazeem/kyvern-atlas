@@ -25,8 +25,8 @@ import { EASE_PREMIUM as ease } from "@/lib/motion";
  * inside the app — the marketing site just sells "Kyvern" itself.
  */
 const NAV_LINKS = [
-  { label: "How it works", href: "#stack" },
-  { label: "Developers", href: "#developers" },
+  { label: "How it works", href: "/#stack" },
+  { label: "Watch Atlas", href: "/atlas" },
   { label: "Docs", href: "/docs" },
 ];
 

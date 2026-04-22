@@ -17,10 +17,10 @@ export default function NotFound() {
             Go home
           </Link>
           <Link
-            href="/pulse/dashboard"
+            href="/atlas"
             className="inline-flex items-center h-10 px-5 rounded-lg border border-black/[0.08] text-[13px] font-medium text-secondary hover:text-primary transition-colors"
           >
-            Open Dashboard
+            Watch Atlas
           </Link>
         </div>
       </div>

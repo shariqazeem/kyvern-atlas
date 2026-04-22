@@ -133,14 +133,14 @@ function LoginInner() {
               letterSpacing: "-0.025em",
             }}
           >
-            Welcome back.
+            Your agents are one click away.
           </h1>
           <p
             className="text-center text-[14.5px] leading-[1.5] mb-8"
             style={{ color: "var(--text-secondary)" }}
           >
-            Sign in to create and manage your agent vaults. One click, no
-            passwords — email, Google, or wallet.
+            Email, Google, or wallet. No passwords. First vault deploys in
+            under a minute.
           </p>
 
           {/* Primary CTA */}

@@ -81,24 +81,24 @@ export function WhySolana() {
                 >
                   Squads v4 smart account
                 </span>
-                — audited three times, securing over $10B across Jito, Pyth,
-                Helium, and hundreds of DAOs. Our Kyvern policy program layers
-                merchant, velocity, memo, and pause enforcement on top, then
-                CPIs into Squads&apos; native spending-limit primitive. Two
-                programs, one atomic transaction.
+                &nbsp;— audited three times, securing over $10B across Jito,
+                Pyth, Helium, and hundreds of DAOs. Our Kyvern policy program
+                layers merchant, velocity, memo, and pause enforcement on top,
+                then CPIs into Squads&apos; native spending-limit primitive.
+                Two programs, one atomic transaction.
               </p>
               <p>
-                And on the receiving side, Pulse reads that same Solana
-                transaction — verifies it against Explorer, attributes it to
-                the paying agent, and drops it into the merchant&apos;s
-                revenue feed seconds after it lands.
+                Every allowed payment is a real Solana signature your agent
+                signed. Every blocked payment is a real failed transaction with
+                our program&apos;s error code in the logs. Neither one passes
+                through a server we could be asked to lie about.
               </p>
               <p
                 className="pt-2 text-[14px]"
                 style={{ color: "var(--text-tertiary)" }}
               >
-                You inherit Squads&apos; security. We inherit the trust. Both
-                sides see the same signature.
+                You inherit Squads&apos; security. Your agent inherits rules it
+                can&apos;t break. The chain is the arbiter, not us.
               </p>
             </motion.div>
           </div>

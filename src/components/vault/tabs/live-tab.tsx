@@ -24,10 +24,12 @@
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
+  ArrowRight,
   ArrowUpRight,
   Check,
   OctagonAlert,
   ShieldCheck,
+  Zap,
 } from "lucide-react";
 import { EASE_PREMIUM as EASE } from "@/lib/motion";
 import { fmtAgo, fmtUsd, fmtInt } from "@/lib/format";
@@ -298,40 +300,50 @@ function PolicyHealthChip({ vault }: { vault: Vault }) {
 
 function EmptyState({ vault }: { vault: Vault }) {
   return (
-    <div className="px-6 py-10 text-center">
+    <div className="px-6 py-12 text-center">
       <div
-        className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full"
-        style={{ background: "var(--surface-2)" }}
+        className="mx-auto mb-4 flex h-11 w-11 items-center justify-center rounded-full"
+        style={{ background: "var(--agent-bg)" }}
       >
-        <Check className="h-4 w-4" style={{ color: "var(--text-tertiary)" }} />
+        <Zap className="h-5 w-5" style={{ color: "var(--agent)" }} />
       </div>
       <p
-        className="text-[13.5px] font-semibold"
+        className="text-[16px] font-semibold tracking-tight"
         style={{ color: "var(--text-primary)" }}
       >
-        Agent is armed, just hasn&apos;t paid anyone yet.
+        Fire your first payment.
       </p>
       <p
-        className="mt-1 text-[12px]"
+        className="mx-auto mt-1.5 max-w-[320px] text-[12.5px] leading-[1.5]"
         style={{ color: "var(--text-tertiary)" }}
       >
-        Fire a test payment from{" "}
-        <Link
-          href="?tab=integrate"
-          scroll={false}
-          className="font-semibold underline underline-offset-2"
-          style={{ color: "var(--text-secondary)" }}
-        >
-          Integrate
-        </Link>
-        {" "}or wire{" "}
+        Every test is a real Solana tx you can verify on Explorer — the
+        policy enforces before a single token moves.
+      </p>
+      <Link
+        href="?tab=integrate"
+        scroll={false}
+        className="mt-5 inline-flex items-center gap-1.5 h-9 px-4 rounded-[10px] text-[12.5px] font-semibold transition-colors"
+        style={{
+          background: "var(--text-primary)",
+          color: "var(--background)",
+        }}
+      >
+        Open Playground
+        <ArrowRight className="h-3.5 w-3.5" />
+      </Link>
+      <p
+        className="mt-4 text-[11.5px]"
+        style={{ color: "var(--text-quaternary)" }}
+      >
+        Or wire{" "}
         <code
           className="code-inline"
           title={vault.id}
         >
           @kyvernlabs/sdk
         </code>
-        {" "}to your agent.
+        {" "}into your own agent.
       </p>
     </div>
   );

@@ -12,7 +12,8 @@ import { motion } from "framer-motion";
 import { Check, Copy, ArrowRight, ExternalLink, ShieldCheck } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { VaultConfig } from "../types";
-import { CrossConversionBanner } from "@/components/app/journey-checklist";
+// CrossConversionBanner removed for the Frontier build — single-brand
+// narrative. Re-introduce if a distinct merchant-side product returns.
 import { SignatureReveal } from "@/components/atlas/signature-reveal";
 import { EASE_PREMIUM as ease } from "@/lib/motion";
 
@@ -388,42 +389,37 @@ await vault.pay({
         </pre>
       </div>
 
-      {/* Cross-conversion — the "now the other side" moment.
-           This is the thesis: every pay-side user tries the earn-side
-           within 5 minutes of their first vault. */}
-      <div className="pt-4">
-        <CrossConversionBanner direction="to-earn" />
-      </div>
-
-      {/* Next steps — tighter, Pulse already has its own big banner above */}
+      {/* Next steps — land the judge on the Playground tab so they
+          immediately fire a real on-chain test payment instead of
+          staring at an empty Live feed. */}
       <div className="grid sm:grid-cols-2 gap-2.5 pt-2">
         <NextLink
-          href={`/vault/${vaultId}`}
-          title="Open your vault"
-          description="Live dashboard, activity feed, kill switch."
+          href={`/vault/${vaultId}?tab=integrate`}
+          title="Fire your first payment"
+          description="Trigger a real on-chain USDC transfer in one click."
           primary
         />
         <NextLink
-          href="/docs/quickstart"
-          title="Read the quickstart"
-          description="Wire the SDK into your first agent."
+          href={`/vault/${vaultId}`}
+          title="Open the live dashboard"
+          description="Activity feed, kill switch, policy edits."
         />
       </div>
 
-      {/* The loop visualization — tiny, understated, but it's what completes
-          the narrative: your agent pays merchants who use Pulse to see you. */}
+      {/* The loop visualization — tiny, understated. The signature your
+          agent just signed is the same row anyone can verify on Explorer. */}
       <div
         className="mt-2 flex items-center justify-center gap-2 text-[11.5px]"
         style={{ color: "var(--text-quaternary)" }}
       >
-        <span>Agent (Vault)</span>
+        <span>Your agent</span>
+        <span>→</span>
+        <span>Kyvern policy PDA</span>
         <span>→</span>
         <span>Solana tx</span>
-        <span>→</span>
-        <span>Merchant (Pulse)</span>
         <span className="mx-1">·</span>
         <span style={{ color: "var(--text-tertiary)" }}>
-          both sides see the same signature
+          every row verifiable on Explorer
         </span>
       </div>
     </div>

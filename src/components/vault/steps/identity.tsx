@@ -7,20 +7,28 @@
 
      LEFT                          RIGHT
      · Agent name input            · Live "agent nameplate" card —
-     · Purpose picker (6 chips)      renders as the user types, so the
+     · Emoji picker (6 options)      renders as the user types, so the
                                      config feels like character design,
                                      not form-fill.
 
    The nameplate mirrors the visual language of the /vault/[id] header
    row so when the user finally deploys, the card they've been shaping
-   materializes 1:1 in their dashboard. "You designed this, and it's
-   now live" is a stronger outcome than "your vault is ready."
+   materializes 1:1 in their dashboard.
+
+   Historical note: this step used to include a 6-option "purpose"
+   picker (research / trading / devtools / data / content / other). The
+   field was purely cosmetic — it stored a string but no code used it
+   to change budgets, allowlists, or policy behavior. Removed because
+   fake complexity confuses real users. An agent's purpose IS its
+   policy (budgets + allowlist + velocity), not a label.
    ════════════════════════════════════════════════════════════════════ */
 
 import { motion } from "framer-motion";
-import { PURPOSE_PRESETS, type AgentPurpose, type VaultConfig } from "../types";
+import type { VaultConfig } from "../types";
 import { EASE_PREMIUM as ease } from "@/lib/motion";
 import { WizardPreviewDrawer } from "../wizard-preview-drawer";
+
+const EMOJI_CHOICES = ["🧭", "📈", "⚙️", "🔗", "✍️", "🤖"];
 
 export interface IdentityStepProps {
   config: VaultConfig;
@@ -84,36 +92,39 @@ export function IdentityStep({ config, setConfig }: IdentityStepProps) {
           </p>
         </div>
 
-        {/* Purpose grid */}
+        {/* Emoji picker — personalization only. The actual policy (what
+            your agent can spend, who it can pay, how often) lives in the
+            next two steps. */}
         <div>
           <label
             className="text-[13px] font-medium mb-3 block"
             style={{ color: "var(--text-primary)" }}
           >
-            What will this agent do?
+            Pick an emoji
+            <span
+              className="ml-1.5 font-normal"
+              style={{ color: "var(--text-quaternary)" }}
+            >
+              — so you can tell it apart at a glance.
+            </span>
           </label>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-            {(Object.keys(PURPOSE_PRESETS) as AgentPurpose[]).map((key, i) => {
-              const preset = PURPOSE_PRESETS[key];
-              const selected = config.purpose === key;
+          <div className="flex flex-wrap gap-2">
+            {EMOJI_CHOICES.map((em, i) => {
+              const selected = config.emoji === em;
               return (
                 <motion.button
-                  key={key}
-                  initial={{ opacity: 0, y: 8 }}
+                  key={em}
+                  initial={{ opacity: 0, y: 4 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{
-                    duration: 0.35,
-                    delay: 0.05 + i * 0.04,
+                    duration: 0.3,
+                    delay: 0.05 + i * 0.03,
                     ease,
                   }}
                   onClick={() =>
-                    setConfig((c) => ({
-                      ...c,
-                      purpose: key,
-                      emoji: preset.emoji,
-                    }))
+                    setConfig((c) => ({ ...c, emoji: em }))
                   }
-                  className="group text-left p-4 rounded-[14px] relative"
+                  className="relative w-12 h-12 rounded-[12px] flex items-center justify-center text-[22px] transition-all"
                   style={{
                     background: selected
                       ? "var(--surface)"
@@ -122,31 +133,17 @@ export function IdentityStep({ config, setConfig }: IdentityStepProps) {
                       ? "0.5px solid var(--text-primary)"
                       : "0.5px solid transparent",
                     boxShadow: selected
-                      ? "0 1px 2px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.06)"
+                      ? "0 1px 2px rgba(0,0,0,0.06), 0 6px 18px rgba(0,0,0,0.05)"
                       : "none",
-                    transition: "all 250ms var(--ease-premium)",
                   }}
                 >
-                  <div className="text-[22px] mb-2.5">{preset.emoji}</div>
-                  <div
-                    className="text-[13.5px] font-semibold mb-0.5"
-                    style={{ color: "var(--text-primary)" }}
-                  >
-                    {preset.label}
-                  </div>
-                  <div
-                    className="text-[12px] leading-[1.4]"
-                    style={{ color: "var(--text-tertiary)" }}
-                  >
-                    {preset.description}
-                  </div>
+                  {em}
                   {selected && (
-                    <motion.div
-                      layoutId="identity-ring"
-                      className="absolute inset-0 rounded-[14px] pointer-events-none"
+                    <motion.span
+                      layoutId="emoji-ring"
+                      className="absolute inset-0 rounded-[12px] pointer-events-none"
                       style={{
-                        boxShadow:
-                          "inset 0 0 0 1px var(--text-primary)",
+                        boxShadow: "inset 0 0 0 1px var(--text-primary)",
                       }}
                       transition={{ duration: 0.3, ease }}
                     />
@@ -175,7 +172,6 @@ export function IdentityStep({ config, setConfig }: IdentityStepProps) {
    ──────────────────────────────────────────────────────────────── */
 
 function LiveNameplate({ config }: { config: VaultConfig }) {
-  const preset = PURPOSE_PRESETS[config.purpose];
   const name = config.name.trim() || "Unnamed agent";
   const readyness = config.name.trim().length >= 2;
   return (
@@ -278,7 +274,9 @@ function LiveNameplate({ config }: { config: VaultConfig }) {
             </div>
           </div>
 
-          {/* Purpose chip */}
+          {/* Policy preview — a compact line showing what this agent
+              will actually be allowed to do, pulled live from the
+              running config. Rules are the agent's real identity. */}
           <div
             className="inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full text-[11px] font-semibold"
             style={{
@@ -286,14 +284,15 @@ function LiveNameplate({ config }: { config: VaultConfig }) {
               color: "var(--agent)",
             }}
           >
-            <span>{preset.emoji}</span>
-            {preset.label}
+            <span>●</span>
+            On-chain policy
           </div>
           <p
             className="mt-3 text-[12px] leading-[1.5]"
             style={{ color: "var(--text-tertiary)" }}
           >
-            {preset.description}
+            Your rules live on a policy PDA on Solana. Daily cap, allowlist,
+            velocity, and kill switch — enforced by consensus, not a server.
           </p>
 
           {/* Placeholder footer (the live observatory once it's running) */}

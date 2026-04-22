@@ -5,27 +5,22 @@
  * JourneyChecklist — the "here's what to do next" card on /app home.
  *
  * Purpose:
- *   Every signed-in user touches two sides of Kyvern — spend (letting an
- *   agent pay within on-chain limits) and earn (capturing every payment
- *   that lands at their service). Whichever they start with, we want
- *   them to experience BOTH sides within the first ~5 minutes, because
- *   the platform thesis is unified agent commerce on Solana — not two
- *   separate products.
+ *   Get every signed-in user to the moment of proof — an agent of theirs
+ *   running a real on-chain transaction that Solana's consensus either
+ *   settles or refuses based on the policy PDA they just deployed.
  *
- *   Five concrete tasks, live-detected:
- *     1. Create a vault                            (spend)
- *     2. Fund it with test USDC                    (spend)
- *     3. Send a test payment                       (spend · proof)
- *     4. Set up a service                          (earn)
- *     5. Receive your first x402 payment           (earn)
+ *   Three concrete tasks, live-detected:
+ *     1. Deploy your first agent      (vault + policy PDA)
+ *     2. Give it real USDC            (fund the Squads vault ATA)
+ *     3. Watch Solana enforce         (run one allowed + one blocked)
  *
- *   When all five are done, the component self-collapses to a
- *   dismissable green "You're shipping on both sides" bar.
+ *   When all three are done, the component self-collapses to a
+ *   dismissable green "Your agent is running" bar.
  *
  * Design:
  *   Matches the eyebrow + title + subhead rhythm of every other /app
- *   page. Rows have StepCircle, a side chip (Spend / Earn), and a
- *   contextual CTA that routes into the right place. Fully dismissable.
+ *   page. Rows have a StepCircle and a contextual CTA that routes into
+ *   the right place. Fully dismissable.
  * ════════════════════════════════════════════════════════════════════
  */
 
@@ -51,10 +46,6 @@ export interface JourneyState {
   vaultUsdcBalance: number | null;
   /** Has the user's agent made at least one settled on-chain payment? */
   hasSettledPayment: boolean;
-  /** Has the user generated at least one Pulse service key? */
-  hasPulseKey: boolean;
-  /** Has Pulse captured at least one inbound payment event? */
-  hasPulseEvent: boolean;
   /** User's first vault id (for deep-linking to funding/testing). */
   firstVaultId: string | null;
 }
@@ -113,35 +104,10 @@ export function JourneyChecklist({ state }: { state: JourneyState }) {
       cta:
         state.hasVault && state.firstVaultId
           ? {
-              label: "Run test payment",
-              href: `/vault/${state.firstVaultId}`,
+              label: "Open Playground",
+              href: `/vault/${state.firstVaultId}?tab=integrate`,
             }
           : null,
-    },
-    {
-      id: "service",
-      title: "Capture payments from other agents",
-      description:
-        "Wrap your x402 endpoint so Kyvern agents paying you show up with identity.",
-      done: state.hasPulseKey,
-      side: "earn",
-      cta: state.hasPulseKey
-        ? null
-        : { label: "Set up a service", href: "/pulse/dashboard/keys" },
-    },
-    {
-      id: "earn",
-      title: "Receive your first agent payment",
-      description: "Verified on Solana, tagged with the payer's policy PDA.",
-      done: state.hasPulseEvent,
-      side: "earn",
-      locked: !state.hasPulseKey,
-      cta: state.hasPulseKey
-        ? {
-            label: "Open setup guide",
-            href: "/pulse/dashboard/setup",
-          }
-        : null,
     },
   ];
 
@@ -183,7 +149,7 @@ export function JourneyChecklist({ state }: { state: JourneyState }) {
               className="text-[11.5px]"
               style={{ color: "var(--text-tertiary)" }}
             >
-              Policy active · first revenue captured · everything verifiable on-chain.
+              Vault deployed · funded · policy enforced on-chain.
             </p>
           </div>
         </div>
@@ -221,20 +187,20 @@ export function JourneyChecklist({ state }: { state: JourneyState }) {
             className="text-[10.5px] font-semibold uppercase tracking-[0.08em]"
             style={{ color: "var(--text-quaternary)" }}
           >
-            Deploy · Fund · Run · Earn · {doneCount}/{tasks.length}
+            Deploy · Fund · Run · {doneCount}/{tasks.length}
           </p>
           <h2
             className="mt-0.5 text-[18px] font-semibold tracking-[-0.015em]"
             style={{ color: "var(--text-primary)" }}
           >
-            Your first autonomous agent, in five steps.
+            Your first autonomous agent, in three steps.
           </h2>
           <p
             className="mt-0.5 text-[12.5px] leading-[1.55]"
             style={{ color: "var(--text-tertiary)" }}
           >
-            Five steps across both sides of Kyvern. Your agent spends, your
-            service earns, everything verified on Solana.
+            Deploy an agent. Fund it. Let Solana enforce every boundary,
+            every transaction.
           </p>
         </div>
         <button
