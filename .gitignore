@@ -53,3 +53,9 @@ anchor/target/
 
 # local Claude Code worktrees
 .claude/
+
+# Deployment memory — contains VM IP, SSH key path, agent keys.
+# Written once per session so a fresh Claude session can pick up
+# deploy context. NEVER COMMIT.
+DEPLOY_MEMORY.md
+DEPLOY_MEMORY.local.md
