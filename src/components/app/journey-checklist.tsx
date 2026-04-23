@@ -362,7 +362,7 @@ export function CrossConversionBanner({
           title: "Your agent is running. Now earn from agent traffic.",
           description:
             "Wrap any x402 endpoint with one line of middleware. Every inbound Kyvern agent that pays you shows up with verifiable identity, policy context, and on-chain reputation.",
-          cta: { label: "Set up a service", href: "/pulse/dashboard/setup" },
+          cta: { label: "Set up a service", href: "/docs" },
           icon: Zap,
         }
       : {

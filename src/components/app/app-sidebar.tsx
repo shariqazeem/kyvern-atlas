@@ -23,7 +23,6 @@ import Link from "next/link";
 import {
   Home,
   Wallet,
-  Globe,
   Activity,
   Key,
   Settings,
@@ -66,7 +65,6 @@ const NAV_GROUPS = [
       { href: "/app", label: "Home", icon: Home, matchExact: true },
       { href: "/app/vaults", label: "Agents", icon: Wallet },
       { href: "/app/payments", label: "Activity", icon: Activity },
-      { href: "/app/services", label: "Revenue", icon: Globe },
     ],
   },
   {
@@ -215,9 +213,6 @@ function itemIsActive(
   // sections:
   //   · /pulse/dashboard/*  → earn side ("Services")
   //   · /vault, /vault/*    → pay side ("Vaults")
-  if (item.href === "/app/services" && pathname.startsWith("/pulse/dashboard")) {
-    return true;
-  }
   if (
     item.href === "/app/vaults" &&
     (pathname === "/vault" ||
