@@ -1,11 +1,10 @@
 "use client";
 
 /**
- * /app — Device Collection.
+ * /app — KyvernOS Home Screen.
  *
- * Dark surface showing all your devices (vaults) as mini device cards.
- * Each card shows the device name, budget gauge, LED, and last activity.
- * Click a device to open its full-screen view.
+ * Your devices in a clean grid. Today's stats. Recent activity.
+ * White, minimal, Apple-grade.
  */
 
 import { useEffect, useState } from "react";
@@ -26,7 +25,6 @@ interface VaultBrief {
     pausedAt: string | null;
     network: "devnet" | "mainnet";
     squadsAddress: string;
-    createdAt?: string;
   };
   budget: {
     spentToday: number;
@@ -41,12 +39,11 @@ interface VaultBrief {
   } | null;
 }
 
-/* ── Fallback wallet ── */
-function devFallbackWallet(): string {
+function devWallet(): string {
   if (typeof window === "undefined") return "";
   const KEY = "kyvern:dev-wallet";
-  const existing = window.localStorage.getItem(KEY);
-  if (existing) return existing;
+  const e = window.localStorage.getItem(KEY);
+  if (e) return e;
   const a = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
   let s = "";
   for (let i = 0; i < 44; i++) s += a[Math.floor(Math.random() * a.length)];
@@ -54,264 +51,357 @@ function devFallbackWallet(): string {
   return s;
 }
 
-export default function AppDeviceCollection() {
-  const { wallet, isLoading: authLoading } = useAuth();
-  const [owner, setOwner] = useState<string | null>(null);
+function relTime(iso: string): string {
+  const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (s < 60) return `${s}s ago`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
+
+export default function OSHome() {
+  const { wallet, isLoading } = useAuth();
   const [vaults, setVaults] = useState<VaultBrief[] | null>(null);
 
   useEffect(() => {
-    if (authLoading) return;
-    setOwner(wallet ?? devFallbackWallet());
-  }, [wallet, authLoading]);
-
-  useEffect(() => {
+    if (isLoading) return;
+    const owner = wallet ?? devWallet();
     if (!owner) return;
-    let cancelled = false;
+    let c = false;
     fetch(`/api/vault/list?ownerWallet=${encodeURIComponent(owner)}`)
       .then((r) => (r.ok ? r.json() : { vaults: [] }))
-      .then((d) => !cancelled && setVaults((d?.vaults ?? []) as VaultBrief[]))
-      .catch(() => !cancelled && setVaults([]));
-    return () => { cancelled = true; };
-  }, [owner]);
+      .then((d) => !c && setVaults((d?.vaults ?? []) as VaultBrief[]))
+      .catch(() => !c && setVaults([]));
+    return () => { c = true; };
+  }, [wallet, isLoading]);
 
-  const hasVaults = (vaults ?? []).length > 0;
   const loading = vaults === null;
+  const hasVaults = (vaults ?? []).length > 0;
+  const spentToday = (vaults ?? []).reduce((a, v) => a + v.budget.spentToday, 0);
+  const activeCount = (vaults ?? []).filter((v) => !v.vault.pausedAt).length;
 
   return (
-    <div
-      className="-mx-5 md:-mx-8 -my-8 px-5 md:px-8 py-8 min-h-[calc(100vh-56px)]"
-      style={{ background: "#050505" }}
-    >
-      {/* Header */}
+    <div className="py-2">
+      {/* Large title */}
       <motion.div
-        initial={{ opacity: 0, y: 10 }}
+        initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, ease }}
-        className="flex items-center justify-between mb-8"
+        transition={{ duration: 0.5, ease }}
+        className="flex items-end justify-between mb-6"
       >
-        <div>
-          <p className="font-mono text-[10px] tracking-[0.15em] text-white/25 mb-1">
-            YOUR DEVICES
-          </p>
-          <h1 className="text-[24px] font-semibold text-white/85 tracking-[-0.02em]">
-            {hasVaults
-              ? `${vaults!.length} device${vaults!.length > 1 ? "s" : ""}`
-              : "No devices yet"}
-          </h1>
-        </div>
+        <h1
+          className="text-[28px] font-semibold tracking-[-0.025em]"
+          style={{ color: "#111" }}
+        >
+          Your devices
+        </h1>
         <Link
           href="/vault/new"
-          className="flex items-center gap-2 h-9 px-4 rounded-full font-mono text-[11px] font-semibold tracking-wider transition-all hover:scale-[1.02]"
+          className="flex items-center gap-1.5 h-8 px-3.5 rounded-[10px] text-[12px] font-semibold transition-all active:scale-[0.97]"
           style={{
-            background: "rgba(255,255,255,0.08)",
-            color: "rgba(255,255,255,0.6)",
-            border: "1px solid rgba(255,255,255,0.1)",
+            background: "#111",
+            color: "#fff",
           }}
         >
           <Plus className="w-3.5 h-3.5" />
-          NEW DEVICE
+          New
         </Link>
       </motion.div>
 
       {/* Loading */}
       {loading && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[0, 1, 2].map((i) => (
+        <div className="space-y-3">
+          {[0, 1].map((i) => (
             <div
               key={i}
-              className="h-[200px] rounded-[20px] animate-pulse"
-              style={{ background: "rgba(255,255,255,0.03)" }}
+              className="h-[140px] rounded-[20px] animate-pulse"
+              style={{ background: "rgba(0,0,0,0.03)" }}
             />
           ))}
         </div>
       )}
 
       {/* Empty state */}
-      {!loading && !hasVaults && <EmptyDevices />}
+      {!loading && !hasVaults && <EmptyState />}
 
       {/* Device grid */}
       {hasVaults && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {vaults!.map((v, i) => (
-            <DeviceCard key={v.vault.id} vault={v} index={i} />
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {vaults!.map((v, i) => (
+              <DeviceCard key={v.vault.id} vault={v} index={i} />
+            ))}
+          </div>
+
+          {/* Today summary */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.2, duration: 0.5 }}
+            className="mt-8 rounded-[16px] px-5 py-4 flex items-center justify-between"
+            style={{
+              background: "#fff",
+              boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+              border: "1px solid rgba(0,0,0,0.05)",
+            }}
+          >
+            <div>
+              <p className="text-[11px] font-medium text-[#9CA3AF] uppercase tracking-wider">
+                Today
+              </p>
+              <p className="text-[22px] font-semibold tracking-tight text-[#111] font-mono">
+                ${spentToday.toFixed(2)}
+              </p>
+            </div>
+            <div className="flex items-center gap-6">
+              <div className="text-right">
+                <p className="text-[11px] text-[#9CA3AF]">Active</p>
+                <p className="text-[15px] font-semibold text-[#111]">
+                  {activeCount}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-[11px] text-[#9CA3AF]">Lost</p>
+                <p className="text-[15px] font-semibold text-[#22C55E]">$0</p>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Recent activity */}
+          <RecentActivity vaults={vaults!} />
+        </>
       )}
     </div>
   );
 }
 
-/* ── Device Card (mini device for the grid) ── */
+/* ── Device Card ── */
 
 function DeviceCard({ vault, index }: { vault: VaultBrief; index: number }) {
   const v = vault.vault;
   const b = vault.budget;
-  const isActive = !v.pausedAt;
+  const active = !v.pausedAt;
   const util = Math.min(b.dailyUtilization * 100, 100);
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 16 }}
+      initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.06, duration: 0.5, ease }}
+      transition={{ delay: index * 0.05, duration: 0.45, ease }}
     >
       <Link href={`/vault/${v.id}`} className="block group">
         <div
-          className="rounded-[20px] p-4 transition-all group-hover:scale-[1.01] group-hover:shadow-lg"
+          className="rounded-[20px] p-4 transition-all group-hover:shadow-md group-active:scale-[0.98]"
           style={{
-            background: "linear-gradient(165deg, #151515 0%, #0c0c0c 100%)",
-            border: "1px solid rgba(255,255,255,0.06)",
+            background: "#fff",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+            border: "1px solid rgba(0,0,0,0.05)",
           }}
         >
-          {/* Top: name + LED */}
-          <div className="flex items-center justify-between mb-4">
+          {/* Top: emoji + name + LED */}
+          <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2.5">
-              <span className="text-[18px]">{v.emoji || "🧭"}</span>
+              <span
+                className="w-9 h-9 rounded-[11px] flex items-center justify-center text-[17px]"
+                style={{ background: "#F3F4F6" }}
+              >
+                {v.emoji || "🧭"}
+              </span>
               <div>
-                <p className="font-mono text-[13px] font-semibold text-white/80 truncate max-w-[160px]">
+                <p className="text-[14px] font-semibold text-[#111] truncate max-w-[140px]">
                   {v.name}
                 </p>
-                <p className="font-mono text-[9px] text-white/25 tracking-wider">
-                  {v.network.toUpperCase()}
+                <p className="text-[10px] text-[#9CA3AF] font-medium">
+                  {v.network}
                 </p>
               </div>
             </div>
-            {/* LED */}
-            <div className="relative">
-              <motion.div
-                className="w-2.5 h-2.5 rounded-full"
-                style={{ background: isActive ? "#00ff88" : "#ff4444" }}
-                animate={{
-                  boxShadow: [
-                    `0 0 4px ${isActive ? "#00ff88" : "#ff4444"}`,
-                    `0 0 10px ${isActive ? "#00ff88" : "#ff4444"}`,
-                    `0 0 4px ${isActive ? "#00ff88" : "#ff4444"}`,
-                  ],
-                }}
-                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+            <div className="flex items-center gap-1.5">
+              <motion.span
+                className="w-[7px] h-[7px] rounded-full"
+                style={{ background: active ? "#22C55E" : "#EF4444" }}
+                animate={{ opacity: active ? [0.6, 1, 0.6] : 1 }}
+                transition={
+                  active
+                    ? { duration: 2, repeat: Infinity, ease: "easeInOut" }
+                    : {}
+                }
               />
+              <span
+                className="text-[10px] font-medium"
+                style={{ color: active ? "#22C55E" : "#EF4444" }}
+              >
+                {active ? "Active" : "Paused"}
+              </span>
             </div>
           </div>
 
-          {/* OLED-style mini screen */}
-          <div
-            className="rounded-[12px] p-3 mb-3"
-            style={{
-              background: "#000",
-              boxShadow: "inset 0 1px 2px rgba(0,0,0,0.8)",
-            }}
-          >
-            {/* Budget gauge */}
-            <div className="flex items-baseline justify-between mb-2">
-              <span className="font-mono text-[9px] text-white/30 tracking-wider">
-                BUDGET
-              </span>
-              <span className="font-mono text-[11px] text-white/60">
+          {/* Budget bar */}
+          <div className="mb-3">
+            <div className="flex items-baseline justify-between mb-1.5">
+              <span className="text-[11px] text-[#9CA3AF]">Daily budget</span>
+              <span className="text-[12px] font-mono font-medium text-[#111]">
                 ${b.spentToday.toFixed(2)}
-                <span className="text-white/20"> / ${b.dailyLimitUsd.toFixed(0)}</span>
+                <span className="text-[#D1D5DB]"> / ${b.dailyLimitUsd}</span>
               </span>
             </div>
             <div
-              className="h-[2px] rounded-full overflow-hidden"
-              style={{ background: "rgba(255,255,255,0.06)" }}
+              className="h-[4px] rounded-full overflow-hidden"
+              style={{ background: "#F3F4F6" }}
             >
               <div
                 className="h-full rounded-full transition-all duration-700"
                 style={{
                   width: `${util}%`,
                   background:
-                    util > 80
-                      ? "linear-gradient(90deg, #ffaa00, #ff4444)"
-                      : "#00ff88",
+                    util > 85 ? "#EF4444" : util > 60 ? "#F59E0B" : "#22C55E",
                 }}
               />
             </div>
-
-            {/* Last activity */}
-            {vault.lastPayment && (
-              <div className="mt-2.5 flex items-center gap-2">
-                <div
-                  className="w-1.5 h-1.5 rounded-full shrink-0"
-                  style={{
-                    background:
-                      vault.lastPayment.status === "blocked"
-                        ? "#ff4444"
-                        : "#00ff88",
-                  }}
-                />
-                <span className="font-mono text-[10px] text-white/40 truncate">
-                  {vault.lastPayment.merchant}
-                </span>
-                <span className="font-mono text-[10px] text-white/20 shrink-0 ml-auto">
-                  ${vault.lastPayment.amountUsd.toFixed(2)}
-                </span>
-              </div>
-            )}
           </div>
 
-          {/* Status row */}
-          <div className="flex items-center justify-between">
-            <span
-              className="font-mono text-[9px] font-semibold tracking-wider px-2 py-0.5 rounded"
-              style={{
-                background: isActive
-                  ? "rgba(0,255,136,0.1)"
-                  : "rgba(255,68,68,0.1)",
-                color: isActive ? "#00ff88" : "#ff4444",
-              }}
-            >
-              {isActive ? "ACTIVE" : "PAUSED"}
-            </span>
-            <ArrowRight className="w-3.5 h-3.5 text-white/15 group-hover:text-white/40 transition-colors" />
-          </div>
+          {/* Last payment */}
+          {vault.lastPayment && (
+            <div className="flex items-center gap-2 pt-2" style={{ borderTop: "1px solid #F3F4F6" }}>
+              <span
+                className="w-[5px] h-[5px] rounded-full shrink-0"
+                style={{
+                  background:
+                    vault.lastPayment.status === "blocked" ? "#EF4444" : "#22C55E",
+                }}
+              />
+              <span className="text-[11px] text-[#6B7280] truncate flex-1">
+                {vault.lastPayment.merchant}
+              </span>
+              <span className="text-[11px] font-mono text-[#9CA3AF] shrink-0">
+                ${vault.lastPayment.amountUsd.toFixed(2)}
+              </span>
+              <span className="text-[10px] text-[#D1D5DB] shrink-0">
+                {relTime(vault.lastPayment.createdAt)}
+              </span>
+            </div>
+          )}
         </div>
       </Link>
     </motion.div>
   );
 }
 
-/* ── Empty state ── */
+/* ── Recent Activity ── */
 
-function EmptyDevices() {
+function RecentActivity({ vaults }: { vaults: VaultBrief[] }) {
+  const items = vaults
+    .filter((v) => v.lastPayment)
+    .map((v) => ({
+      device: v.vault.name,
+      emoji: v.vault.emoji,
+      merchant: v.lastPayment!.merchant,
+      amount: v.lastPayment!.amountUsd,
+      status: v.lastPayment!.status,
+      at: v.lastPayment!.createdAt,
+      network: v.vault.network,
+    }))
+    .sort((a, b) => b.at.localeCompare(a.at))
+    .slice(0, 5);
+
+  if (items.length === 0) return null;
+
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-      className="flex flex-col items-center justify-center text-center py-20"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ delay: 0.3, duration: 0.5 }}
+      className="mt-6"
     >
-      {/* Mini device outline */}
+      <h2 className="text-[13px] font-semibold text-[#9CA3AF] uppercase tracking-wider mb-3">
+        Recent
+      </h2>
       <div
-        className="w-[120px] h-[180px] rounded-[18px] mb-6 flex items-center justify-center"
+        className="rounded-[16px] overflow-hidden divide-y"
         style={{
-          background: "linear-gradient(165deg, #151515 0%, #0c0c0c 100%)",
-          border: "1px solid rgba(255,255,255,0.06)",
+          background: "#fff",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+          border: "1px solid rgba(0,0,0,0.05)",
         }}
       >
-        <div
-          className="w-[96px] h-[130px] rounded-[12px] flex items-center justify-center"
-          style={{ background: "#000" }}
-        >
-          <span className="font-mono text-[10px] text-white/15 tracking-[0.2em]">
-            KYVERN
-          </span>
-        </div>
+        {items.map((item, i) => {
+          const blocked = item.status === "blocked" || item.status === "failed";
+          return (
+            <div
+              key={i}
+              className="flex items-center gap-3 px-4 py-3"
+              style={i > 0 ? { borderTop: "1px solid #F3F4F6" } : {}}
+            >
+              <span
+                className="w-[5px] h-[5px] rounded-full shrink-0"
+                style={{ background: blocked ? "#EF4444" : "#22C55E" }}
+              />
+              <div className="flex-1 min-w-0">
+                <p className="text-[13px] text-[#111] truncate">
+                  {item.device} → {item.merchant}
+                  {blocked && (
+                    <span className="ml-1.5 text-[10px] font-medium text-[#EF4444]">
+                      blocked
+                    </span>
+                  )}
+                </p>
+              </div>
+              <span
+                className={`text-[12px] font-mono shrink-0 ${blocked ? "line-through text-[#D1D5DB]" : "text-[#111]"}`}
+              >
+                ${item.amount.toFixed(2)}
+              </span>
+              <span className="text-[10px] text-[#D1D5DB] shrink-0 w-12 text-right">
+                {relTime(item.at)}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </motion.div>
+  );
+}
+
+/* ── Empty State ── */
+
+function EmptyState() {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+      className="flex flex-col items-center text-center py-16"
+    >
+      {/* Abstract device shape */}
+      <div
+        className="w-[80px] h-[80px] rounded-[22px] mb-5 flex items-center justify-center"
+        style={{ background: "#F3F4F6" }}
+      >
+        <span className="text-[28px]">🧭</span>
       </div>
 
-      <h2 className="text-[22px] font-semibold text-white/80 tracking-[-0.02em]">
-        Get your first device.
+      <h2 className="text-[20px] font-semibold text-[#111] tracking-tight">
+        Create your first device.
       </h2>
-      <p className="mt-2 text-[14px] text-white/30 max-w-sm leading-[1.6]">
-        Create a device for your AI agent. Set its budget, allowlist, and
-        spending rules — all enforced on-chain by Solana.
+      <p className="mt-2 text-[14px] text-[#6B7280] max-w-[320px] leading-[1.6]">
+        Give your AI agent a wallet with spending rules enforced on-chain by
+        Solana. 60 seconds.
       </p>
       <Link
         href="/vault/new"
-        className="group mt-6 inline-flex items-center gap-2 h-11 px-6 rounded-full font-semibold text-[14px] transition-all hover:scale-[1.02]"
-        style={{ background: "#00ff88", color: "#000" }}
+        className="group mt-5 inline-flex items-center gap-2 h-11 px-5 rounded-[12px] text-[14px] font-semibold transition-all active:scale-[0.97]"
+        style={{ background: "#111", color: "#fff" }}
       >
-        Create your first device
+        Create device
         <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
+      </Link>
+      <Link
+        href="/atlas"
+        className="mt-3 text-[13px] font-medium text-[#9CA3AF] hover:text-[#6B7280] transition-colors"
+      >
+        or watch Atlas live →
       </Link>
     </motion.div>
   );

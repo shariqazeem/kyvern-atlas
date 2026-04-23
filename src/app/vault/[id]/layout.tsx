@@ -1,23 +1,16 @@
 import type { Metadata } from "next";
+import { KyvernOS } from "@/components/os/kyvern-os";
 
 export const metadata: Metadata = {
   title: "Device · Kyvern",
   robots: { index: false, follow: false },
 };
 
-/**
- * /vault/[id] — Full-screen device view. No sidebar, no SaaS chrome.
- * Auth is handled by the page component via useAuth hook.
- * Dark background matches the device aesthetic.
- */
+/** /vault/[id] renders inside the OS shell with tab bar. */
 export default function VaultDeviceLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return (
-    <div className="min-h-screen" style={{ background: "#050505" }}>
-      {children}
-    </div>
-  );
+  return <KyvernOS>{children}</KyvernOS>;
 }
