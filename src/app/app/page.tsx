@@ -1,68 +1,21 @@
 "use client";
 
-/* ════════════════════════════════════════════════════════════════════
-   /app — the Kyvern operator home.
+/**
+ * /app — Device Collection.
+ *
+ * Dark surface showing all your devices (vaults) as mini device cards.
+ * Each card shows the device name, budget gauge, LED, and last activity.
+ * Click a device to open its full-screen view.
+ */
 
-   One screen, pay-side focused. Single-brand Kyvern (the Frontier
-   reframe): every agent the signed-in user owns, what it did today,
-   how much it spent, how many attempts the policy refused on-chain.
-
-   Sections (top to bottom):
-     1. Welcome headline
-     2. Journey checklist (3-step, auto-dismisses once running)
-     3. "Today" card — spent / active agents / decisions / $0 lost
-     4. Agents card (full width) — every vault, click through to /vault/[id]
-     5. Unified recent activity feed
-     6. "The network around your agents" — Atlas attack leaderboard
-
-   Data sources:
-     · /api/vault/list?ownerWallet=…      (vaults + last payment)
-     · /api/vault/[id]/funding             (lazy, first vault only)
-
-   Historical note: this page used to render an EarnSideCard + PulseStats
-   in a 2-column grid alongside a "net flow today" hero metric. That
-   architecture dated to the dual-brand era (Vault + Pulse). Pay-side
-   focus for Frontier. Earn surfaces can come back when an earn product
-   exists as its own brand.
-   ════════════════════════════════════════════════════════════════════ */
-
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import {
-  ArrowRight,
-  ArrowUpRight,
-  Activity,
-  Wallet,
-  Globe,
-  Plus,
-} from "lucide-react";
+import { ArrowRight, Plus } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { JourneyChecklist } from "@/components/app/journey-checklist";
-import { AtlasRunningStrip } from "@/components/vault/atlas-running-strip";
-import { AttackLeaderboard } from "@/components/atlas/attack-leaderboard";
-import { NumberScramble } from "@/components/atlas/number-scramble";
-import { EASE_PREMIUM as EASE } from "@/lib/motion";
+import { EASE_PREMIUM as ease } from "@/lib/motion";
 
-/* ─── Fallback dev wallet (mirrors /vault/new) ─── */
-function devFallbackWallet(): string {
-  if (typeof window === "undefined")
-    return "DevPlaceholderWallet11111111111111111111111";
-  const KEY = "kyvern:dev-wallet";
-  const existing = window.localStorage.getItem(KEY);
-  if (existing) return existing;
-  const alphabet =
-    "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-  let s = "";
-  for (let i = 0; i < 44; i++) {
-    s += alphabet[Math.floor(Math.random() * alphabet.length)];
-  }
-  window.localStorage.setItem(KEY, s);
-  return s;
-}
-
-/* ─── Types (minimal — we only read what the home uses) ─── */
+/* ── Types ── */
 
 interface VaultBrief {
   vault: {
@@ -73,6 +26,7 @@ interface VaultBrief {
     pausedAt: string | null;
     network: "devnet" | "mainnet";
     squadsAddress: string;
+    createdAt?: string;
   };
   budget: {
     spentToday: number;
@@ -82,1019 +36,283 @@ interface VaultBrief {
   lastPayment: {
     merchant: string;
     amountUsd: number;
-    status: "allowed" | "blocked" | "settled" | "failed";
+    status: string;
     createdAt: string;
   } | null;
 }
 
-interface ActivityItem {
-  key: string;
-  side: "pay" | "earn";
-  label: string; // "agent paid merchant.com" or "you received from agent"
-  amount: number;
-  status: "allowed" | "blocked" | "settled" | "failed" | "received";
-  at: string;
-  tx: string | null;
-  network: "devnet" | "mainnet";
+/* ── Fallback wallet ── */
+function devFallbackWallet(): string {
+  if (typeof window === "undefined") return "";
+  const KEY = "kyvern:dev-wallet";
+  const existing = window.localStorage.getItem(KEY);
+  if (existing) return existing;
+  const a = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+  let s = "";
+  for (let i = 0; i < 44; i++) s += a[Math.floor(Math.random() * a.length)];
+  window.localStorage.setItem(KEY, s);
+  return s;
 }
 
-/* ─── Helpers ─── */
-
-function fmtUsd(n: number): string {
-  if (n >= 1000) return `$${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k`;
-  if (n === 0) return "$0";
-  return n < 1 ? `$${n.toFixed(2)}` : `$${n.toFixed(2)}`;
-}
-
-function relTime(iso: string): string {
-  try {
-    const d =
-      iso.endsWith("Z") || /[+-]\d{2}:?\d{2}$/.test(iso)
-        ? new Date(iso)
-        : new Date(iso.replace(" ", "T") + "Z");
-    const diffMs = Date.now() - d.getTime();
-    const s = Math.floor(diffMs / 1000);
-    if (s < 5) return "just now";
-    if (s < 60) return `${s}s`;
-    const m = Math.floor(s / 60);
-    if (m < 60) return `${m}m`;
-    const h = Math.floor(m / 60);
-    if (h < 24) return `${h}h`;
-    const days = Math.floor(h / 24);
-    return `${days}d`;
-  } catch {
-    return "—";
-  }
-}
-
-function explorerUrl(
-  sig: string | null,
-  network: "devnet" | "mainnet" = "devnet",
-): string | null {
-  if (!sig) return null;
-  const base = `https://explorer.solana.com/tx/${sig}`;
-  return network === "devnet" ? `${base}?cluster=devnet` : base;
-}
-
-function greeting(): string {
-  const h = new Date().getHours();
-  if (h < 5) return "Night owl";
-  if (h < 12) return "Good morning";
-  if (h < 18) return "Good afternoon";
-  return "Good evening";
-}
-
-/* ═══════════════════════════════════════════════════════════════════ */
-
-export default function AppHomePage() {
-  const router = useRouter();
+export default function AppDeviceCollection() {
   const { wallet, isLoading: authLoading } = useAuth();
-
   const [owner, setOwner] = useState<string | null>(null);
   const [vaults, setVaults] = useState<VaultBrief[] | null>(null);
-
-  // First-time visitor → redirect to /welcome for a 12s cinematic
-  // orientation. The welcome page sets localStorage.welcomeSeen=1
-  // on exit so this redirect stops firing for returning users.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (authLoading) return;
-    try {
-      const seen = window.localStorage.getItem("kyvern:welcomeSeen");
-      if (!seen) {
-        router.replace("/welcome");
-      }
-    } catch {
-      /* storage unavailable — silently skip welcome. Better than never landing. */
-    }
-  }, [authLoading, router]);
 
   useEffect(() => {
     if (authLoading) return;
     setOwner(wallet ?? devFallbackWallet());
   }, [wallet, authLoading]);
 
-  // Pay side — vault list
   useEffect(() => {
     if (!owner) return;
     let cancelled = false;
     fetch(`/api/vault/list?ownerWallet=${encodeURIComponent(owner)}`)
       .then((r) => (r.ok ? r.json() : { vaults: [] }))
-      .then((d) => {
-        if (cancelled) return;
-        setVaults((d?.vaults ?? []) as VaultBrief[]);
-      })
+      .then((d) => !cancelled && setVaults((d?.vaults ?? []) as VaultBrief[]))
       .catch(() => !cancelled && setVaults([]));
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [owner]);
 
-  // Earn-side fetches removed — single-brand Kyvern for the Frontier
-  // reframe. If an earn product returns, its API calls belong in its
-  // own component, not cross-fetched from the pay-side home.
-
-  // Derived totals
-  const spentToday = useMemo(
-    () => (vaults ?? []).reduce((a, v) => a + v.budget.spentToday, 0),
-    [vaults],
-  );
-  const activeVaults = useMemo(
-    () => (vaults ?? []).filter((v) => v.vault.pausedAt == null).length,
-    [vaults],
-  );
-
-  // Unified activity feed — merge outgoing (vault last payments) + inbound
-  // (pulse recent — best-effort).
-  const activity = useUnifiedActivity(vaults);
-
   const hasVaults = (vaults ?? []).length > 0;
-  const brandNew = vaults !== null && !hasVaults;
-
-  // Journey checklist — live state across BOTH sides of the product.
-  // Powers the top-of-page "take your agent all the way" card which
-  // cross-converts pay users into earn and vice versa. Self-collapses
-  // once every task is done. Balance is fetched lazily for the first
-  // vault only (the next step is "fund this one" — batching for all
-  // vaults would waste RPC without a clearer UX win).
-  const firstVaultId = hasVaults ? (vaults![0].vault.id ?? null) : null;
-  const [firstVaultBalance, setFirstVaultBalance] = useState<number | null>(
-    null,
-  );
-  useEffect(() => {
-    if (!firstVaultId) {
-      setFirstVaultBalance(null);
-      return;
-    }
-    let cancelled = false;
-    fetch(`/api/vault/${firstVaultId}/funding`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        if (cancelled) return;
-        setFirstVaultBalance(
-          d && typeof d.balanceUsdc === "number" ? d.balanceUsdc : 0,
-        );
-      })
-      .catch(() => !cancelled && setFirstVaultBalance(0));
-    return () => {
-      cancelled = true;
-    };
-  }, [firstVaultId]);
-
-  const hasSettledPayment = useMemo(() => {
-    return (vaults ?? []).some(
-      (v) =>
-        v.budget.spentToday > 0 ||
-        v.lastPayment?.status === "settled" ||
-        v.lastPayment?.status === "allowed",
-    );
-  }, [vaults]);
+  const loading = vaults === null;
 
   return (
-    <div className="space-y-10 pb-16">
-      {/* ── Network pulse — the live Atlas network sits above every
-           user surface so "you are inside a running network" reads
-           on first paint. Self-hides on /atlas / /tour. ── */}
-      <AtlasRunningStrip />
-
-      {/* ── Hello row ── */}
+    <div
+      className="-mx-5 md:-mx-8 -my-8 px-5 md:px-8 py-8 min-h-[calc(100vh-56px)]"
+      style={{ background: "#050505" }}
+    >
+      {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, ease: EASE }}
-        className="flex flex-col gap-1.5"
+        transition={{ duration: 0.6, ease }}
+        className="flex items-center justify-between mb-8"
       >
-        <p
-          className="text-[11px] font-semibold uppercase tracking-[0.1em]"
-          style={{ color: "var(--text-quaternary)" }}
-        >
-          {greeting()}
-        </p>
-        <h1
-          className="tracking-[-0.035em] text-balance"
-          style={{
-            fontSize: "clamp(30px, 4.2vw, 42px)",
-            lineHeight: 1.02,
-            fontWeight: 600,
-            color: "var(--text-primary)",
-          }}
-        >
-          Your agents on Solana.
-        </h1>
-      </motion.div>
-
-      {brandNew ? (
-        <BrandNewHero />
-      ) : (
-        <>
-          {/* ── Journey checklist (Phase 2 · cross-conversion engine) ──
-               Lives directly under the hello row so every returning user
-               sees their progress across both sides. Self-dismissable +
-               auto-collapses once every step is done. */}
-          <JourneyChecklist
-            state={{
-              hasVault: hasVaults,
-              vaultUsdcBalance: firstVaultBalance,
-              hasSettledPayment,
-              firstVaultId,
-            }}
-          />
-
-          {/* ── Today card — one hero for pay-side. Chrome bar, huge
-               Spent-Today number, supporting mini-stats (active agents,
-               $0 lost indicator). Mirrors the Atlas observatory's visual
-               language so /app reads as an operator cockpit. ── */}
-          <DayAtAGlance
-            spentToday={spentToday}
-            activeVaults={activeVaults}
-          />
-
-          {/* ── Your agents (full width) ── */}
-          <PaySideCard vaults={vaults} />
-
-          {/* ── Unified activity feed ── */}
-          <ActivityCard items={activity} />
-
-          {/* ── Network presence — the Atlas attack leaderboard
-               appears here so the user sees the live network
-               around them, not just their own numbers. "You're
-               in a network that survived 184 attacks this week." ── */}
-          <div className="pt-4">
-            <h3
-              className="text-[11px] font-semibold uppercase tracking-[0.1em] mb-3"
-              style={{ color: "var(--text-quaternary)" }}
-            >
-              The network around your agents
-            </h3>
-            <AttackLeaderboard />
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-/* ═══════════════════════════════════════════════════════════════════ */
-/*                              Sub-cards                             */
-/* ═══════════════════════════════════════════════════════════════════ */
-
-/**
- * DayAtAGlance — today's operator snapshot for the signed-in user.
- *
- * One hero number — Spent today — with the Atlas observatory's visual
- * language (chrome bar, live pill, JetBrains Mono). Supporting row:
- * active agents, lost-to-exploits.
- *
- * This replaced an earlier "net flow today" hero that subtracted
- * earn-side revenue from pay-side spend. That was a dual-brand metric;
- * single-brand Kyvern shows pay-side only.
- */
-function DayAtAGlance({
-  spentToday,
-  activeVaults,
-}: {
-  spentToday: number;
-  activeVaults: number;
-}) {
-  const today = new Date().toLocaleDateString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  });
-
-  return (
-    <motion.section
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.55, ease: EASE }}
-      className="rounded-[20px] overflow-hidden"
-      style={{
-        background: "var(--surface)",
-        border: "0.5px solid var(--border-subtle)",
-        boxShadow:
-          "0 1px 2px rgba(0,0,0,0.03), 0 20px 60px -30px rgba(0,0,0,0.10)",
-      }}
-    >
-      {/* Chrome bar */}
-      <div
-        className="flex items-center justify-between px-5 py-2.5"
-        style={{ borderBottom: "0.5px solid var(--border-subtle)" }}
-      >
-        <div className="flex items-center gap-1.5">
-          <span
-            className="w-2 h-2 rounded-full"
-            style={{ background: "var(--chrome-red)" }}
-          />
-          <span
-            className="w-2 h-2 rounded-full"
-            style={{ background: "var(--chrome-yellow)" }}
-          />
-          <span
-            className="w-2 h-2 rounded-full"
-            style={{ background: "var(--chrome-green)" }}
-          />
-          <span
-            className="ml-2 text-[10.5px] font-mono-numbers"
-            style={{ color: "var(--text-quaternary)" }}
-          >
-            today · {today}
-          </span>
-        </div>
-        <div className="flex items-center gap-1">
-          <motion.span
-            className="w-1.5 h-1.5 rounded-full"
-            style={{ background: "var(--success)" }}
-            animate={{ opacity: [0.5, 1, 0.5] }}
-            transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
-          />
-          <span
-            className="text-[10px] font-semibold uppercase tracking-[0.08em]"
-            style={{ color: "var(--success-deep)" }}
-          >
-            live
-          </span>
-        </div>
-      </div>
-
-      {/* Hero row — Spent today */}
-      <div className="relative px-6 md:px-8 pt-6 pb-5">
-        <motion.div
-          aria-hidden
-          className="absolute left-6 top-4 w-[180px] h-[80px] rounded-full -z-0"
-          style={{
-            background: "var(--agent-bg)",
-            filter: "blur(32px)",
-            opacity: 0.55,
-          }}
-          animate={{ opacity: [0.4, 0.7, 0.4] }}
-          transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
-        />
-
-        <div className="relative">
-          <p
-            className="text-[10.5px] font-semibold uppercase tracking-[0.1em]"
-            style={{ color: "var(--text-quaternary)" }}
-          >
-            Spent today · across your agents
-          </p>
-          <p
-            className="mt-1 text-[52px] md:text-[60px] font-semibold leading-none tracking-[-0.025em]"
-            style={{
-              color: "var(--text-primary)",
-              fontVariantNumeric: "tabular-nums",
-            }}
-          >
-            <NumberScramble value={spentToday} format={fmtUsd} />
-          </p>
-          <p
-            className="mt-2 text-[13px]"
-            style={{ color: "var(--text-tertiary)" }}
-          >
-            Every dollar stayed inside the policies you set. $0 lost to
-            anything the chain refused to sign.
-          </p>
-        </div>
-      </div>
-
-      {/* Supporting row — pay-side stats only */}
-      <div
-        className="grid grid-cols-2"
-        style={{ borderTop: "0.5px solid var(--border-subtle)" }}
-      >
-        <DayStat
-          label="Active agents"
-          icon={Wallet}
-          value={
-            <NumberScramble value={activeVaults} format={(n) => String(n)} />
-          }
-          sub={activeVaults === 1 ? "one vault running" : "vaults running"}
-          accent="var(--agent)"
-          divider
-        />
-        <DayStat
-          label="Lost to exploits"
-          icon={Globe}
-          value={<NumberScramble value={0} format={fmtUsd} />}
-          sub="Solana refused every blocked tx"
-          accent="var(--success-deep)"
-        />
-      </div>
-    </motion.section>
-  );
-}
-
-/** One cell in the day-at-a-glance supporting row. */
-function DayStat({
-  label,
-  icon: Icon,
-  value,
-  sub,
-  accent,
-  divider,
-}: {
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
-  value: React.ReactNode;
-  sub: string;
-  accent: string;
-  divider?: boolean;
-}) {
-  return (
-    <div
-      className="px-5 py-4 md:py-5"
-      style={
-        divider
-          ? { borderRight: "0.5px solid var(--border-subtle)" }
-          : undefined
-      }
-    >
-      <div className="flex items-center gap-1.5 mb-1.5">
-        <span style={{ color: accent }}>
-          <Icon className="w-3 h-3" />
-        </span>
-        <span
-          className="text-[10px] font-semibold uppercase tracking-[0.08em]"
-          style={{ color: "var(--text-quaternary)" }}
-        >
-          {label}
-        </span>
-      </div>
-      <p
-        className="text-[22px] font-semibold leading-none tracking-tight"
-        style={{
-          color: "var(--text-primary)",
-          fontVariantNumeric: "tabular-nums",
-        }}
-      >
-        {value}
-      </p>
-      <p
-        className="mt-1 text-[11px]"
-        style={{ color: "var(--text-tertiary)" }}
-      >
-        {sub}
-      </p>
-    </div>
-  );
-}
-
-function PaySideCard({ vaults }: { vaults: VaultBrief[] | null }) {
-  const loading = vaults === null;
-  const empty = vaults !== null && vaults.length === 0;
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 14 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6, delay: 0.12, ease: EASE }}
-      className="rounded-[20px] overflow-hidden"
-      style={{
-        background: "var(--surface)",
-        border: "0.5px solid var(--border-subtle)",
-        boxShadow: "0 1px 2px rgba(0,0,0,0.03)",
-      }}
-    >
-      <div className="px-6 pt-5 pb-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div
-            className="w-7 h-7 rounded-[8px] flex items-center justify-center"
-            style={{ background: "#EEF0FF" }}
-          >
-            <Wallet className="w-3.5 h-3.5" style={{ color: "#4F46E5" }} />
-          </div>
-          <div>
-            <p
-              className="text-[10.5px] font-semibold uppercase tracking-[0.08em]"
-              style={{ color: "#4F46E5" }}
-            >
-              Agents
-            </p>
-            <h3
-              className="text-[16px] font-semibold tracking-tight"
-              style={{ color: "var(--text-primary)" }}
-            >
-              Your agents
-            </h3>
-          </div>
-        </div>
-        <Link
-          href="/vault/new"
-          className="inline-flex items-center gap-1 h-7 px-2.5 rounded-[8px] text-[11.5px] font-semibold transition-colors hover:bg-[var(--surface-2)]"
-          style={{ color: "var(--text-primary)" }}
-        >
-          <Plus className="w-3 h-3" strokeWidth={2.5} />
-          New
-        </Link>
-      </div>
-
-      <div
-        className="px-6 py-3"
-        style={{ borderTop: "0.5px solid var(--border-subtle)" }}
-      >
-        {loading ? (
-          <div className="space-y-2">
-            {[0, 1, 2].map((i) => (
-              <div
-                key={i}
-                className="h-[52px] rounded-[10px] animate-pulse"
-                style={{ background: "var(--surface-2)" }}
-              />
-            ))}
-          </div>
-        ) : empty ? (
-          <EmptyBlock
-            label="No agents yet"
-            copy="Deploy your first autonomous agent and let Solana enforce its budget."
-            ctaLabel="Deploy your first agent"
-            ctaHref="/vault/new"
-            tone="indigo"
-          />
-        ) : (
-          <ul className="divide-y divide-[var(--border-subtle)]">
-            {vaults!.slice(0, 4).map((v) => {
-              const util = Math.min(100, Math.round(v.budget.dailyUtilization * 100));
-              return (
-                <li key={v.vault.id}>
-                  <Link
-                    href={`/vault/${v.vault.id}`}
-                    className="flex items-center gap-3 py-3 group"
-                  >
-                    <div
-                      className="w-9 h-9 rounded-[11px] flex items-center justify-center text-[18px] shrink-0"
-                      style={{
-                        background: "var(--surface-2)",
-                        border: "0.5px solid var(--border-subtle)",
-                      }}
-                    >
-                      <span aria-hidden>{v.vault.emoji || "🧭"}</span>
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <p
-                          className="text-[13.5px] font-semibold truncate"
-                          style={{ color: "var(--text-primary)" }}
-                        >
-                          {v.vault.name}
-                        </p>
-                        {v.vault.pausedAt && (
-                          <span
-                            className="px-1.5 py-0 rounded-[4px] text-[9px] font-semibold uppercase tracking-wider"
-                            style={{
-                              background: "#FEF2F2",
-                              color: "#B91C1C",
-                            }}
-                          >
-                            Paused
-                          </span>
-                        )}
-                      </div>
-                      <div
-                        className="mt-1 h-1 w-full rounded-full overflow-hidden"
-                        style={{ background: "var(--surface-2)" }}
-                      >
-                        <div
-                          className="h-full rounded-full transition-all duration-500"
-                          style={{
-                            width: `${util}%`,
-                            background:
-                              util >= 90
-                                ? "#EF4444"
-                                : util >= 70
-                                  ? "#F59E0B"
-                                  : "var(--text-primary)",
-                          }}
-                        />
-                      </div>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p
-                        className="text-[12.5px] font-mono-numbers font-semibold"
-                        style={{ color: "var(--text-primary)" }}
-                      >
-                        {fmtUsd(v.budget.spentToday)}
-                      </p>
-                      <p
-                        className="text-[10.5px] font-mono-numbers"
-                        style={{ color: "var(--text-tertiary)" }}
-                      >
-                        of {fmtUsd(v.vault.dailyLimitUsd)}
-                      </p>
-                    </div>
-                    <ArrowUpRight
-                      className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-                      style={{ color: "var(--text-tertiary)" }}
-                    />
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </div>
-
-      {!empty && !loading && (vaults?.length ?? 0) > 4 && (
-        <div
-          className="px-6 py-3 text-right"
-          style={{ borderTop: "0.5px solid var(--border-subtle)" }}
-        >
-          <Link
-            href="/vault"
-            className="text-[12px] font-medium inline-flex items-center gap-1"
-            style={{ color: "var(--text-secondary)" }}
-          >
-            View all {vaults!.length}
-            <ArrowRight className="w-3 h-3" />
-          </Link>
-        </div>
-      )}
-    </motion.div>
-  );
-}
-
-/*
- * EarnSideCard + MiniStat removed — they were the legacy Pulse earn-side
- * surface on /app home. When an earn product returns it should live in
- * its own component, not cross-rendered from the pay-side home.
- */
-
-function EmptyBlock({
-  label,
-  copy,
-  ctaLabel,
-  ctaHref,
-  tone,
-}: {
-  label: string;
-  copy: string;
-  ctaLabel: string;
-  ctaHref: string;
-  tone: "indigo" | "sky";
-}) {
-  const accent = tone === "indigo" ? "#4F46E5" : "#0EA5E9";
-  return (
-    <div className="py-4 flex flex-col items-start gap-3">
-      <div>
-        <p
-          className="text-[13px] font-semibold"
-          style={{ color: "var(--text-primary)" }}
-        >
-          {label}
-        </p>
-        <p
-          className="mt-0.5 text-[12.5px] leading-[1.5] max-w-[360px]"
-          style={{ color: "var(--text-tertiary)" }}
-        >
-          {copy}
-        </p>
-      </div>
-      <Link
-        href={ctaHref}
-        className="inline-flex items-center gap-1.5 h-8 px-3 rounded-[10px] text-[12.5px] font-semibold transition-opacity hover:opacity-90"
-        style={{ background: accent, color: "white" }}
-      >
-        {ctaLabel}
-        <ArrowRight className="w-3 h-3" />
-      </Link>
-    </div>
-  );
-}
-
-/* ── Unified activity feed ── */
-
-function useUnifiedActivity(vaults: VaultBrief[] | null): ActivityItem[] {
-  return useMemo(() => {
-    const out: ActivityItem[] = [];
-    (vaults ?? []).forEach((v) => {
-      if (!v.lastPayment) return;
-      out.push({
-        key: `pay-${v.vault.id}`,
-        side: "pay",
-        label: `${v.vault.name} → ${v.lastPayment.merchant}`,
-        amount: v.lastPayment.amountUsd,
-        status: v.lastPayment.status,
-        at: v.lastPayment.createdAt,
-        tx: null,
-        network: v.vault.network,
-      });
-    });
-    // Sort by recency
-    out.sort((a, b) => (b.at ?? "").localeCompare(a.at ?? ""));
-    return out.slice(0, 12);
-  }, [vaults]);
-}
-
-function ActivityCard({ items }: { items: ActivityItem[] }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 14 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6, delay: 0.3, ease: EASE }}
-      className="rounded-[20px] overflow-hidden"
-      style={{
-        background: "var(--surface)",
-        border: "0.5px solid var(--border-subtle)",
-        boxShadow: "0 1px 2px rgba(0,0,0,0.03)",
-      }}
-    >
-      <div className="px-6 pt-5 pb-4 flex items-center justify-between">
         <div>
-          <p
-            className="text-[10.5px] font-semibold uppercase tracking-[0.08em]"
-            style={{ color: "var(--text-quaternary)" }}
-          >
-            Recent activity · both sides
+          <p className="font-mono text-[10px] tracking-[0.15em] text-white/25 mb-1">
+            YOUR DEVICES
           </p>
-          <h3
-            className="text-[16px] font-semibold tracking-tight"
-            style={{ color: "var(--text-primary)" }}
-          >
-            Every Solana transaction. One place.
-          </h3>
+          <h1 className="text-[24px] font-semibold text-white/85 tracking-[-0.02em]">
+            {hasVaults
+              ? `${vaults!.length} device${vaults!.length > 1 ? "s" : ""}`
+              : "No devices yet"}
+          </h1>
         </div>
-        <div className="flex items-center gap-1.5 text-[11px]" style={{ color: "var(--text-tertiary)" }}>
-          <motion.span
-            className="h-1.5 w-1.5 rounded-full bg-[#22C55E]"
-            animate={{ opacity: [0.4, 1, 0.4] }}
-            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-          />
-          Live
-        </div>
-      </div>
-
-      <div
-        className="px-2 pb-2"
-        style={{ borderTop: "0.5px solid var(--border-subtle)" }}
-      >
-        {items.length === 0 ? (
-          <div className="py-12 text-center">
-            <Activity
-              className="w-5 h-5 mx-auto mb-2"
-              style={{ color: "var(--text-quaternary)" }}
-            />
-            <p
-              className="text-[13px] font-semibold"
-              style={{ color: "var(--text-primary)" }}
-            >
-              Nothing to show yet.
-            </p>
-            <p
-              className="text-[12px] mt-0.5"
-              style={{ color: "var(--text-tertiary)" }}
-            >
-              The moment an agent pays or your service receives, it appears
-              here.
-            </p>
-          </div>
-        ) : (
-          <ul>
-            {items.map((item) => (
-              <li key={item.key}>
-                <ActivityRow item={item} />
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    </motion.div>
-  );
-}
-
-function ActivityRow({ item }: { item: ActivityItem }) {
-  const isBlocked = item.status === "blocked" || item.status === "failed";
-  const isPay = item.side === "pay";
-  const txUrl = explorerUrl(item.tx, item.network);
-
-  return (
-    <div className="px-4 py-2.5 rounded-[10px] hover:bg-[var(--surface-2)] transition-colors">
-      <div className="flex items-center gap-3">
-        <div
-          className="w-7 h-7 rounded-[9px] flex items-center justify-center shrink-0"
+        <Link
+          href="/vault/new"
+          className="flex items-center gap-2 h-9 px-4 rounded-full font-mono text-[11px] font-semibold tracking-wider transition-all hover:scale-[1.02]"
           style={{
-            background: isBlocked
-              ? "#FEF2F2"
-              : isPay
-                ? "#EEF0FF"
-                : "#E8F4FE",
-            color: isBlocked ? "#DC2626" : isPay ? "#4F46E5" : "#0EA5E9",
+            background: "rgba(255,255,255,0.08)",
+            color: "rgba(255,255,255,0.6)",
+            border: "1px solid rgba(255,255,255,0.1)",
           }}
         >
-          {isBlocked ? (
-            <span className="text-[14px] leading-none">✕</span>
-          ) : isPay ? (
-            <ArrowUpRight className="w-3.5 h-3.5" />
-          ) : (
-            <ArrowRight className="w-3.5 h-3.5 rotate-180" />
-          )}
+          <Plus className="w-3.5 h-3.5" />
+          NEW DEVICE
+        </Link>
+      </motion.div>
+
+      {/* Loading */}
+      {loading && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[0, 1, 2].map((i) => (
+            <div
+              key={i}
+              className="h-[200px] rounded-[20px] animate-pulse"
+              style={{ background: "rgba(255,255,255,0.03)" }}
+            />
+          ))}
         </div>
-        <div className="min-w-0 flex-1">
-          <p
-            className="text-[13px] truncate"
-            style={{ color: "var(--text-primary)" }}
-          >
-            {item.label}
-            {isBlocked && (
-              <span
-                className="ml-2 rounded px-1.5 py-0.5 text-[10px] font-semibold"
-                style={{ background: "#FEF2F2", color: "#B91C1C" }}
-              >
-                blocked
-              </span>
-            )}
-          </p>
-          <p
-            className="text-[11.5px] mt-0.5"
-            style={{ color: "var(--text-tertiary)" }}
-          >
-            {relTime(item.at)} ago · {item.network}
-            {txUrl && (
-              <>
-                {" · "}
-                <a
-                  href={txUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="underline-offset-2 hover:underline"
-                  style={{ color: "var(--text-secondary)" }}
-                >
-                  view tx
-                </a>
-              </>
-            )}
-          </p>
+      )}
+
+      {/* Empty state */}
+      {!loading && !hasVaults && <EmptyDevices />}
+
+      {/* Device grid */}
+      {hasVaults && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {vaults!.map((v, i) => (
+            <DeviceCard key={v.vault.id} vault={v} index={i} />
+          ))}
         </div>
-        <div className="text-right shrink-0">
-          <p
-            className={`text-[13px] font-semibold font-mono-numbers ${isBlocked ? "line-through" : ""}`}
-            style={{
-              color: isBlocked
-                ? "var(--text-tertiary)"
-                : "var(--text-primary)",
-            }}
-          >
-            {isPay ? "−" : "+"}
-            {fmtUsd(item.amount)}
-          </p>
-        </div>
-      </div>
+      )}
     </div>
   );
 }
 
-/* ── Brand-new hero — Apple-grade single moment ──
- *
- * No card grid. No checklist. Just one centered statement, one magnetic
- * button, one quiet "we're live" whisper. The first action is obvious;
- * everything else waits until the user creates their first vault.
- */
+/* ── Device Card (mini device for the grid) ── */
 
-function BrandNewHero() {
+function DeviceCard({ vault, index }: { vault: VaultBrief; index: number }) {
+  const v = vault.vault;
+  const b = vault.budget;
+  const isActive = !v.pausedAt;
+  const util = Math.min(b.dailyUtilization * 100, 100);
+
   return (
-    <section
-      className="relative flex flex-col items-center text-center pt-6 pb-14"
-      style={{ minHeight: "62vh" }}
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.06, duration: 0.5, ease }}
     >
-      {/* Tiny "Start here" eyebrow */}
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, delay: 0.1, ease: EASE }}
-        className="inline-flex items-center gap-2 h-7 px-3 rounded-full text-[11px] font-medium mb-10 mt-4"
-        style={{
-          background: "var(--surface)",
-          border: "0.5px solid var(--border-subtle)",
-          color: "var(--text-tertiary)",
-          boxShadow: "0 1px 2px rgba(0,0,0,0.02)",
-        }}
-      >
-        <motion.span
-          className="w-1.5 h-1.5 rounded-full"
-          style={{ background: "var(--success)" }}
-          animate={{ opacity: [0.5, 1, 0.5] }}
-          transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
-        />
-        Programs live on Solana devnet
-      </motion.div>
-
-      {/* The statement */}
-      <motion.h2
-        initial={{ opacity: 0, y: 10, filter: "blur(8px)" }}
-        animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-        transition={{ duration: 0.9, delay: 0.25, ease: EASE }}
-        className="text-balance max-w-[720px] mb-4"
-        style={{
-          fontSize: "clamp(38px, 5.5vw, 62px)",
-          lineHeight: 1.02,
-          letterSpacing: "-0.04em",
-          fontWeight: 500,
-          color: "var(--text-primary)",
-        }}
-      >
-        Deploy your first agent.
-        <br />
-        <span style={{ color: "var(--text-tertiary)", fontWeight: 300 }}>
-          Let Solana enforce the boundaries.
-        </span>
-      </motion.h2>
-
-      {/* The sub */}
-      <motion.p
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.7, delay: 0.5, ease: EASE }}
-        className="mx-auto max-w-[540px] text-[15px] leading-[1.55] mb-10"
-        style={{ color: "var(--text-tertiary)" }}
-      >
-        Sixty seconds. A real Squads multisig, a real Kyvern policy PDA,
-        and an agent keypair the chain itself is watching.
-      </motion.p>
-
-      {/* One primary CTA, one quiet secondary */}
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.7, delay: 0.6, ease: EASE }}
-        className="flex flex-col sm:flex-row items-center gap-3"
-      >
-        <Link
-          href="/vault/new"
-          className="group inline-flex items-center justify-center gap-2 h-12 px-6 rounded-[14px] text-[15px] font-semibold transition-opacity hover:opacity-90"
+      <Link href={`/vault/${v.id}`} className="block group">
+        <div
+          className="rounded-[20px] p-4 transition-all group-hover:scale-[1.01] group-hover:shadow-lg"
           style={{
-            background: "var(--text-primary)",
-            color: "var(--background)",
-            boxShadow:
-              "0 1px 2px rgba(0,0,0,0.08), 0 10px 28px rgba(0,0,0,0.14)",
+            background: "linear-gradient(165deg, #151515 0%, #0c0c0c 100%)",
+            border: "1px solid rgba(255,255,255,0.06)",
           }}
         >
-          Deploy your first agent
-          <ArrowRight className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-0.5" />
-        </Link>
-        <Link
-          href="/app/services"
-          className="inline-flex items-center gap-2 h-12 px-5 text-[14px] font-semibold transition-colors"
-          style={{ color: "var(--text-secondary)" }}
+          {/* Top: name + LED */}
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2.5">
+              <span className="text-[18px]">{v.emoji || "🧭"}</span>
+              <div>
+                <p className="font-mono text-[13px] font-semibold text-white/80 truncate max-w-[160px]">
+                  {v.name}
+                </p>
+                <p className="font-mono text-[9px] text-white/25 tracking-wider">
+                  {v.network.toUpperCase()}
+                </p>
+              </div>
+            </div>
+            {/* LED */}
+            <div className="relative">
+              <motion.div
+                className="w-2.5 h-2.5 rounded-full"
+                style={{ background: isActive ? "#00ff88" : "#ff4444" }}
+                animate={{
+                  boxShadow: [
+                    `0 0 4px ${isActive ? "#00ff88" : "#ff4444"}`,
+                    `0 0 10px ${isActive ? "#00ff88" : "#ff4444"}`,
+                    `0 0 4px ${isActive ? "#00ff88" : "#ff4444"}`,
+                  ],
+                }}
+                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+              />
+            </div>
+          </div>
+
+          {/* OLED-style mini screen */}
+          <div
+            className="rounded-[12px] p-3 mb-3"
+            style={{
+              background: "#000",
+              boxShadow: "inset 0 1px 2px rgba(0,0,0,0.8)",
+            }}
+          >
+            {/* Budget gauge */}
+            <div className="flex items-baseline justify-between mb-2">
+              <span className="font-mono text-[9px] text-white/30 tracking-wider">
+                BUDGET
+              </span>
+              <span className="font-mono text-[11px] text-white/60">
+                ${b.spentToday.toFixed(2)}
+                <span className="text-white/20"> / ${b.dailyLimitUsd.toFixed(0)}</span>
+              </span>
+            </div>
+            <div
+              className="h-[2px] rounded-full overflow-hidden"
+              style={{ background: "rgba(255,255,255,0.06)" }}
+            >
+              <div
+                className="h-full rounded-full transition-all duration-700"
+                style={{
+                  width: `${util}%`,
+                  background:
+                    util > 80
+                      ? "linear-gradient(90deg, #ffaa00, #ff4444)"
+                      : "#00ff88",
+                }}
+              />
+            </div>
+
+            {/* Last activity */}
+            {vault.lastPayment && (
+              <div className="mt-2.5 flex items-center gap-2">
+                <div
+                  className="w-1.5 h-1.5 rounded-full shrink-0"
+                  style={{
+                    background:
+                      vault.lastPayment.status === "blocked"
+                        ? "#ff4444"
+                        : "#00ff88",
+                  }}
+                />
+                <span className="font-mono text-[10px] text-white/40 truncate">
+                  {vault.lastPayment.merchant}
+                </span>
+                <span className="font-mono text-[10px] text-white/20 shrink-0 ml-auto">
+                  ${vault.lastPayment.amountUsd.toFixed(2)}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Status row */}
+          <div className="flex items-center justify-between">
+            <span
+              className="font-mono text-[9px] font-semibold tracking-wider px-2 py-0.5 rounded"
+              style={{
+                background: isActive
+                  ? "rgba(0,255,136,0.1)"
+                  : "rgba(255,68,68,0.1)",
+                color: isActive ? "#00ff88" : "#ff4444",
+              }}
+            >
+              {isActive ? "ACTIVE" : "PAUSED"}
+            </span>
+            <ArrowRight className="w-3.5 h-3.5 text-white/15 group-hover:text-white/40 transition-colors" />
+          </div>
+        </div>
+      </Link>
+    </motion.div>
+  );
+}
+
+/* ── Empty state ── */
+
+function EmptyDevices() {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+      className="flex flex-col items-center justify-center text-center py-20"
+    >
+      {/* Mini device outline */}
+      <div
+        className="w-[120px] h-[180px] rounded-[18px] mb-6 flex items-center justify-center"
+        style={{
+          background: "linear-gradient(165deg, #151515 0%, #0c0c0c 100%)",
+          border: "1px solid rgba(255,255,255,0.06)",
+        }}
+      >
+        <div
+          className="w-[96px] h-[130px] rounded-[12px] flex items-center justify-center"
+          style={{ background: "#000" }}
         >
-          Running a service? See revenue →
-        </Link>
-      </motion.div>
+          <span className="font-mono text-[10px] text-white/15 tracking-[0.2em]">
+            KYVERN
+          </span>
+        </div>
+      </div>
 
-      {/* Micro-breadcrumb — implied next steps, unobtrusive */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.8, delay: 1.1 }}
-        className="mt-14 flex items-center gap-4 text-[11.5px]"
-        style={{ color: "var(--text-quaternary)" }}
+      <h2 className="text-[22px] font-semibold text-white/80 tracking-[-0.02em]">
+        Get your first device.
+      </h2>
+      <p className="mt-2 text-[14px] text-white/30 max-w-sm leading-[1.6]">
+        Create a device for your AI agent. Set its budget, allowlist, and
+        spending rules — all enforced on-chain by Solana.
+      </p>
+      <Link
+        href="/vault/new"
+        className="group mt-6 inline-flex items-center gap-2 h-11 px-6 rounded-full font-semibold text-[14px] transition-all hover:scale-[1.02]"
+        style={{ background: "#00ff88", color: "#000" }}
       >
-        <TrailItem n="1" label="Name it" active />
-        <Dash />
-        <TrailItem n="2" label="Set the budget" />
-        <Dash />
-        <TrailItem n="3" label="Deploy on Solana" />
-        <Dash />
-        <TrailItem n="4" label="Let it run" />
-      </motion.div>
-    </section>
-  );
-}
-
-function TrailItem({
-  n,
-  label,
-  active,
-}: {
-  n: string;
-  label: string;
-  active?: boolean;
-}) {
-  return (
-    <span className="inline-flex items-center gap-1.5">
-      <span
-        className="inline-flex h-4 w-4 items-center justify-center rounded-full font-mono-numbers text-[9px] font-semibold"
-        style={{
-          background: active ? "var(--text-primary)" : "var(--surface-2)",
-          color: active ? "var(--background)" : "var(--text-tertiary)",
-          border: active ? "none" : "0.5px solid var(--border-subtle)",
-        }}
-      >
-        {n}
-      </span>
-      <span
-        style={{
-          color: active ? "var(--text-secondary)" : "var(--text-quaternary)",
-        }}
-      >
-        {label}
-      </span>
-    </span>
-  );
-}
-
-function Dash() {
-  return (
-    <span
-      aria-hidden
-      className="h-px w-5 opacity-60"
-      style={{ background: "var(--border)" }}
-    />
+        Create your first device
+        <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
+      </Link>
+    </motion.div>
   );
 }

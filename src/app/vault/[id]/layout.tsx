@@ -1,25 +1,23 @@
 import type { Metadata } from "next";
-import { AuthShell } from "@/components/app/auth-shell";
-import { PageTransition } from "@/components/app/page-transition";
 
 export const metadata: Metadata = {
-  title: "Vault · Kyvern",
+  title: "Device · Kyvern",
   robots: { index: false, follow: false },
 };
 
 /**
- * /vault/[id] — AuthShell replaces the prior AppShell + ConnectGate
- * nesting. Pre-auth: clean welcome screen with no sidebar. Post-auth:
- * full app chrome with the vault dashboard.
+ * /vault/[id] — Full-screen device view. No sidebar, no SaaS chrome.
+ * Auth is handled by the page component via useAuth hook.
+ * Dark background matches the device aesthetic.
  */
-export default function VaultIdLayout({
+export default function VaultDeviceLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   return (
-    <AuthShell>
-      <PageTransition>{children}</PageTransition>
-    </AuthShell>
+    <div className="min-h-screen" style={{ background: "#050505" }}>
+      {children}
+    </div>
   );
 }
