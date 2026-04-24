@@ -269,25 +269,25 @@ export function Unboxing({ onComplete }: UnboxingProps) {
 
                         {/* Mini title */}
                         <p className="text-[7.5px] font-semibold text-[#111] mb-2">
-                          Your devices
+                          Your device
                         </p>
 
-                        {/* Mini device cards */}
-                        <div className="space-y-1.5 flex-1">
-                          <MiniCard emoji="🧭" name="My Forecaster" pct={82} active />
-                          <MiniCard emoji="🤖" name="Trade Bot" pct={35} active />
-                          <MiniCard emoji="📊" name="Data Agent" pct={12} active={false} />
+                        {/* Mini ability icons (iOS grid) */}
+                        <div className="grid grid-cols-3 gap-1.5 flex-1">
+                          <MiniAbilityIcon emoji="💰" label="Paywall" />
+                          <MiniAbilityIcon emoji="🛡️" label="Bounty" />
+                          <MiniAbilityIcon emoji="🧠" label="Intel" />
                         </div>
 
-                        {/* Mini today strip */}
+                        {/* Mini PnL strip */}
                         <div
                           className="rounded-[5px] p-1.5 mb-1.5"
                           style={{ background: "#fff", border: "1px solid #F3F4F6" }}
                         >
                           <div className="flex items-center justify-between">
-                            <span className="text-[5px] text-[#9CA3AF]">Today</span>
-                            <span className="text-[6.5px] font-semibold font-mono text-[#111]">
-                              $4.50
+                            <span className="text-[5px] text-[#9CA3AF]">Earned</span>
+                            <span className="text-[6.5px] font-semibold font-mono text-[#22C55E]">
+                              +$5.60
                             </span>
                           </div>
                         </div>
@@ -318,25 +318,25 @@ export function Unboxing({ onComplete }: UnboxingProps) {
                 {phase >= 5 && phase < 6 && (
                   <>
                     <FeatureLabel
-                      text="On-chain budgets"
+                      text="Ability Store"
                       side="left"
                       y="18%"
                       delay={0}
                     />
                     <FeatureLabel
-                      text="Kill switch"
+                      text="Paywall any URL"
                       side="right"
                       y="30%"
                       delay={0.12}
                     />
                     <FeatureLabel
-                      text="Merchant allowlists"
+                      text="Live PnL tracking"
                       side="left"
                       y="50%"
                       delay={0.24}
                     />
                     <FeatureLabel
-                      text="Solana enforcement"
+                      text="Solana powered"
                       side="right"
                       y="62%"
                       delay={0.36}
@@ -417,41 +417,16 @@ function FeatureLabel({
   );
 }
 
-function MiniCard({
-  emoji,
-  name,
-  pct,
-  active,
-}: {
-  emoji: string;
-  name: string;
-  pct: number;
-  active: boolean;
-}) {
+function MiniAbilityIcon({ emoji, label }: { emoji: string; label: string }) {
   return (
-    <div
-      className="rounded-[6px] p-1.5"
-      style={{ background: "#fff", border: "1px solid #F3F4F6" }}
-    >
-      <div className="flex items-center gap-1 mb-1">
-        <span className="text-[6px]">{emoji}</span>
-        <span className="text-[5.5px] font-semibold text-[#111] truncate">
-          {name}
-        </span>
-        <span
-          className="ml-auto w-[3px] h-[3px] rounded-full"
-          style={{ background: active ? "#22C55E" : "#EF4444" }}
-        />
+    <div className="flex flex-col items-center gap-0.5">
+      <div
+        className="w-[22px] h-[22px] rounded-[5px] flex items-center justify-center text-[10px]"
+        style={{ background: "#fff", border: "1px solid #F3F4F6" }}
+      >
+        {emoji}
       </div>
-      <div className="h-[1.5px] rounded-full bg-[#F3F4F6]">
-        <div
-          className="h-full rounded-full transition-all"
-          style={{
-            width: `${pct}%`,
-            background: pct > 80 ? "#F59E0B" : "#22C55E",
-          }}
-        />
-      </div>
+      <span className="text-[4px] text-[#9CA3AF]">{label}</span>
     </div>
   );
 }

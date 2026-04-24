@@ -124,23 +124,25 @@ export function LandingPage({ initialAtlas }: Props) {
             className="flex-1 max-w-[520px]"
           >
             <p className="text-[12px] font-medium text-[#9CA3AF] uppercase tracking-wider mb-4">
-              For AI agent builders on Solana
+              Sovereign AI agents on Solana
             </p>
             <h1
               className="text-[36px] sm:text-[48px] font-semibold tracking-[-0.035em] leading-[1.05]"
               style={{ color: "#111" }}
             >
-              Your agent can spend.
+              Your device.
               <br />
-              <span style={{ color: "#9CA3AF" }}>Only what you allow.</span>
+              <span style={{ color: "#9CA3AF" }}>Your abilities. Your economy.</span>
             </h1>
             <p
               className="mt-5 text-[16px] leading-[1.65] max-w-[440px]"
               style={{ color: "#6B7280" }}
             >
-              On-chain spending rules for autonomous agents on Solana. Budgets,
-              allowlists, velocity limits, kill switch — enforced by a program,
-              not a promise.
+              Deploy a sovereign AI device on Solana. Install abilities — earn,
+              protect, monitor. Atlas — Device #0000 — has been alive{" "}
+              {s ? `${Math.floor((s.uptimeMs ?? 0) / 86400000)} days` : "since April 20"},{" "}
+              earned ${s?.totalEarnedUsd?.toFixed(2) ?? "5.60"}, and survived{" "}
+              {s?.totalAttacksBlocked ?? 524} attacks.
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
               <Link
@@ -254,13 +256,13 @@ export function LandingPage({ initialAtlas }: Props) {
             },
             {
               n: "02",
-              title: "Connect your agent",
-              body: "One API key. Drop @kyvernlabs/sdk into your agent code. Every vault.pay() is a real Solana transaction.",
+              title: "Install abilities",
+              body: "Open the Ability Store. Tap install. Earn USDC, block attacks, monitor wallets — all with zero code.",
             },
             {
               n: "03",
-              title: "Watch it run",
-              body: "Every payment visible in real-time. Kill switch always ready. Solana Explorer receipts for everything.",
+              title: "Watch it earn",
+              body: "Your device runs 24/7. Abilities earn, spend, and defend — all on-chain. Every tx verifiable on Solana Explorer.",
             },
           ].map((step, i) => (
             <motion.div
