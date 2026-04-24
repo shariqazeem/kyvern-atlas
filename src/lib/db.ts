@@ -361,6 +361,31 @@ function migrate(db: Database.Database) {
       db.exec("ALTER TABLE vault_agent_keys ADD COLUMN solana_secret_b58 TEXT");
   }
 
+  // ─── Ability Store: user-created x402 endpoints + bounty targets ────
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS user_endpoints (
+      id              TEXT PRIMARY KEY,
+      vault_id        TEXT NOT NULL,
+      target_url      TEXT NOT NULL,
+      price_usd       REAL NOT NULL DEFAULT 0.001,
+      active          INTEGER NOT NULL DEFAULT 1,
+      greeted         INTEGER NOT NULL DEFAULT 0,
+      created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (vault_id) REFERENCES vaults(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_user_endpoints_vault ON user_endpoints(vault_id);
+    CREATE INDEX IF NOT EXISTS idx_user_endpoints_active ON user_endpoints(active);
+  `);
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS bounty_vaults (
+      vault_id        TEXT PRIMARY KEY,
+      enabled_at      TEXT NOT NULL DEFAULT (datetime('now')),
+      attack_count    INTEGER NOT NULL DEFAULT 0,
+      FOREIGN KEY (vault_id) REFERENCES vaults(id) ON DELETE CASCADE
+    );
+  `);
+
   // Ensure demo API key exists (needed for middleware ingest + demo endpoint)
   db.prepare(`
     INSERT OR IGNORE INTO api_keys (id, key_hash, key_prefix, name, email)

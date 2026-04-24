@@ -523,3 +523,158 @@ export function getSpendSnapshot(
     windowStart,
   };
 }
+
+/* ─── PnL for a vault (Device economics) ─── */
+
+export interface VaultPnL {
+  earned: number;
+  spent: number;
+  net: number;
+}
+
+/**
+ * Calculate PnL for a vault. Spent = outgoing settled payments.
+ * Earned = incoming payments where this vault is the recipient
+ * (tracked as payments with a special "x402_inbound" status or by
+ * aggregating from the user_endpoints earnings).
+ *
+ * For the hackathon, earnings come from Atlas greeter payments
+ * recorded in the atlas_state.totalEarnedUsd and any x402
+ * inbound payments logged as events with the vault's endpoint.
+ */
+export function getVaultPnL(vaultId: string): VaultPnL {
+  const db = getDb();
+
+  // Total spent (outgoing settled payments from this vault)
+  const spent = db
+    .prepare(
+      `SELECT COALESCE(SUM(amount_usd), 0) AS total
+       FROM vault_payments
+       WHERE vault_id = ? AND status IN ('allowed','settled')`,
+    )
+    .get(vaultId) as { total: number };
+
+  // Total earned (x402 inbound payments TO this vault's endpoints)
+  const earned = db
+    .prepare(
+      `SELECT COALESCE(SUM(ue.price_usd), 0) AS total
+       FROM user_endpoints ue
+       WHERE ue.vault_id = ? AND ue.greeted = 1`,
+    )
+    .get(vaultId) as { total: number };
+
+  const e = earned.total ?? 0;
+  const s = spent.total ?? 0;
+  return { earned: e, spent: s, net: e - s };
+}
+
+/* ─── User Endpoints Registry (for Ability Store x402 proxy) ─── */
+
+export interface UserEndpointRecord {
+  id: string;
+  vaultId: string;
+  targetUrl: string;
+  priceUsd: number;
+  active: boolean;
+  greeted: boolean;
+  createdAt: string;
+}
+
+export function registerEndpoint(
+  vaultId: string,
+  targetUrl: string,
+  priceUsd: number,
+): UserEndpointRecord {
+  const id = `ep_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+  getDb()
+    .prepare(
+      `INSERT INTO user_endpoints (id, vault_id, target_url, price_usd)
+       VALUES (?, ?, ?, ?)`,
+    )
+    .run(id, vaultId, targetUrl, priceUsd);
+
+  return {
+    id,
+    vaultId,
+    targetUrl,
+    priceUsd,
+    active: true,
+    greeted: false,
+    createdAt: new Date().toISOString(),
+  };
+}
+
+export function listActiveEndpoints(): UserEndpointRecord[] {
+  const rows = getDb()
+    .prepare(`SELECT * FROM user_endpoints WHERE active = 1 ORDER BY created_at DESC`)
+    .all() as Array<{
+    id: string;
+    vault_id: string;
+    target_url: string;
+    price_usd: number;
+    active: number;
+    greeted: number;
+    created_at: string;
+  }>;
+  return rows.map((r) => ({
+    id: r.id,
+    vaultId: r.vault_id,
+    targetUrl: r.target_url,
+    priceUsd: r.price_usd,
+    active: r.active === 1,
+    greeted: r.greeted === 1,
+    createdAt: r.created_at,
+  }));
+}
+
+export function listUngreetedEndpoints(): UserEndpointRecord[] {
+  const rows = getDb()
+    .prepare(`SELECT * FROM user_endpoints WHERE active = 1 AND greeted = 0 ORDER BY created_at ASC`)
+    .all() as Array<{
+    id: string;
+    vault_id: string;
+    target_url: string;
+    price_usd: number;
+    active: number;
+    greeted: number;
+    created_at: string;
+  }>;
+  return rows.map((r) => ({
+    id: r.id,
+    vaultId: r.vault_id,
+    targetUrl: r.target_url,
+    priceUsd: r.price_usd,
+    active: r.active === 1,
+    greeted: r.greeted === 1,
+    createdAt: r.created_at,
+  }));
+}
+
+export function markEndpointGreeted(endpointId: string): void {
+  getDb()
+    .prepare(`UPDATE user_endpoints SET greeted = 1 WHERE id = ?`)
+    .run(endpointId);
+}
+
+export function listEndpointsByVault(vaultId: string): UserEndpointRecord[] {
+  const rows = getDb()
+    .prepare(`SELECT * FROM user_endpoints WHERE vault_id = ? ORDER BY created_at DESC`)
+    .all(vaultId) as Array<{
+    id: string;
+    vault_id: string;
+    target_url: string;
+    price_usd: number;
+    active: number;
+    greeted: number;
+    created_at: string;
+  }>;
+  return rows.map((r) => ({
+    id: r.id,
+    vaultId: r.vault_id,
+    targetUrl: r.target_url,
+    priceUsd: r.price_usd,
+    active: r.active === 1,
+    greeted: r.greeted === 1,
+    createdAt: r.created_at,
+  }));
+}
