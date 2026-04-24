@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { registerEndpoint, getVault } from "@/lib/vault-store";
+import { registerEndpoint, getVault, writeDeviceLog } from "@/lib/vault-store";
 
 /**
  * POST /api/endpoints/register
  * Register a new x402 proxy endpoint for a vault (Paywall ability).
+ * Returns the slug and full paywall URL.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -23,7 +24,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Verify vault exists
     const vault = getVault(vaultId);
     if (!vault) {
       return NextResponse.json({ error: "vault not found" }, { status: 404 });
@@ -31,12 +31,26 @@ export async function POST(req: NextRequest) {
 
     const endpoint = registerEndpoint(vaultId, targetUrl, priceUsd);
 
-    return NextResponse.json({ endpoint }, { status: 201 });
+    // Log to device log
+    writeDeviceLog({
+      deviceId: vaultId,
+      eventType: "earning_received",
+      abilityId: "paywall-url",
+      description: `Paywall endpoint registered: ${targetUrl}`,
+      metadata: { slug: endpoint.slug, priceUsd, targetUrl },
+    });
+
+    const baseUrl = process.env.KYVERN_BASE_URL ?? process.env.NEXT_PUBLIC_BASE_URL ?? "https://app.kyvernlabs.com";
+
+    // Trigger the greeter immediately so Atlas pays within seconds
+    fetch(`${baseUrl}/api/greeter`, { method: "POST" }).catch(() => {});
+
+    return NextResponse.json({
+      endpoint,
+      paywallUrl: `${baseUrl}/api/paywall/${endpoint.slug}`,
+    }, { status: 201 });
   } catch (e) {
     console.error("[endpoints/register]", e);
-    return NextResponse.json(
-      { error: "internal error" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "internal error" }, { status: 500 });
   }
 }

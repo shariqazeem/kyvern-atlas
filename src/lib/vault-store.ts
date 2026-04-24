@@ -584,14 +584,15 @@ export function registerEndpoint(
   vaultId: string,
   targetUrl: string,
   priceUsd: number,
-): UserEndpointRecord {
+): UserEndpointRecord & { slug: string } {
   const id = `ep_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+  const slug = Math.random().toString(36).slice(2, 8);
   getDb()
     .prepare(
-      `INSERT INTO user_endpoints (id, vault_id, target_url, price_usd)
-       VALUES (?, ?, ?, ?)`,
+      `INSERT INTO user_endpoints (id, vault_id, target_url, price_usd, slug)
+       VALUES (?, ?, ?, ?, ?)`,
     )
-    .run(id, vaultId, targetUrl, priceUsd);
+    .run(id, vaultId, targetUrl, priceUsd, slug);
 
   return {
     id,
@@ -601,6 +602,7 @@ export function registerEndpoint(
     active: true,
     greeted: false,
     createdAt: new Date().toISOString(),
+    slug,
   };
 }
 
