@@ -8,14 +8,20 @@
  * (for Paywall: registers x402 endpoint), redirects to home.
  */
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { ArrowLeft, Check, Shield, Zap } from "lucide-react";
 import { getAbility } from "@/lib/abilities/registry";
 import { useDeviceStore } from "@/hooks/use-device-store";
+import { useAuth } from "@/hooks/use-auth";
 import { ConfigFields } from "@/components/store/config-fields";
+
+function devWallet(): string {
+  if (typeof window === "undefined") return "";
+  return window.localStorage.getItem("kyvern:dev-wallet") ?? "";
+}
 
 const CATEGORY_COLORS: Record<string, string> = {
   earn: "#22C55E",
@@ -30,9 +36,17 @@ export default function AbilityDetailPage({
 }) {
   const router = useRouter();
   const ability = getAbility(params.id);
-  const { install, isInstalled, vaultId } = useDeviceStore();
+  const { install, isInstalled, vaultId, autoInit } = useDeviceStore();
+  const { wallet, isLoading: authLoading } = useAuth();
   const [installing, setInstalling] = useState(false);
   const [installed, setInstalled] = useState(false);
+
+  // Auto-init store if not initialized
+  useEffect(() => {
+    if (authLoading || vaultId) return;
+    const w = wallet ?? devWallet();
+    if (w) void autoInit(w);
+  }, [authLoading, wallet, autoInit, vaultId]);
 
   // Build initial config from schema defaults
   const defaultConfig = useMemo(() => {

@@ -1,9 +1,11 @@
 /**
  * Device store — zustand + localStorage for installed ability state.
  *
- * Ability install state is UI-only (localStorage). Server-side
- * registrations (x402 endpoints, bounty targets) happen via API calls
- * at install time — this store only tracks what's shown on the device.
+ * The store auto-hydrates: whenever init(vaultId) is called, it reads
+ * localStorage. Components should call init on mount with the user's
+ * vault ID. Multiple init calls with the same ID are idempotent but
+ * always re-read localStorage (so navigating back after install picks
+ * up the new ability).
  */
 
 import { create } from "zustand";
@@ -31,29 +33,36 @@ function saveState(vaultId: string, abilities: InstalledAbility[]): void {
   window.localStorage.setItem(storageKey(vaultId), JSON.stringify(state));
 }
 
+/** Get the first vault ID from the user's vaults API */
+async function fetchFirstVaultId(wallet: string): Promise<string | null> {
+  try {
+    const r = await fetch(
+      `/api/vault/list?ownerWallet=${encodeURIComponent(wallet)}`,
+    );
+    if (!r.ok) return null;
+    const d = await r.json();
+    const vaults = d?.vaults ?? [];
+    return vaults.length > 0 ? vaults[0].vault.id : null;
+  } catch {
+    return null;
+  }
+}
+
 interface DeviceStore {
   vaultId: string | null;
   abilities: InstalledAbility[];
 
-  /** Initialize with a vault ID — loads from localStorage */
+  /** Initialize with a vault ID — ALWAYS re-reads localStorage */
   init: (vaultId: string) => void;
 
-  /** Install a new ability with config */
+  /** Auto-init: fetches user's first vault and inits */
+  autoInit: (wallet: string) => Promise<void>;
+
   install: (abilityId: string, config: Record<string, string | number | boolean>) => void;
-
-  /** Uninstall an ability */
   uninstall: (abilityId: string) => void;
-
-  /** Update ability config */
   updateConfig: (abilityId: string, config: Record<string, string | number | boolean>) => void;
-
-  /** Toggle ability status */
   toggleStatus: (abilityId: string) => void;
-
-  /** Check if an ability is installed */
   isInstalled: (abilityId: string) => boolean;
-
-  /** Get a specific installed ability */
   getInstalled: (abilityId: string) => InstalledAbility | undefined;
 }
 
@@ -62,8 +71,17 @@ export const useDeviceStore = create<DeviceStore>((set, get) => ({
   abilities: [],
 
   init: (vaultId: string) => {
+    // Always re-read from localStorage (fixes navigation-back bug)
     const abilities = loadState(vaultId);
     set({ vaultId, abilities });
+  },
+
+  autoInit: async (wallet: string) => {
+    const id = await fetchFirstVaultId(wallet);
+    if (id) {
+      const abilities = loadState(id);
+      set({ vaultId: id, abilities });
+    }
   },
 
   install: (abilityId, config) => {

@@ -7,21 +7,35 @@
  * Filter by category. Tap to view detail + install.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { ABILITIES } from "@/lib/abilities/registry";
 import { useDeviceStore } from "@/hooks/use-device-store";
+import { useAuth } from "@/hooks/use-auth";
 import { AbilityCard } from "@/components/store/ability-card";
 import { CategoryTabs } from "@/components/store/category-tabs";
 import type { AbilityCategory } from "@/lib/abilities/types";
 
 type Filter = "all" | AbilityCategory;
 
+function devWallet(): string {
+  if (typeof window === "undefined") return "";
+  return window.localStorage.getItem("kyvern:dev-wallet") ?? "";
+}
+
 export default function AbilityStorePage() {
   const [filter, setFilter] = useState<Filter>("all");
-  const { isInstalled } = useDeviceStore();
+  const { isInstalled, autoInit, vaultId } = useDeviceStore();
+  const { wallet, isLoading } = useAuth();
+
+  // Auto-init store so "installed" badges show correctly
+  useEffect(() => {
+    if (isLoading || vaultId) return;
+    const w = wallet ?? devWallet();
+    if (w) void autoInit(w);
+  }, [isLoading, wallet, autoInit, vaultId]);
 
   const filtered =
     filter === "all"
