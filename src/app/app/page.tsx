@@ -3,9 +3,9 @@
 /**
  * /app — Device Home Screen.
  *
- * The first thing you see inside KyvernOS. Your device identity,
- * installed abilities as an icon grid, PnL, and recent activity.
- * Feels like an iPhone home screen — not a SaaS dashboard.
+ * Alive from second one. Atlas pulses at the top.
+ * Your device identity, installed abilities, real activity feed.
+ * Every 5 seconds something updates.
  */
 
 import { useEffect, useState } from "react";
@@ -15,29 +15,30 @@ import { ArrowRight, ArrowUpRight, Store } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useDeviceStore } from "@/hooks/use-device-store";
 import { getAbility } from "@/lib/abilities/registry";
-import { fmtAgo } from "@/lib/format";
+import { fmtAgo, fmtUptime } from "@/lib/format";
+
+/* ── Types ── */
 
 interface VaultBrief {
   vault: {
-    id: string;
-    name: string;
-    emoji: string;
-    dailyLimitUsd: number;
-    pausedAt: string | null;
-    network: string;
-    createdAt?: string;
+    id: string; name: string; emoji: string;
+    dailyLimitUsd: number; pausedAt: string | null; network: string;
   };
   budget: { spentToday: number; dailyLimitUsd: number; dailyUtilization: number };
   lastPayment: { merchant: string; amountUsd: number; status: string; createdAt: string } | null;
 }
 
-interface Payment {
-  id: string;
-  merchant: string;
-  amountUsd: number;
-  status: string;
-  txSignature: string | null;
-  createdAt: string;
+interface AtlasState {
+  running: boolean; totalCycles: number; totalSettled: number;
+  totalAttacksBlocked: number; totalSpentUsd: number; totalEarnedUsd: number;
+  fundsLostUsd: number; uptimeMs: number; firstIgnitionAt: string | null;
+}
+
+interface FeedItem {
+  id: string; _kind: "decision" | "attack"; _when: string;
+  reasoning?: string; merchant?: string | null; amountUsd?: number;
+  outcome?: string; type?: string; txSignature?: string | null;
+  blockedReason?: string | null; description?: string;
 }
 
 function devWallet(): string {
@@ -57,10 +58,12 @@ export default function DeviceHome() {
   const { abilities, init } = useDeviceStore();
 
   const [vault, setVault] = useState<VaultBrief | null>(null);
-  const [payments, setPayments] = useState<Payment[]>([]);
+  const [atlas, setAtlas] = useState<AtlasState | null>(null);
+  const [feed, setFeed] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [uptimeMs, setUptimeMs] = useState(0);
 
-  // Load vault + init store on every mount (fixes navigation-back bug)
+  // Load vault + init store
   useEffect(() => {
     if (isLoading) return;
     const owner = wallet ?? devWallet();
@@ -72,30 +75,48 @@ export default function DeviceHome() {
         const vaults = (d?.vaults ?? []) as VaultBrief[];
         if (vaults.length > 0) {
           setVault(vaults[0]);
-          // Always re-init to pick up newly installed abilities
           init(vaults[0].vault.id);
-          // Load payments
-          fetch(`/api/vault/${vaults[0].vault.id}?limit=8`)
-            .then((r) => (r.ok ? r.json() : null))
-            .then((d) => d?.payments && setPayments(d.payments as Payment[]))
-            .catch(() => {});
         }
         setLoading(false);
       })
       .catch(() => setLoading(false));
   }, [isLoading, wallet, init]);
 
-  // No vault → create device
+  // Poll Atlas (the heartbeat) + feed
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const [s, f] = await Promise.all([
+          fetch("/api/atlas/status").then((r) => (r.ok ? r.json() : null)),
+          fetch("/api/atlas/decisions?kind=both&limit=6").then((r) => (r.ok ? r.json() : null)),
+        ]);
+        if (s) setAtlas(s as AtlasState);
+        if (f?.feed) setFeed(f.feed as FeedItem[]);
+      } catch { /* silent */ }
+    };
+    load();
+    const iv = setInterval(load, 5000);
+    return () => clearInterval(iv);
+  }, []);
+
+  // Live uptime
+  useEffect(() => {
+    if (!atlas?.firstIgnitionAt) return;
+    const iv = setInterval(() => {
+      setUptimeMs(Date.now() - new Date(atlas.firstIgnitionAt!).getTime());
+    }, 1000);
+    return () => clearInterval(iv);
+  }, [atlas?.firstIgnitionAt]);
+
   if (!loading && !vault) return <NoDeviceState />;
 
   const hasAbilities = abilities.length > 0;
   const serialNum = vault?.vault.id
     ? `KVN-${vault.vault.id.replace("vlt_", "").slice(0, 8).toUpperCase()}`
-    : "KVN-????";
+    : "";
 
   return (
     <div className="py-2">
-      {/* Loading */}
       {loading && (
         <div className="flex items-center justify-center py-20">
           <div className="w-5 h-5 border-2 rounded-full animate-spin"
@@ -105,7 +126,32 @@ export default function DeviceHome() {
 
       {vault && (
         <>
-          {/* ── Device Identity Card ── */}
+          {/* ── Network Pulse ── */}
+          {atlas && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.4 }}
+              className="flex items-center justify-between px-1 mb-4"
+            >
+              <div className="flex items-center gap-2">
+                <motion.span
+                  className="w-[6px] h-[6px] rounded-full"
+                  style={{ background: "#22C55E" }}
+                  animate={{ opacity: [0.4, 1, 0.4] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                />
+                <span className="text-[11px] text-[#9CA3AF]">
+                  Solana {vault.vault.network} · {fmtUptime(uptimeMs)} uptime
+                </span>
+              </div>
+              <span className="text-[11px] font-mono text-[#9CA3AF]">
+                {atlas.totalCycles} cycles
+              </span>
+            </motion.div>
+          )}
+
+          {/* ── Device Card ── */}
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
@@ -135,42 +181,64 @@ export default function DeviceHome() {
                   <span className="font-mono text-[10px] text-[#9CA3AF] bg-[#F3F4F6] px-1.5 py-0.5 rounded">
                     {serialNum}
                   </span>
-                  <motion.span
-                    className="w-[6px] h-[6px] rounded-full"
-                    style={{ background: vault.vault.pausedAt ? "#EF4444" : "#22C55E" }}
-                    animate={!vault.vault.pausedAt ? { opacity: [0.5, 1, 0.5] } : {}}
-                    transition={{ duration: 2, repeat: Infinity }}
-                  />
-                  <span className="text-[10px] text-[#9CA3AF]">
-                    {vault.vault.network}
+                  <span
+                    className="text-[10px] font-medium"
+                    style={{ color: vault.vault.pausedAt ? "#EF4444" : "#22C55E" }}
+                  >
+                    {vault.vault.pausedAt ? "Paused" : "Active"}
                   </span>
                 </div>
               </div>
             </div>
 
-            {/* PnL row */}
-            <div
-              className="grid grid-cols-3 gap-4 pt-4"
-              style={{ borderTop: "1px solid #F3F4F6" }}
-            >
-              <PnLStat label="Earned" value={`$${(0).toFixed(2)}`} color="#22C55E" />
-              <PnLStat label="Spent" value={`$${vault.budget.spentToday.toFixed(2)}`} color="#111" />
-              <PnLStat
-                label="Budget"
-                value={`${Math.round(vault.budget.dailyUtilization * 100)}%`}
-                color={vault.budget.dailyUtilization > 0.85 ? "#EF4444" : vault.budget.dailyUtilization > 0.6 ? "#F59E0B" : "#22C55E"}
-              />
+            {/* Budget bar */}
+            <div className="mb-3">
+              <div className="flex items-baseline justify-between mb-1.5">
+                <span className="text-[11px] text-[#9CA3AF]">Daily budget</span>
+                <span className="text-[13px] font-mono font-semibold text-[#111]">
+                  ${vault.budget.spentToday.toFixed(2)}
+                  <span className="text-[#D1D5DB]"> / ${vault.budget.dailyLimitUsd}</span>
+                </span>
+              </div>
+              <div className="h-[5px] rounded-full overflow-hidden" style={{ background: "#F3F4F6" }}>
+                <motion.div
+                  className="h-full rounded-full"
+                  initial={{ width: 0 }}
+                  animate={{ width: `${Math.min(vault.budget.dailyUtilization * 100, 100)}%` }}
+                  transition={{ duration: 0.8 }}
+                  style={{
+                    background: vault.budget.dailyUtilization > 0.85 ? "#EF4444"
+                      : vault.budget.dailyUtilization > 0.6 ? "#F59E0B" : "#22C55E",
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Stats row */}
+            <div className="grid grid-cols-3 gap-3 pt-3" style={{ borderTop: "1px solid #F3F4F6" }}>
+              <div className="text-center">
+                <p className="text-[10px] text-[#9CA3AF] uppercase tracking-wider">Settled</p>
+                <p className="text-[16px] font-semibold font-mono text-[#111]">{atlas?.totalSettled ?? 0}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-[10px] text-[#9CA3AF] uppercase tracking-wider">Blocked</p>
+                <p className="text-[16px] font-semibold font-mono text-[#EF4444]">{atlas?.totalAttacksBlocked ?? 0}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-[10px] text-[#9CA3AF] uppercase tracking-wider">Lost</p>
+                <p className="text-[16px] font-semibold font-mono text-[#22C55E]">$0</p>
+              </div>
             </div>
           </motion.div>
 
-          {/* ── Abilities Section ── */}
+          {/* ── Abilities ── */}
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1, duration: 0.5 }}
             className="mb-5"
           >
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-3">
               <h2 className="text-[16px] font-semibold text-[#111]">
                 {hasAbilities ? "Abilities" : "Get started"}
               </h2>
@@ -207,17 +275,13 @@ export default function DeviceHome() {
                         <div className="relative">
                           <div
                             className="w-[52px] h-[52px] rounded-[14px] flex items-center justify-center text-[24px]"
-                            style={{
-                              background: "linear-gradient(135deg, #F9FAFB, #F3F4F6)",
-                            }}
+                            style={{ background: "linear-gradient(135deg, #F9FAFB, #F3F4F6)" }}
                           >
                             {def.emoji}
                           </div>
                           <span
-                            className="absolute -top-0.5 -right-0.5 w-[9px] h-[9px] rounded-full border-[2px] border-white"
-                            style={{
-                              background: inst.status === "active" ? "#22C55E" : "#9CA3AF",
-                            }}
+                            className="absolute -top-0.5 -right-0.5 w-[9px] h-[9px] rounded-full border-[2px] border-[#FAFAFA]"
+                            style={{ background: inst.status === "active" ? "#22C55E" : "#9CA3AF" }}
                           />
                         </div>
                         <span className="text-[11px] font-medium text-[#6B7280] text-center leading-tight">
@@ -227,25 +291,17 @@ export default function DeviceHome() {
                     </motion.div>
                   );
                 })}
-
-                {/* Add more button */}
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  transition={{ delay: abilities.length * 0.08 + 0.1, duration: 0.3 }}
+                  transition={{ delay: abilities.length * 0.08 + 0.1 }}
                 >
                   <Link
                     href="/app/store"
                     className="flex flex-col items-center justify-center gap-2 p-3 rounded-[20px] h-full transition-all active:scale-[0.95]"
-                    style={{
-                      border: "1px dashed rgba(0,0,0,0.1)",
-                      minHeight: "100px",
-                    }}
+                    style={{ border: "1px dashed rgba(0,0,0,0.1)", minHeight: "100px" }}
                   >
-                    <div
-                      className="w-[52px] h-[52px] rounded-[14px] flex items-center justify-center"
-                      style={{ background: "#F9FAFB" }}
-                    >
+                    <div className="w-[52px] h-[52px] rounded-[14px] flex items-center justify-center" style={{ background: "#F9FAFB" }}>
                       <span className="text-[20px] text-[#D1D5DB]">+</span>
                     </div>
                     <span className="text-[11px] text-[#D1D5DB]">Add</span>
@@ -253,130 +309,108 @@ export default function DeviceHome() {
                 </motion.div>
               </div>
             ) : (
-              /* Empty: Open Store CTA */
               <Link
                 href="/app/store"
                 className="block rounded-[20px] p-6 text-center group transition-all hover:shadow-md active:scale-[0.98]"
-                style={{
-                  background: "#fff",
-                  border: "1px dashed rgba(0,0,0,0.1)",
-                }}
+                style={{ background: "#fff", border: "1px dashed rgba(0,0,0,0.1)" }}
               >
-                <div
-                  className="w-14 h-14 rounded-[16px] flex items-center justify-center mx-auto mb-3"
-                  style={{ background: "#F3F4F6" }}
-                >
+                <div className="w-14 h-14 rounded-[16px] flex items-center justify-center mx-auto mb-3" style={{ background: "#F3F4F6" }}>
                   <Store className="w-6 h-6 text-[#9CA3AF]" />
                 </div>
-                <p className="text-[15px] font-semibold text-[#111]">
-                  Open the Ability Store
-                </p>
+                <p className="text-[15px] font-semibold text-[#111]">Open the Ability Store</p>
                 <p className="text-[12px] text-[#9CA3AF] mt-1 max-w-[240px] mx-auto">
-                  Install abilities on your device — earn USDC, block attacks, get intelligence. No code.
+                  Install abilities — earn, protect, monitor. No code needed.
                 </p>
-                <span
-                  className="inline-flex items-center gap-1 mt-3 text-[12px] font-semibold"
-                  style={{ color: "#111" }}
-                >
-                  Browse abilities <ArrowRight className="w-3 h-3" />
-                </span>
               </Link>
             )}
           </motion.div>
 
-          {/* ── Recent Activity ── */}
-          {payments.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.25, duration: 0.4 }}
-            >
-              <h2 className="text-[13px] font-semibold text-[#9CA3AF] uppercase tracking-wider mb-3">
-                Recent
+          {/* ── Live Atlas Feed (the heartbeat) ── */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.2, duration: 0.5 }}
+            className="mb-5"
+          >
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-[13px] font-semibold text-[#9CA3AF] uppercase tracking-wider">
+                Network activity
               </h2>
-              <div
-                className="rounded-[20px] overflow-hidden"
-                style={{
-                  background: "#fff",
-                  boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
-                  border: "1px solid rgba(0,0,0,0.05)",
-                }}
-              >
-                {payments.slice(0, 5).map((p, i) => {
-                  const blocked = p.status === "blocked" || p.status === "failed";
+              <Link href="/atlas" className="text-[11px] text-[#9CA3AF] hover:text-[#6B7280]">
+                Full view →
+              </Link>
+            </div>
+            <div
+              className="rounded-[20px] overflow-hidden"
+              style={{
+                background: "#fff",
+                boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
+                border: "1px solid rgba(0,0,0,0.05)",
+              }}
+            >
+              {feed.length === 0 ? (
+                <p className="text-[12px] text-[#D1D5DB] text-center py-6">Loading...</p>
+              ) : (
+                feed.slice(0, 5).map((item, i) => {
+                  const isAttack = item._kind === "attack";
+                  const blocked = isAttack || item.outcome === "blocked";
+                  const label = isAttack
+                    ? (item.type?.replace(/_/g, " ") ?? "attack")
+                    : (item.merchant ?? "—");
                   return (
                     <div
-                      key={p.id}
-                      className="flex items-center gap-3 px-4 py-3"
-                      style={i > 0 ? { borderTop: "1px solid #F3F4F6" } : {}}
+                      key={item.id}
+                      className="flex items-center gap-3 px-4 py-2.5"
+                      style={i > 0 ? { borderTop: "1px solid #F9FAFB" } : {}}
                     >
                       <span
                         className="w-[6px] h-[6px] rounded-full shrink-0"
                         style={{ background: blocked ? "#EF4444" : "#22C55E" }}
                       />
-                      <span className="text-[13px] text-[#111] truncate flex-1">
-                        {p.merchant}
-                        {blocked && <span className="ml-1.5 text-[10px] text-[#EF4444]">blocked</span>}
-                      </span>
-                      <span className={`text-[12px] font-mono shrink-0 ${blocked ? "line-through text-[#D1D5DB]" : "text-[#111]"}`}>
-                        ${p.amountUsd.toFixed(2)}
-                      </span>
-                      {p.txSignature && (
-                        <a
-                          href={`https://explorer.solana.com/tx/${p.txSignature}?cluster=devnet`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-[#D1D5DB] hover:text-[#9CA3AF]"
-                        >
+                      <div className="flex-1 min-w-0">
+                        <span className="text-[12px] text-[#111] truncate block">
+                          {isAttack ? "Attack: " : "→ "}{label}
+                          {blocked && (
+                            <span className="ml-1.5 text-[9px] font-semibold text-[#EF4444] bg-[#FEF2F2] px-1 py-0.5 rounded">
+                              BLOCKED
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                      {(item.amountUsd ?? 0) > 0 && (
+                        <span className={`text-[11px] font-mono shrink-0 ${blocked ? "line-through text-[#D1D5DB]" : "text-[#111]"}`}>
+                          ${(item.amountUsd ?? 0).toFixed(2)}
+                        </span>
+                      )}
+                      {item.txSignature && (
+                        <a href={`https://explorer.solana.com/tx/${item.txSignature}?cluster=devnet`}
+                          target="_blank" rel="noopener noreferrer"
+                          className="text-[#D1D5DB] hover:text-[#9CA3AF] shrink-0">
                           <ArrowUpRight className="w-3 h-3" />
                         </a>
                       )}
                       <span className="text-[10px] text-[#D1D5DB] shrink-0">
-                        {fmtAgo(p.createdAt)}
+                        {fmtAgo(item._when)}
                       </span>
                     </div>
                   );
-                })}
-              </div>
-            </motion.div>
-          )}
+                })
+              )}
+            </div>
+          </motion.div>
 
-          {/* ── Device links ── */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.35, duration: 0.4 }}
-            className="mt-6 flex items-center justify-center gap-4"
-          >
+          {/* ── Footer links ── */}
+          <div className="flex items-center justify-center gap-4 mt-4">
             <Link href="/app/devices" className="text-[11px] text-[#9CA3AF] hover:text-[#6B7280]">
               Device registry
             </Link>
             <span className="text-[#E5E7EB]">·</span>
-            <Link href={`/vault/${vault.vault.id}`} className="text-[11px] text-[#9CA3AF] hover:text-[#6B7280]">
-              Vault detail
-            </Link>
-            <span className="text-[#E5E7EB]">·</span>
             <Link href="/atlas" className="text-[11px] text-[#9CA3AF] hover:text-[#6B7280]">
-              Atlas live
+              Atlas observatory
             </Link>
-          </motion.div>
+          </div>
         </>
       )}
-    </div>
-  );
-}
-
-/* ── Sub-components ── */
-
-function PnLStat({ label, value, color }: { label: string; value: string; color: string }) {
-  return (
-    <div className="text-center">
-      <p className="text-[10px] font-medium text-[#9CA3AF] uppercase tracking-wider mb-0.5">
-        {label}
-      </p>
-      <p className="text-[18px] font-semibold font-mono" style={{ color }}>
-        {value}
-      </p>
     </div>
   );
 }
@@ -391,16 +425,11 @@ function NoDeviceState() {
     >
       <div
         className="w-[80px] h-[80px] rounded-[22px] mb-5 flex items-center justify-center"
-        style={{
-          background: "linear-gradient(135deg, #F9FAFB, #F3F4F6)",
-          border: "1px solid rgba(0,0,0,0.04)",
-        }}
+        style={{ background: "linear-gradient(135deg, #F9FAFB, #F3F4F6)", border: "1px solid rgba(0,0,0,0.04)" }}
       >
         <span className="text-[32px]">🧭</span>
       </div>
-      <h2 className="text-[22px] font-semibold text-[#111] tracking-tight">
-        Create your device.
-      </h2>
+      <h2 className="text-[22px] font-semibold text-[#111] tracking-tight">Create your device.</h2>
       <p className="mt-2 text-[14px] text-[#6B7280] max-w-[300px] leading-[1.6]">
         A sovereign wallet on Solana. Install abilities. Earn, protect, monitor — no code.
       </p>
