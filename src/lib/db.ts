@@ -386,6 +386,60 @@ function migrate(db: Database.Database) {
     );
   `);
 
+  // ─── Device Log — the unified event feed for every device ────────
+  // Every ability action, payment, attack, install writes here.
+  // Powers: device home feed, public profile log, PnL aggregation.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS device_log (
+      id              TEXT PRIMARY KEY,
+      device_id       TEXT NOT NULL,
+      timestamp       TEXT NOT NULL DEFAULT (datetime('now')),
+      event_type      TEXT NOT NULL,
+      ability_id      TEXT,
+      signature       TEXT,
+      amount_usd      REAL,
+      counterparty    TEXT,
+      description     TEXT,
+      metadata_json   TEXT,
+      FOREIGN KEY (device_id) REFERENCES vaults(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_device_log_device ON device_log(device_id, timestamp DESC);
+    CREATE INDEX IF NOT EXISTS idx_device_log_type ON device_log(event_type);
+    CREATE INDEX IF NOT EXISTS idx_device_log_ability ON device_log(ability_id);
+  `);
+
+  // ─── Public mirror of installed abilities (for registry display) ──
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS device_abilities_public (
+      device_id       TEXT NOT NULL,
+      ability_id      TEXT NOT NULL,
+      installed_at    TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (device_id, ability_id),
+      FOREIGN KEY (device_id) REFERENCES vaults(id) ON DELETE CASCADE
+    );
+  `);
+
+  // Add greeter_paid_at to user_endpoints if not present
+  {
+    const epCols = db.pragma("table_info(user_endpoints)") as Array<{ name: string }>;
+    const epNames = new Set(epCols.map((c) => c.name));
+    if (!epNames.has("greeter_paid_at")) {
+      db.exec("ALTER TABLE user_endpoints ADD COLUMN greeter_paid_at TEXT");
+    }
+    if (!epNames.has("slug")) {
+      db.exec("ALTER TABLE user_endpoints ADD COLUMN slug TEXT");
+    }
+  }
+
+  // Add welcome_attack_sig to bounty_vaults if not present
+  {
+    const bvCols = db.pragma("table_info(bounty_vaults)") as Array<{ name: string }>;
+    const bvNames = new Set(bvCols.map((c) => c.name));
+    if (!bvNames.has("welcome_attack_sig")) {
+      db.exec("ALTER TABLE bounty_vaults ADD COLUMN welcome_attack_sig TEXT");
+    }
+  }
+
   // Ensure demo API key exists (needed for middleware ingest + demo endpoint)
   db.prepare(`
     INSERT OR IGNORE INTO api_keys (id, key_hash, key_prefix, name, email)

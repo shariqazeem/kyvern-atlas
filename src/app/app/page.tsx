@@ -60,10 +60,17 @@ export default function DeviceHome() {
   const [vault, setVault] = useState<VaultBrief | null>(null);
   const [atlas, setAtlas] = useState<AtlasState | null>(null);
   const [feed, setFeed] = useState<FeedItem[]>([]);
+  const [devicePnl, setDevicePnl] = useState({ earned: 0, spent: 0, net: 0 });
+  const [deviceLog, setDeviceLog] = useState<Array<{
+    id: string; timestamp: string; eventType: string;
+    description: string; signature: string | null;
+    amountUsd: number | null; counterparty: string | null;
+  }>>([]);
+  const [attacksBlocked, setAttacksBlocked] = useState(0);
   const [loading, setLoading] = useState(true);
   const [uptimeMs, setUptimeMs] = useState(0);
 
-  // Load vault + init store
+  // Load vault + init store + device log
   useEffect(() => {
     if (isLoading) return;
     const owner = wallet ?? devWallet();
@@ -76,6 +83,15 @@ export default function DeviceHome() {
         if (vaults.length > 0) {
           setVault(vaults[0]);
           init(vaults[0].vault.id);
+          // Fetch device log + PnL
+          fetch(`/api/devices/${vaults[0].vault.id}/log?limit=10`)
+            .then((r) => (r.ok ? r.json() : null))
+            .then((d) => {
+              if (d?.log) setDeviceLog(d.log);
+              if (d?.pnl) setDevicePnl(d.pnl);
+              if (typeof d?.attacksBlocked === "number") setAttacksBlocked(d.attacksBlocked);
+            })
+            .catch(() => {});
         }
         setLoading(false);
       })
@@ -214,19 +230,25 @@ export default function DeviceHome() {
               </div>
             </div>
 
-            {/* Stats row */}
-            <div className="grid grid-cols-3 gap-3 pt-3" style={{ borderTop: "1px solid #F3F4F6" }}>
+            {/* PnL + Stats row */}
+            <div className="grid grid-cols-4 gap-3 pt-3" style={{ borderTop: "1px solid #F3F4F6" }}>
               <div className="text-center">
-                <p className="text-[10px] text-[#9CA3AF] uppercase tracking-wider">Settled</p>
-                <p className="text-[16px] font-semibold font-mono text-[#111]">{atlas?.totalSettled ?? 0}</p>
+                <p className="text-[16px] font-semibold font-mono text-[#00A86B]">${devicePnl.earned.toFixed(2)}</p>
+                <p className="text-[10px] text-[#9CA3AF] uppercase tracking-wider">Earned</p>
               </div>
               <div className="text-center">
+                <p className="text-[16px] font-semibold font-mono text-[#111]">${devicePnl.spent.toFixed(2)}</p>
+                <p className="text-[10px] text-[#9CA3AF] uppercase tracking-wider">Spent</p>
+              </div>
+              <div className="text-center">
+                <p className="text-[16px] font-semibold font-mono" style={{ color: devicePnl.net >= 0 ? "#00A86B" : "#D92D20" }}>
+                  {devicePnl.net >= 0 ? "+" : ""}${devicePnl.net.toFixed(2)}
+                </p>
+                <p className="text-[10px] text-[#9CA3AF] uppercase tracking-wider">Net</p>
+              </div>
+              <div className="text-center">
+                <p className="text-[16px] font-semibold font-mono text-[#D92D20]">{attacksBlocked}</p>
                 <p className="text-[10px] text-[#9CA3AF] uppercase tracking-wider">Blocked</p>
-                <p className="text-[16px] font-semibold font-mono text-[#EF4444]">{atlas?.totalAttacksBlocked ?? 0}</p>
-              </div>
-              <div className="text-center">
-                <p className="text-[10px] text-[#9CA3AF] uppercase tracking-wider">Lost</p>
-                <p className="text-[16px] font-semibold font-mono text-[#22C55E]">$0</p>
               </div>
             </div>
           </motion.div>
@@ -324,6 +346,67 @@ export default function DeviceHome() {
               </Link>
             )}
           </motion.div>
+
+          {/* ── Device Log (your device's activity) ── */}
+          {deviceLog.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.15, duration: 0.4 }}
+              className="mb-5"
+            >
+              <h2 className="text-[13px] font-semibold text-[#9CA3AF] uppercase tracking-wider mb-3">
+                Your device log
+              </h2>
+              <div
+                className="rounded-[20px] overflow-hidden"
+                style={{
+                  background: "#fff",
+                  boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
+                  border: "1px solid rgba(0,0,0,0.05)",
+                }}
+              >
+                {deviceLog.slice(0, 5).map((entry, i) => {
+                  const isEarning = entry.eventType === "earning_received";
+                  const isSpending = entry.eventType === "spending_sent";
+                  const isAttack = entry.eventType === "attack_blocked";
+                  return (
+                    <div
+                      key={entry.id}
+                      className="flex items-center gap-3 px-4 py-2.5"
+                      style={i > 0 ? { borderTop: "1px solid #F9FAFB" } : {}}
+                    >
+                      <span
+                        className="w-[6px] h-[6px] rounded-full shrink-0"
+                        style={{
+                          background: isAttack ? "#D92D20" : isEarning ? "#00A86B" : isSpending ? "#0052FF" : "#9CA3AF",
+                        }}
+                      />
+                      <span className="text-[12px] text-[#111] truncate flex-1">
+                        {entry.description}
+                      </span>
+                      {entry.amountUsd != null && entry.amountUsd > 0 && (
+                        <span className="text-[11px] font-mono shrink-0" style={{
+                          color: isEarning ? "#00A86B" : isAttack ? "#D92D20" : "#111",
+                        }}>
+                          {isEarning ? "+" : isAttack ? "−" : ""}${entry.amountUsd.toFixed(3)}
+                        </span>
+                      )}
+                      {entry.signature && (
+                        <a
+                          href={`https://explorer.solana.com/tx/${entry.signature}?cluster=devnet`}
+                          target="_blank" rel="noopener noreferrer"
+                          className="text-[#D1D5DB] hover:text-[#9CA3AF] shrink-0"
+                        >
+                          <ArrowUpRight className="w-3 h-3" />
+                        </a>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </motion.div>
+          )}
 
           {/* ── Live Atlas Feed (the heartbeat) ── */}
           <motion.div

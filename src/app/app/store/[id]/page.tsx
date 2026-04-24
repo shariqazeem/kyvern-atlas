@@ -96,6 +96,17 @@ export default function AbilityDetailPage({
 
       // Save to device store (localStorage)
       install(ability.id, config);
+
+      // Log to server (device_log + public abilities)
+      await fetch(`/api/devices/${vaultId}/install`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          abilityId: ability.id,
+          abilityName: ability.name,
+        }),
+      }).catch(() => {});
+
       setInstalled(true);
 
       // Redirect to home after a beat

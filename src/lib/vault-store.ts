@@ -678,3 +678,131 @@ export function listEndpointsByVault(vaultId: string): UserEndpointRecord[] {
     createdAt: r.created_at,
   }));
 }
+
+/* ═══════════════════════════════════════════════════════════════════ */
+/*                     Device Log + Public Abilities                  */
+/* ═══════════════════════════════════════════════════════════════════ */
+
+export type DeviceEventType =
+  | "ability_installed"
+  | "ability_uninstalled"
+  | "earning_received"
+  | "spending_sent"
+  | "attack_blocked"
+  | "bounty_enabled"
+  | "device_created";
+
+export interface DeviceLogEntry {
+  id: string;
+  deviceId: string;
+  timestamp: string;
+  eventType: DeviceEventType;
+  abilityId: string | null;
+  signature: string | null;
+  amountUsd: number | null;
+  counterparty: string | null;
+  description: string;
+  metadata: Record<string, unknown> | null;
+}
+
+export function writeDeviceLog(entry: {
+  deviceId: string;
+  eventType: DeviceEventType;
+  abilityId?: string;
+  signature?: string;
+  amountUsd?: number;
+  counterparty?: string;
+  description: string;
+  metadata?: Record<string, unknown>;
+}): DeviceLogEntry {
+  const id = `dl_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+  const ts = new Date().toISOString();
+  getDb()
+    .prepare(
+      `INSERT INTO device_log (id, device_id, timestamp, event_type, ability_id, signature, amount_usd, counterparty, description, metadata_json)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .run(
+      id, entry.deviceId, ts, entry.eventType,
+      entry.abilityId ?? null, entry.signature ?? null,
+      entry.amountUsd ?? null, entry.counterparty ?? null,
+      entry.description, entry.metadata ? JSON.stringify(entry.metadata) : null,
+    );
+  return {
+    id, deviceId: entry.deviceId, timestamp: ts,
+    eventType: entry.eventType, abilityId: entry.abilityId ?? null,
+    signature: entry.signature ?? null, amountUsd: entry.amountUsd ?? null,
+    counterparty: entry.counterparty ?? null, description: entry.description,
+    metadata: entry.metadata ?? null,
+  };
+}
+
+export function readDeviceLog(deviceId: string, limit = 50): DeviceLogEntry[] {
+  const rows = getDb()
+    .prepare(
+      `SELECT * FROM device_log WHERE device_id = ? ORDER BY timestamp DESC LIMIT ?`,
+    )
+    .all(deviceId, limit) as Array<{
+    id: string; device_id: string; timestamp: string; event_type: string;
+    ability_id: string | null; signature: string | null; amount_usd: number | null;
+    counterparty: string | null; description: string; metadata_json: string | null;
+  }>;
+  return rows.map((r) => ({
+    id: r.id, deviceId: r.device_id, timestamp: r.timestamp,
+    eventType: r.event_type as DeviceEventType,
+    abilityId: r.ability_id, signature: r.signature,
+    amountUsd: r.amount_usd, counterparty: r.counterparty,
+    description: r.description,
+    metadata: r.metadata_json ? JSON.parse(r.metadata_json) : null,
+  }));
+}
+
+/** PnL computed from device_log (the real one, not the payment-based estimate) */
+export function getDevicePnL(deviceId: string): VaultPnL {
+  const db = getDb();
+  const earned = db
+    .prepare(
+      `SELECT COALESCE(SUM(amount_usd), 0) AS total
+       FROM device_log WHERE device_id = ? AND event_type = 'earning_received'`,
+    )
+    .get(deviceId) as { total: number };
+  const spent = db
+    .prepare(
+      `SELECT COALESCE(SUM(amount_usd), 0) AS total
+       FROM device_log WHERE device_id = ? AND event_type = 'spending_sent'`,
+    )
+    .get(deviceId) as { total: number };
+  const e = earned.total ?? 0;
+  const s = spent.total ?? 0;
+  return { earned: e, spent: s, net: e - s };
+}
+
+export function getDeviceAttackCount(deviceId: string): number {
+  const row = getDb()
+    .prepare(
+      `SELECT COUNT(*) AS n FROM device_log WHERE device_id = ? AND event_type = 'attack_blocked'`,
+    )
+    .get(deviceId) as { n: number };
+  return row.n ?? 0;
+}
+
+/* ─── Public abilities mirror ─── */
+
+export function recordPublicAbility(deviceId: string, abilityId: string): void {
+  getDb()
+    .prepare(`INSERT OR IGNORE INTO device_abilities_public (device_id, ability_id) VALUES (?, ?)`)
+    .run(deviceId, abilityId);
+}
+
+export function removePublicAbility(deviceId: string, abilityId: string): void {
+  getDb()
+    .prepare(`DELETE FROM device_abilities_public WHERE device_id = ? AND ability_id = ?`)
+    .run(deviceId, abilityId);
+}
+
+export function getPublicAbilities(deviceId: string): string[] {
+  const rows = getDb()
+    .prepare(`SELECT ability_id FROM device_abilities_public WHERE device_id = ? ORDER BY installed_at ASC`)
+    .all(deviceId) as Array<{ ability_id: string }>;
+  return rows.map((r) => r.ability_id);
+}
