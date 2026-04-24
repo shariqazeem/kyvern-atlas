@@ -1,17 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getVault, writeDeviceLog } from "@/lib/vault-store";
+import { getVault } from "@/lib/vault-store";
+import { serverVaultPay } from "@/lib/server-pay";
 
 /**
  * POST /api/devices/[id]/subscribe
  *
  * Atlas Intelligence subscription payment.
- * The device pays Atlas $0.001 for each update.
- * Writes spending_sent to device_log with a signature.
- *
- * For the hackathon, this is a logged payment event.
- * The real vault.pay() path through the policy engine will be
- * wired when vault-to-vault transfer is confirmed on devnet.
+ * The device pays Atlas $0.001 via real vault.pay() → Squads → Solana.
+ * Produces a real signature verifiable on Explorer.
  */
+
+// Atlas's Squads vault address — the recipient of Intelligence payments
+const ATLAS_VAULT_ID = "vlt_QcCPbp3XTzHtF5";
+
 export async function POST(
   _req: NextRequest,
   { params }: { params: { id: string } },
@@ -22,26 +23,44 @@ export async function POST(
       return NextResponse.json({ error: "device not found" }, { status: 404 });
     }
 
-    const paymentSig = `intel_${params.id}_${Date.now().toString(36)}`;
+    // Get Atlas's vault to find its squads address (recipient)
+    const atlasVault = getVault(ATLAS_VAULT_ID);
+    if (!atlasVault) {
+      return NextResponse.json({ error: "Atlas vault not found" }, { status: 500 });
+    }
+
     const amount = 0.001;
 
-    // Log the spending event
-    writeDeviceLog({
-      deviceId: params.id,
-      eventType: "spending_sent",
-      abilityId: "atlas-intelligence",
-      signature: paymentSig,
+    // Execute real vault.pay() through Squads
+    const result = await serverVaultPay({
+      vaultId: params.id,
+      merchant: "atlas.kyvernlabs.com",
+      recipientPubkey: atlasVault.ownerWallet,
       amountUsd: amount,
-      counterparty: "KVN-0000 (Atlas)",
-      description: `Paid Atlas $${amount.toFixed(3)} for intelligence update`,
+      memo: "atlas-intelligence subscription",
+      logEvent: {
+        eventType: "spending_sent",
+        abilityId: "atlas-intelligence",
+        counterparty: "KVN-0000 (Atlas)",
+        description: `Paid Atlas $${amount.toFixed(3)} for intelligence update`,
+      },
     });
 
-    return NextResponse.json({
-      paid: true,
-      amount,
-      signature: paymentSig,
-      counterparty: "KVN-0000 (Atlas)",
-    });
+    if (result.success) {
+      return NextResponse.json({
+        paid: true,
+        amount,
+        signature: result.signature,
+        explorerUrl: result.explorerUrl,
+        counterparty: "KVN-0000 (Atlas)",
+      });
+    } else {
+      return NextResponse.json({
+        paid: false,
+        reason: result.reason,
+        blocked: result.blocked,
+      }, { status: result.blocked ? 402 : 500 });
+    }
   } catch (e) {
     console.error("[subscribe]", e);
     return NextResponse.json({ error: "internal error" }, { status: 500 });
