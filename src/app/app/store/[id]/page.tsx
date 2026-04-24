@@ -87,8 +87,16 @@ export default function AbilityDetailPage({
       }
 
       if (ability.id === "drain-bounty") {
-        // Enable bounty on vault (fires welcome attack)
+        // Enable bounty on vault (fires welcome attack → counter 0→1 in 5s)
         await fetch(`/api/vault/${vaultId}/bounty`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        }).catch(() => {});
+      }
+
+      if (ability.id === "atlas-intelligence") {
+        // First subscription payment — device pays Atlas $0.001
+        await fetch(`/api/devices/${vaultId}/subscribe`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
         }).catch(() => {});
