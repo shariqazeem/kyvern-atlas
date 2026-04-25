@@ -440,6 +440,112 @@ function migrate(db: Database.Database) {
     }
   }
 
+  // ─── Agents — autonomous workers that live on devices ─────────────
+  // Each agent has a personality, a job, allowed tools, and a frequency.
+  // The agent-pool runner ticks each one — calls Claude, executes tools,
+  // logs thoughts. A device can host multiple agents.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS agents (
+      id                  TEXT PRIMARY KEY,
+      device_id           TEXT NOT NULL,
+      name                TEXT NOT NULL,
+      emoji               TEXT NOT NULL DEFAULT '✨',
+      personality_prompt  TEXT NOT NULL,
+      job_prompt          TEXT NOT NULL,
+      allowed_tools       TEXT NOT NULL DEFAULT '[]',
+      template            TEXT NOT NULL DEFAULT 'custom',
+      frequency_seconds   INTEGER NOT NULL DEFAULT 180,
+      status              TEXT NOT NULL DEFAULT 'alive',
+      created_at          INTEGER NOT NULL,
+      last_thought_at     INTEGER,
+      total_thoughts      INTEGER NOT NULL DEFAULT 0,
+      total_earned_usd    REAL NOT NULL DEFAULT 0,
+      total_spent_usd     REAL NOT NULL DEFAULT 0,
+      is_public           INTEGER NOT NULL DEFAULT 1,
+      metadata_json       TEXT NOT NULL DEFAULT '{}',
+      FOREIGN KEY (device_id) REFERENCES vaults(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_agents_device ON agents(device_id);
+    CREATE INDEX IF NOT EXISTS idx_agents_status ON agents(status);
+    CREATE INDEX IF NOT EXISTS idx_agents_template ON agents(template);
+  `);
+
+  // Agent thoughts — one row per decision cycle.
+  // Stores reasoning + decision + tool used + signature if action produced one.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS agent_thoughts (
+      id              TEXT PRIMARY KEY,
+      agent_id        TEXT NOT NULL,
+      timestamp       INTEGER NOT NULL,
+      thought         TEXT NOT NULL,
+      decision_json   TEXT,
+      tool_used       TEXT,
+      signature       TEXT,
+      amount_usd      REAL,
+      counterparty    TEXT,
+      FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_thoughts_agent_time ON agent_thoughts(agent_id, timestamp DESC);
+    CREATE INDEX IF NOT EXISTS idx_thoughts_signature ON agent_thoughts(signature);
+  `);
+
+  // Agent chat — synchronous user ↔ agent conversations.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS agent_chat_messages (
+      id          TEXT PRIMARY KEY,
+      agent_id    TEXT NOT NULL,
+      role        TEXT NOT NULL,
+      content     TEXT NOT NULL,
+      timestamp   INTEGER NOT NULL,
+      FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_chat_agent_time ON agent_chat_messages(agent_id, timestamp DESC);
+  `);
+
+  // Agent tasks — the cross-agent task economy.
+  // One agent posts a task with a bounty, another claims and completes it.
+  // Settlement uses serverVaultPay() — real USDC moves between vaults.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS agent_tasks (
+      id                    TEXT PRIMARY KEY,
+      posting_agent_id      TEXT NOT NULL,
+      task_type             TEXT NOT NULL,
+      payload_json          TEXT NOT NULL,
+      bounty_usd            REAL NOT NULL,
+      status                TEXT NOT NULL DEFAULT 'open',
+      claiming_agent_id     TEXT,
+      result_json           TEXT,
+      payment_signature     TEXT,
+      created_at            INTEGER NOT NULL,
+      expires_at            INTEGER NOT NULL,
+      completed_at          INTEGER,
+      FOREIGN KEY (posting_agent_id) REFERENCES agents(id) ON DELETE CASCADE,
+      FOREIGN KEY (claiming_agent_id) REFERENCES agents(id) ON DELETE SET NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_tasks_status_time ON agent_tasks(status, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_tasks_posting ON agent_tasks(posting_agent_id);
+    CREATE INDEX IF NOT EXISTS idx_tasks_claiming ON agent_tasks(claiming_agent_id);
+  `);
+
+  // Backfill Atlas as the first agent (template='atlas').
+  // Uses Atlas's vault id and its actual April 20 ignition timestamp.
+  // INSERT OR IGNORE so re-running migrate is safe.
+  const atlasIgnition = new Date("2026-04-20T17:55:22.402Z").getTime();
+  db.prepare(`
+    INSERT OR IGNORE INTO agents (
+      id, device_id, name, emoji, personality_prompt, job_prompt,
+      allowed_tools, template, frequency_seconds, status, created_at,
+      total_thoughts, total_earned_usd, total_spent_usd, is_public, metadata_json
+    ) VALUES (
+      'agt_atlas', 'vlt_QcCPbp3XTzHtF5', 'Atlas', '🧭',
+      'You are an autonomous research agent. You make decisions every few minutes about what data to buy, what to publish, and what to ignore. You think out loud — one paragraph of reasoning per cycle. You are calm, methodical, and disciplined about staying within your daily budget.',
+      'Buy intelligence from research APIs. Cross-check signals. Publish a forecast to permanent storage. Self-report each cycle.',
+      '["read_onchain","subscribe_to_agent","expose_paywall","message_user","post_task","claim_task"]',
+      'atlas', 180, 'alive', ?,
+      0, 0, 0, 1, '{}'
+    )
+  `).run(atlasIgnition);
+
   // Ensure demo API key exists (needed for middleware ingest + demo endpoint)
   db.prepare(`
     INSERT OR IGNORE INTO api_keys (id, key_hash, key_prefix, name, email)
