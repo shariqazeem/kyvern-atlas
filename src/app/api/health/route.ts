@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
+import { getAtlasDb } from "@/lib/atlas/db";
 
 const startTime = Date.now();
 
@@ -15,16 +16,22 @@ export async function GET() {
     const db = getDb();
     const now = Date.now();
 
+    // Atlas data lives in a separate database (atlas.db)
+    let adb: ReturnType<typeof getAtlasDb> | null = null;
+    try { adb = getAtlasDb(); } catch { /* atlas.db might not exist locally */ }
+
     // Check Atlas heartbeat (last decision within 6 minutes)
     let atlasOk = false;
     let atlasAge = Infinity;
     try {
-      const lastDecision = db
-        .prepare(`SELECT decided_at FROM atlas_decisions ORDER BY decided_at DESC LIMIT 1`)
-        .get() as { decided_at: string } | undefined;
-      if (lastDecision) {
-        atlasAge = now - new Date(lastDecision.decided_at).getTime();
-        atlasOk = atlasAge < 6 * 60 * 1000;
+      if (adb) {
+        const lastDecision = adb
+          .prepare(`SELECT decided_at FROM atlas_decisions ORDER BY decided_at DESC LIMIT 1`)
+          .get() as { decided_at: string } | undefined;
+        if (lastDecision) {
+          atlasAge = now - new Date(lastDecision.decided_at).getTime();
+          atlasOk = atlasAge < 6 * 60 * 1000;
+        }
       }
     } catch { /* table might not exist */ }
 
@@ -32,19 +39,23 @@ export async function GET() {
     let attackerOk = false;
     let attackerAge = Infinity;
     try {
-      const lastAttack = db
-        .prepare(`SELECT attempted_at FROM atlas_attacks ORDER BY attempted_at DESC LIMIT 1`)
-        .get() as { attempted_at: string } | undefined;
-      if (lastAttack) {
-        attackerAge = now - new Date(lastAttack.attempted_at).getTime();
-        attackerOk = attackerAge < 15 * 60 * 1000;
+      if (adb) {
+        const lastAttack = adb
+          .prepare(`SELECT attempted_at FROM atlas_attacks ORDER BY attempted_at DESC LIMIT 1`)
+          .get() as { attempted_at: string } | undefined;
+        if (lastAttack) {
+          attackerAge = now - new Date(lastAttack.attempted_at).getTime();
+          attackerOk = attackerAge < 15 * 60 * 1000;
+        }
       }
     } catch { /* table might not exist */ }
 
     // Atlas state
     let atlasState: { total_cycles: number; total_spent_usd: number; total_earned_usd: number; total_attacks_blocked: number; funds_lost_usd: number } | undefined;
     try {
-      atlasState = db.prepare(`SELECT * FROM atlas_state LIMIT 1`).get() as typeof atlasState;
+      if (adb) {
+        atlasState = adb.prepare(`SELECT * FROM atlas_state LIMIT 1`).get() as typeof atlasState;
+      }
     } catch { /* table might not exist */ }
 
     // Total devices

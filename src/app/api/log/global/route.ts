@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
+import { getAtlasDb } from "@/lib/atlas/db";
 
 /**
  * GET /api/log/global
@@ -41,8 +42,12 @@ export async function GET(req: NextRequest) {
       device_emoji: string | null;
     }>;
 
+    // Atlas data lives in a separate database (atlas.db)
+    let adb: ReturnType<typeof getAtlasDb> | null = null;
+    try { adb = getAtlasDb(); } catch { /* atlas.db might not exist locally */ }
+
     // Also get Atlas events from atlas_decisions + atlas_attacks for the firehose
-    const atlasDecisions = db
+    const atlasDecisions = adb ? adb
       .prepare(
         `SELECT id, decided_at AS timestamp, reasoning AS description,
                 merchant, amount_usd, outcome, tx_signature AS signature
@@ -57,9 +62,9 @@ export async function GET(req: NextRequest) {
       amount_usd: number;
       outcome: string;
       signature: string | null;
-    }>;
+    }> : [];
 
-    const atlasAttacks = db
+    const atlasAttacks = adb ? adb
       .prepare(
         `SELECT id, attempted_at AS timestamp, description, type,
                 blocked_reason, failed_tx_signature AS signature
@@ -73,7 +78,7 @@ export async function GET(req: NextRequest) {
       type: string;
       blocked_reason: string;
       signature: string | null;
-    }>;
+    }> : [];
 
     // Merge and sort all events
     const merged = [
@@ -141,10 +146,15 @@ export async function GET(req: NextRequest) {
         .get() as { n: number }
     ).n;
 
-    // Add Atlas's own stats
-    const atlasState = db
-      .prepare(`SELECT total_spent_usd, total_earned_usd, total_attacks_blocked FROM atlas_state LIMIT 1`)
-      .get() as { total_spent_usd: number; total_earned_usd: number; total_attacks_blocked: number } | undefined;
+    // Add Atlas's own stats (from atlas.db)
+    let atlasState: { total_spent_usd: number; total_earned_usd: number; total_attacks_blocked: number } | undefined;
+    try {
+      if (adb) {
+        atlasState = adb
+          .prepare(`SELECT total_spent_usd, total_earned_usd, total_attacks_blocked FROM atlas_state LIMIT 1`)
+          .get() as typeof atlasState;
+      }
+    } catch { /* atlas.db might not have this table */ }
 
     return NextResponse.json({
       events: merged,
