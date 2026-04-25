@@ -1,107 +1,127 @@
 "use client";
 
 /**
- * /app/store — Ability Store.
+ * /app/store — Tool Library.
  *
- * Browse and install abilities. 3 first-party abilities.
- * Filter by category. Tap to view detail + install.
+ * Reframed from "Ability Store" to "Tools for your agents."
+ * Tools are not installed standalone — they're granted to agents
+ * during the spawn flow. This page is informational + the link to
+ * spawn an agent that uses these tools.
  */
 
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
-import { ABILITIES } from "@/lib/abilities/registry";
-import { useDeviceStore } from "@/hooks/use-device-store";
-import { useAuth } from "@/hooks/use-auth";
-import { AbilityCard } from "@/components/store/ability-card";
-import { CategoryTabs } from "@/components/store/category-tabs";
-import type { AbilityCategory } from "@/lib/abilities/types";
+import { motion } from "framer-motion";
+import { ArrowRight, Sparkles } from "lucide-react";
 
-type Filter = "all" | AbilityCategory;
-
-function devWallet(): string {
-  if (typeof window === "undefined") return "";
-  return window.localStorage.getItem("kyvern:dev-wallet") ?? "";
+interface ToolMeta {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  costsMoney: boolean;
 }
 
-export default function AbilityStorePage() {
-  const [filter, setFilter] = useState<Filter>("all");
-  const { isInstalled, autoInit, vaultId } = useDeviceStore();
-  const { wallet, isLoading } = useAuth();
+const CATEGORY_COLORS: Record<string, string> = {
+  earn: "#00A86B",
+  spend: "#0052FF",
+  protect: "#D92D20",
+  read: "#6B6B6B",
+  monitor: "#0052FF",
+  communicate: "#9B9B9B",
+};
 
-  // Auto-init store so "installed" badges show correctly
+export default function ToolLibraryPage() {
+  const [tools, setTools] = useState<ToolMeta[]>([]);
+
   useEffect(() => {
-    if (isLoading || vaultId) return;
-    const w = wallet ?? devWallet();
-    if (w) void autoInit(w);
-  }, [isLoading, wallet, autoInit, vaultId]);
-
-  const filtered =
-    filter === "all"
-      ? ABILITIES
-      : ABILITIES.filter((a) => a.category === filter);
+    fetch("/api/tools")
+      .then((r) => (r.ok ? r.json() : { tools: [] }))
+      .then((d) => setTools(d?.tools ?? []));
+  }, []);
 
   return (
     <div className="py-2">
-      {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
         className="mb-5"
       >
-        <h1 className="text-[28px] font-semibold tracking-[-0.025em] text-[#111]">
-          Ability Store
+        <h1 className="text-[28px] font-semibold tracking-[-0.025em] text-[#0A0A0A]">
+          Tool Library
         </h1>
-        <p className="text-[13px] text-[#9CA3AF] mt-1">
-          Install abilities on your device. No code needed.
+        <p className="text-[13px] text-[#6B6B6B] mt-1">
+          What your agents can do. Granted at spawn time.
         </p>
       </motion.div>
 
-      {/* Category filter */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.1, duration: 0.3 }}
-        className="mb-5"
-      >
-        <CategoryTabs active={filter} onChange={setFilter} />
-      </motion.div>
-
-      {/* Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {filtered.map((ability, i) => (
-          <AbilityCard
-            key={ability.id}
-            ability={ability}
-            installed={isInstalled(ability.id)}
-            index={i}
-          />
-        ))}
+      <div className="space-y-2 mb-6">
+        {tools.map((t, i) => {
+          const color = CATEGORY_COLORS[t.category] ?? "#9B9B9B";
+          return (
+            <motion.div
+              key={t.id}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.04 }}
+              className="rounded-[14px] p-4"
+              style={{
+                background: "#fff",
+                boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+                border: "1px solid rgba(0,0,0,0.05)",
+              }}
+            >
+              <div className="flex items-start gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <p className="text-[14px] font-semibold text-[#0A0A0A]">{t.name}</p>
+                    <span
+                      className="text-[9px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded"
+                      style={{ background: `${color}10`, color }}
+                    >
+                      {t.category}
+                    </span>
+                    {t.costsMoney && (
+                      <span
+                        className="text-[9px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded"
+                        style={{ background: "#FEF3C7", color: "#D97706" }}
+                      >
+                        ON-CHAIN
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[12px] text-[#6B6B6B] leading-[1.5]">
+                    {t.description}
+                  </p>
+                  <code
+                    className="inline-block text-[10px] font-mono mt-2 px-1.5 py-0.5 rounded"
+                    style={{ background: "#F5F5F5", color: "#6B6B6B" }}
+                  >
+                    {t.id}
+                  </code>
+                </div>
+              </div>
+            </motion.div>
+          );
+        })}
       </div>
 
-      {/* No vault CTA */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.3, duration: 0.4 }}
-        className="mt-8 rounded-[16px] p-4 text-center"
+      <Link
+        href="/app/agents/spawn"
+        className="block rounded-[16px] p-4 text-center transition-all active:scale-[0.99]"
         style={{
-          background: "#F9FAFB",
-          border: "1px solid rgba(0,0,0,0.04)",
+          background: "#0A0A0A",
+          color: "#fff",
         }}
       >
-        <p className="text-[12px] text-[#9CA3AF]">
-          Need a device first?
-        </p>
-        <Link
-          href="/vault/new"
-          className="inline-flex items-center gap-1 mt-1 text-[12px] font-semibold text-[#111]"
-        >
-          Create your device <ArrowRight className="w-3 h-3" />
-        </Link>
-      </motion.div>
+        <div className="flex items-center justify-center gap-2">
+          <Sparkles className="w-4 h-4" />
+          <span className="text-[14px] font-semibold">
+            Spawn an agent that uses these tools
+          </span>
+          <ArrowRight className="w-4 h-4" />
+        </div>
+      </Link>
     </div>
   );
 }

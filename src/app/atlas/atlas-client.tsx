@@ -233,12 +233,27 @@ export default function AtlasClient({
             className="text-[16px] leading-[1.55] max-w-[640px]"
             style={{ color: "var(--text-tertiary)" }}
           >
-            The first autonomous agent on Kyvern. Atlas operates real USDC
-            on Solana devnet — pulls data, reasons over it, publishes
-            forecasts, monetizes reads, and occasionally gets attacked.
-            Every decision and every refusal below is real, on-chain,
-            verifiable.
+            The first autonomous agent on Kyvern. Born April 20, 2026.
+            Atlas operates real USDC on Solana devnet — pulls data,
+            reasons over it, publishes forecasts, monetizes reads, and
+            occasionally gets attacked. Every decision below is real,
+            on-chain, verifiable.
           </p>
+
+          {/* Fork Atlas banner */}
+          <Link
+            href="/app/agents/spawn"
+            className="inline-flex items-center gap-2 mt-4 h-9 px-4 rounded-[12px] text-[13px] font-semibold transition-all hover:scale-[1.02] active:scale-[0.98]"
+            style={{
+              background: "linear-gradient(135deg, #0A0A0A, #1F1F22)",
+              color: "#fff",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.12)",
+            }}
+          >
+            <span>🧭</span>
+            Fork Atlas — spawn your own
+            <ArrowUpRight className="w-3.5 h-3.5" />
+          </Link>
         </motion.div>
 
         {/* Hero stats */}
