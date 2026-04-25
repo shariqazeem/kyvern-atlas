@@ -280,6 +280,63 @@ await vault.pay({
         </div>
       )}
 
+      {/* Fund your device */}
+      {squads && (
+        <div
+          className="p-5 rounded-[16px]"
+          style={{
+            background: "linear-gradient(135deg, #F0FDF4, #FAFAFA)",
+            border: "1px solid rgba(34,197,94,0.15)",
+          }}
+        >
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-[16px]">💰</span>
+            <div>
+              <div className="text-[14px] font-semibold" style={{ color: "var(--text-primary)" }}>
+                Fund your device
+              </div>
+              <div className="text-[12px]" style={{ color: "var(--text-tertiary)" }}>
+                Send devnet USDC to this address to activate abilities
+              </div>
+            </div>
+          </div>
+
+          <FundingAddress
+            label="Vault treasury (send USDC here)"
+            address={squads.vaultPdaExplorerUrl.split("/address/")[1]?.split("?")[0] ?? squads.smartAccountAddress}
+            network={config.network}
+          />
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            <a
+              href="https://faucet.solana.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 h-8 px-3 rounded-[8px] text-[11px] font-medium transition-colors"
+              style={{ background: "rgba(0,0,0,0.04)", color: "var(--text-secondary)" }}
+            >
+              <ExternalLink className="w-3 h-3" />
+              SOL Faucet
+            </a>
+            <a
+              href="https://faucet.circle.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 h-8 px-3 rounded-[8px] text-[11px] font-medium transition-colors"
+              style={{ background: "rgba(0,0,0,0.04)", color: "var(--text-secondary)" }}
+            >
+              <ExternalLink className="w-3 h-3" />
+              USDC Faucet (Circle)
+            </a>
+          </div>
+
+          <p className="mt-3 text-[11px] leading-[1.5]" style={{ color: "var(--text-tertiary)" }}>
+            Your device needs devnet USDC to make payments through abilities.
+            Use the faucets above, or transfer from any Solana devnet wallet.
+          </p>
+        </div>
+      )}
+
       {/* Agent key */}
       <div>
         <div className="flex items-center justify-between mb-2">
@@ -540,6 +597,54 @@ function NextLink({
  * Respects `prefers-reduced-motion` via the parent screen's motion
  * context (motion.div animations will be skipped if the OS says so).
  */
+function FundingAddress({
+  label,
+  address,
+  network,
+}: {
+  label: string;
+  address: string;
+  network: string;
+}) {
+  const [copied, setCopied] = useState(false);
+  const explorerUrl = `https://explorer.solana.com/address/${address}?cluster=${network}`;
+  return (
+    <div
+      className="flex items-center gap-2 p-3 rounded-[10px]"
+      style={{ background: "rgba(255,255,255,0.8)", border: "0.5px solid rgba(0,0,0,0.06)" }}
+    >
+      <div className="flex-1 min-w-0">
+        <div className="text-[10px] uppercase tracking-[0.06em] mb-0.5" style={{ color: "var(--text-quaternary)" }}>
+          {label}
+        </div>
+        <a
+          href={explorerUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-[12px] font-mono-numbers text-[#0052FF] hover:underline truncate block"
+        >
+          {address}
+        </a>
+      </div>
+      <button
+        onClick={() => {
+          navigator.clipboard.writeText(address);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 2000);
+        }}
+        className="inline-flex items-center gap-1 h-7 px-2.5 rounded-[8px] text-[11px] font-medium shrink-0"
+        style={{
+          background: copied ? "var(--success)" : "var(--surface-2)",
+          color: copied ? "white" : "var(--text-secondary)",
+        }}
+      >
+        {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+        {copied ? "Copied" : "Copy"}
+      </button>
+    </div>
+  );
+}
+
 function ConfettiBurst() {
   const particles = Array.from({ length: 20 }, (_, i) => {
     // Even angular spread around the circle.

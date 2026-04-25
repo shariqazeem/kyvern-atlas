@@ -45,6 +45,7 @@ export default function VaultDevicePage({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pauseBusy, setPauseBusy] = useState(false);
+  const [showFunding, setShowFunding] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const load = useCallback(
@@ -210,9 +211,42 @@ export default function VaultDevicePage({
           onClick={togglePause}
           variant={active ? "default" : "success"}
         />
-        <ActionButton icon={Wallet} label="Fund" onClick={() => {}} variant="default" />
+        <ActionButton icon={Wallet} label="Fund" onClick={() => setShowFunding(!showFunding)} variant="default" />
         <ActionButton icon={Shield} label="Policy" onClick={() => {}} variant="default" />
       </motion.div>
+
+      {/* Funding panel */}
+      {showFunding && (
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: "auto" }}
+          className="rounded-[16px] p-4 mb-6"
+          style={{
+            background: "linear-gradient(135deg, #F0FDF4, #FAFAFA)",
+            border: "1px solid rgba(34,197,94,0.15)",
+          }}
+        >
+          <p className="text-[13px] font-semibold text-[#111] mb-2">
+            Fund your device
+          </p>
+          <p className="text-[12px] text-[#6B7280] mb-3">
+            Send devnet USDC to your vault address to activate real payments:
+          </p>
+          <div className="flex items-center gap-2 p-3 rounded-[10px] mb-3"
+            style={{ background: "#fff", border: "1px solid rgba(0,0,0,0.06)" }}>
+            <span className="text-[11px] font-mono text-[#111] truncate flex-1">
+              {v.squadsAddress}
+            </span>
+            <CopyPill value={v.squadsAddress} />
+          </div>
+          <div className="flex gap-2">
+            <a href="https://faucet.solana.com/" target="_blank" rel="noopener noreferrer"
+              className="text-[11px] font-medium text-[#6B7280] underline">SOL Faucet</a>
+            <a href="https://faucet.circle.com/" target="_blank" rel="noopener noreferrer"
+              className="text-[11px] font-medium text-[#6B7280] underline">USDC Faucet</a>
+          </div>
+        </motion.div>
+      )}
 
       {/* Activity feed */}
       <motion.div
