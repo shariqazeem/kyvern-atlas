@@ -124,22 +124,22 @@ export function LandingPage({ initialAtlas }: Props) {
             className="flex-1 max-w-[520px]"
           >
             <p className="text-[12px] font-medium text-[#9CA3AF] uppercase tracking-wider mb-4">
-              Sovereign AI agents on Solana
+              Living agents on Solana
             </p>
             <h1
               className="text-[36px] sm:text-[48px] font-semibold tracking-[-0.035em] leading-[1.05]"
               style={{ color: "#111" }}
             >
-              Your device.
+              Spawn an AI worker.
               <br />
-              <span style={{ color: "#9CA3AF" }}>Your abilities. Your economy.</span>
+              <span style={{ color: "#9CA3AF" }}>Watch it earn while you sleep.</span>
             </h1>
             <p
               className="mt-5 text-[16px] leading-[1.65] max-w-[440px]"
               style={{ color: "#6B7280" }}
             >
-              Deploy a sovereign AI device on Solana. Install abilities — earn,
-              protect, monitor. Atlas — Device #0000 — has been alive{" "}
+              No code. Pick a personality, give it a job, watch it think and pay
+              other agents in real USDC. Atlas — Device #0000 — has been alive{" "}
               {s ? `${Math.floor((s.uptimeMs ?? 0) / 86400000)} days` : "since April 20"},{" "}
               earned ${s?.totalEarnedUsd?.toFixed(2) ?? "5.60"}, and survived{" "}
               {s?.totalAttacksBlocked ?? 524} attacks.

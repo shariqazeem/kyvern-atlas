@@ -7,11 +7,11 @@
 
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { Home, Store, Activity, Settings } from "lucide-react";
+import { Home, Briefcase, Activity, Settings } from "lucide-react";
 
 const TABS = [
   { href: "/app", label: "Home", icon: Home, exact: true },
-  { href: "/app/store", label: "Store", icon: Store, exact: false },
+  { href: "/app/tasks", label: "Tasks", icon: Briefcase, exact: false },
   { href: "/app/payments", label: "Activity", icon: Activity, exact: false },
   { href: "/app/settings", label: "Settings", icon: Settings, exact: false },
 ] as const;
