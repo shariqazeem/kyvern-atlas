@@ -502,6 +502,43 @@ function migrate(db: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_chat_agent_time ON agent_chat_messages(agent_id, timestamp DESC);
   `);
 
+  // Signals — Path C inbox. Workers produce structured findings (vs.
+  // free-form chat). Each row = one thing the owner should read.
+  // device_id is denormalized for fast inbox queries per device.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS signals (
+      id              TEXT PRIMARY KEY,
+      agent_id        TEXT NOT NULL,
+      device_id       TEXT NOT NULL,
+      kind            TEXT NOT NULL,
+      subject         TEXT NOT NULL,
+      evidence_json   TEXT NOT NULL,
+      suggestion      TEXT,
+      signature       TEXT,
+      source_url      TEXT,
+      status          TEXT NOT NULL DEFAULT 'unread',
+      created_at      INTEGER NOT NULL,
+      FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_signals_device_time ON signals(device_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_signals_agent_time ON signals(agent_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_signals_status ON signals(device_id, status, created_at DESC);
+  `);
+
+  // watch_url cache — per-(agent_id, url), so the watch_url tool can
+  // answer sinceLastCheck=true and only return new items.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS watch_url_cache (
+      agent_id          TEXT NOT NULL,
+      url               TEXT NOT NULL,
+      last_response_hash TEXT,
+      last_seen_ids     TEXT,           -- JSON array of stable ids/links seen
+      last_check_at     INTEGER NOT NULL,
+      PRIMARY KEY (agent_id, url),
+      FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE
+    );
+  `);
+
   // Agent tasks — the cross-agent task economy.
   // One agent posts a task with a bounty, another claims and completes it.
   // Settlement uses serverVaultPay() — real USDC moves between vaults.

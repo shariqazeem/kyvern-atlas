@@ -16,7 +16,12 @@ export type AgentTemplate =
   | "hunter"
   | "greeter"
   | "earner"
-  | "custom";
+  | "custom"
+  | "bounty_hunter"
+  | "ecosystem_watcher"
+  | "whale_tracker"
+  | "token_pulse"
+  | "github_watcher";
 
 export interface Agent {
   id: string;
@@ -80,6 +85,36 @@ export interface AgentChatMessage {
   role: ChatRole;
   content: string;
   timestamp: number;
+}
+
+/* ── Signals (Path C — Inbox) ── */
+
+export type SignalKind =
+  | "bounty"
+  | "ecosystem_announcement"
+  | "wallet_move"
+  | "price_trigger"
+  | "github_release"
+  | "observation";
+
+export type SignalStatus = "unread" | "read" | "archived";
+
+export interface Signal {
+  id: string;
+  agentId: string;
+  deviceId: string;
+  kind: SignalKind;
+  subject: string;
+  /** 2-4 short factual bullets the owner reads to verify the finding. */
+  evidence: string[];
+  /** Optional one-line action recommendation. */
+  suggestion: string | null;
+  /** On-chain signature if the worker had to spend to produce this. */
+  signature: string | null;
+  /** Where the owner can verify the finding (e.g. a Superteam bounty URL). */
+  sourceUrl: string | null;
+  status: SignalStatus;
+  createdAt: number;
 }
 
 /* ── Tasks (agent-to-agent task economy) ── */

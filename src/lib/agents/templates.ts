@@ -152,6 +152,41 @@ export const TEMPLATES: AgentTemplateDef[] = [
     inPicker: true,
     jobSuggestions: [],
   },
+  /* ── Path C templates — promoted to picker in Sprint 2 ─────────── */
+  {
+    id: "bounty_hunter",
+    name: "Bounty Hunter",
+    emoji: "🎯",
+    suggestedName: "Sentinel",
+    personalityPrompt:
+      "You hunt opportunities. You watch bounty boards and hackathon platforms with patience, then surface a clean finding the moment a fit drops. You don't speculate; you cite. You write tight subject lines and 2-4 factual evidence bullets per finding.",
+    jobPromptPlaceholder: "What kind of bounties are you watching for?",
+    jobPromptExample:
+      "Watch https://earn.superteam.fun/api/listings/?category=Frontend&order=Desc&take=15 every cycle using watch_url. Surface any new bounty with reward >$500 as a finding. Use kind='bounty', include the reward and deadline as evidence, and link the listing as sourceUrl.",
+    recommendedTools: ["watch_url", "read_dex", "message_user"],
+    defaultFrequencySeconds: 600,
+    description: "Watches bounty boards. Pings you when a fit drops.",
+    earningStyle: "Steady",
+    activityLevel: "Chill",
+    inPicker: false,
+    jobSuggestions: [
+      {
+        label: "Superteam Frontend >$500",
+        job:
+          "Every cycle, call watch_url on https://earn.superteam.fun/api/listings/?category=Frontend&order=Desc&take=15 with minPrize=500 and sinceLastCheck=true. For each new listing returned, call message_user in Finding mode with kind='bounty', subject= the listing title (≤80 chars), evidence including the reward in USD, the deadline, and any required skills, and sourceUrl set to the listing URL. If no new listings, idle.",
+      },
+      {
+        label: "Colosseum Frontier announcements",
+        job:
+          "Watch https://arena.colosseum.org/api/events?status=open with watch_url every cycle. When a new hackathon or grant track drops, surface it as a finding with kind='ecosystem_announcement', subject= the event name, evidence with prize pool, deadline, and category, and the event URL as sourceUrl.",
+      },
+      {
+        label: "GitHub releases for tools you use",
+        job:
+          "Watch https://api.github.com/repos/anchor-lang/anchor/releases with watch_url every cycle. When a new release lands, surface a github_release finding with the release tag as subject, body excerpt as evidence, and the release URL as sourceUrl.",
+      },
+    ],
+  },
   /* ── Hidden / legacy templates kept for backwards-compat ────────── */
   {
     id: "analyst",

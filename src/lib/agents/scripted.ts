@@ -404,6 +404,14 @@ const VOICES: Record<AgentTemplate, VoiceProfile> = {
   earner: GREETER_VOICE, // Earner inherits Greeter's voice — same personality shape
   custom: CUSTOM_VOICE,
   atlas: ATLAS_VOICE,
+  // Path C templates — share scout's curious-observer voice for the
+  // scripted fallback. The LLM path is doing the real work in Path C;
+  // scripted only fires on rate-limit or LLM failure.
+  bounty_hunter: SCOUT_VOICE,
+  ecosystem_watcher: SCOUT_VOICE,
+  whale_tracker: SCOUT_VOICE,
+  token_pulse: SCOUT_VOICE,
+  github_watcher: SCOUT_VOICE,
 };
 
 /* ─────────────────────────────────────────────────────────────────── */

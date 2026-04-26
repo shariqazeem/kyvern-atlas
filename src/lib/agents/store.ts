@@ -16,6 +16,9 @@ import type {
   AgentTemplate,
   AgentThought,
   ChatRole,
+  Signal,
+  SignalKind,
+  SignalStatus,
   TaskStatus,
 } from "./types";
 
@@ -356,6 +359,218 @@ function rowToTask(r: TaskRow): AgentTask {
     completedAt: r.completed_at,
   };
 }
+
+/* ─────────────────────────────────────────────────────────────────── */
+/*                              Signals                                 */
+/* ─────────────────────────────────────────────────────────────────── */
+
+interface SignalRow {
+  id: string;
+  agent_id: string;
+  device_id: string;
+  kind: string;
+  subject: string;
+  evidence_json: string;
+  suggestion: string | null;
+  signature: string | null;
+  source_url: string | null;
+  status: string;
+  created_at: number;
+}
+
+const VALID_KINDS: SignalKind[] = [
+  "bounty",
+  "ecosystem_announcement",
+  "wallet_move",
+  "price_trigger",
+  "github_release",
+  "observation",
+];
+
+function rowToSignal(r: SignalRow): Signal {
+  return {
+    id: r.id,
+    agentId: r.agent_id,
+    deviceId: r.device_id,
+    kind: (VALID_KINDS.includes(r.kind as SignalKind) ? r.kind : "observation") as SignalKind,
+    subject: r.subject,
+    evidence: (() => {
+      try {
+        const v = JSON.parse(r.evidence_json) as unknown;
+        return Array.isArray(v) ? v.map(String) : [];
+      } catch {
+        return [];
+      }
+    })(),
+    suggestion: r.suggestion,
+    signature: r.signature,
+    sourceUrl: r.source_url,
+    status: (["unread", "read", "archived"].includes(r.status) ? r.status : "unread") as SignalStatus,
+    createdAt: r.created_at,
+  };
+}
+
+export function writeSignal(input: {
+  agentId: string;
+  deviceId: string;
+  kind: SignalKind;
+  subject: string;
+  evidence: string[];
+  suggestion?: string | null;
+  signature?: string | null;
+  sourceUrl?: string | null;
+}): Signal {
+  const id = `sig_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+  const now = Date.now();
+  const subject = input.subject.slice(0, 200);
+  const evidence = input.evidence.map((e) => String(e).slice(0, 400)).slice(0, 8);
+
+  getDb()
+    .prepare(
+      `INSERT INTO signals (
+        id, agent_id, device_id, kind, subject, evidence_json,
+        suggestion, signature, source_url, status, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'unread', ?)`,
+    )
+    .run(
+      id,
+      input.agentId,
+      input.deviceId,
+      input.kind,
+      subject,
+      JSON.stringify(evidence),
+      input.suggestion ?? null,
+      input.signature ?? null,
+      input.sourceUrl ?? null,
+      now,
+    );
+
+  return {
+    id,
+    agentId: input.agentId,
+    deviceId: input.deviceId,
+    kind: input.kind,
+    subject,
+    evidence,
+    suggestion: input.suggestion ?? null,
+    signature: input.signature ?? null,
+    sourceUrl: input.sourceUrl ?? null,
+    status: "unread",
+    createdAt: now,
+  };
+}
+
+export function listInbox(
+  deviceId: string,
+  opts: { status?: SignalStatus; limit?: number; since?: number } = {},
+): Signal[] {
+  const limit = Math.max(1, Math.min(opts.limit ?? 50, 200));
+  const since = opts.since ?? 0;
+  const db = getDb();
+  const rows = opts.status
+    ? (db
+        .prepare(
+          `SELECT * FROM signals
+           WHERE device_id = ? AND status = ? AND created_at >= ?
+           ORDER BY created_at DESC LIMIT ?`,
+        )
+        .all(deviceId, opts.status, since, limit) as SignalRow[])
+    : (db
+        .prepare(
+          `SELECT * FROM signals
+           WHERE device_id = ? AND created_at >= ?
+           ORDER BY created_at DESC LIMIT ?`,
+        )
+        .all(deviceId, since, limit) as SignalRow[]);
+  return rows.map(rowToSignal);
+}
+
+export function countSignals(
+  deviceId: string,
+  status?: SignalStatus,
+): number {
+  const db = getDb();
+  if (status) {
+    const r = db
+      .prepare(`SELECT COUNT(*) as n FROM signals WHERE device_id = ? AND status = ?`)
+      .get(deviceId, status) as { n: number };
+    return r.n;
+  }
+  const r = db.prepare(`SELECT COUNT(*) as n FROM signals WHERE device_id = ?`).get(deviceId) as { n: number };
+  return r.n;
+}
+
+export function markSignalStatus(signalId: string, status: SignalStatus): boolean {
+  const r = getDb()
+    .prepare(`UPDATE signals SET status = ? WHERE id = ?`)
+    .run(status, signalId);
+  return r.changes > 0;
+}
+
+export function getSignal(signalId: string): Signal | null {
+  const row = getDb()
+    .prepare(`SELECT * FROM signals WHERE id = ?`)
+    .get(signalId) as SignalRow | undefined;
+  return row ? rowToSignal(row) : null;
+}
+
+/* ── watch_url cache (used by the watch_url tool for sinceLastCheck) ── */
+
+interface WatchUrlCacheRow {
+  agent_id: string;
+  url: string;
+  last_response_hash: string | null;
+  last_seen_ids: string | null;
+  last_check_at: number;
+}
+
+export function readWatchCache(
+  agentId: string,
+  url: string,
+): { lastResponseHash: string | null; lastSeenIds: string[]; lastCheckAt: number } | null {
+  const row = getDb()
+    .prepare(`SELECT * FROM watch_url_cache WHERE agent_id = ? AND url = ?`)
+    .get(agentId, url) as WatchUrlCacheRow | undefined;
+  if (!row) return null;
+  let lastSeenIds: string[] = [];
+  if (row.last_seen_ids) {
+    try {
+      const v = JSON.parse(row.last_seen_ids) as unknown;
+      lastSeenIds = Array.isArray(v) ? v.map(String) : [];
+    } catch {
+      lastSeenIds = [];
+    }
+  }
+  return {
+    lastResponseHash: row.last_response_hash,
+    lastSeenIds,
+    lastCheckAt: row.last_check_at,
+  };
+}
+
+export function writeWatchCache(
+  agentId: string,
+  url: string,
+  responseHash: string,
+  seenIds: string[],
+): void {
+  // Cap stored ids to the most recent 200 to bound the cache row size
+  const trimmed = seenIds.slice(0, 200);
+  getDb()
+    .prepare(
+      `INSERT INTO watch_url_cache (agent_id, url, last_response_hash, last_seen_ids, last_check_at)
+       VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT(agent_id, url) DO UPDATE SET
+         last_response_hash = excluded.last_response_hash,
+         last_seen_ids = excluded.last_seen_ids,
+         last_check_at = excluded.last_check_at`,
+    )
+    .run(agentId, url, responseHash, JSON.stringify(trimmed), Date.now());
+}
+
+/* ─────────────────────────────────────────────────────────────────── */
+/*                              Tasks                                   */
+/* ─────────────────────────────────────────────────────────────────── */
 
 export function postTask(input: {
   postingAgentId: string;
