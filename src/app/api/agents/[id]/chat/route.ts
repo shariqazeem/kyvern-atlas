@@ -17,11 +17,14 @@ import type {
   AgentDecision,
 } from "@/lib/agents/types";
 
-const apiKey = process.env.ANTHROPIC_API_KEY;
 const SONNET_MODEL = "claude-sonnet-4-6";
 
 let _client: Anthropic | null = null;
+function getApiKey(): string | undefined {
+  return process.env.ANTHROPIC_API_KEY;
+}
 function client(): Anthropic | null {
+  const apiKey = getApiKey();
   if (!apiKey) return null;
   if (!_client) _client = new Anthropic({ apiKey });
   return _client;
@@ -83,7 +86,7 @@ export async function POST(
     const userMessage = appendChat(agent.id, "user", userText);
 
     // Try Claude path if we have a key + slot
-    const haveKey = !!apiKey;
+    const haveKey = !!getApiKey();
     const haveSlot = haveKey && tryAcquireChatSlot();
 
     if (haveSlot) {

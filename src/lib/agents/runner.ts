@@ -30,11 +30,14 @@ import type {
   AgentToolContext,
 } from "./types";
 
-const apiKey = process.env.ANTHROPIC_API_KEY;
 const HAIKU_MODEL = "claude-haiku-4-5";
 
 let _client: Anthropic | null = null;
+function getApiKey(): string | undefined {
+  return process.env.ANTHROPIC_API_KEY;
+}
 function client(): Anthropic | null {
+  const apiKey = getApiKey();
   if (!apiKey) return null;
   if (!_client) _client = new Anthropic({ apiKey });
   return _client;
@@ -282,7 +285,7 @@ export async function tickAgent(agentId: string): Promise<{
   const ctx = buildToolContext(agent);
 
   // Try Claude path first if key + rate-limit slot
-  const haveKey = !!apiKey;
+  const haveKey = !!getApiKey();
   const haveSlot = haveKey && tryAcquireTickSlot();
 
   if (haveSlot) {
