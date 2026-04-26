@@ -18,7 +18,17 @@ import type {
 } from "@/lib/agents/types";
 
 const COMMONSTACK_BASE_URL = "https://api.commonstack.ai/v1";
-const MODEL = "deepseek/deepseek-v3.2";
+const MODEL = "openai/gpt-oss-120b";
+
+interface ChatMessageWithReasoning {
+  content?: string | null;
+  reasoning_content?: string | null;
+  tool_calls?: Array<{
+    id: string;
+    type: string;
+    function: { name: string; arguments: string };
+  }>;
+}
 
 let _client: OpenAI | null = null;
 function getApiKey(): string | undefined {
@@ -219,7 +229,14 @@ ${thoughtSummary || "(none)"}]`;
   const choice = response.choices?.[0];
   if (!choice) return { ok: false, text: "", error: "empty_response" };
 
-  let agentText = (choice.message?.content ?? "").trim();
+  // Reasoning models put their final reply in `content` (terminal answer)
+  // and their internal thinking in `reasoning_content`. For chat, the
+  // user wants the answer, not the thinking — so prefer content, fall
+  // back to reasoning only if content is empty (rare, e.g. tool-only turns).
+  const cmsg = choice.message as ChatMessageWithReasoning;
+  let agentText = (cmsg.content ?? "").trim();
+  if (!agentText) agentText = (cmsg.reasoning_content ?? "").trim();
+
   let toolUseBlock: {
     id: string;
     name: string;

@@ -31,10 +31,21 @@ import type {
 } from "./types";
 
 const COMMONSTACK_BASE_URL = "https://api.commonstack.ai/v1";
-// v4-flash is in the catalog but blocked at the API layer for our account
-// (works in playground, returns 403 "no accessible providers" via REST).
-// v3.2 is the next-cheapest fully-accessible DeepSeek with tool-use support.
-const MODEL = "deepseek/deepseek-v3.2";
+// gpt-oss-120b is the cheapest tool-use-capable model on Commonstack
+// ($0.05/M in, $0.25/M out — ~10× cheaper than v3.2). It's a reasoning
+// model that puts its thinking in `reasoning_content`, so the parser
+// below falls back to that when `content` is empty.
+const MODEL = "openai/gpt-oss-120b";
+
+interface ChatMessageWithReasoning {
+  content?: string | null;
+  reasoning_content?: string | null;
+  tool_calls?: Array<{
+    id: string;
+    type: string;
+    function: { name: string; arguments: string };
+  }>;
+}
 
 let _client: OpenAI | null = null;
 function getApiKey(): string | undefined {
@@ -177,7 +188,12 @@ async function llmTick(agent: Agent, ctx: AgentToolContext): Promise<LlmTickOutc
   const choice = response.choices?.[0];
   if (!choice) return { ok: false, error: "empty_response" };
 
-  let thought = (choice.message?.content ?? "").trim();
+  // Reasoning models put their thinking in `reasoning_content` instead
+  // of `content`. Use whichever is non-empty so the thought feed isn't blank.
+  const msg = choice.message as ChatMessageWithReasoning;
+  const contentText = (msg.content ?? "").trim();
+  const reasoningText = (msg.reasoning_content ?? "").trim();
+  let thought = contentText || reasoningText;
 
   let toolUseBlock: {
     id: string;
