@@ -329,6 +329,32 @@ export default function SpawnPage() {
               <label className="block text-[12px] font-medium text-[#0A0A0A] mb-1.5">
                 Job description
               </label>
+
+              {selectedTemplate.jobSuggestions.length > 0 && (
+                <div className="mb-2">
+                  <div className="text-[10px] uppercase tracking-wide text-[#6B6B6B] mb-1.5">
+                    Tap to use a suggested job
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {selectedTemplate.jobSuggestions.map((s) => (
+                      <button
+                        key={s.label}
+                        type="button"
+                        onClick={() => setJob(s.job)}
+                        className="text-[11px] px-2.5 py-1 rounded-full transition active:scale-[0.97]"
+                        style={{
+                          background: "#fff",
+                          border: "1px solid rgba(0,0,0,0.1)",
+                          color: "#0A0A0A",
+                        }}
+                      >
+                        {s.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <textarea
                 value={job}
                 onChange={(e) => setJob(e.target.value)}
@@ -340,15 +366,32 @@ export default function SpawnPage() {
                   border: "1px solid rgba(0,0,0,0.08)",
                 }}
               />
+              <div className="mt-1.5 flex items-center gap-1.5 text-[10px] text-[#8B8B8B]">
+                <Zap className="w-2.5 h-2.5" />
+                <span>
+                  Powered by Kyvern AI — your agent thinks at no cost to you during
+                  the demo.
+                </span>
+              </div>
             </div>
 
             <div className="mt-4">
               <label className="block text-[12px] font-medium text-[#0A0A0A] mb-2">
                 Tools
+                <span className="ml-2 text-[10px] font-normal text-[#6B6B6B]">
+                  Recommended for {selectedTemplate.name} are pre-selected
+                </span>
               </label>
               <div className="space-y-1.5">
-                {allTools.map((t) => {
+                {[...allTools]
+                  .sort((a, b) => {
+                    const ar = selectedTemplate.recommendedTools.includes(a.id) ? 0 : 1;
+                    const br = selectedTemplate.recommendedTools.includes(b.id) ? 0 : 1;
+                    return ar - br;
+                  })
+                  .map((t) => {
                   const active = tools.includes(t.id);
+                  const recommended = selectedTemplate.recommendedTools.includes(t.id);
                   return (
                     <button
                       key={t.id}
@@ -378,10 +421,18 @@ export default function SpawnPage() {
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1.5 flex-wrap">
                             <p className="text-[13px] font-medium text-[#0A0A0A]">
                               {t.name}
                             </p>
+                            {recommended && (
+                              <span
+                                className="text-[9px] font-medium px-1.5 py-0.5 rounded"
+                                style={{ background: "#EEF2FF", color: "#4338CA" }}
+                              >
+                                RECOMMENDED
+                              </span>
+                            )}
                             {t.costsMoney && (
                               <span
                                 className="text-[9px] font-mono px-1.5 py-0.5 rounded"
@@ -392,8 +443,8 @@ export default function SpawnPage() {
                             )}
                           </div>
                           <p className="text-[11px] text-[#6B6B6B] mt-0.5 leading-[1.4]">
-                            {t.description.slice(0, 100)}
-                            {t.description.length > 100 ? "..." : ""}
+                            {t.description.slice(0, 140)}
+                            {t.description.length > 140 ? "…" : ""}
                           </p>
                         </div>
                       </div>

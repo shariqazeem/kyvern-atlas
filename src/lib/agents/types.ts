@@ -166,4 +166,8 @@ export interface AgentTemplateDef {
   recommendedTools: string[];
   defaultFrequencySeconds: number;
   description: string;
+  /** Tap-to-fill job suggestions for the spawn flow. Each one is a
+   *  complete, working job paragraph that uses only tools available to
+   *  this template's recommendedTools. */
+  jobSuggestions: Array<{ label: string; job: string }>;
 }

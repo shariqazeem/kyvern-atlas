@@ -13,6 +13,7 @@ import { postTaskTool } from "./post-task";
 import { claimTaskTool } from "./claim-task";
 import { readOnchainTool } from "./read-onchain";
 import { readDexTool } from "./read-dex";
+import { watchWalletTool, watchWalletSwapsTool } from "./watch-wallet";
 
 export const TOOLS: Record<string, AgentTool> = {
   [messageUserTool.id]: messageUserTool,
@@ -22,6 +23,8 @@ export const TOOLS: Record<string, AgentTool> = {
   [claimTaskTool.id]: claimTaskTool,
   [readOnchainTool.id]: readOnchainTool,
   [readDexTool.id]: readDexTool,
+  [watchWalletTool.id]: watchWalletTool,
+  [watchWalletSwapsTool.id]: watchWalletSwapsTool,
 };
 
 export function getTool(id: string): AgentTool | undefined {
