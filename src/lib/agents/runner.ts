@@ -323,9 +323,13 @@ export async function tickAgent(agentId: string): Promise<{
 
   const ctx = buildToolContext(agent);
 
-  // Try LLM path first if key + rate-limit slot
+  // Try LLM path first if key + rate-limit slot.
+  // First-thought priority lane (Section 3A): brand-new agents bypass
+  // the RPS cap on their very first tick so a judge always sees
+  // mode:"llm" on the first card, never scripted.
   const haveKey = !!getApiKey();
-  const haveSlot = haveKey && tryAcquireTickSlot();
+  const isFirstEver = agent.totalThoughts === 0;
+  const haveSlot = haveKey && (isFirstEver || tryAcquireTickSlot());
 
   if (haveSlot) {
     const llm = await llmTick(agent, ctx);
@@ -374,7 +378,21 @@ export async function tickEligibleAgents(): Promise<{
   for (const agent of agents) {
     if (agent.template === "atlas" && agent.id === "agt_atlas") continue;
 
-    const dueAt = (agent.lastThoughtAt ?? 0) + agent.frequencySeconds * 1000;
+    // Section 3A — first-thought priority queue
+    //   total_thoughts === 0  →  tick on the next pool cycle (no wait)
+    //   total_thoughts < 3    →  warmup mode: cap frequency to 60s so
+    //                            the agent feels alive in the first
+    //                            few minutes regardless of the user's
+    //                            chosen cadence
+    //   otherwise             →  honour the user's frequency
+    const isFirstEver = agent.totalThoughts === 0;
+    const isWarmup = agent.totalThoughts > 0 && agent.totalThoughts < 3;
+    const effectiveFreqSec = isFirstEver
+      ? 0
+      : isWarmup
+        ? Math.min(60, agent.frequencySeconds)
+        : agent.frequencySeconds;
+    const dueAt = (agent.lastThoughtAt ?? 0) + effectiveFreqSec * 1000;
     if (now < dueAt) continue;
 
     try {

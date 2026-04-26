@@ -9,8 +9,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Send, Pause, Play, Activity, X } from "lucide-react";
+import { ArrowLeft, Send, Pause, Play, Activity, X, Sparkles } from "lucide-react";
 import { StatBlock } from "@/components/primitives/stat-block";
 import { SignaturePill } from "@/components/primitives/signature-pill";
 import { fmtAgo } from "@/lib/format";
@@ -51,6 +52,7 @@ interface ChatMessage {
 }
 
 export default function AgentDetailPage({ params }: { params: { id: string } }) {
+  const searchParams = useSearchParams();
   const [agent, setAgent] = useState<Agent | null>(null);
   const [thoughts, setThoughts] = useState<Thought[]>([]);
   const [chat, setChat] = useState<ChatMessage[]>([]);
@@ -60,6 +62,14 @@ export default function AgentDetailPage({ params }: { params: { id: string } }) 
   const [inputValue, setInputValue] = useState("");
   const [sending, setSending] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // Section 3C — fresh-spawn activation banner. Shows when the user
+  // landed here from the spawn flow (?fresh=true) and the agent
+  // hasn't produced its first thought yet. Disappears the moment
+  // total_thoughts goes from 0 to 1.
+  const isFreshParam = searchParams.get("fresh") === "true";
+  const showActivation =
+    isFreshParam && !!agent && agent.totalThoughts === 0 && agent.status === "alive";
 
   // Load agent + thoughts + chat
   const load = useCallback(async () => {
@@ -94,9 +104,16 @@ export default function AgentDetailPage({ params }: { params: { id: string } }) 
     void load();
   }, [load]);
 
-  // Poll for updates every 5s
+  // Poll for updates. While the activation banner is showing, poll the
+  // agent endpoint every 2s so the banner clears the instant the first
+  // thought lands. After that, ease off to 5s.
   useEffect(() => {
+    const intervalMs = showActivation ? 2000 : 5000;
     const iv = setInterval(() => {
+      fetch(`/api/agents/${params.id}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => d?.agent && setAgent(d.agent as Agent))
+        .catch(() => {});
       fetch(`/api/agents/${params.id}/thoughts?limit=30`)
         .then((r) => (r.ok ? r.json() : null))
         .then((d) => d?.thoughts && setThoughts(d.thoughts as Thought[]))
@@ -105,9 +122,9 @@ export default function AgentDetailPage({ params }: { params: { id: string } }) 
         .then((r) => (r.ok ? r.json() : null))
         .then((d) => d?.messages && setChat(d.messages as ChatMessage[]))
         .catch(() => {});
-    }, 5000);
+    }, intervalMs);
     return () => clearInterval(iv);
-  }, [params.id]);
+  }, [params.id, showActivation]);
 
   // Auto-scroll chat to bottom on new messages
   useEffect(() => {
@@ -371,6 +388,76 @@ export default function AgentDetailPage({ params }: { params: { id: string } }) 
           ))}
         </div>
       </motion.div>
+
+      {/* Activation banner — appears between hero and thought feed when
+          the user just spawned this worker and the first thought hasn't
+          landed yet. Auto-dissolves the moment totalThoughts hits 1. */}
+      <AnimatePresence>
+        {showActivation && (
+          <motion.div
+            key="activation"
+            initial={{ opacity: 0, y: -8, height: 0 }}
+            animate={{ opacity: 1, y: 0, height: "auto" }}
+            exit={{ opacity: 0, y: -8, height: 0, marginBottom: 0 }}
+            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            className="mb-4 rounded-[16px] overflow-hidden"
+            style={{
+              background:
+                "radial-gradient(120% 100% at 30% 0%, #1B2230 0%, #0E1320 55%, #080B14 100%)",
+              border: "1px solid rgba(74,222,128,0.25)",
+              boxShadow: "0 0 24px rgba(74,222,128,0.12)",
+            }}
+          >
+            <div className="px-5 py-4 flex items-center gap-3">
+              <motion.div
+                className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
+                style={{
+                  background: "rgba(74,222,128,0.12)",
+                  border: "1px solid rgba(74,222,128,0.45)",
+                }}
+                animate={{ scale: [1, 1.08, 1] }}
+                transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+              >
+                <Sparkles className="w-4 h-4" style={{ color: "#4ADE80" }} />
+              </motion.div>
+              <div className="flex-1 min-w-0">
+                <div
+                  className="text-[10px] font-mono uppercase mb-0.5"
+                  style={{ color: "rgba(74,222,128,0.85)", letterSpacing: "0.12em" }}
+                >
+                  Activating
+                </div>
+                <div className="text-[15px] font-semibold text-white">
+                  {agent?.name} is waking up · first thought arriving
+                </div>
+              </div>
+              <motion.div
+                className="font-mono text-[11px]"
+                style={{ color: "rgba(255,255,255,0.55)" }}
+                animate={{ opacity: [0.4, 1, 0.4] }}
+                transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
+              >
+                ●
+              </motion.div>
+            </div>
+            <div
+              className="h-[2px] origin-left"
+              style={{
+                background:
+                  "linear-gradient(to right, #4ADE80, rgba(74,222,128,0.05))",
+              }}
+            >
+              <motion.div
+                className="h-full"
+                style={{ background: "rgba(255,255,255,0.18)" }}
+                initial={{ width: "0%" }}
+                animate={{ width: "100%" }}
+                transition={{ duration: 60, ease: "linear" }}
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Thought feed */}
       <motion.div

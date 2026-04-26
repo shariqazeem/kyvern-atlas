@@ -121,7 +121,9 @@ export default function SpawnPage() {
       if (!res.ok || !data.agent) {
         throw new Error(data.error ?? "spawn failed");
       }
-      router.push(`/app/agents/${data.agent.id}`);
+      // ?fresh=true triggers the "Activating…" banner on the detail page
+      // until the first thought lands (Section 3C of the plan).
+      router.push(`/app/agents/${data.agent.id}?fresh=true`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "spawn failed");
       setSpawning(false);
