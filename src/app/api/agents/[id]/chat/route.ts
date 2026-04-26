@@ -43,6 +43,42 @@ function client(): OpenAI | null {
   return _client;
 }
 
+/**
+ * Translate a raw tool result into a sentence the owner reads in chat.
+ * Money tools get "Settled — <sig>" with a short signature; read tools
+ * pass their summary through directly. Goal: chat answers in natural
+ * English instead of "✓ tool name: { ok: true, ... }".
+ */
+function narrateToolResult(
+  toolId: string,
+  result: { ok: boolean; message: string; signature?: string; amountUsd?: number; counterparty?: string },
+): string {
+  const sig = result.signature ? `${result.signature.slice(0, 4)}…${result.signature.slice(-4)}` : null;
+  const usd = typeof result.amountUsd === "number" ? `$${result.amountUsd.toFixed(3)}` : null;
+
+  if (!result.ok) return `Tried but couldn't — ${result.message}`;
+
+  switch (toolId) {
+    case "claim_task":
+      return `Claimed a task${usd ? ` and earned ${usd}` : ""}. ${sig ? `Settled — ${sig}` : ""}`.trim();
+    case "subscribe_to_agent":
+      return `Paid ${result.counterparty ? "another worker " : ""}${usd ?? ""}. ${sig ? `Settled — ${sig}` : ""}`.trim();
+    case "post_task":
+      return `Posted a task${usd ? ` with bounty ${usd}` : ""} to the public board.`;
+    case "expose_paywall":
+      return `Stood up a paid feed.${result.message ? ` ${result.message}` : ""}`;
+    case "message_user":
+      return ""; // Already represented by the chat reply itself
+    case "read_dex":
+    case "read_onchain":
+    case "watch_wallet":
+    case "watch_wallet_swaps":
+      return result.message;
+    default:
+      return result.message;
+  }
+}
+
 function toOpenAITool(tool: AgentTool) {
   return {
     type: "function" as const,
@@ -285,7 +321,7 @@ ${thoughtSummary || "(none)"}]`;
 
       try {
         const result = await tool.execute(ctx, toolUseBlock.input);
-        toolResultText = `\n\n${result.ok ? "✓" : "✗"} ${tool.name}: ${result.message}`;
+        toolResultText = `\n\n${narrateToolResult(tool.id, result)}`;
         if (result.signature) toolSignature = result.signature;
 
         const decision: AgentDecision = {

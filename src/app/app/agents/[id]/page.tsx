@@ -42,6 +42,7 @@ interface Thought {
   signature: string | null;
   amountUsd: number | null;
   counterparty: string | null;
+  mode: "llm" | "scripted";
 }
 
 interface ChatMessage {
@@ -459,104 +460,89 @@ export default function AgentDetailPage({ params }: { params: { id: string } }) 
         )}
       </AnimatePresence>
 
-      {/* Thought feed */}
+      {/* Thought feed — Section 2C. Reasoning is the hero. */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.1, duration: 0.4 }}
         className="mb-4"
       >
-        <div className="flex items-center gap-2 mb-2">
+        <div className="flex items-center gap-2 mb-3">
           <Activity className="w-3.5 h-3.5 text-[#9B9B9B]" />
           <h2 className="text-[12px] font-semibold text-[#9B9B9B] uppercase tracking-[0.08em]">
             Thoughts
           </h2>
         </div>
-        <div
-          className="rounded-[16px] overflow-hidden"
-          style={{
-            background: "#fff",
-            boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
-            border: "1px solid rgba(0,0,0,0.05)",
-          }}
-        >
-          {thoughts.length === 0 ? (
-            <p className="text-[13px] text-[#9B9B9B] text-center py-8">
-              {isAlive ? "Waiting for first thought..." : "Agent is paused."}
-            </p>
-          ) : (
-            thoughts.map((t, i) => (
-              <div
-                key={t.id}
-                className="px-4 py-3"
-                style={i > 0 ? { borderTop: "1px solid #F5F5F5" } : {}}
-              >
-                <p className="text-[13px] text-[#0A0A0A] leading-[1.5]">{t.thought}</p>
-                <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                  {t.toolUsed && (
-                    <span
-                      className="text-[10px] font-mono px-1.5 py-0.5 rounded"
-                      style={{ background: "#F5F5F5", color: "#6B6B6B" }}
-                    >
-                      {t.toolUsed}
-                    </span>
-                  )}
-                  {t.amountUsd != null && t.amountUsd > 0 && (
-                    <span className="text-[11px] font-mono text-[#0A0A0A]">
-                      ${t.amountUsd.toFixed(3)}
-                    </span>
-                  )}
-                  {t.counterparty && (
-                    <span className="text-[10px] text-[#9B9B9B]">→ {t.counterparty}</span>
-                  )}
-                  {t.signature && <SignaturePill signature={t.signature} />}
-                  <span className="text-[10px] text-[#D1D5DB] ml-auto">
-                    {fmtAgo(new Date(t.timestamp).toISOString())}
-                  </span>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
+
+        {thoughts.length === 0 ? (
+          <div
+            className="rounded-[14px] py-8 text-center text-[13px] text-[#9B9B9B]"
+            style={{
+              background: "#fff",
+              border: "1px solid rgba(0,0,0,0.05)",
+              boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+            }}
+          >
+            {isAlive ? "Waiting for first thought…" : "Worker is paused."}
+          </div>
+        ) : (
+          <div className="space-y-2.5">
+            <AnimatePresence initial={false}>
+              {thoughts.map((t, i) => (
+                <ThoughtCard
+                  key={t.id}
+                  thought={t}
+                  cycleNumber={agent.totalThoughts - i}
+                />
+              ))}
+            </AnimatePresence>
+          </div>
+        )}
       </motion.div>
 
-      {/* Sticky chat */}
+      {/* Sticky chat — Section 2C. Bubbles + breathing avatar + quick replies. */}
       <div
         className="fixed bottom-[72px] inset-x-0 z-40 px-5 sm:px-8 max-w-[680px] mx-auto"
         style={{
-          background: "linear-gradient(to top, #FAFAFA 60%, transparent)",
-          paddingTop: "32px",
+          background: "linear-gradient(to top, #FAFAFA 70%, rgba(250,250,250,0))",
+          paddingTop: "40px",
           paddingBottom: "12px",
         }}
       >
-        {/* Recent chat preview (last 3 messages above input) */}
-        {chat.length > 0 && (
-          <div className="space-y-2 mb-3 max-h-[280px] overflow-y-auto">
+        {/* Bubbles */}
+        {(chat.length > 0 || sending) && (
+          <div className="space-y-2 mb-2.5 max-h-[280px] overflow-y-auto">
             <AnimatePresence initial={false}>
               {chat.slice(-6).map((m) => (
-                <motion.div
-                  key={m.id}
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0 }}
-                  className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
-                >
-                  <div
-                    className="max-w-[85%] rounded-[16px] px-3.5 py-2 text-[13px] leading-[1.5]"
-                    style={{
-                      background: m.role === "user" ? "#0A0A0A" : "#fff",
-                      color: m.role === "user" ? "#fff" : "#0A0A0A",
-                      border: m.role === "agent" ? "1px solid rgba(0,0,0,0.06)" : "none",
-                      boxShadow: m.role === "agent" ? "0 1px 3px rgba(0,0,0,0.04)" : "none",
-                      whiteSpace: "pre-wrap",
-                    }}
-                  >
-                    {m.content}
-                  </div>
-                </motion.div>
+                <ChatBubble key={m.id} message={m} agentEmoji={agent.emoji} />
               ))}
+              {sending && (chat.length === 0 || chat[chat.length - 1].role === "user") && (
+                <TypingBubble key="__typing" agentEmoji={agent.emoji} />
+              )}
             </AnimatePresence>
             <div ref={chatEndRef} />
+          </div>
+        )}
+
+        {/* Quick reply chips */}
+        {!sending && (
+          <div className="flex flex-wrap gap-1.5 mb-2">
+            {QUICK_REPLIES.map((q) => (
+              <button
+                key={q}
+                type="button"
+                onClick={() => setInputValue(q)}
+                className="text-[11px] px-2.5 py-1 rounded-full transition active:scale-[0.97]"
+                style={{
+                  background: "rgba(255,255,255,0.85)",
+                  border: "1px solid rgba(0,0,0,0.08)",
+                  color: "#374151",
+                  backdropFilter: "blur(4px)",
+                }}
+              >
+                {q}
+              </button>
+            ))}
           </div>
         )}
 
@@ -605,5 +591,251 @@ export default function AgentDetailPage({ params }: { params: { id: string } }) 
         </div>
       </div>
     </div>
+  );
+}
+
+/* ── Quick replies ───────────────────────────────────────────────── */
+const QUICK_REPLIES = [
+  "How are you doing?",
+  "Show me what you found",
+  "Take a break",
+];
+
+/* ── ThoughtCard ─────────────────────────────────────────────────── */
+
+function ThoughtCard({
+  thought,
+  cycleNumber,
+}: {
+  thought: Thought;
+  cycleNumber: number;
+}) {
+  const ts = new Date(thought.timestamp);
+  const hh = String(ts.getHours()).padStart(2, "0");
+  const mm = String(ts.getMinutes()).padStart(2, "0");
+  const ss = String(ts.getSeconds()).padStart(2, "0");
+  const time = `${hh}:${mm}:${ss}`;
+
+  const moneyKind = moneyDirection(thought.toolUsed);
+  const hasFooter =
+    !!thought.toolUsed || !!thought.signature || (thought.amountUsd != null && thought.amountUsd > 0);
+
+  return (
+    <motion.article
+      layout
+      initial={{ opacity: 0, y: -8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.98 }}
+      transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+      className="rounded-[14px] p-4"
+      style={{
+        background: "#fff",
+        border: "1px solid rgba(0,0,0,0.05)",
+        boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+      }}
+    >
+      {/* Top row */}
+      <div className="flex items-center gap-2 mb-2.5">
+        <span className="font-mono text-[11px]" style={{ color: "#9CA3AF" }}>
+          {time}
+        </span>
+        <ModePill mode={thought.mode} />
+        <span
+          className="font-mono text-[10px] ml-auto"
+          style={{ color: "#9CA3AF" }}
+        >
+          #{cycleNumber}
+        </span>
+      </div>
+
+      {/* Body — reasoning is the hero */}
+      <p
+        className="text-[#0A0A0A]"
+        style={{ fontSize: "16px", lineHeight: 1.6 }}
+      >
+        {thought.thought}
+      </p>
+
+      {/* Footer */}
+      {hasFooter && (
+        <div
+          className="flex items-center gap-2 mt-3 pt-3 flex-wrap"
+          style={{ borderTop: "1px solid rgba(0,0,0,0.04)" }}
+        >
+          {thought.toolUsed && (
+            <span
+              className="font-mono text-[10px] px-2 py-0.5 rounded"
+              style={{ background: "#F3F4F6", color: "#6B7280" }}
+            >
+              {thought.toolUsed.replace(/_/g, " ")}
+            </span>
+          )}
+          {thought.signature && <SignaturePill signature={thought.signature} />}
+          {thought.amountUsd != null && thought.amountUsd > 0 && moneyKind && (
+            <MoneyDelta amount={thought.amountUsd} kind={moneyKind} />
+          )}
+        </div>
+      )}
+    </motion.article>
+  );
+}
+
+function ModePill({ mode }: { mode: "llm" | "scripted" }) {
+  if (mode === "llm") {
+    return (
+      <span
+        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-mono uppercase"
+        style={{
+          background: "rgba(74,222,128,0.12)",
+          color: "#15803D",
+          fontSize: "9.5px",
+          letterSpacing: "0.06em",
+        }}
+      >
+        <span
+          className="w-1.5 h-1.5 rounded-full"
+          style={{ background: "#22C55E" }}
+        />
+        mode: llm
+      </span>
+    );
+  }
+  return (
+    <span
+      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-mono uppercase"
+      style={{
+        background: "rgba(0,0,0,0.05)",
+        color: "#6B7280",
+        fontSize: "9.5px",
+        letterSpacing: "0.06em",
+      }}
+    >
+      mode: scripted
+    </span>
+  );
+}
+
+function MoneyDelta({
+  amount,
+  kind,
+}: {
+  amount: number;
+  kind: "earned" | "spent";
+}) {
+  const earned = kind === "earned";
+  return (
+    <span
+      className="font-mono font-medium"
+      style={{
+        color: earned ? "#16A34A" : "#D97706",
+        fontSize: "12px",
+        fontVariantNumeric: "tabular-nums",
+      }}
+    >
+      {earned ? "+" : "−"}${amount.toFixed(3)} {earned ? "earned" : "spent"}
+    </span>
+  );
+}
+
+/** Maps a tool id to whether it earns or spends (or neither). */
+function moneyDirection(tool: string | null): "earned" | "spent" | null {
+  if (!tool) return null;
+  if (tool === "claim_task") return "earned";
+  if (tool === "subscribe_to_agent" || tool === "post_task") return "spent";
+  return null;
+}
+
+/* ── Chat bubbles ────────────────────────────────────────────────── */
+
+function ChatBubble({
+  message,
+  agentEmoji,
+}: {
+  message: ChatMessage;
+  agentEmoji: string;
+}) {
+  const isUser = message.role === "user";
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.22 }}
+      className={`flex items-end gap-2 ${isUser ? "justify-end" : "justify-start"}`}
+    >
+      {!isUser && (
+        <div
+          className="w-7 h-7 rounded-full flex items-center justify-center text-[14px] shrink-0 mb-0.5"
+          style={{
+            background: "linear-gradient(135deg, #F9FAFB, #F3F4F6)",
+            border: "1px solid rgba(0,0,0,0.06)",
+          }}
+        >
+          {agentEmoji || "✨"}
+        </div>
+      )}
+      <div
+        className="max-w-[85%] rounded-[16px] px-3.5 py-2 text-[13px] leading-[1.5]"
+        style={{
+          background: isUser ? "#0A0A0A" : "#fff",
+          color: isUser ? "#fff" : "#0A0A0A",
+          border: isUser ? "none" : "1px solid rgba(0,0,0,0.06)",
+          boxShadow: isUser ? "none" : "0 1px 3px rgba(0,0,0,0.04)",
+          whiteSpace: "pre-wrap",
+          borderBottomLeftRadius: isUser ? 16 : 6,
+          borderBottomRightRadius: isUser ? 6 : 16,
+        }}
+      >
+        {message.content}
+      </div>
+    </motion.div>
+  );
+}
+
+function TypingBubble({ agentEmoji }: { agentEmoji: string }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.22 }}
+      className="flex items-end gap-2 justify-start"
+    >
+      <motion.div
+        className="w-7 h-7 rounded-full flex items-center justify-center text-[14px] shrink-0 mb-0.5"
+        style={{
+          background: "linear-gradient(135deg, #F9FAFB, #F3F4F6)",
+          border: "1px solid rgba(0,0,0,0.06)",
+        }}
+        animate={{ scale: [1, 1.06, 1] }}
+        transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+      >
+        {agentEmoji || "✨"}
+      </motion.div>
+      <div
+        className="rounded-[16px] px-3.5 py-2 flex items-center gap-1"
+        style={{
+          background: "#fff",
+          border: "1px solid rgba(0,0,0,0.06)",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+          borderBottomLeftRadius: 6,
+        }}
+      >
+        {[0, 1, 2].map((i) => (
+          <motion.span
+            key={i}
+            className="w-1.5 h-1.5 rounded-full"
+            style={{ background: "#9CA3AF" }}
+            animate={{ opacity: [0.3, 1, 0.3], y: [0, -2, 0] }}
+            transition={{
+              duration: 1.0,
+              repeat: Infinity,
+              ease: "easeInOut",
+              delay: i * 0.15,
+            }}
+          />
+        ))}
+      </div>
+    </motion.div>
   );
 }

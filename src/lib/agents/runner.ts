@@ -293,6 +293,7 @@ async function scriptedTickWrapper(agent: Agent, ctx: AgentToolContext) {
     signature: result.toolResult?.signature ?? null,
     amountUsd: result.toolResult?.amountUsd ?? null,
     counterparty: result.toolResult?.counterparty ?? null,
+    mode: "scripted",
   });
 
   return {

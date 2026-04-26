@@ -180,16 +180,20 @@ export function recordAgentTick(input: {
   signature?: string | null;
   amountUsd?: number | null;
   counterparty?: string | null;
+  /** "llm" (default) or "scripted" — drives the mode pill on the
+   *  thought card. The LLM path wins ~all the time on paid Commonstack. */
+  mode?: "llm" | "scripted";
 }): AgentThought {
   const id = `tht_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
   const ts = Date.now();
   const db = getDb();
+  const mode: "llm" | "scripted" = input.mode ?? "llm";
 
   db.prepare(
     `INSERT INTO agent_thoughts (
       id, agent_id, timestamp, thought, decision_json, tool_used,
-      signature, amount_usd, counterparty
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      signature, amount_usd, counterparty, mode
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     id,
     input.agentId,
@@ -200,6 +204,7 @@ export function recordAgentTick(input: {
     input.signature ?? null,
     input.amountUsd ?? null,
     input.counterparty ?? null,
+    mode,
   );
 
   // Update agent rollups (callers use bumpAgentEarned/bumpAgentSpent
@@ -221,6 +226,7 @@ export function recordAgentTick(input: {
     signature: input.signature ?? null,
     amountUsd: input.amountUsd ?? null,
     counterparty: input.counterparty ?? null,
+    mode,
   };
 }
 
@@ -250,6 +256,7 @@ interface ThoughtRow {
   signature: string | null;
   amount_usd: number | null;
   counterparty: string | null;
+  mode: string | null;
 }
 
 export function listThoughts(agentId: string, limit = 50): AgentThought[] {
@@ -268,6 +275,7 @@ export function listThoughts(agentId: string, limit = 50): AgentThought[] {
     signature: r.signature,
     amountUsd: r.amount_usd,
     counterparty: r.counterparty,
+    mode: (r.mode === "scripted" ? "scripted" : "llm") as "llm" | "scripted",
   }));
 }
 

@@ -551,6 +551,15 @@ function migrate(db: Database.Database) {
     INSERT OR IGNORE INTO api_keys (id, key_hash, key_prefix, name, email)
     VALUES ('demo_key_001', 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', 'kv_demo_', 'Pulse Demo', 'demo@kyvernlabs.com')
   `).run();
+
+  // Per-session migrations — additive, idempotent.
+  const tryAlter = (sql: string) => {
+    try { db.exec(sql); } catch { /* already applied */ }
+  };
+  // mode: 'llm' | 'scripted' — populated at write time so the detail
+  // page can render the green "mode: llm" pill on cards that came from
+  // the LLM path and a subtle muted pill on the scripted fallback.
+  tryAlter(`ALTER TABLE agent_thoughts ADD COLUMN mode TEXT DEFAULT 'llm'`);
 }
 
 // --- Benchmark Queries (cross-user market intelligence) ---

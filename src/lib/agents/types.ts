@@ -65,6 +65,9 @@ export interface AgentThought {
   signature: string | null; // Solana tx sig if action produced one
   amountUsd: number | null;
   counterparty: string | null;
+  /** Which path produced this thought — drives the green "mode: llm"
+   *  pill on the thought card. Defaults to "llm" on legacy rows. */
+  mode: "llm" | "scripted";
 }
 
 /* ── Chat (synchronous user ↔ agent) ── */
