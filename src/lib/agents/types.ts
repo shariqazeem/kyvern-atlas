@@ -15,6 +15,7 @@ export type AgentTemplate =
   | "analyst"
   | "hunter"
   | "greeter"
+  | "earner"
   | "custom";
 
 export interface Agent {
@@ -170,4 +171,12 @@ export interface AgentTemplateDef {
    *  complete, working job paragraph that uses only tools available to
    *  this template's recommendedTools. */
   jobSuggestions: Array<{ label: string; job: string }>;
+  /** Pills shown on the picker card — "earning style" and "activity level".
+   *  These are display copy, not enum-strict, so future templates can riff. */
+  earningStyle: "Steady" | "Opportunistic" | "Hands-on" | "Your call";
+  activityLevel: "Chill" | "Balanced" | "Aggressive" | "Your call";
+  /** Whether this template appears in the spawn picker. False for legacy
+   *  templates kept around for backwards-compat with existing DB rows
+   *  (e.g. greeter, analyst), and for atlas which is forked from /atlas. */
+  inPicker: boolean;
 }

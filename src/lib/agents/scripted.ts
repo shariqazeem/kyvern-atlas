@@ -401,6 +401,7 @@ const VOICES: Record<AgentTemplate, VoiceProfile> = {
   analyst: ANALYST_VOICE,
   hunter: HUNTER_VOICE,
   greeter: GREETER_VOICE,
+  earner: GREETER_VOICE, // Earner inherits Greeter's voice — same personality shape
   custom: CUSTOM_VOICE,
   atlas: ATLAS_VOICE,
 };

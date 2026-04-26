@@ -1,28 +1,58 @@
 "use client";
 
 /**
- * /app/agents/spawn — Agent spawn ritual.
+ * /app/agents/spawn — two-screen worker hiring flow.
  *
- * Four steps:
- *   1. Pick template
- *   2. Name + emoji + personality
- *   3. Job description + tools
- *   4. Frequency + review + spawn
+ * Section 2B of the Grand Champion plan.
  *
- * On spawn: POST /api/agents/spawn → redirect to /app/agents/[id]
+ *   Screen 1 ("template")  — 4-card 2x2 picker. Tap → screen 2.
+ *   Screen 2 ("configure") — name + emoji + job (chips + textarea),
+ *                            primary Spawn button, "Customize" link
+ *                            opens the depth drawer.
+ *   On Spawn               — Birth animation overlay plays for ~1.6s,
+ *                            then router.push to /app/agents/[id]?fresh=true
+ *                            (the activation banner from 3C takes over).
+ *
+ * Most users finish in 3 taps: pick template → tap chip → Spawn.
+ * The 5% who care about depth tap Customize — sliders, abilities,
+ * cadence, and the on-chain budget callout that flips a judge from
+ * "consumer UI" to "wait, this is a smart contract."
  */
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, ArrowRight, Check, Zap } from "lucide-react";
+import { ArrowLeft, ChevronRight, RefreshCw, Sliders } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { TEMPLATES, ATLAS_TEMPLATE_DEF } from "@/lib/agents/templates";
+import {
+  getPickerTemplates,
+  getTemplate,
+  EMOJI_PALETTE,
+  NAME_POOL,
+} from "@/lib/agents/templates";
 import type { AgentTemplate, AgentTemplateDef } from "@/lib/agents/types";
+import {
+  CustomizeDrawer,
+  derivePersonalityPrompt,
+} from "@/components/spawn/customize-drawer";
+import { BirthAnimation } from "@/components/spawn/birth-animation";
 
 interface VaultBrief {
-  vault: { id: string; name: string; emoji: string };
+  vault: {
+    id: string;
+    name: string;
+    emoji: string;
+    pausedAt: string | null;
+    network: "devnet" | "mainnet";
+    perTxMaxUsd?: number;
+    dailyLimitUsd?: number;
+  };
+  budget?: {
+    spentToday: number;
+    dailyLimitUsd: number;
+    dailyUtilization: number;
+  };
 }
 
 interface ToolMeta {
@@ -35,10 +65,45 @@ interface ToolMeta {
 
 function devWallet(): string {
   if (typeof window === "undefined") return "";
-  return window.localStorage.getItem("kyvern:dev-wallet") ?? "";
+  const K = "kyvern:dev-wallet";
+  const e = window.localStorage.getItem(K);
+  if (e) return e;
+  const a = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+  let s = "";
+  for (let i = 0; i < 44; i++) s += a[Math.floor(Math.random() * a.length)];
+  window.localStorage.setItem(K, s);
+  return s;
 }
 
-const ALL_TEMPLATES: AgentTemplateDef[] = [ATLAS_TEMPLATE_DEF, ...TEMPLATES];
+const PICKER = getPickerTemplates();
+
+/** Slider defaults per template — Hunter starts aggressive, Earner cautious. */
+function defaultSliders(template: AgentTemplate): { lc: number; ca: number } {
+  switch (template) {
+    case "scout":
+      return { lc: 25, ca: 20 };
+    case "earner":
+      return { lc: 0, ca: 50 };
+    case "hunter":
+      return { lc: -30, ca: -50 };
+    default:
+      return { lc: 0, ca: 0 };
+  }
+}
+
+function estimateDailyCostUsd(seconds: number): number {
+  const ticksPerDay = 86_400 / Math.max(60, seconds);
+  return ticksPerDay * 0.00003; // gpt-oss-120b per-tick estimate
+}
+
+function fmtCost(usd: number): string {
+  if (usd < 0.01) return `${(usd * 100).toFixed(2)}¢`;
+  return `$${usd.toFixed(3)}`;
+}
+
+function deriveSerial(vaultId: string): string {
+  return `KVN-${vaultId.replace("vlt_", "").slice(0, 8).toUpperCase()}`;
+}
 
 export default function SpawnPage() {
   const router = useRouter();
@@ -46,21 +111,31 @@ export default function SpawnPage() {
 
   const [vaults, setVaults] = useState<VaultBrief[]>([]);
   const [allTools, setAllTools] = useState<ToolMeta[]>([]);
-  const [step, setStep] = useState(0);
-  const [spawning, setSpawning] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  // Form state
-  const [template, setTemplate] = useState<AgentTemplate>("scout");
+  // Step machine
+  const [screen, setScreen] = useState<"template" | "configure" | "spawning">(
+    "template",
+  );
+
+  // Picked template
+  const [template, setTemplate] = useState<AgentTemplate | null>(null);
+
+  // Configure state
   const [name, setName] = useState("");
-  const [emoji, setEmoji] = useState("");
-  const [personality, setPersonality] = useState("");
+  const [emoji, setEmoji] = useState("🔭");
   const [job, setJob] = useState("");
   const [tools, setTools] = useState<string[]>([]);
-  const [frequency, setFrequency] = useState(180);
+  const [frequency, setFrequency] = useState(240);
+  const [logicalCreative, setLogicalCreative] = useState(0);
+  const [cautiousAggressive, setCautiousAggressive] = useState(0);
+  const [activeChip, setActiveChip] = useState<string | null>(null);
+  const [nameSeed, setNameSeed] = useState(0);
 
-  const selectedTemplate = useMemo(
-    () => ALL_TEMPLATES.find((t) => t.id === template) ?? ALL_TEMPLATES[0],
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const selectedTemplate: AgentTemplateDef | null = useMemo(
+    () => (template ? getTemplate(template) ?? null : null),
     [template],
   );
 
@@ -77,71 +152,105 @@ export default function SpawnPage() {
       .then((d) => setAllTools(d?.tools ?? []));
   }, [wallet, isLoading]);
 
-  // Pre-fill from template when selected
-  useEffect(() => {
-    setName(selectedTemplate.suggestedName);
-    setEmoji(selectedTemplate.emoji);
-    setPersonality(selectedTemplate.personalityPrompt);
-    setJob(selectedTemplate.jobPromptExample);
-    setTools(selectedTemplate.recommendedTools);
-    setFrequency(selectedTemplate.defaultFrequencySeconds);
-  }, [selectedTemplate]);
+  // When user picks a template → pre-fill configure state, advance screen
+  const pickTemplate = (id: AgentTemplate) => {
+    const t = getTemplate(id);
+    if (!t) return;
+    setTemplate(id);
+    setName(t.suggestedName || NAME_POOL[0]);
+    setEmoji(t.emoji);
+    setJob(t.jobPromptExample);
+    setTools(t.recommendedTools);
+    setFrequency(t.defaultFrequencySeconds);
+    const def = defaultSliders(id);
+    setLogicalCreative(def.lc);
+    setCautiousAggressive(def.ca);
+    setActiveChip(null);
+    setScreen("configure");
+  };
 
-  const canContinue = useMemo(() => {
-    if (step === 0) return !!template;
-    if (step === 1) return name.trim().length >= 2 && !!emoji && !!personality.trim();
-    if (step === 2) return job.trim().length >= 5 && tools.length > 0;
-    if (step === 3) return frequency >= 30;
-    return false;
-  }, [step, template, name, emoji, personality, job, tools, frequency]);
+  const cycleName = () => {
+    setNameSeed((s) => s + 1);
+    setName(NAME_POOL[(nameSeed + 1) % NAME_POOL.length]);
+  };
+
+  const onChip = (chip: { label: string; job: string }) => {
+    setJob(chip.job);
+    setActiveChip(chip.label);
+  };
+
+  const vault = vaults[0]?.vault;
+  const serial = vault ? deriveSerial(vault.id) : "KVN-——————";
+  const perTxMaxUsd = vault?.perTxMaxUsd ?? 0.5;
+  const dailyLimitUsd = vault?.dailyLimitUsd ?? vaults[0]?.budget?.dailyLimitUsd ?? 5;
+  const network = (vault?.network ?? "devnet") as "devnet" | "mainnet";
+
+  const dailyCostUsd = estimateDailyCostUsd(frequency);
+  const personalityPrompt = useMemo(
+    () => derivePersonalityPrompt(name, logicalCreative, cautiousAggressive),
+    [name, logicalCreative, cautiousAggressive],
+  );
+
+  const canSpawn =
+    !!template && name.trim().length >= 2 && job.trim().length >= 5 && tools.length > 0;
 
   const handleSpawn = async () => {
-    if (vaults.length === 0) {
-      setError("You need a device first. Create one at /vault/new.");
+    if (!vault || !template) {
+      setError("Need a device + a template before spawning.");
       return;
     }
-    setSpawning(true);
     setError(null);
+    setScreen("spawning");
     try {
       const res = await fetch("/api/agents/spawn", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          deviceId: vaults[0].vault.id,
+          deviceId: vault.id,
           template,
           name,
           emoji,
-          personalityPrompt: personality,
+          personalityPrompt,
           jobPrompt: job,
           allowedTools: tools,
           frequencySeconds: frequency,
         }),
       });
       const data = await res.json();
-      if (!res.ok || !data.agent) {
-        throw new Error(data.error ?? "spawn failed");
-      }
-      // ?fresh=true triggers the "Activating…" banner on the detail page
-      // until the first thought lands (Section 3C of the plan).
-      router.push(`/app/agents/${data.agent.id}?fresh=true`);
+      if (!res.ok || !data.agent) throw new Error(data.error ?? "spawn failed");
+      // Hold on the birth animation a beat — onComplete will redirect.
+      // Stash the new id; the BirthAnimation onComplete callback navigates.
+      sessionStorage.setItem("kyvern:last-spawn-id", data.agent.id);
     } catch (e) {
       setError(e instanceof Error ? e.message : "spawn failed");
-      setSpawning(false);
+      setScreen("configure");
     }
   };
 
+  const onBirthComplete = () => {
+    const id = sessionStorage.getItem("kyvern:last-spawn-id");
+    if (id) {
+      sessionStorage.removeItem("kyvern:last-spawn-id");
+      router.push(`/app/agents/${id}?fresh=true`);
+    } else {
+      // POST is still pending or failed — fall back gracefully
+      setScreen("configure");
+    }
+  };
+
+  // No-device state — keep the existing nudge to /vault/new
   if (vaults.length === 0 && !isLoading) {
     return (
       <div className="py-16 text-center">
         <p className="text-[14px] text-[#6B6B6B] mb-3">
-          You need a device before spawning agents.
+          You need a device before hiring workers.
         </p>
         <Link
           href="/vault/new"
           className="inline-flex items-center gap-1.5 h-10 px-5 rounded-[12px] text-[13px] font-semibold"
           style={{ background: "#0A0A0A", color: "#fff" }}
         >
-          Create your device <ArrowRight className="w-3.5 h-3.5" />
+          Get your Kyvern <ChevronRight className="w-3.5 h-3.5" />
         </Link>
       </div>
     );
@@ -149,6 +258,7 @@ export default function SpawnPage() {
 
   return (
     <div className="py-2 pb-16">
+      {/* Top: back link */}
       <Link
         href="/app"
         className="inline-flex items-center gap-1.5 text-[12px] font-medium text-[#9B9B9B] mb-4 hover:text-[#6B6B6B]"
@@ -157,73 +267,75 @@ export default function SpawnPage() {
         Home
       </Link>
 
-      {/* Progress */}
-      <div className="flex items-center gap-2 mb-6">
-        {[0, 1, 2, 3].map((i) => (
-          <div
-            key={i}
-            className="flex-1 h-[3px] rounded-full"
-            style={{ background: i <= step ? "#0A0A0A" : "#E5E7EB" }}
-          />
-        ))}
-      </div>
-
       <AnimatePresence mode="wait">
-        {step === 0 && (
+        {/* ───────── SCREEN 1: Hire a worker ───────── */}
+        {screen === "template" && (
           <motion.div
-            key="step0"
+            key="screen1"
             initial={{ opacity: 0, x: 8 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -8 }}
-            transition={{ duration: 0.2 }}
+            transition={{ duration: 0.22 }}
           >
-            <h1 className="text-[24px] font-semibold tracking-tight text-[#0A0A0A] mb-1">
-              Pick a template
+            <h1 className="text-[26px] font-semibold tracking-tight text-[#0A0A0A]">
+              Hire a worker
             </h1>
-            <p className="text-[13px] text-[#6B6B6B] mb-5">
-              Each template comes with a starting personality, default tools, and frequency.
+            <p className="text-[13px] text-[#6B6B6B] mb-6">
+              For{" "}
+              <span className="font-mono text-[#0A0A0A]">{serial}</span>. Pick the
+              shape — you can fine-tune the rest in the next step.
             </p>
-            <div className="space-y-2">
-              {ALL_TEMPLATES.map((t) => (
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {PICKER.map((t) => (
                 <button
                   key={t.id}
-                  onClick={() => setTemplate(t.id)}
-                  className="w-full text-left rounded-[16px] p-4 transition-all active:scale-[0.99]"
+                  type="button"
+                  onClick={() => pickTemplate(t.id)}
+                  className="text-left rounded-[16px] p-4 transition-all active:scale-[0.99] hover:shadow-md"
                   style={{
                     background: "#fff",
-                    border:
-                      template === t.id
-                        ? "1.5px solid #0A0A0A"
-                        : "1px solid rgba(0,0,0,0.06)",
+                    border: "1px solid rgba(0,0,0,0.06)",
                     boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
                   }}
                 >
-                  <div className="flex items-start gap-3">
-                    <span
-                      className="w-12 h-12 rounded-[12px] flex items-center justify-center text-[24px] shrink-0"
-                      style={{ background: "#F5F5F5" }}
+                  <div className="flex items-start justify-between mb-3">
+                    <div
+                      className="w-12 h-12 rounded-[14px] flex items-center justify-center text-[26px]"
+                      style={{
+                        background: "linear-gradient(135deg, #F9FAFB, #F3F4F6)",
+                        border: "1px solid rgba(0,0,0,0.04)",
+                      }}
                     >
                       {t.emoji}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="text-[15px] font-semibold text-[#0A0A0A]">{t.name}</p>
-                        {t.id === "atlas" && (
-                          <span
-                            className="text-[9px] font-mono font-semibold px-1.5 py-0.5 rounded"
-                            style={{ background: "#F0FDF4", color: "#00A86B" }}
-                          >
-                            ORIGINAL
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-[12px] text-[#6B6B6B] mt-0.5 leading-[1.5]">
-                        {t.description}
-                      </p>
                     </div>
-                    {template === t.id && (
-                      <Check className="w-5 h-5 text-[#0A0A0A] shrink-0" />
-                    )}
+                    <ChevronRight className="w-4 h-4 text-[#D1D5DB] mt-1" />
+                  </div>
+                  <h3 className="text-[16px] font-semibold text-[#0A0A0A] mb-1">
+                    {t.name}
+                  </h3>
+                  <p className="text-[12px] text-[#6B6B6B] leading-[1.5] mb-3">
+                    {t.description}
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    <span
+                      className="text-[10px] px-2 py-0.5 rounded-full"
+                      style={{
+                        background: "#F3F4F6",
+                        color: "#374151",
+                      }}
+                    >
+                      {t.earningStyle}
+                    </span>
+                    <span
+                      className="text-[10px] px-2 py-0.5 rounded-full"
+                      style={{
+                        background: "#F3F4F6",
+                        color: "#374151",
+                      }}
+                    >
+                      {t.activityLevel}
+                    </span>
                   </div>
                 </button>
               ))}
@@ -231,142 +343,127 @@ export default function SpawnPage() {
           </motion.div>
         )}
 
-        {step === 1 && (
+        {/* ───────── SCREEN 2: Configure ───────── */}
+        {screen === "configure" && selectedTemplate && (
           <motion.div
-            key="step1"
+            key="screen2"
             initial={{ opacity: 0, x: 8 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -8 }}
-            transition={{ duration: 0.2 }}
+            transition={{ duration: 0.22 }}
           >
-            <h1 className="text-[24px] font-semibold tracking-tight text-[#0A0A0A] mb-1">
-              Identity
-            </h1>
-            <p className="text-[13px] text-[#6B6B6B] mb-5">
-              Give your agent a name, an emoji, and a personality.
-            </p>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-[12px] font-medium text-[#0A0A0A] mb-1.5">
-                  Name
-                </label>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. Percival"
-                  className="w-full h-11 px-3 rounded-[10px] text-[14px] outline-none"
-                  style={{
-                    background: "#fff",
-                    border: "1px solid rgba(0,0,0,0.08)",
-                  }}
-                />
+            <button
+              onClick={() => setScreen("template")}
+              className="inline-flex items-center gap-1.5 text-[11px] font-medium text-[#9B9B9B] mb-2 hover:text-[#6B6B6B]"
+            >
+              <ArrowLeft className="w-3 h-3" />
+              All workers
+            </button>
+            <div className="flex items-center gap-3 mb-5">
+              <div
+                className="w-12 h-12 rounded-[14px] flex items-center justify-center text-[26px]"
+                style={{
+                  background: "linear-gradient(135deg, #F9FAFB, #F3F4F6)",
+                  border: "1px solid rgba(0,0,0,0.04)",
+                }}
+              >
+                {emoji}
               </div>
-
               <div>
-                <label className="block text-[12px] font-medium text-[#0A0A0A] mb-1.5">
-                  Emoji
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {["🔭", "📊", "🎯", "👋", "✨", "🤖", "🧭", "🦊", "🦉", "🐺", "🦅", "🐝"].map(
-                    (e) => (
-                      <button
-                        key={e}
-                        onClick={() => setEmoji(e)}
-                        className="w-11 h-11 rounded-[10px] flex items-center justify-center text-[20px] transition-all active:scale-[0.95]"
-                        style={{
-                          background: emoji === e ? "#0A0A0A" : "#fff",
-                          border:
-                            emoji === e
-                              ? "1.5px solid #0A0A0A"
-                              : "1px solid rgba(0,0,0,0.08)",
-                        }}
-                      >
-                        {e}
-                      </button>
-                    ),
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[12px] font-medium text-[#0A0A0A] mb-1.5">
-                  Personality
-                </label>
-                <textarea
-                  value={personality}
-                  onChange={(e) => setPersonality(e.target.value)}
-                  rows={4}
-                  className="w-full px-3 py-2.5 rounded-[10px] text-[13px] outline-none leading-[1.5] resize-none"
-                  style={{
-                    background: "#fff",
-                    border: "1px solid rgba(0,0,0,0.08)",
-                  }}
-                />
-                <p className="text-[10px] text-[#9B9B9B] mt-1">
-                  How your agent thinks and speaks. Edit freely.
+                <h1 className="text-[22px] font-semibold tracking-tight text-[#0A0A0A] leading-tight">
+                  Configure {selectedTemplate.name}
+                </h1>
+                <p className="text-[12px] text-[#9B9B9B]">
+                  {selectedTemplate.description}
                 </p>
               </div>
             </div>
-          </motion.div>
-        )}
 
-        {step === 2 && (
-          <motion.div
-            key="step2"
-            initial={{ opacity: 0, x: 8 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -8 }}
-            transition={{ duration: 0.2 }}
-          >
-            <h1 className="text-[24px] font-semibold tracking-tight text-[#0A0A0A] mb-1">
-              Job & tools
-            </h1>
-            <p className="text-[13px] text-[#6B6B6B] mb-5">
-              What should your agent do? What can it use?
-            </p>
-
-            <div>
-              <label className="block text-[12px] font-medium text-[#0A0A0A] mb-1.5">
-                Job description
+            {/* Name + emoji */}
+            <div className="mb-5">
+              <label className="block text-[11px] font-medium text-[#6B6B6B] mb-1.5">
+                Name
               </label>
+              <div className="flex items-center gap-1.5 mb-3">
+                <input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Sentinel"
+                  className="flex-1 px-3 py-2 rounded-[10px] text-[14px] outline-none"
+                  style={{ background: "#fff", border: "1px solid rgba(0,0,0,0.08)" }}
+                />
+                <button
+                  type="button"
+                  onClick={cycleName}
+                  className="w-9 h-9 rounded-[10px] flex items-center justify-center"
+                  style={{ background: "#F5F5F5", color: "#6B6B6B" }}
+                  aria-label="Suggest another name"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {EMOJI_PALETTE.map((e) => {
+                  const active = e === emoji;
+                  return (
+                    <button
+                      key={e}
+                      type="button"
+                      onClick={() => setEmoji(e)}
+                      className="w-9 h-9 rounded-full flex items-center justify-center text-[18px] transition active:scale-[0.95]"
+                      style={{
+                        background: active ? "#0A0A0A" : "#fff",
+                        border: active
+                          ? "1px solid #0A0A0A"
+                          : "1px solid rgba(0,0,0,0.08)",
+                      }}
+                    >
+                      {e}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
 
+            {/* Job */}
+            <div className="mb-5">
+              <label className="block text-[11px] font-medium text-[#6B6B6B] mb-1.5">
+                What&apos;s the job?
+              </label>
               {selectedTemplate.jobSuggestions.length > 0 && (
-                <div className="mb-2">
-                  <div className="text-[10px] uppercase tracking-wide text-[#6B6B6B] mb-1.5">
-                    Tap to use a suggested job
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {selectedTemplate.jobSuggestions.map((s) => (
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {selectedTemplate.jobSuggestions.map((s) => {
+                    const active = activeChip === s.label;
+                    return (
                       <button
                         key={s.label}
                         type="button"
-                        onClick={() => setJob(s.job)}
+                        onClick={() => onChip(s)}
                         className="text-[11px] px-2.5 py-1 rounded-full transition active:scale-[0.97]"
                         style={{
-                          background: "#fff",
-                          border: "1px solid rgba(0,0,0,0.1)",
-                          color: "#0A0A0A",
+                          background: active ? "#0A0A0A" : "#fff",
+                          color: active ? "#fff" : "#0A0A0A",
+                          border: active
+                            ? "1px solid #0A0A0A"
+                            : "1px solid rgba(0,0,0,0.1)",
                         }}
                       >
                         {s.label}
                       </button>
-                    ))}
-                  </div>
+                    );
+                  })}
                 </div>
               )}
-
               <textarea
                 value={job}
-                onChange={(e) => setJob(e.target.value)}
+                onChange={(e) => {
+                  setJob(e.target.value);
+                  setActiveChip(null);
+                }}
                 rows={5}
                 placeholder={selectedTemplate.jobPromptPlaceholder}
                 className="w-full px-3 py-2.5 rounded-[10px] text-[13px] outline-none leading-[1.5] resize-none"
-                style={{
-                  background: "#fff",
-                  border: "1px solid rgba(0,0,0,0.08)",
-                }}
+                style={{ background: "#fff", border: "1px solid rgba(0,0,0,0.08)" }}
               />
               {/^.*0x[0-9a-fA-F]{40}.*$/m.test(job) && (
                 <div
@@ -377,218 +474,104 @@ export default function SpawnPage() {
                     color: "#92400E",
                   }}
                 >
-                  <strong>That looks like an Ethereum address (0x…).</strong> Workers run on Solana — wallets here are base58 (e.g. <span className="font-mono">7Yk8cPDKL5h4QnQiVhHcvWg9HXKJpQfTmnK9zTzk5bWqA</span>). If you mean a Solana wallet, replace the 0x… address before spawning, or your worker will loop asking for a Solana address.
+                  <strong>That looks like an Ethereum address (0x…).</strong>{" "}
+                  Workers run on Solana — wallets here are base58. Replace the
+                  address before spawning, or your worker will loop asking your
+                  owner for a Solana address.
                 </div>
               )}
-              <div className="mt-1.5 flex items-center gap-1.5 text-[10px] text-[#8B8B8B]">
-                <Zap className="w-2.5 h-2.5" />
-                <span>
-                  Powered by Kyvern AI — your agent thinks at no cost to you during
-                  the demo.
-                </span>
+            </div>
+
+            {/* Abilities granted (collapsed summary) */}
+            <button
+              type="button"
+              onClick={() => setDrawerOpen(true)}
+              className="w-full flex items-center justify-between rounded-[12px] px-3 py-3 mb-5 transition active:scale-[0.99]"
+              style={{
+                background: "#fff",
+                border: "1px solid rgba(0,0,0,0.08)",
+              }}
+            >
+              <div className="flex items-center gap-2">
+                <Sliders className="w-3.5 h-3.5 text-[#6B6B6B]" />
+                <div className="text-left">
+                  <div className="text-[12.5px] font-medium text-[#0A0A0A]">
+                    {tools.length} {tools.length === 1 ? "ability" : "abilities"} granted
+                  </div>
+                  <div className="text-[11px] text-[#9B9B9B]">
+                    Cadence: every {Math.round(frequency / 60) || frequency / 60} min ·
+                    on-chain caps inherited from {serial}
+                  </div>
+                </div>
               </div>
-            </div>
-
-            <div className="mt-4">
-              <label className="block text-[12px] font-medium text-[#0A0A0A] mb-2">
-                Tools
-                <span className="ml-2 text-[10px] font-normal text-[#6B6B6B]">
-                  Recommended for {selectedTemplate.name} are pre-selected
-                </span>
-              </label>
-              <div className="space-y-1.5">
-                {[...allTools]
-                  .sort((a, b) => {
-                    const ar = selectedTemplate.recommendedTools.includes(a.id) ? 0 : 1;
-                    const br = selectedTemplate.recommendedTools.includes(b.id) ? 0 : 1;
-                    return ar - br;
-                  })
-                  .map((t) => {
-                  const active = tools.includes(t.id);
-                  const recommended = selectedTemplate.recommendedTools.includes(t.id);
-                  return (
-                    <button
-                      key={t.id}
-                      onClick={() =>
-                        setTools((prev) =>
-                          active ? prev.filter((x) => x !== t.id) : [...prev, t.id],
-                        )
-                      }
-                      className="w-full text-left rounded-[12px] p-3 transition-all active:scale-[0.99]"
-                      style={{
-                        background: "#fff",
-                        border: active
-                          ? "1.5px solid #0A0A0A"
-                          : "1px solid rgba(0,0,0,0.06)",
-                      }}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div
-                          className="w-5 h-5 rounded-full flex items-center justify-center shrink-0"
-                          style={{
-                            background: active ? "#0A0A0A" : "#fff",
-                            border: active ? "none" : "1.5px solid rgba(0,0,0,0.15)",
-                          }}
-                        >
-                          {active && (
-                            <Check className="w-3 h-3 text-white" strokeWidth={3} />
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <p className="text-[13px] font-medium text-[#0A0A0A]">
-                              {t.name}
-                            </p>
-                            {recommended && (
-                              <span
-                                className="text-[9px] font-medium px-1.5 py-0.5 rounded"
-                                style={{ background: "#EEF2FF", color: "#4338CA" }}
-                              >
-                                RECOMMENDED
-                              </span>
-                            )}
-                            {t.costsMoney && (
-                              <span
-                                className="text-[9px] font-mono px-1.5 py-0.5 rounded"
-                                style={{ background: "#FEF3C7", color: "#D97706" }}
-                              >
-                                COSTS USDC
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-[11px] text-[#6B6B6B] mt-0.5 leading-[1.4]">
-                            {t.description.slice(0, 140)}
-                            {t.description.length > 140 ? "…" : ""}
-                          </p>
-                        </div>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </motion.div>
-        )}
-
-        {step === 3 && (
-          <motion.div
-            key="step3"
-            initial={{ opacity: 0, x: 8 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -8 }}
-            transition={{ duration: 0.2 }}
-          >
-            <h1 className="text-[24px] font-semibold tracking-tight text-[#0A0A0A] mb-1">
-              Boundaries
-            </h1>
-            <p className="text-[13px] text-[#6B6B6B] mb-5">
-              How often should your agent think? Money limits come from your device&apos;s policy.
-            </p>
-
-            <div className="rounded-[16px] p-4" style={{ background: "#fff", border: "1px solid rgba(0,0,0,0.06)" }}>
-              <label className="block text-[12px] font-medium text-[#0A0A0A] mb-2">
-                Tick frequency
-              </label>
-              <input
-                type="range"
-                min={30}
-                max={600}
-                step={30}
-                value={frequency}
-                onChange={(e) => setFrequency(Number(e.target.value))}
-                className="w-full accent-[#0A0A0A]"
-              />
-              <div className="flex items-center justify-between mt-1">
-                <span className="text-[10px] text-[#9B9B9B]">30s</span>
-                <span className="text-[14px] font-mono font-semibold text-[#0A0A0A]">
-                  every {frequency}s
-                </span>
-                <span className="text-[10px] text-[#9B9B9B]">10m</span>
-              </div>
-            </div>
-
-            {/* Review */}
-            <div className="mt-5 rounded-[16px] p-4 space-y-2.5" style={{ background: "#fff", border: "1px solid rgba(0,0,0,0.06)" }}>
-              <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[#9B9B9B] mb-2">
-                Review
-              </p>
-              <ReviewRow label="Template" value={selectedTemplate.name} />
-              <ReviewRow label="Name" value={`${emoji} ${name}`} />
-              <ReviewRow label="Tools" value={`${tools.length} selected`} />
-              <ReviewRow label="Frequency" value={`every ${frequency}s`} />
-              {vaults[0] && (
-                <ReviewRow label="Device" value={`${vaults[0].vault.emoji} ${vaults[0].vault.name}`} />
-              )}
-            </div>
+              <span className="text-[11px] text-[#6B6B6B] font-medium">
+                Customize ↗
+              </span>
+            </button>
 
             {error && (
-              <div className="mt-3 rounded-[10px] p-3 text-[12px]"
-                style={{ background: "#FEF2F2", color: "#D92D20", border: "1px solid rgba(217,45,32,0.15)" }}>
+              <div
+                className="mb-3 px-3 py-2 rounded-[10px] text-[12px]"
+                style={{
+                  background: "#FEE2E2",
+                  border: "1px solid #FECACA",
+                  color: "#B91C1C",
+                }}
+              >
                 {error}
               </div>
             )}
+
+            {/* Primary spawn button */}
+            <button
+              type="button"
+              onClick={handleSpawn}
+              disabled={!canSpawn}
+              className="w-full h-12 rounded-[12px] text-[14px] font-semibold transition active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{ background: "#0A0A0A", color: "#fff" }}
+            >
+              {canSpawn ? (
+                <>
+                  Spawn {name || "worker"}
+                  <span className="ml-1.5 font-mono opacity-70">
+                    · ~{fmtCost(dailyCostUsd)}/day
+                  </span>
+                </>
+              ) : (
+                "Fill in name + job to spawn"
+              )}
+            </button>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Sticky footer */}
-      <div className="fixed bottom-[72px] inset-x-0 z-40 px-5 sm:px-8 max-w-[680px] mx-auto">
-        <div
-          className="flex items-center gap-2 rounded-[16px] p-2"
-          style={{
-            background: "#fff",
-            boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
-            border: "1px solid rgba(0,0,0,0.06)",
-          }}
-        >
-          {step > 0 && (
-            <button
-              onClick={() => setStep(step - 1)}
-              className="h-10 px-4 rounded-[10px] text-[13px] font-medium"
-              style={{ background: "#F5F5F5", color: "#6B6B6B" }}
-            >
-              Back
-            </button>
-          )}
-          {step < 3 ? (
-            <button
-              onClick={() => setStep(step + 1)}
-              disabled={!canContinue}
-              className="flex-1 h-10 rounded-[10px] text-[14px] font-semibold flex items-center justify-center gap-1.5 active:scale-[0.98] disabled:opacity-30"
-              style={{ background: "#0A0A0A", color: "#fff" }}
-            >
-              Continue <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          ) : (
-            <button
-              onClick={handleSpawn}
-              disabled={!canContinue || spawning}
-              className="flex-1 h-10 rounded-[10px] text-[14px] font-semibold flex items-center justify-center gap-1.5 active:scale-[0.98] disabled:opacity-30"
-              style={{ background: "#0A0A0A", color: "#fff" }}
-            >
-              {spawning ? (
-                <motion.span
-                  className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full"
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }}
-                />
-              ) : (
-                <Zap className="w-3.5 h-3.5" />
-              )}
-              {spawning ? "Spawning..." : "Spawn agent"}
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
+      {/* Customize drawer (overlays configure screen) */}
+      {selectedTemplate && (
+        <CustomizeDrawer
+          open={drawerOpen}
+          onClose={() => setDrawerOpen(false)}
+          logicalCreative={logicalCreative}
+          setLogicalCreative={setLogicalCreative}
+          cautiousAggressive={cautiousAggressive}
+          setCautiousAggressive={setCautiousAggressive}
+          allTools={allTools}
+          selectedTools={tools}
+          setSelectedTools={setTools}
+          recommendedTools={selectedTemplate.recommendedTools}
+          frequencySeconds={frequency}
+          setFrequencySeconds={setFrequency}
+          perTxMaxUsd={perTxMaxUsd}
+          dailyLimitUsd={dailyLimitUsd}
+          network={network}
+        />
+      )}
 
-function ReviewRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between">
-      <span className="text-[12px] text-[#6B6B6B]">{label}</span>
-      <span className="text-[12px] font-medium text-[#0A0A0A]">{value}</span>
+      {/* Birth animation overlay (during spawn) */}
+      <AnimatePresence>
+        {screen === "spawning" && (
+          <BirthAnimation name={name} emoji={emoji} onComplete={onBirthComplete} />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
