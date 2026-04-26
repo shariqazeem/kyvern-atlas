@@ -30,6 +30,12 @@ export interface AtlasSnapshot {
         | (AtlasAttack & { _kind: "attack"; _when: string })
       >
     | null;
+  /** Up to 60 most recent caught attacks — feeds the Attack Wall on /atlas. */
+  recentAttacks: AtlasAttack[] | null;
+  /** 24 hourly buckets of net PnL (earned − spent) for the sparkline.
+   *  Atlas mostly spends, so the line typically slopes downward; that's
+   *  the right honest picture. */
+  pnl24h: number[] | null;
 }
 
 /**
@@ -44,12 +50,14 @@ export function readInitialAtlasSnapshot(): AtlasSnapshot {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { readState, readRecentDecisions, readRecentAttacks } = require("./db") as typeof import("./db");
     const state = readState();
-    const decisions = readRecentDecisions(40).map((d) => ({
+    const decisionsAll = readRecentDecisions(120);
+    const decisions = decisionsAll.slice(0, 40).map((d) => ({
       ...d,
       _kind: "decision" as const,
       _when: d.decidedAt,
     }));
-    const attacks = readRecentAttacks(40).map((a) => ({
+    const recentAttacks = readRecentAttacks(60);
+    const attacks = recentAttacks.slice(0, 40).map((a) => ({
       ...a,
       _kind: "attack" as const,
       _when: a.attemptedAt,
@@ -57,14 +65,32 @@ export function readInitialAtlasSnapshot(): AtlasSnapshot {
     const recentFeed = [...decisions, ...attacks]
       .sort((a, b) => (b._when > a._when ? 1 : -1))
       .slice(0, 40);
-    return { state, recentFeed };
+
+    // 24-hour PnL sparkline — bucket settled decisions into 24 hourly
+    // slots, cumulative net (negative = Atlas net-spent that hour).
+    const now = Date.now();
+    const dayAgo = now - 24 * 60 * 60 * 1000;
+    const buckets = new Array<number>(24).fill(0);
+    for (const d of decisionsAll) {
+      const t = Date.parse(d.decidedAt);
+      if (!isFinite(t) || t < dayAgo) continue;
+      if (d.outcome !== "settled") continue;
+      const hoursAgo = Math.floor((now - t) / (60 * 60 * 1000));
+      const idx = 23 - hoursAgo;
+      if (idx >= 0 && idx <= 23) {
+        // Atlas almost exclusively spends — use as negative delta
+        buckets[idx] -= d.amountUsd ?? 0;
+      }
+    }
+    let cum = 0;
+    const pnl24h = buckets.map((b) => (cum += b));
+
+    return { state, recentFeed, recentAttacks, pnl24h };
   } catch (e) {
-    // Log but don't throw — SSR must be resilient. Worst case, the
-    // client component sees `null` and renders its own loading state.
     console.warn(
       "[atlas/ssr] could not read initial snapshot:",
       e instanceof Error ? e.message : String(e),
     );
-    return { state: null, recentFeed: null };
+    return { state: null, recentFeed: null, recentAttacks: null, pnl24h: null };
   }
 }

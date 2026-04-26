@@ -30,6 +30,8 @@ export default function AtlasPage() {
     <AtlasClient
       initialState={snapshot.state}
       initialFeed={snapshot.recentFeed ?? []}
+      initialAttacks={snapshot.recentAttacks ?? []}
+      initialPnl24h={snapshot.pnl24h ?? new Array(24).fill(0)}
     />
   );
 }

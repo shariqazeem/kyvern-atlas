@@ -34,6 +34,7 @@ import {
   setVaultId,
 } from "./db";
 import { decide } from "./decide";
+import { autoDripIfLow } from "./auto-drip";
 
 // Config via env — keeps the runner hackable on the VM.
 const BASE_URL =
@@ -48,6 +49,23 @@ const HEARTBEAT_MS = 15_000;
 
 function log(...args: unknown[]) {
   console.log(`[atlas ${new Date().toISOString()}]`, ...args);
+}
+
+/** Section 3B — fire-and-forget auto-drip check. Logs the outcome,
+ *  swallows any error so the cycle loop is unaffected. */
+async function runAutoDrip(cycle: number): Promise<void> {
+  try {
+    const r = await autoDripIfLow();
+    if (r.skipped) {
+      log(`cycle ${cycle} · auto-drip skipped (${r.reason}) · balance=$${r.balance.toFixed(3)}`);
+    } else {
+      log(
+        `cycle ${cycle} · AUTO-DRIPPED $${r.amountUsd} → Atlas vault. balanceBefore=$${r.balanceBefore.toFixed(3)} sig=${r.signature.slice(0, 12)}…`,
+      );
+    }
+  } catch (e) {
+    log("cycle", cycle, "· auto-drip error:", e instanceof Error ? e.message : String(e));
+  }
 }
 
 export async function runAtlas(): Promise<void> {
@@ -89,6 +107,15 @@ async function doOneCycle() {
   const cycle = nextCycleId();
   recordCycleStart(cycle);
   const t0 = Date.now();
+
+  // Section 3B — auto-drip. Every 30 cycles (~90 min on 3-min cycles)
+  // check Atlas's USDC balance and top up from the treasury if dry.
+  // Cheap when healthy (one RPC read), only fires the transfer when
+  // the vault is below $1. Never throws — if the treasury isn't
+  // configured or the transfer errors, we log and move on.
+  if (cycle % 30 === 0) {
+    void runAutoDrip(cycle);
+  }
 
   const proposal = await decide();
   log(`cycle ${cycle} · decided:`, proposal.action, "→", proposal.reasoning);
