@@ -41,6 +41,7 @@ import { LiveTimer } from "@/components/atlas/live-timer";
 import { NumberScramble } from "@/components/atlas/number-scramble";
 import { AttackAtlas } from "@/components/atlas/attack-atlas";
 import { AttackLeaderboard } from "@/components/atlas/attack-leaderboard";
+import { TopUpAtlas } from "@/components/atlas/top-up-atlas";
 
 /* ── Types mirror /api/atlas/status + /api/atlas/decisions ──────── */
 
@@ -310,6 +311,8 @@ export default function AtlasClient({
           <AttackLeaderboard />
           <AttackAtlas />
         </motion.div>
+
+        <TopUpAtlas />
 
         {/* Current state card */}
         <motion.section
