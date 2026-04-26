@@ -50,7 +50,14 @@ interface ThoughtRow {
 interface LogRow {
   amount_usd: number | null;
   event_type: string;
-  timestamp: number;
+  timestamp: string; // SQL datetime string e.g. "2026-04-26 10:31:13"
+}
+
+function tsToMs(s: string): number {
+  // SQLite returns "YYYY-MM-DD HH:MM:SS" which JS Date can parse if we
+  // hint the timezone. Stored values are UTC.
+  const ms = Date.parse(s.replace(" ", "T") + "Z");
+  return isNaN(ms) ? 0 : ms;
 }
 
 function rpcUrlFor(network: string): string {
@@ -165,42 +172,48 @@ export async function GET(
   }
 
   // Money flow (last 24h + last hour) — pull from device_log
-  const logs24h = db
+  const allLogs = db
     .prepare(
       `SELECT amount_usd, event_type, timestamp
        FROM device_log
-       WHERE device_id = ? AND timestamp >= ?`,
+       WHERE device_id = ?
+       ORDER BY timestamp DESC
+       LIMIT 500`,
     )
-    .all(params.id, dayAgo) as LogRow[];
+    .all(params.id) as LogRow[];
 
   let earnedToday = 0;
   let spentToday = 0;
   let earnedLastHour = 0;
-  for (const r of logs24h) {
+  const buckets = new Array(24).fill(0);
+
+  for (const r of allLogs) {
+    const ms = tsToMs(r.timestamp);
+    if (ms < dayAgo) continue;
     const amt = r.amount_usd ?? 0;
     if (amt <= 0) continue;
+
     const isEarn = r.event_type === "earning_received";
     const isSpend = r.event_type === "spending_sent";
+
     if (isEarn) {
       earnedToday += amt;
-      if (r.timestamp >= minuteAgo) earnedLastHour += amt;
+      if (ms >= minuteAgo) earnedLastHour += amt;
     } else if (isSpend) {
       spentToday += amt;
+    }
+
+    const hoursAgo = Math.floor((now - ms) / (60 * 60 * 1000));
+    const idx = 23 - hoursAgo;
+    if (idx >= 0 && idx <= 23) {
+      if (isEarn) buckets[idx] += amt;
+      else if (isSpend) buckets[idx] -= amt;
     }
   }
   const netToday = earnedToday - spentToday;
   const earningPerMinUsd = earnedLastHour / 60;
 
-  // 24-bucket sparkline of cumulative net over the last 24 hours
-  const buckets = new Array(24).fill(0);
-  for (const r of logs24h) {
-    const hoursAgo = Math.floor((now - r.timestamp) / (60 * 60 * 1000));
-    const idx = 23 - hoursAgo;
-    if (idx < 0 || idx > 23) continue;
-    const amt = r.amount_usd ?? 0;
-    if (r.event_type === "earning_received") buckets[idx] += amt;
-    else if (r.event_type === "spending_sent") buckets[idx] -= amt;
-  }
+  // Cumulative net over the 24 hourly buckets
   let cum = 0;
   const sparkline = buckets.map((b) => (cum += b));
 
