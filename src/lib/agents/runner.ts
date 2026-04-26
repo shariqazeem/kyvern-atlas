@@ -1,23 +1,28 @@
 /**
- * AgentRunner — generalized tick loop for any user-spawned agent.
+ * AgentRunner — dual-mode tick loop.
  *
- * One tick = one Claude call. The agent thinks (text response) and
- * optionally uses a tool (tool_use block). We execute the tool,
- * record the thought + decision + signature in agent_thoughts AND
- * device_log so it shows up everywhere.
+ * Path A (preferred): Claude Haiku 4.5 with tool-use, prompt caching.
+ *   Used when ANTHROPIC_API_KEY is set AND a rate-limit slot is available.
+ *   Cached prefix (system prompt + tool schemas) keeps token cost low.
  *
- * Atlas (template='atlas') is NOT ticked by this runner — it has
- * its own dedicated PM2 process and decide.ts logic. This runner
- * handles user-spawned agents only.
+ * Path B (fallback): Scripted decisions per template (see scripted.ts).
+ *   Used when no key, rate-limited, or Claude errors. Same output shape.
+ *   Tool execution path is identical — both paths produce real signatures.
  *
- * Cost: Haiku for routine ticks (~$0.001/tick), Sonnet for explicit
- * reasoning (chat, large spends). Budget tracked in agents.metadata.
+ * Atlas (template='atlas') is NOT ticked here — it has its own dedicated
+ * PM2 process and decide.ts logic. Defensive guard included.
  */
 
 import Anthropic from "@anthropic-ai/sdk";
 import { writeDeviceLog } from "@/lib/vault-store";
-import { getAgent, recordAgentTick, listThoughts } from "./store";
+import {
+  getAgent,
+  recordAgentTick,
+  listThoughts,
+} from "./store";
 import { getTool } from "./tools";
+import { tryAcquireTickSlot } from "./rate-limit";
+import { scriptedTick } from "./scripted";
 import type {
   Agent,
   AgentDecision,
@@ -26,7 +31,7 @@ import type {
 } from "./types";
 
 const apiKey = process.env.ANTHROPIC_API_KEY;
-const HAIKU_MODEL = "claude-haiku-4-5-20251001";
+const HAIKU_MODEL = "claude-haiku-4-5";
 
 let _client: Anthropic | null = null;
 function client(): Anthropic | null {
@@ -35,12 +40,48 @@ function client(): Anthropic | null {
   return _client;
 }
 
-/* ─── System prompt construction ─── */
+/* ─── Build tool ctx (used by both paths) ─── */
 
-function buildSystemPrompt(
+function buildToolContext(agent: Agent): AgentToolContext {
+  return {
+    agent,
+    log: (entry) => {
+      writeDeviceLog({
+        deviceId: agent.deviceId,
+        eventType: entry.eventType ?? "ability_installed",
+        abilityId: undefined,
+        signature: entry.signature,
+        amountUsd: entry.amountUsd,
+        counterparty: entry.counterparty,
+        description: entry.description,
+        metadata: { agentId: agent.id, agentName: agent.name },
+      });
+    },
+  };
+}
+
+/* ─── Claude path ─── */
+
+function buildSystemPrompt(agent: Agent): string {
+  // STABLE prefix — gets cached. No timestamps, no per-request data.
+  return `You are ${agent.name}, an autonomous agent on Solana.
+
+PERSONALITY: ${agent.personalityPrompt}
+
+YOUR JOB: ${agent.jobPrompt}
+
+INSTRUCTIONS:
+- Each tick is one decision. Think briefly (1-3 sentences), then either use a tool or stay idle.
+- Stay in character. Be concise. Don't repeat past actions.
+- Tools that cost money cannot exceed your daily budget — the policy program enforces this on-chain.
+- If you spend money, justify why. If you earn, surface it to your owner via message_user.`;
+}
+
+function buildContextMessage(
   agent: Agent,
   recentThoughts: { thought: string; timestamp: number; toolUsed: string | null }[],
 ): string {
+  // VOLATILE part — placed in user message, not system prompt, so caching works.
   const lastThoughtsText = recentThoughts
     .slice(0, 5)
     .reverse()
@@ -51,142 +92,89 @@ function buildSystemPrompt(
     })
     .join("\n");
 
-  return `You are ${agent.name}, an autonomous agent on Solana.
+  return `Current status:
+- Total thoughts: ${agent.totalThoughts}
+- Earned: $${agent.totalEarnedUsd.toFixed(3)} · Spent: $${agent.totalSpentUsd.toFixed(3)}
+- Tick frequency: every ${agent.frequencySeconds}s
 
-PERSONALITY: ${agent.personalityPrompt}
+Recent thoughts:
+${lastThoughtsText || "(none — first tick)"}
 
-YOUR JOB: ${agent.jobPrompt}
-
-CURRENT STATUS:
-- Total thoughts so far: ${agent.totalThoughts}
-- Total earned: $${agent.totalEarnedUsd.toFixed(3)} USDC
-- Total spent: $${agent.totalSpentUsd.toFixed(3)} USDC
-- Tick frequency: every ${agent.frequencySeconds} seconds
-
-RECENT THOUGHTS:
-${lastThoughtsText || "(none yet — this is your first tick)"}
-
-INSTRUCTIONS:
-- This is one tick. Think briefly (1-3 sentences) about what to do.
-- Then either use a tool to act, or stay idle if nothing is worth doing.
-- Stay in character. Be concise. Don't repeat past actions unless useful.
-- If you spend money, justify why. If you earn money, surface it to your owner.
-- You cannot exceed your daily budget — the policy program will reject overspends.
-
-Your response should be a short thought followed by an optional tool call.`;
+Make your next decision. Brief reasoning + optional tool call.`;
 }
 
-/* ─── Convert AgentTool to Claude tool format ─── */
-
-function toClaudeTool(tool: AgentTool): {
-  name: string;
-  description: string;
-  input_schema: {
-    type: "object";
-    properties: Record<string, { type: string; description: string; enum?: string[] }>;
-    required: string[];
-  };
-} {
+function toClaudeTool(tool: AgentTool) {
   return {
     name: tool.id,
     description: tool.description,
     input_schema: {
-      type: "object",
+      type: "object" as const,
       properties: tool.schema.properties,
       required: tool.schema.required,
     },
   };
 }
 
-/* ─── The tick ─── */
-
-export async function tickAgent(agentId: string): Promise<{
-  success: boolean;
+interface ClaudeTickOutcome {
+  ok: boolean;
   thought?: string;
   toolUsed?: string;
   signature?: string;
-  reason?: string;
-}> {
-  const agent = getAgent(agentId);
-  if (!agent) return { success: false, reason: "agent not found" };
-  if (agent.status !== "alive") return { success: false, reason: `status=${agent.status}` };
-  if (agent.template === "atlas" && agent.id === "agt_atlas") {
-    // The original Atlas runs through its own dedicated PM2 process.
-    // Don't tick it from this runner.
-    return { success: false, reason: "atlas runs in its own process" };
-  }
+  rateLimited?: boolean;
+  error?: string;
+}
 
+async function claudeTick(agent: Agent, ctx: AgentToolContext): Promise<ClaudeTickOutcome> {
   const c = client();
-  if (!c) {
-    // No Claude key — record an idle thought so the agent appears active
-    recordAgentTick({
-      agentId: agent.id,
-      thought: "(no LLM key configured — idling)",
-      decision: { action: "idle" },
-    });
-    return { success: false, reason: "ANTHROPIC_API_KEY not set" };
-  }
+  if (!c) return { ok: false, error: "no_api_key" };
 
-  const recentThoughts = listThoughts(agent.id, 10);
-
-  // Resolve allowed tools
   const tools: AgentTool[] = agent.allowedTools
     .map((id) => getTool(id))
     .filter((t): t is AgentTool => !!t);
 
-  if (tools.length === 0) {
-    recordAgentTick({
-      agentId: agent.id,
-      thought: "I have no tools available. Idling until configured.",
-      decision: { action: "idle" },
-    });
-    return { success: false, reason: "no tools configured" };
-  }
+  if (tools.length === 0) return { ok: false, error: "no_tools" };
 
-  const claudeTools = tools.map(toClaudeTool);
-  const systemPrompt = buildSystemPrompt(agent, recentThoughts);
+  const recentThoughts = listThoughts(agent.id, 10);
+  const systemPrompt = buildSystemPrompt(agent);
+  const userMessage = buildContextMessage(agent, recentThoughts);
 
-  // Call Claude with tool-use
-  let response: Awaited<ReturnType<typeof c.messages.create>>;
+  let response;
   try {
     response = await c.messages.create({
       model: HAIKU_MODEL,
       max_tokens: 1024,
-      system: systemPrompt,
-      messages: [
+      // Cache the system prompt + tool definitions (stable prefix)
+      system: [
         {
-          role: "user",
-          content:
-            "Make your next decision. Think briefly (1-3 sentences) then either use a tool or stay idle.",
+          type: "text",
+          text: systemPrompt,
+          cache_control: { type: "ephemeral" },
         },
       ],
-      tools: claudeTools,
+      tools: tools.map(toClaudeTool),
+      messages: [{ role: "user", content: userMessage }],
     });
   } catch (e) {
+    // Detect rate limit
+    if (e instanceof Anthropic.RateLimitError) {
+      return { ok: false, rateLimited: true, error: "rate_limit" };
+    }
     const msg = e instanceof Error ? e.message : String(e);
-    recordAgentTick({
-      agentId: agent.id,
-      thought: `(LLM error: ${msg.slice(0, 200)})`,
-      decision: { action: "idle" },
-    });
-    return { success: false, reason: `claude error: ${msg}` };
+    return { ok: false, error: msg };
   }
 
   // Parse Claude's response
   let thought = "";
   let toolUseBlock: {
-    type: "tool_use";
     id: string;
     name: string;
     input: Record<string, unknown>;
   } | null = null;
 
   for (const block of response.content) {
-    if (block.type === "text") {
-      thought += block.text;
-    } else if (block.type === "tool_use") {
+    if (block.type === "text") thought += block.text;
+    else if (block.type === "tool_use") {
       toolUseBlock = {
-        type: "tool_use",
         id: block.id,
         name: block.name,
         input: block.input as Record<string, unknown>,
@@ -196,17 +184,17 @@ export async function tickAgent(agentId: string): Promise<{
 
   thought = thought.trim() || "(no reasoning offered)";
 
-  // No tool — just observation
+  // No tool — observe only
   if (!toolUseBlock) {
     recordAgentTick({
       agentId: agent.id,
       thought,
       decision: { action: "observe" },
     });
-    return { success: true, thought };
+    return { ok: true, thought };
   }
 
-  // Execute the tool
+  // Execute tool
   const tool = getTool(toolUseBlock.name);
   if (!tool) {
     recordAgentTick({
@@ -214,25 +202,8 @@ export async function tickAgent(agentId: string): Promise<{
       thought: `${thought} [unknown tool: ${toolUseBlock.name}]`,
       decision: { action: "observe" },
     });
-    return { success: false, reason: `unknown tool: ${toolUseBlock.name}` };
+    return { ok: true, thought };
   }
-
-  // Build the tool context — log function bridges to device_log
-  const ctx: AgentToolContext = {
-    agent,
-    log: (entry) => {
-      writeDeviceLog({
-        deviceId: agent.deviceId,
-        eventType: entry.eventType ?? "ability_installed",
-        abilityId: tool.id,
-        signature: entry.signature,
-        amountUsd: entry.amountUsd,
-        counterparty: entry.counterparty,
-        description: entry.description,
-        metadata: { agentId: agent.id, agentName: agent.name },
-      });
-    },
-  };
 
   let toolResult;
   try {
@@ -244,7 +215,6 @@ export async function tickAgent(agentId: string): Promise<{
     };
   }
 
-  // Record the thought + decision in agent_thoughts
   const decision: AgentDecision = {
     action: "tool_call",
     toolId: tool.id,
@@ -262,10 +232,87 @@ export async function tickAgent(agentId: string): Promise<{
   });
 
   return {
-    success: true,
+    ok: true,
     thought,
     toolUsed: tool.id,
     signature: toolResult.signature,
+  };
+}
+
+/* ─── Scripted path wrapper ─── */
+
+async function scriptedTickWrapper(agent: Agent, ctx: AgentToolContext) {
+  const result = await scriptedTick(agent, ctx);
+
+  recordAgentTick({
+    agentId: agent.id,
+    thought: result.thought,
+    decision: result.decision,
+    signature: result.toolResult?.signature ?? null,
+    amountUsd: result.toolResult?.amountUsd ?? null,
+    counterparty: result.toolResult?.counterparty ?? null,
+  });
+
+  return {
+    ok: true,
+    thought: result.thought,
+    toolUsed: result.decision.toolId,
+    signature: result.toolResult?.signature,
+  };
+}
+
+/* ─── Public tick API ─── */
+
+export async function tickAgent(agentId: string): Promise<{
+  success: boolean;
+  thought?: string;
+  toolUsed?: string;
+  signature?: string;
+  reason?: string;
+  mode?: "claude" | "scripted";
+}> {
+  const agent = getAgent(agentId);
+  if (!agent) return { success: false, reason: "agent not found" };
+  if (agent.status !== "alive")
+    return { success: false, reason: `status=${agent.status}` };
+  if (agent.template === "atlas" && agent.id === "agt_atlas") {
+    return { success: false, reason: "atlas runs in its own process" };
+  }
+
+  const ctx = buildToolContext(agent);
+
+  // Try Claude path first if key + rate-limit slot
+  const haveKey = !!apiKey;
+  const haveSlot = haveKey && tryAcquireTickSlot();
+
+  if (haveSlot) {
+    const claude = await claudeTick(agent, ctx);
+
+    // Success → return
+    if (claude.ok) {
+      return {
+        success: true,
+        thought: claude.thought,
+        toolUsed: claude.toolUsed,
+        signature: claude.signature,
+        mode: "claude",
+      };
+    }
+
+    // Rate limited or error → fall through to scripted (don't waste the tick)
+    console.log(
+      `[runner] claude path failed (${claude.error ?? "unknown"}) — falling back to scripted for ${agent.id}`,
+    );
+  }
+
+  // Scripted fallback (also: when no key, no slot, or claude errored)
+  const scripted = await scriptedTickWrapper(agent, ctx);
+  return {
+    success: scripted.ok,
+    thought: scripted.thought,
+    toolUsed: scripted.toolUsed ?? undefined,
+    signature: scripted.signature,
+    mode: "scripted",
   };
 }
 
@@ -283,7 +330,6 @@ export async function tickEligibleAgents(): Promise<{
   let errors = 0;
 
   for (const agent of agents) {
-    // Skip Atlas — it has its own runner
     if (agent.template === "atlas" && agent.id === "agt_atlas") continue;
 
     const dueAt = (agent.lastThoughtAt ?? 0) + agent.frequencySeconds * 1000;
