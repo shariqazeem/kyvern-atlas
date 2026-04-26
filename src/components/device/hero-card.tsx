@@ -103,33 +103,44 @@ function ScrambleNumber({
 function Sparkline({
   values,
   color,
-  width = 96,
-  height = 28,
+  width = 160,
+  height = 36,
+  gradientId = "spark-grad",
 }: {
   values: number[];
   color: string;
   width?: number;
   height?: number;
+  gradientId?: string;
 }) {
   if (!values || values.length === 0) return null;
   const min = Math.min(...values, 0);
   const max = Math.max(...values, 0);
   const range = max - min || 1;
   const stepX = width / Math.max(1, values.length - 1);
-  const path = values
-    .map((v, i) => {
-      const x = i * stepX;
-      const y = height - ((v - min) / range) * height;
-      return `${i === 0 ? "M" : "L"}${x.toFixed(2)},${y.toFixed(2)}`;
-    })
+  const points = values.map((v, i) => {
+    const x = i * stepX;
+    const y = height - ((v - min) / range) * (height - 2) - 1;
+    return { x, y };
+  });
+  const linePath = points
+    .map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(2)},${p.y.toFixed(2)}`)
     .join(" ");
+  const areaPath = `${linePath} L${width.toFixed(2)},${height} L0,${height} Z`;
   return (
     <svg width={width} height={height} className="block">
+      <defs>
+        <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity={0.35} />
+          <stop offset="100%" stopColor={color} stopOpacity={0} />
+        </linearGradient>
+      </defs>
+      <path d={areaPath} fill={`url(#${gradientId})`} />
       <path
-        d={path}
+        d={linePath}
         fill="none"
         stroke={color}
-        strokeWidth={1.5}
+        strokeWidth={1.75}
         strokeLinecap="round"
         strokeLinejoin="round"
       />
@@ -167,23 +178,31 @@ function StatusPill({
 function WorkerAvatar({ emoji, thinking, name }: { emoji: string; thinking: boolean; name: string }) {
   return (
     <div className="relative" title={name}>
+      {/* always-on subtle ring — signals "powered" even at rest */}
+      <div
+        className="absolute inset-[-3px] rounded-full pointer-events-none"
+        style={{ border: "1px solid rgba(255,255,255,0.12)" }}
+      />
       <div
         className="w-9 h-9 rounded-full flex items-center justify-center text-[18px] relative z-10"
         style={{
           background: "rgba(255,255,255,0.04)",
-          border: "1px solid rgba(255,255,255,0.1)",
+          border: "1px solid rgba(255,255,255,0.14)",
+          boxShadow: thinking
+            ? "0 0 0 1px rgba(74,222,128,0.18), 0 0 14px rgba(74,222,128,0.18)"
+            : undefined,
         }}
       >
         {emoji}
       </div>
       {thinking && (
         <motion.div
-          className="absolute inset-[-3px] rounded-full pointer-events-none"
+          className="absolute inset-[-5px] rounded-full pointer-events-none"
           style={{
-            border: "1px dashed rgba(74,222,128,0.6)",
+            border: "1.5px dashed rgba(74,222,128,0.85)",
           }}
           animate={{ rotate: 360 }}
-          transition={{ duration: 6, repeat: Infinity, ease: "linear" }}
+          transition={{ duration: 5, repeat: Infinity, ease: "linear" }}
         />
       )}
     </div>
@@ -314,7 +333,7 @@ export function DeviceHeroCard({ deviceId }: { deviceId: string }) {
           <ScrambleNumber
             value={status?.usdcBalance ?? 0}
             prefix="$"
-            decimals={3}
+            decimals={2}
             className="font-mono text-white text-[56px] sm:text-[80px] leading-none tracking-tight font-light"
           />
           <div
@@ -409,14 +428,14 @@ export function DeviceHeroCard({ deviceId }: { deviceId: string }) {
               className="font-mono text-[18px] mt-1"
               style={{ color: netColor, fontVariantNumeric: "tabular-nums" }}
             >
-              {netPositive ? "+" : ""}${(status?.pnlToday.net ?? 0).toFixed(3)}
+              {netPositive ? "+" : ""}${(status?.pnlToday.net ?? 0).toFixed(2)}
             </div>
           </div>
           <Sparkline
             values={status?.pnlSparkline ?? new Array(24).fill(0)}
             color={sparkColor}
-            width={96}
-            height={28}
+            width={160}
+            height={36}
           />
         </div>
       </div>

@@ -135,7 +135,12 @@ export async function GET(
     id: a.id,
     name: a.name,
     emoji: a.emoji,
-    isThinking: a.last_thought_at != null && now - a.last_thought_at < 30_000,
+    // "thinking" if alive AND ticked recently — wide enough that the orbit
+    // ring is reliably visible in screenshots, narrow enough to mean it
+    isThinking:
+      a.status === "alive" &&
+      a.last_thought_at != null &&
+      now - a.last_thought_at < 90_000,
     totalThoughts: a.total_thoughts,
     totalEarnedUsd: a.total_earned_usd,
   }));

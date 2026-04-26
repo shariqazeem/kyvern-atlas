@@ -1,13 +1,50 @@
 "use client";
 
 /**
- * StatusBar — top system bar showing network + greeting.
- * Like the iOS status bar but for Kyvern.
+ * StatusBar — top system bar showing network + greeting + device serial.
+ *
+ * The greeting personalises with the user's active device serial so the
+ * very first line of chrome reads as: "Solana devnet · Good afternoon ·
+ * KVN-LZJSXSSN online." Greeting → device identity in one line.
  */
 
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
+import { useAuth } from "@/hooks/use-auth";
 
-export function StatusBar({ network = "devnet" }: { network?: string }) {
+interface VaultBrief {
+  vault: { id: string; network: string };
+}
+
+function devWallet(): string {
+  if (typeof window === "undefined") return "";
+  const K = "kyvern:dev-wallet";
+  return window.localStorage.getItem(K) ?? "";
+}
+
+export function StatusBar({ network: forcedNetwork }: { network?: string }) {
+  const { wallet, isLoading } = useAuth();
+  const [serial, setSerial] = useState<string | null>(null);
+  const [networkFromVault, setNetworkFromVault] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isLoading) return;
+    const owner = wallet ?? devWallet();
+    if (!owner) return;
+    fetch(`/api/vault/list?ownerWallet=${encodeURIComponent(owner)}`)
+      .then((r) => (r.ok ? r.json() : { vaults: [] }))
+      .then((d) => {
+        const vaults = (d?.vaults ?? []) as VaultBrief[];
+        if (vaults.length > 0) {
+          const v = vaults[0].vault;
+          setSerial(`KVN-${v.id.replace("vlt_", "").slice(0, 8).toUpperCase()}`);
+          setNetworkFromVault(v.network);
+        }
+      })
+      .catch(() => {});
+  }, [isLoading, wallet]);
+
+  const network = forcedNetwork ?? networkFromVault ?? "devnet";
   const h = new Date().getHours();
   const greeting =
     h < 5 ? "Night owl" : h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
@@ -31,7 +68,16 @@ export function StatusBar({ network = "devnet" }: { network?: string }) {
           Solana {network}
         </span>
       </div>
-      <span className="text-[12px] text-[#9CA3AF]">{greeting}</span>
+      <span className="text-[12px] text-[#9CA3AF]">
+        {greeting}
+        {serial && (
+          <>
+            <span className="mx-1.5 text-[#D1D5DB]">·</span>
+            <span className="font-mono text-[11px] text-[#6B7280]">{serial}</span>
+            <span className="ml-1.5 text-[11px] text-[#22C55E]">online</span>
+          </>
+        )}
+      </span>
     </div>
   );
 }

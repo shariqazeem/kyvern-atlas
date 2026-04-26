@@ -29,7 +29,15 @@ function timeOnly(ts: string): string {
   const hh = String(d.getUTCHours()).padStart(2, "0");
   const mm = String(d.getUTCMinutes()).padStart(2, "0");
   const ss = String(d.getUTCSeconds()).padStart(2, "0");
-  return `${hh}:${mm}:${ss}`;
+  // Date prefix only when not today — avoids the "10:58 above 19:48" confusion
+  const now = new Date();
+  const sameDay =
+    d.getUTCFullYear() === now.getUTCFullYear() &&
+    d.getUTCMonth() === now.getUTCMonth() &&
+    d.getUTCDate() === now.getUTCDate();
+  if (sameDay) return `${hh}:${mm}:${ss}`;
+  const month = d.toLocaleString("en-US", { month: "short", timeZone: "UTC" });
+  return `${month} ${d.getUTCDate()} ${hh}:${mm}`;
 }
 
 function verb(e: LogEntry): { text: string; color: string } {
@@ -61,7 +69,7 @@ export function ActivityFeed({ deviceId }: { deviceId: string }) {
   useEffect(() => {
     let alive = true;
     const load = () => {
-      fetch(`/api/devices/${deviceId}/log?limit=8`)
+      fetch(`/api/devices/${deviceId}/log?limit=10`)
         .then((r) => (r.ok ? r.json() : null))
         .then((d) => {
           if (alive && d?.log) setRows(d.log as LogEntry[]);
@@ -76,7 +84,14 @@ export function ActivityFeed({ deviceId }: { deviceId: string }) {
     };
   }, [deviceId]);
 
-  const top = rows.slice(0, 5);
+  // Defensive client-side sort by parsed timestamp (newest first)
+  const top = [...rows]
+    .sort((a, b) => {
+      const ta = Date.parse(a.timestamp.replace(" ", "T") + "Z");
+      const tb = Date.parse(b.timestamp.replace(" ", "T") + "Z");
+      return tb - ta;
+    })
+    .slice(0, 5);
 
   return (
     <div
