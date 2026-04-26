@@ -366,6 +366,18 @@ export default function SpawnPage() {
                   border: "1px solid rgba(0,0,0,0.08)",
                 }}
               />
+              {/^.*0x[0-9a-fA-F]{40}.*$/m.test(job) && (
+                <div
+                  className="mt-2 px-3 py-2 rounded-[10px] text-[11px] leading-[1.5]"
+                  style={{
+                    background: "#FEF3C7",
+                    border: "1px solid #FDE68A",
+                    color: "#92400E",
+                  }}
+                >
+                  <strong>That looks like an Ethereum address (0x…).</strong> Workers run on Solana — wallets here are base58 (e.g. <span className="font-mono">7Yk8cPDKL5h4QnQiVhHcvWg9HXKJpQfTmnK9zTzk5bWqA</span>). If you mean a Solana wallet, replace the 0x… address before spawning, or your worker will loop asking for a Solana address.
+                </div>
+              )}
               <div className="mt-1.5 flex items-center gap-1.5 text-[10px] text-[#8B8B8B]">
                 <Zap className="w-2.5 h-2.5" />
                 <span>

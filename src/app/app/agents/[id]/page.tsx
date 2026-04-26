@@ -10,7 +10,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Send, Pause, Play, Activity } from "lucide-react";
+import { ArrowLeft, Send, Pause, Play, Activity, X } from "lucide-react";
 import { StatBlock } from "@/components/primitives/stat-block";
 import { SignaturePill } from "@/components/primitives/signature-pill";
 import { fmtAgo } from "@/lib/format";
@@ -159,11 +159,41 @@ export default function AgentDetailPage({ params }: { params: { id: string } }) 
     }
   }, [inputValue, sending, params.id]);
 
+  const setStatus = useCallback(
+    async (next: "alive" | "paused" | "retired") => {
+      if (!agent) return;
+      try {
+        const res = await fetch(`/api/agents/${params.id}/status`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: next }),
+        });
+        if (res.ok) {
+          setAgent((a) => (a ? { ...a, status: next } : a));
+        }
+      } catch {
+        /* ignore */
+      }
+    },
+    [agent, params.id],
+  );
+
   const handlePauseResume = useCallback(async () => {
     if (!agent) return;
-    // TODO: wire to /api/agents/[id]/status PATCH endpoint
-    alert("Pause/resume coming in Phase 5");
-  }, [agent]);
+    if (agent.status === "alive") await setStatus("paused");
+    else if (agent.status === "paused") await setStatus("alive");
+  }, [agent, setStatus]);
+
+  const handleRetire = useCallback(async () => {
+    if (!agent) return;
+    const confirmed =
+      typeof window !== "undefined" &&
+      window.confirm(
+        `Retire ${agent.name}? This is permanent — the worker will stop ticking and can't be brought back. Use Pause instead if you might restart it later.`,
+      );
+    if (!confirmed) return;
+    await setStatus("retired");
+  }, [agent, setStatus]);
 
   if (loading) {
     return (
@@ -249,13 +279,28 @@ export default function AgentDetailPage({ params }: { params: { id: string } }) 
               <span className="text-[11px] text-[#9B9B9B] font-mono">{agent.template}</span>
             </div>
           </div>
-          <button
-            onClick={handlePauseResume}
-            className="w-9 h-9 rounded-[10px] flex items-center justify-center transition-colors"
-            style={{ background: "#F5F5F5", color: "#6B6B6B" }}
-          >
-            {isAlive ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-          </button>
+          <div className="flex items-center gap-1.5">
+            {agent.status !== "retired" && (
+              <button
+                onClick={handlePauseResume}
+                title={isAlive ? "Pause worker" : "Resume worker"}
+                className="w-9 h-9 rounded-[10px] flex items-center justify-center transition-colors active:scale-[0.95]"
+                style={{ background: "#F5F5F5", color: "#6B6B6B" }}
+              >
+                {isAlive ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+              </button>
+            )}
+            {agent.status !== "retired" && (
+              <button
+                onClick={handleRetire}
+                title="Retire worker (permanent)"
+                className="w-9 h-9 rounded-[10px] flex items-center justify-center transition-colors active:scale-[0.95]"
+                style={{ background: "#FEE2E2", color: "#B91C1C" }}
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Stats */}

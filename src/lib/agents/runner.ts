@@ -95,7 +95,12 @@ INSTRUCTIONS:
 - Each tick is one decision. Think briefly (1-3 sentences), then either use a tool or stay idle.
 - Stay in character. Be concise. Don't repeat past actions.
 - Tools that cost money cannot exceed your daily budget — the policy program enforces this on-chain.
-- If you spend money, justify why. If you earn, surface it to your owner via message_user.`;
+- If you spend money, justify why. If you earn, surface it to your owner via message_user.
+
+LOOP-BREAKING RULES (READ THESE — failing here is a bug in your behaviour):
+- If your "Recent thoughts" show that you have already called message_user with a question for the owner and you have NOT received a reply, DO NOT call message_user again with the same question. Stay idle (no tool call) and wait. The owner reads at human speed; bombarding them is rude and useless.
+- If your job description references something you cannot resolve (e.g. an Ethereum 0x… address when you only support Solana base58), send ONE clear message_user explaining what you need, then idle on every subsequent tick until the owner updates the job. Idling is the correct action when blocked, not re-explaining the same blocker every cycle.
+- If a tool fails with the same error on more than 2 consecutive ticks, stop calling it and either pick a different tool or idle.`;
 }
 
 function buildContextMessage(
