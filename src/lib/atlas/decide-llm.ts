@@ -32,7 +32,7 @@ import type { AtlasDecision } from "./schema";
 import type { AtlasContext } from "./decide";
 
 const COMMONSTACK_BASE_URL = "https://api.commonstack.ai/v1";
-const DEFAULT_MODEL = "deepseek/deepseek-v4-flash";
+const DEFAULT_MODEL = "deepseek/deepseek-v3.2";
 
 /** Same shape the scripted decide() returns. */
 export interface DecisionProposal {

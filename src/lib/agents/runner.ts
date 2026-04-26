@@ -31,7 +31,10 @@ import type {
 } from "./types";
 
 const COMMONSTACK_BASE_URL = "https://api.commonstack.ai/v1";
-const MODEL = "deepseek/deepseek-v4-flash";
+// v4-flash is in the catalog but blocked at the API layer for our account
+// (works in playground, returns 403 "no accessible providers" via REST).
+// v3.2 is the next-cheapest fully-accessible DeepSeek with tool-use support.
+const MODEL = "deepseek/deepseek-v3.2";
 
 let _client: OpenAI | null = null;
 function getApiKey(): string | undefined {

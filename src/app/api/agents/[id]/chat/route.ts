@@ -18,7 +18,7 @@ import type {
 } from "@/lib/agents/types";
 
 const COMMONSTACK_BASE_URL = "https://api.commonstack.ai/v1";
-const MODEL = "deepseek/deepseek-v4-flash";
+const MODEL = "deepseek/deepseek-v3.2";
 
 let _client: OpenAI | null = null;
 function getApiKey(): string | undefined {
