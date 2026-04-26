@@ -12,6 +12,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
+import { TopUpDrawer } from "./top-up-drawer";
 
 interface LiveStatus {
   serial: string;
@@ -19,6 +20,9 @@ interface LiveStatus {
   paused: boolean;
   bornAt: string;
   usdcBalance: number;
+  solBalance: number;
+  vaultPda: string | null;
+  usdcAta: string | null;
   pnlToday: { earned: number; spent: number; net: number };
   pnlSparkline: number[];
   workersActive: number;
@@ -230,6 +234,7 @@ function agoLabel(seconds: number): string {
 
 export function DeviceHeroCard({ deviceId }: { deviceId: string }) {
   const [status, setStatus] = useState<LiveStatus | null>(null);
+  const [topUpOpen, setTopUpOpen] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -376,7 +381,7 @@ export function DeviceHeroCard({ deviceId }: { deviceId: string }) {
         </div>
 
         {/* Workers row */}
-        <div className="flex items-center justify-center gap-2 mb-6 flex-wrap">
+        <div className="flex items-center justify-center gap-2 mb-4 flex-wrap">
           {status?.workers && status.workers.length > 0 ? (
             <>
               {status.workers.slice(0, 8).map((w) => (
@@ -412,6 +417,35 @@ export function DeviceHeroCard({ deviceId }: { deviceId: string }) {
           )}
         </div>
 
+        {/* Top up trigger — subtle, always visible, more prominent when dry */}
+        <div className="flex justify-center mb-5">
+          <button
+            type="button"
+            onClick={() => setTopUpOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] transition active:scale-[0.97]"
+            style={{
+              background:
+                (status?.usdcBalance ?? 0) > 0
+                  ? "rgba(255,255,255,0.04)"
+                  : "rgba(74,222,128,0.08)",
+              border:
+                (status?.usdcBalance ?? 0) > 0
+                  ? "1px solid rgba(255,255,255,0.1)"
+                  : "1px solid rgba(74,222,128,0.35)",
+              color:
+                (status?.usdcBalance ?? 0) > 0
+                  ? "rgba(255,255,255,0.85)"
+                  : "rgba(220,255,232,0.95)",
+            }}
+          >
+            <span style={{ fontSize: 13, lineHeight: 1, marginTop: -1 }}>+</span>
+            Top up{" "}
+            {status?.serial ? (
+              <span className="font-mono opacity-70">{status.serial}</span>
+            ) : null}
+          </button>
+        </div>
+
         {/* PnL today + sparkline */}
         <div
           className="flex items-end justify-between pt-4"
@@ -439,6 +473,16 @@ export function DeviceHeroCard({ deviceId }: { deviceId: string }) {
           />
         </div>
       </div>
+
+      <TopUpDrawer
+        open={topUpOpen}
+        onClose={() => setTopUpOpen(false)}
+        vaultPda={status?.vaultPda ?? null}
+        usdcAta={status?.usdcAta ?? null}
+        network={status?.network ?? "devnet"}
+        solBalance={status?.solBalance ?? 0}
+        usdcBalance={status?.usdcBalance ?? 0}
+      />
     </motion.div>
   );
 }

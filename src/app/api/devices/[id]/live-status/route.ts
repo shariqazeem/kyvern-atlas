@@ -67,17 +67,29 @@ function rpcUrlFor(network: string): string {
   return process.env.SOLANA_DEVNET_RPC ?? "https://api.devnet.solana.com";
 }
 
-async function fetchUsdcBalance(vaultPda: string, network: string): Promise<number> {
+async function fetchVaultBalances(
+  vaultPda: string,
+  network: string,
+): Promise<{ usdc: number; sol: number; usdcAta: string | null }> {
   try {
     const conn = new Connection(rpcUrlFor(network), "confirmed");
     const owner = new PublicKey(vaultPda);
     const mint = new PublicKey(network === "mainnet" ? USDC_MINT_MAINNET : USDC_MINT_DEVNET);
-    const accounts = await conn.getParsedTokenAccountsByOwner(owner, { mint });
-    if (accounts.value.length === 0) return 0;
-    const ui = accounts.value[0].account.data.parsed.info.tokenAmount.uiAmount;
-    return typeof ui === "number" ? ui : 0;
+    const [accounts, lamports] = await Promise.all([
+      conn.getParsedTokenAccountsByOwner(owner, { mint }),
+      conn.getBalance(owner),
+    ]);
+    let usdc = 0;
+    let usdcAta: string | null = null;
+    if (accounts.value.length > 0) {
+      const acc = accounts.value[0];
+      const ui = acc.account.data.parsed.info.tokenAmount.uiAmount;
+      usdc = typeof ui === "number" ? ui : 0;
+      usdcAta = acc.pubkey.toBase58();
+    }
+    return { usdc, sol: lamports / 1e9, usdcAta };
   } catch {
-    return 0;
+    return { usdc: 0, sol: 0, usdcAta: null };
   }
 }
 
@@ -222,10 +234,10 @@ export async function GET(
   let cum = 0;
   const sparkline = buckets.map((b) => (cum += b));
 
-  // USDC balance — live on-chain (legacy vaults without a PDA report 0)
-  const usdcBalance = vault.vaultPda
-    ? await fetchUsdcBalance(vault.vaultPda, vault.network)
-    : 0;
+  // On-chain balances (legacy vaults without a PDA report zero)
+  const balances = vault.vaultPda
+    ? await fetchVaultBalances(vault.vaultPda, vault.network)
+    : { usdc: 0, sol: 0, usdcAta: null };
 
   const serial = `KVN-${params.id.replace("vlt_", "").slice(0, 8).toUpperCase()}`;
 
@@ -234,7 +246,10 @@ export async function GET(
     network: vault.network,
     paused: !!vault.pausedAt,
     bornAt: vault.createdAt,
-    usdcBalance,
+    usdcBalance: balances.usdc,
+    solBalance: balances.sol,
+    vaultPda: vault.vaultPda,
+    usdcAta: balances.usdcAta,
     pnlToday: { earned: earnedToday, spent: spentToday, net: netToday },
     pnlSparkline: sparkline,
     workersActive,
