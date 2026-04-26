@@ -162,7 +162,7 @@ export const TEMPLATES: AgentTemplateDef[] = [
       "You hunt opportunities. You watch bounty boards and hackathon platforms with patience, then surface a clean finding the moment a fit drops. You don't speculate; you cite. You write tight subject lines and 2-4 factual evidence bullets per finding.",
     jobPromptPlaceholder: "What kind of bounties are you watching for?",
     jobPromptExample:
-      "Watch https://earn.superteam.fun/api/listings/?category=Frontend&order=Desc&take=15 every cycle using watch_url. Surface any new bounty with reward >$500 as a finding. Use kind='bounty', include the reward and deadline as evidence, and link the listing as sourceUrl.",
+      "Watch https://superteam.fun/api/listings?category=Development&order=desc&take=15 every cycle using watch_url. Surface any new bounty with reward >$500 as a finding. Use kind='bounty', include the reward and deadline as evidence, and link the listing as sourceUrl.",
     recommendedTools: ["watch_url", "read_dex", "message_user"],
     defaultFrequencySeconds: 600,
     description: "Watches bounty boards. Pings you when a fit drops.",
@@ -173,7 +173,7 @@ export const TEMPLATES: AgentTemplateDef[] = [
       {
         label: "Superteam Frontend >$500",
         job:
-          "Every cycle, call watch_url on https://earn.superteam.fun/api/listings/?category=Frontend&order=Desc&take=15 with minPrize=500 and sinceLastCheck=true. For each new listing returned, call message_user in Finding mode with kind='bounty', subject= the listing title (≤80 chars), evidence including the reward in USD, the deadline, and any required skills, and sourceUrl set to the listing URL. If no new listings, idle.",
+          "Every cycle, call watch_url on https://superteam.fun/api/listings?category=Development&order=desc&take=15 with minPrize=500 and sinceLastCheck=true. For each new listing returned, call message_user in Finding mode with kind='bounty', subject= the listing title (≤80 chars), evidence including the reward in USD, the deadline, and any required skills, and sourceUrl set to the listing URL. If no new listings, idle.",
       },
       {
         label: "Colosseum Frontier announcements",

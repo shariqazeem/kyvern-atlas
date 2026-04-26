@@ -29,7 +29,11 @@ import type { AgentTool } from "../types";
 import { readWatchCache, writeWatchCache } from "../store";
 
 const FETCH_TIMEOUT_MS = 5000;
-const SUPERTEAM_HOST = "earn.superteam.fun";
+// Superteam moved their listings API from earn.superteam.fun to
+// superteam.fun in early 2026 (the old host now 308-redirects, but the
+// old enum values like Frontend are also rejected — we accept both
+// hosts and let the URL the user/agent supplies determine the path).
+const SUPERTEAM_HOSTS = new Set(["earn.superteam.fun", "superteam.fun"]);
 
 interface NormalizedItem {
   id: string;
@@ -80,10 +84,12 @@ async function fetchSuperteam(url: string): Promise<{ items: NormalizedItem[]; o
       : (parsed as { listings?: ListingItem[] }).listings ?? [];
     const items: NormalizedItem[] = arr.map((it) => {
       const slug = it.slug ?? it.id ?? md5(String(it.title ?? Math.random()));
+      // Superteam canonical listing URL pattern post-2026 migration.
+      const listingUrl = `https://superteam.fun/listing/${slug}`;
       return {
         id: String(slug),
         title: String(it.title ?? "Untitled listing"),
-        url: `https://earn.superteam.fun/listings/${slug}/`,
+        url: listingUrl,
         summary: it.description ? String(it.description).slice(0, 240) : undefined,
         rewardUsd:
           typeof it.usdValue === "number"
@@ -283,7 +289,7 @@ export const watchUrlTool: AgentTool = {
     // Fetch
     let result: { items: NormalizedItem[]; ok: boolean; raw?: string };
     let kindHint: string;
-    if (parsedUrl.host === SUPERTEAM_HOST) {
+    if (SUPERTEAM_HOSTS.has(parsedUrl.host)) {
       result = await fetchSuperteam(url);
       kindHint = "bounty";
     } else if (format === "rss") {
