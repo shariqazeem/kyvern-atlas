@@ -1,17 +1,21 @@
 /**
- * Simple in-memory rate limiter for Claude API calls.
+ * In-memory client-side throttle for LLM calls.
  *
- * Free tier limit: 5 RPM across all models.
- * We reserve headroom: max 4 requests in any 60-second window.
- * The 5th slot stays available for chat (which is user-triggered, latency-sensitive).
+ * We're on paid Commonstack credits with DeepSeek V4 flash, so the
+ * real provider rate limits are far higher than what an agent pool
+ * can produce. The cap here is just a runaway-loop safety valve, not
+ * a budget gate. The user wants the LLM path to win nearly every
+ * tick — scripted is a true fallback for actual API errors only, not
+ * for client-side throttling.
  *
- * Returns true if a slot is available, false if rate-limited.
- * Caller should fall back to scripted mode on false.
+ * Caps below are deliberately generous (10 RPS for ticks). If the
+ * provider returns a 429, the runner catches it and falls through to
+ * scripted for that one tick — exactly the behavior we want.
  */
 
 const WINDOW_MS = 60_000;
-const MAX_REQUESTS = 4; // reserve 1 RPM headroom for chat
-const MAX_CHAT_REQUESTS = 1; // strict reserve for chat
+const MAX_TICK_REQUESTS = 600; // 10 RPS safety cap
+const MAX_CHAT_REQUESTS = 120; // 2 RPS safety cap for chat
 
 const tickTimestamps: number[] = [];
 const chatTimestamps: number[] = [];
@@ -24,27 +28,18 @@ function pruneOlderThan(arr: number[], cutoff: number): void {
 export function tryAcquireTickSlot(): boolean {
   const now = Date.now();
   pruneOlderThan(tickTimestamps, now - WINDOW_MS);
-  if (tickTimestamps.length >= MAX_REQUESTS) return false;
+  if (tickTimestamps.length >= MAX_TICK_REQUESTS) return false;
   tickTimestamps.push(now);
   return true;
 }
 
-/** Check + reserve a slot for chat. Has a separate quota that always works. */
+/** Check + reserve a slot for chat. Independent budget from ticks. */
 export function tryAcquireChatSlot(): boolean {
   const now = Date.now();
   pruneOlderThan(chatTimestamps, now - WINDOW_MS);
-  // Chat can use up to MAX_CHAT_REQUESTS in any window, OR steal from tick budget
-  if (chatTimestamps.length < MAX_CHAT_REQUESTS) {
-    chatTimestamps.push(now);
-    return true;
-  }
-  // Try to steal from tick budget
-  pruneOlderThan(tickTimestamps, now - WINDOW_MS);
-  if (tickTimestamps.length < MAX_REQUESTS) {
-    tickTimestamps.push(now);
-    return true;
-  }
-  return false;
+  if (chatTimestamps.length >= MAX_CHAT_REQUESTS) return false;
+  chatTimestamps.push(now);
+  return true;
 }
 
 /** For diagnostics. */
@@ -55,7 +50,7 @@ export function getRateLimitStatus() {
   return {
     tickRequestsInWindow: tickTimestamps.length,
     chatRequestsInWindow: chatTimestamps.length,
-    tickSlotsAvailable: Math.max(0, MAX_REQUESTS - tickTimestamps.length),
+    tickSlotsAvailable: Math.max(0, MAX_TICK_REQUESTS - tickTimestamps.length),
     chatSlotsAvailable: Math.max(0, MAX_CHAT_REQUESTS - chatTimestamps.length),
   };
 }

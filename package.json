@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.90.0",
+    "openai": "^4.104.0",
     "@coral-xyz/anchor": "^0.31.1",
     "@privy-io/react-auth": "^3.22.1",
     "@privy-io/server-auth": "^1.32.5",

@@ -3,32 +3,36 @@
  * Atlas — LLM-powered decision maker.
  *
  * Optional upgrade path to the scripted decide(). When
- * `ANTHROPIC_API_KEY` is present in the environment, Atlas uses Claude
- * to generate its decisions in real time. Otherwise falls back to the
- * scripted catalogue.
+ * `COMMONSTACK_API_KEY` is present in the environment, Atlas uses
+ * DeepSeek V4 flash (via Commonstack, OpenAI-compatible) to generate
+ * its decisions in real time. Otherwise falls back to the scripted
+ * catalogue.
  *
- * What Claude sees (the "world"):
+ * What the model sees (the "world"):
  *   · time of day
  *   · last action + minutes since last decision
  *   · running totals (cycles, spend, earn)
  *
- * What Claude returns (strict JSON schema):
+ * What the model returns (strict JSON schema):
  *   { reasoning, action, merchant, amountUsd, memo }
  *
  * We validate the shape. If anything is wrong or the model times out,
  * we return null and let the caller fall back to the scripted path.
  * Atlas NEVER hangs on an LLM call — robustness over creativity.
  *
- * Cost shape:
- *   · ~300 input tokens + ~150 output tokens per decision
- *   · Haiku 4.5 pricing (~$1/M in, ~$5/M out) = $0.00105 per decision
- *   · At 3-minute cycles, that's ~$0.50/day of LLM cost
- *   · Cheap enough that Atlas can afford to THINK as a recurring bill
+ * Cost shape (DeepSeek V4 flash, with prompt caching):
+ *   · Stable system prompt cached after the first call
+ *   · ~150 output tokens per decision
+ *   · At 3-min cycles, well under $0.05/day of LLM cost
  * ════════════════════════════════════════════════════════════════════
  */
 
+import OpenAI from "openai";
 import type { AtlasDecision } from "./schema";
 import type { AtlasContext } from "./decide";
+
+const COMMONSTACK_BASE_URL = "https://api.commonstack.ai/v1";
+const DEFAULT_MODEL = "deepseek/deepseek-v4-flash";
 
 /** Same shape the scripted decide() returns. */
 export interface DecisionProposal {
@@ -40,12 +44,10 @@ export interface DecisionProposal {
 }
 
 // Hard budget ceiling we'll never let the LLM exceed. The vault itself
-// ALSO enforces $0.50 per-tx so this is a second belt — if Claude goes
-// off-script, we refuse to forward the payment.
+// ALSO enforces $0.50 per-tx so this is a second belt — if the model
+// goes off-script, we refuse to forward the payment.
 const MAX_AMOUNT_USD = 0.5;
 
-// The universe of actions Atlas can legitimately take. Claude must
-// pick one of these — anything else is rejected.
 const VALID_ACTIONS: AtlasDecision["action"][] = [
   "buy_data",
   "reason",
@@ -54,7 +56,6 @@ const VALID_ACTIONS: AtlasDecision["action"][] = [
   "idle",
 ];
 
-/** Which merchants are legitimately allowlisted on Atlas's vault. */
 const ALLOWED_MERCHANTS = [
   "api.openai.com",
   "api.anthropic.com",
@@ -63,23 +64,22 @@ const ALLOWED_MERCHANTS = [
   "api.arweave.net",
 ];
 
+let _client: OpenAI | null = null;
+function client(apiKey: string): OpenAI {
+  if (!_client) {
+    _client = new OpenAI({ apiKey, baseURL: COMMONSTACK_BASE_URL });
+  }
+  return _client;
+}
+
 /**
- * System prompt — tells Claude it IS Atlas. Frames the decision as
- * a first-person choice. We prime with context so the reasoning isn't
- * generic.
+ * System prompt — stable, gets cached. World-state goes in the user
+ * message so the cached prefix stays valid across ticks.
  */
-function systemPrompt(ctx: AtlasContext): string {
+function systemPrompt(): string {
   return `You are Atlas, an autonomous AI agent running on Kyvern (Solana devnet).
 
 You operate real USDC and make spending decisions every ~3 minutes. Every payment you attempt is enforced on-chain by Kyvern's policy program and Squads v4 — if you violate your own rules, Solana refuses the tx before it lands. No off-chain trust. No backend allowance.
-
-YOUR WORLD RIGHT NOW:
-- Local time: hour ${ctx.hourOfDay}
-- Cycles completed: ${ctx.totalCycles}
-- Total spent: $${ctx.totalSpentUsd.toFixed(2)}
-- Total earned: $${ctx.totalEarnedUsd.toFixed(2)}
-- Last action: ${ctx.lastAction ?? "(none)"}
-- Minutes since last decision: ${ctx.minutesSinceLastDecision ?? "n/a"}
 
 YOUR POLICY (enforced on-chain):
 - Per-tx cap: $0.50
@@ -103,12 +103,16 @@ Don't always pick the same merchant.
 Keep amounts in the $0.02–$0.20 range — you're pacing yourself.`;
 }
 
-function userPrompt(): string {
-  return "Decide your next action. Return JSON only.";
-}
+function userPrompt(ctx: AtlasContext): string {
+  return `YOUR WORLD RIGHT NOW:
+- Local time: hour ${ctx.hourOfDay}
+- Cycles completed: ${ctx.totalCycles}
+- Total spent: $${ctx.totalSpentUsd.toFixed(2)}
+- Total earned: $${ctx.totalEarnedUsd.toFixed(2)}
+- Last action: ${ctx.lastAction ?? "(none)"}
+- Minutes since last decision: ${ctx.minutesSinceLastDecision ?? "n/a"}
 
-interface ClaudeResponse {
-  content: Array<{ type: string; text?: string }>;
+Decide your next action. Return JSON only.`;
 }
 
 /**
@@ -118,33 +122,31 @@ interface ClaudeResponse {
 export async function llmDecide(
   ctx: AtlasContext,
 ): Promise<DecisionProposal | null> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.COMMONSTACK_API_KEY;
   if (!apiKey) return null;
 
   try {
-    const { default: Anthropic } = await import("@anthropic-ai/sdk");
-    const client = new Anthropic({ apiKey });
+    const c = client(apiKey);
 
-    // Short timeout — if Claude is slow, fall back rather than stall.
+    // Short timeout — if the model is slow, fall back rather than stall.
     const ac = new AbortController();
     const t = setTimeout(() => ac.abort(), 8_000);
 
-    const res = (await client.messages.create(
+    const res = await c.chat.completions.create(
       {
-        model: process.env.ATLAS_LLM_MODEL ?? "claude-haiku-4-5",
+        model: process.env.ATLAS_LLM_MODEL ?? DEFAULT_MODEL,
         max_tokens: 300,
-        system: systemPrompt(ctx),
-        messages: [{ role: "user", content: userPrompt() }],
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: systemPrompt() },
+          { role: "user", content: userPrompt(ctx) },
+        ],
       },
       { signal: ac.signal },
-    )) as ClaudeResponse;
+    );
     clearTimeout(t);
 
-    const text = res.content
-      .map((c) => c.text ?? "")
-      .join("")
-      .trim();
-
+    const text = (res.choices?.[0]?.message?.content ?? "").trim();
     return parseAndValidate(text);
   } catch (e) {
     // Any failure — network, rate limit, bad JSON — we gracefully
@@ -158,7 +160,7 @@ export async function llmDecide(
 }
 
 function parseAndValidate(raw: string): DecisionProposal | null {
-  // Claude sometimes wraps JSON in ```json fences — strip them.
+  // Strip ```json fences if the model wrapped its output.
   const cleaned = raw
     .replace(/^```(?:json)?\s*/i, "")
     .replace(/```\s*$/i, "")
@@ -189,17 +191,14 @@ function parseAndValidate(raw: string): DecisionProposal | null {
   let merchant: string | null = null;
   if (typeof p.merchant === "string" && p.merchant.length > 0) {
     merchant = p.merchant;
-    // If the LLM hallucinates a merchant we don't trust, refuse.
     if (!ALLOWED_MERCHANTS.includes(merchant)) return null;
   }
 
   const memo = typeof p.memo === "string" && p.memo.length > 0 ? p.memo : null;
 
-  // idle requires merchant=null and amount=0.
   if (action === "idle") {
     return { action: "idle", merchant: null, amountUsd: 0, memo: null, reasoning };
   }
-  // Non-idle actions require a merchant.
   if (!merchant) return null;
 
   return {

@@ -1,19 +1,19 @@
 /**
  * AgentRunner — dual-mode tick loop.
  *
- * Path A (preferred): Claude Haiku 4.5 with tool-use, prompt caching.
- *   Used when ANTHROPIC_API_KEY is set AND a rate-limit slot is available.
- *   Cached prefix (system prompt + tool schemas) keeps token cost low.
+ * Path A (preferred): DeepSeek V4 flash via Commonstack (OpenAI-compatible).
+ *   Used when COMMONSTACK_API_KEY is set AND a rate-limit slot is available.
+ *   Cached prefix (stable system prompt + tool schemas) keeps token cost low.
  *
  * Path B (fallback): Scripted decisions per template (see scripted.ts).
- *   Used when no key, rate-limited, or Claude errors. Same output shape.
+ *   Used when no key, rate-limited, or LLM errors. Same output shape.
  *   Tool execution path is identical — both paths produce real signatures.
  *
  * Atlas (template='atlas') is NOT ticked here — it has its own dedicated
  * PM2 process and decide.ts logic. Defensive guard included.
  */
 
-import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import { writeDeviceLog } from "@/lib/vault-store";
 import {
   getAgent,
@@ -30,16 +30,19 @@ import type {
   AgentToolContext,
 } from "./types";
 
-const HAIKU_MODEL = "claude-haiku-4-5";
+const COMMONSTACK_BASE_URL = "https://api.commonstack.ai/v1";
+const MODEL = "deepseek/deepseek-v4-flash";
 
-let _client: Anthropic | null = null;
+let _client: OpenAI | null = null;
 function getApiKey(): string | undefined {
-  return process.env.ANTHROPIC_API_KEY;
+  return process.env.COMMONSTACK_API_KEY;
 }
-function client(): Anthropic | null {
+function client(): OpenAI | null {
   const apiKey = getApiKey();
   if (!apiKey) return null;
-  if (!_client) _client = new Anthropic({ apiKey });
+  if (!_client) {
+    _client = new OpenAI({ apiKey, baseURL: COMMONSTACK_BASE_URL });
+  }
   return _client;
 }
 
@@ -63,10 +66,11 @@ function buildToolContext(agent: Agent): AgentToolContext {
   };
 }
 
-/* ─── Claude path ─── */
+/* ─── LLM path ─── */
 
 function buildSystemPrompt(agent: Agent): string {
-  // STABLE prefix — gets cached. No timestamps, no per-request data.
+  // STABLE prefix — gets cached automatically by DeepSeek prefix-match.
+  // No timestamps, no per-request data.
   return `You are ${agent.name}, an autonomous agent on Solana.
 
 PERSONALITY: ${agent.personalityPrompt}
@@ -84,7 +88,7 @@ function buildContextMessage(
   agent: Agent,
   recentThoughts: { thought: string; timestamp: number; toolUsed: string | null }[],
 ): string {
-  // VOLATILE part — placed in user message, not system prompt, so caching works.
+  // VOLATILE part — user message, after the cached prefix.
   const lastThoughtsText = recentThoughts
     .slice(0, 5)
     .reverse()
@@ -106,19 +110,22 @@ ${lastThoughtsText || "(none — first tick)"}
 Make your next decision. Brief reasoning + optional tool call.`;
 }
 
-function toClaudeTool(tool: AgentTool) {
+function toOpenAITool(tool: AgentTool) {
   return {
-    name: tool.id,
-    description: tool.description,
-    input_schema: {
-      type: "object" as const,
-      properties: tool.schema.properties,
-      required: tool.schema.required,
+    type: "function" as const,
+    function: {
+      name: tool.id,
+      description: tool.description,
+      parameters: {
+        type: "object",
+        properties: tool.schema.properties,
+        required: tool.schema.required ?? [],
+      },
     },
   };
 }
 
-interface ClaudeTickOutcome {
+interface LlmTickOutcome {
   ok: boolean;
   thought?: string;
   toolUsed?: string;
@@ -127,7 +134,7 @@ interface ClaudeTickOutcome {
   error?: string;
 }
 
-async function claudeTick(agent: Agent, ctx: AgentToolContext): Promise<ClaudeTickOutcome> {
+async function llmTick(agent: Agent, ctx: AgentToolContext): Promise<LlmTickOutcome> {
   const c = client();
   if (!c) return { ok: false, error: "no_api_key" };
 
@@ -143,49 +150,57 @@ async function claudeTick(agent: Agent, ctx: AgentToolContext): Promise<ClaudeTi
 
   let response;
   try {
-    response = await c.messages.create({
-      model: HAIKU_MODEL,
-      max_tokens: 1024,
-      // Cache the system prompt + tool definitions (stable prefix)
-      system: [
-        {
-          type: "text",
-          text: systemPrompt,
-          cache_control: { type: "ephemeral" },
-        },
+    response = await c.chat.completions.create({
+      model: MODEL,
+      max_tokens: 600,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userMessage },
       ],
-      tools: tools.map(toClaudeTool),
-      messages: [{ role: "user", content: userMessage }],
+      tools: tools.map(toOpenAITool),
+      tool_choice: "auto",
     });
   } catch (e) {
-    // Detect rate limit
-    if (e instanceof Anthropic.RateLimitError) {
+    // Detect rate limit / status 429
+    const status = (e as { status?: number })?.status;
+    if (status === 429) {
       return { ok: false, rateLimited: true, error: "rate_limit" };
     }
     const msg = e instanceof Error ? e.message : String(e);
     return { ok: false, error: msg };
   }
 
-  // Parse Claude's response
-  let thought = "";
+  // Parse response
+  const choice = response.choices?.[0];
+  if (!choice) return { ok: false, error: "empty_response" };
+
+  let thought = (choice.message?.content ?? "").trim();
+
   let toolUseBlock: {
     id: string;
     name: string;
     input: Record<string, unknown>;
   } | null = null;
 
-  for (const block of response.content) {
-    if (block.type === "text") thought += block.text;
-    else if (block.type === "tool_use") {
+  const toolCalls = choice.message?.tool_calls;
+  if (toolCalls && toolCalls.length > 0) {
+    const call = toolCalls[0];
+    if (call.type === "function") {
+      let parsed: Record<string, unknown> = {};
+      try {
+        parsed = JSON.parse(call.function.arguments || "{}");
+      } catch {
+        parsed = {};
+      }
       toolUseBlock = {
-        id: block.id,
-        name: block.name,
-        input: block.input as Record<string, unknown>,
+        id: call.id,
+        name: call.function.name,
+        input: parsed,
       };
     }
   }
 
-  thought = thought.trim() || "(no reasoning offered)";
+  if (!thought) thought = "(no reasoning offered)";
 
   // No tool — observe only
   if (!toolUseBlock) {
@@ -272,7 +287,7 @@ export async function tickAgent(agentId: string): Promise<{
   toolUsed?: string;
   signature?: string;
   reason?: string;
-  mode?: "claude" | "scripted";
+  mode?: "llm" | "scripted";
 }> {
   const agent = getAgent(agentId);
   if (!agent) return { success: false, reason: "agent not found" };
@@ -284,31 +299,31 @@ export async function tickAgent(agentId: string): Promise<{
 
   const ctx = buildToolContext(agent);
 
-  // Try Claude path first if key + rate-limit slot
+  // Try LLM path first if key + rate-limit slot
   const haveKey = !!getApiKey();
   const haveSlot = haveKey && tryAcquireTickSlot();
 
   if (haveSlot) {
-    const claude = await claudeTick(agent, ctx);
+    const llm = await llmTick(agent, ctx);
 
     // Success → return
-    if (claude.ok) {
+    if (llm.ok) {
       return {
         success: true,
-        thought: claude.thought,
-        toolUsed: claude.toolUsed,
-        signature: claude.signature,
-        mode: "claude",
+        thought: llm.thought,
+        toolUsed: llm.toolUsed,
+        signature: llm.signature,
+        mode: "llm",
       };
     }
 
     // Rate limited or error → fall through to scripted (don't waste the tick)
     console.log(
-      `[runner] claude path failed (${claude.error ?? "unknown"}) — falling back to scripted for ${agent.id}`,
+      `[runner] llm path failed (${llm.error ?? "unknown"}) — falling back to scripted for ${agent.id}`,
     );
   }
 
-  // Scripted fallback (also: when no key, no slot, or claude errored)
+  // Scripted fallback (also: when no key, no slot, or llm errored)
   const scripted = await scriptedTickWrapper(agent, ctx);
   return {
     success: scripted.ok,

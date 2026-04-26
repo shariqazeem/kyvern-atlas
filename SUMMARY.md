@@ -148,20 +148,20 @@ Old `kyvernlabs` (Stellar) process stopped. Both `kyvernlabs.com` and `app.kyver
 
 ## Critical Setup Note
 
-**`ANTHROPIC_API_KEY` must be set in `~/kyvernlabs-commerce/.env.local` on the VM** for agents to actually think. Without it:
-- Agents tick but record "no LLM key configured — idling" thoughts
-- Chat returns "(I can't think right now)" message
+**`COMMONSTACK_API_KEY` must be set in `~/kyvernlabs-commerce/.env.local` on the VM** for agents to actually think. Without it:
+- Agents tick but record scripted-fallback thoughts
+- Chat returns scripted-fallback responses
 
 With it:
-- Routine ticks call Claude Haiku 4.5 (~$0.001/tick)
-- Chat calls Claude Sonnet 4.6 (~$0.01/message)
-- Tool-use enabled — agents call tools autonomously
+- Routine ticks (Living Agents + Atlas) call DeepSeek V4 flash via Commonstack (~$0.0002/tick with prompt caching)
+- Chat calls the same model (~$0.001/message)
+- Tool-use / function-calling enabled — agents call tools autonomously
 
 To set:
 ```bash
 ssh -i ~/Documents/ssh-key3.key ubuntu@80.225.209.190
-echo 'ANTHROPIC_API_KEY=sk-ant-...' >> ~/kyvernlabs-commerce/.env.local
-pm2 restart kyvern-commerce --update-env && pm2 save
+echo 'COMMONSTACK_API_KEY=ak-...' >> ~/kyvernlabs-commerce/.env.local
+pm2 restart kyvern-commerce atlas atlas-attacker agent-pool --update-env && pm2 save
 ```
 
 ---

@@ -144,12 +144,13 @@ function reasoningFor(
 /**
  * The decision function. Two paths:
  *
- *   1. If ANTHROPIC_API_KEY is set, Atlas uses Claude to generate a
- *      decision + first-person reasoning in real time. Atlas is then
- *      genuinely thinking — not replaying canned scripts.
+ *   1. If COMMONSTACK_API_KEY is set, Atlas uses DeepSeek V4 flash
+ *      (via Commonstack) to generate a decision + first-person
+ *      reasoning in real time. Atlas is then genuinely thinking —
+ *      not replaying canned scripts.
  *
- *   2. If no key, or Claude call fails/times out, we fall back to the
- *      scripted catalogue. Same shape, zero external dependency.
+ *   2. If no key, or the LLM call fails/times out, we fall back to
+ *      the scripted catalogue. Same shape, zero external dependency.
  *
  * The runner doesn't need to know which path fired — `decide()` is a
  * clean seam. When the key is added to the VM, Atlas starts
@@ -158,7 +159,7 @@ function reasoningFor(
 export async function decide(): Promise<DecisionProposal> {
   const ctx = buildContext();
 
-  // ── LLM path (optional, active when ANTHROPIC_API_KEY is set) ──
+  // ── LLM path (optional, active when COMMONSTACK_API_KEY is set) ──
   const llm = await llmDecide(ctx);
   if (llm) return llm;
 

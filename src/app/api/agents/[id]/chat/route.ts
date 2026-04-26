@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import {
   getAgent,
   appendChat,
@@ -17,27 +17,33 @@ import type {
   AgentDecision,
 } from "@/lib/agents/types";
 
-const SONNET_MODEL = "claude-sonnet-4-6";
+const COMMONSTACK_BASE_URL = "https://api.commonstack.ai/v1";
+const MODEL = "deepseek/deepseek-v4-flash";
 
-let _client: Anthropic | null = null;
+let _client: OpenAI | null = null;
 function getApiKey(): string | undefined {
-  return process.env.ANTHROPIC_API_KEY;
+  return process.env.COMMONSTACK_API_KEY;
 }
-function client(): Anthropic | null {
+function client(): OpenAI | null {
   const apiKey = getApiKey();
   if (!apiKey) return null;
-  if (!_client) _client = new Anthropic({ apiKey });
+  if (!_client) {
+    _client = new OpenAI({ apiKey, baseURL: COMMONSTACK_BASE_URL });
+  }
   return _client;
 }
 
-function toClaudeTool(tool: AgentTool) {
+function toOpenAITool(tool: AgentTool) {
   return {
-    name: tool.id,
-    description: tool.description,
-    input_schema: {
-      type: "object" as const,
-      properties: tool.schema.properties,
-      required: tool.schema.required,
+    type: "function" as const,
+    function: {
+      name: tool.id,
+      description: tool.description,
+      parameters: {
+        type: "object",
+        properties: tool.schema.properties,
+        required: tool.schema.required ?? [],
+      },
     },
   };
 }
@@ -65,7 +71,7 @@ export async function GET(
 
 /**
  * POST /api/agents/[id]/chat
- * Send a user message. Tries Claude first; falls back to scripted.
+ * Send a user message. Tries LLM first; falls back to scripted on error.
  */
 export async function POST(
   req: NextRequest,
@@ -85,23 +91,23 @@ export async function POST(
 
     const userMessage = appendChat(agent.id, "user", userText);
 
-    // Try Claude path if we have a key + slot
+    // Try LLM path if we have a key + slot
     const haveKey = !!getApiKey();
     const haveSlot = haveKey && tryAcquireChatSlot();
 
     if (haveSlot) {
-      const claudeResult = await tryClaudeChat(agent.id);
-      if (claudeResult.ok) {
-        const agentMessage = appendChat(agent.id, "agent", claudeResult.text);
+      const llmResult = await tryLlmChat(agent.id);
+      if (llmResult.ok) {
+        const agentMessage = appendChat(agent.id, "agent", llmResult.text);
         return NextResponse.json({
           userMessage,
           agentMessage,
-          signature: claudeResult.signature,
-          mode: "claude",
+          signature: llmResult.signature,
+          mode: "llm",
         });
       }
       console.log(
-        `[chat] claude failed (${claudeResult.error ?? "unknown"}) — falling back to scripted`,
+        `[chat] llm failed (${llmResult.error ?? "unknown"}) — falling back to scripted`,
       );
     }
 
@@ -122,18 +128,16 @@ export async function POST(
   }
 }
 
-/* ─── Claude chat helper ─── */
+/* ─── LLM chat helper ─── */
 
-interface ClaudeChatOutcome {
+interface LlmChatOutcome {
   ok: boolean;
   text: string;
   signature?: string | null;
   error?: string;
 }
 
-async function tryClaudeChat(
-  agentId: string,
-): Promise<ClaudeChatOutcome> {
+async function tryLlmChat(agentId: string): Promise<LlmChatOutcome> {
   const c = client();
   if (!c) return { ok: false, text: "", error: "no_api_key" };
 
@@ -141,10 +145,6 @@ async function tryClaudeChat(
   if (!agent) return { ok: false, text: "", error: "agent_missing" };
 
   const recentChat = listChat(agent.id, 20);
-  const claudeMessages = recentChat.map((m) => ({
-    role: (m.role === "user" ? "user" : "assistant") as "user" | "assistant",
-    content: m.content,
-  }));
 
   const recentThoughts = listThoughts(agent.id, 5);
   const thoughtSummary = recentThoughts
@@ -173,64 +173,73 @@ INSTRUCTIONS FOR CHAT:
     .map((id) => getTool(id))
     .filter((t): t is AgentTool => !!t);
 
-  // Inject volatile context as a synthetic user message before the actual message
+  // Volatile context — prepended to the latest user message so the
+  // cached prefix (system + history) stays stable.
   const volatileContext = `[Status: ${agent.totalThoughts} thoughts · earned $${agent.totalEarnedUsd.toFixed(3)} · spent $${agent.totalSpentUsd.toFixed(3)}. Recent thoughts:
 ${thoughtSummary || "(none)"}]`;
 
-  // Prepend the volatile context to the most recent user message (claudeMessages[-1])
-  // so the cached prefix stays stable.
-  const messagesWithContext = [...claudeMessages];
-  if (messagesWithContext.length > 0) {
-    const last = messagesWithContext[messagesWithContext.length - 1];
-    if (last.role === "user") {
-      messagesWithContext[messagesWithContext.length - 1] = {
-        role: "user",
-        content: `${volatileContext}\n\n${last.content}`,
-      };
+  const openaiMessages: Array<{
+    role: "system" | "user" | "assistant";
+    content: string;
+  }> = [{ role: "system", content: systemPrompt }];
+
+  for (let i = 0; i < recentChat.length; i++) {
+    const m = recentChat[i];
+    let content = m.content;
+    if (i === recentChat.length - 1 && m.role === "user") {
+      content = `${volatileContext}\n\n${content}`;
     }
+    openaiMessages.push({
+      role: m.role === "user" ? "user" : "assistant",
+      content,
+    });
   }
 
   let response;
   try {
-    response = await c.messages.create({
-      model: SONNET_MODEL,
-      max_tokens: 1024,
-      system: [
-        {
-          type: "text",
-          text: systemPrompt,
-          cache_control: { type: "ephemeral" },
-        },
-      ],
-      messages: messagesWithContext,
-      tools: tools.map(toClaudeTool),
+    response = await c.chat.completions.create({
+      model: MODEL,
+      max_tokens: 600,
+      messages: openaiMessages,
+      tools: tools.length > 0 ? tools.map(toOpenAITool) : undefined,
+      tool_choice: tools.length > 0 ? "auto" : undefined,
     });
   } catch (e) {
-    if (e instanceof Anthropic.RateLimitError) {
+    const status = (e as { status?: number })?.status;
+    if (status === 429) {
       return { ok: false, text: "", error: "rate_limit" };
     }
     return {
       ok: false,
       text: "",
-      error: e instanceof Error ? e.message : "claude_error",
+      error: e instanceof Error ? e.message : "llm_error",
     };
   }
 
-  // Parse response
-  let agentText = "";
+  const choice = response.choices?.[0];
+  if (!choice) return { ok: false, text: "", error: "empty_response" };
+
+  let agentText = (choice.message?.content ?? "").trim();
   let toolUseBlock: {
     id: string;
     name: string;
     input: Record<string, unknown>;
   } | null = null;
 
-  for (const block of response.content) {
-    if (block.type === "text") agentText += block.text;
-    else if (block.type === "tool_use") {
+  const toolCalls = choice.message?.tool_calls;
+  if (toolCalls && toolCalls.length > 0) {
+    const call = toolCalls[0];
+    if (call.type === "function") {
+      let parsed: Record<string, unknown> = {};
+      try {
+        parsed = JSON.parse(call.function.arguments || "{}");
+      } catch {
+        parsed = {};
+      }
       toolUseBlock = {
-        id: block.id,
-        name: block.name,
-        input: block.input as Record<string, unknown>,
+        id: call.id,
+        name: call.function.name,
+        input: parsed,
       };
     }
   }
@@ -282,6 +291,9 @@ ${thoughtSummary || "(none)"}]`;
     }
   }
 
-  const finalText = (agentText.trim() + toolResultText).trim() || "(no response)";
+  if (!agentText && !toolResultText) {
+    agentText = "(no response)";
+  }
+  const finalText = (agentText + toolResultText).trim();
   return { ok: true, text: finalText, signature: toolSignature };
 }
