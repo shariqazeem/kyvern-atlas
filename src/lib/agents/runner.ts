@@ -175,6 +175,35 @@ interface LlmTickOutcome {
   error?: string;
 }
 
+/**
+ * One tick = a multi-step agentic loop.
+ *
+ *   1. Build the conversation (system + user world-state).
+ *   2. Ask the LLM what to do.
+ *   3. If it produces a tool call, execute it, append assistant + tool
+ *      response to the conversation, and ask again.
+ *   4. Stop when the LLM no longer asks for a tool, or after MAX_STEPS.
+ *
+ * Path C demands this. A worker that calls watch_url and finds 6 new
+ * bounties needs to follow up with up to 6 message_user signals in the
+ * same tick — otherwise findings dribble out one per cycle. Each step
+ * gets persisted as a thought row so the detail-page feed shows the
+ * worker's reasoning step-by-step.
+ */
+const MAX_STEPS_PER_TICK = 5;
+
+interface ChatMessageInput {
+  role: "system" | "user" | "assistant" | "tool";
+  content: string | null;
+  tool_calls?: Array<{
+    id: string;
+    type: "function";
+    function: { name: string; arguments: string };
+  }>;
+  tool_call_id?: string;
+  name?: string;
+}
+
 async function llmTick(agent: Agent, ctx: AgentToolContext): Promise<LlmTickOutcome> {
   const c = client();
   if (!c) return { ok: false, error: "no_api_key" };
@@ -189,117 +218,152 @@ async function llmTick(agent: Agent, ctx: AgentToolContext): Promise<LlmTickOutc
   const systemPrompt = buildSystemPrompt(agent);
   const userMessage = buildContextMessage(agent, recentThoughts);
 
-  let response;
-  try {
-    response = await c.chat.completions.create({
-      model: MODEL,
-      max_tokens: 600,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userMessage },
-      ],
-      tools: tools.map(toOpenAITool),
-      tool_choice: "auto",
-    });
-  } catch (e) {
-    // Detect rate limit / status 429
-    const status = (e as { status?: number })?.status;
-    if (status === 429) {
-      return { ok: false, rateLimited: true, error: "rate_limit" };
-    }
-    const msg = e instanceof Error ? e.message : String(e);
-    return { ok: false, error: msg };
-  }
+  const messages: ChatMessageInput[] = [
+    { role: "system", content: systemPrompt },
+    { role: "user", content: userMessage },
+  ];
 
-  // Parse response
-  const choice = response.choices?.[0];
-  if (!choice) return { ok: false, error: "empty_response" };
+  const openaiTools = tools.map(toOpenAITool);
+  let firstThought: string | null = null;
+  let lastToolUsed: string | null = null;
+  let lastSignature: string | null = null;
 
-  // Reasoning models put their thinking in `reasoning_content` instead
-  // of `content`. Use whichever is non-empty so the thought feed isn't blank.
-  const msg = choice.message as ChatMessageWithReasoning;
-  const contentText = (msg.content ?? "").trim();
-  const reasoningText = (msg.reasoning_content ?? "").trim();
-  let thought = contentText || reasoningText;
-
-  let toolUseBlock: {
-    id: string;
-    name: string;
-    input: Record<string, unknown>;
-  } | null = null;
-
-  const toolCalls = choice.message?.tool_calls;
-  if (toolCalls && toolCalls.length > 0) {
-    const call = toolCalls[0];
-    if (call.type === "function") {
-      let parsed: Record<string, unknown> = {};
-      try {
-        parsed = JSON.parse(call.function.arguments || "{}");
-      } catch {
-        parsed = {};
+  for (let step = 0; step < MAX_STEPS_PER_TICK; step++) {
+    let response;
+    try {
+      response = await c.chat.completions.create({
+        model: MODEL,
+        max_tokens: 600,
+        messages: messages as never,
+        tools: openaiTools,
+        tool_choice: "auto",
+      });
+    } catch (e) {
+      const status = (e as { status?: number })?.status;
+      if (status === 429) return { ok: false, rateLimited: true, error: "rate_limit" };
+      const errMsg = e instanceof Error ? e.message : String(e);
+      // If we already produced thoughts this tick, treat partial success as ok.
+      if (firstThought !== null) {
+        return { ok: true, thought: firstThought, toolUsed: lastToolUsed ?? undefined, signature: lastSignature ?? undefined };
       }
-      toolUseBlock = {
-        id: call.id,
-        name: call.function.name,
-        input: parsed,
+      return { ok: false, error: errMsg };
+    }
+
+    const choice = response.choices?.[0];
+    if (!choice) {
+      if (firstThought !== null) {
+        return { ok: true, thought: firstThought, toolUsed: lastToolUsed ?? undefined, signature: lastSignature ?? undefined };
+      }
+      return { ok: false, error: "empty_response" };
+    }
+
+    const msg = choice.message as ChatMessageWithReasoning;
+    const contentText = (msg.content ?? "").trim();
+    const reasoningText = (msg.reasoning_content ?? "").trim();
+    const reasoning = (contentText || reasoningText || "(no reasoning offered)").trim();
+
+    const toolCalls = choice.message?.tool_calls;
+    const hasToolCall = !!(toolCalls && toolCalls.length > 0);
+
+    if (!hasToolCall) {
+      // LLM is done. Record an observe thought only if this is the
+      // first step (otherwise we already have step-thoughts from prior loops).
+      if (firstThought === null) {
+        recordAgentTick({
+          agentId: agent.id,
+          thought: reasoning,
+          decision: { action: "observe" },
+          mode: "llm",
+        });
+        firstThought = reasoning;
+      }
+      break;
+    }
+
+    // Take the FIRST tool call this round (most LLMs return one)
+    const call = toolCalls![0];
+    if (call.type !== "function") break;
+
+    let toolInput: Record<string, unknown> = {};
+    try {
+      toolInput = JSON.parse(call.function.arguments || "{}");
+    } catch {
+      toolInput = {};
+    }
+
+    const tool = getTool(call.function.name);
+    if (!tool) {
+      recordAgentTick({
+        agentId: agent.id,
+        thought: `${reasoning} [unknown tool: ${call.function.name}]`,
+        decision: { action: "observe" },
+        mode: "llm",
+      });
+      if (firstThought === null) firstThought = reasoning;
+      break;
+    }
+
+    let toolResult;
+    try {
+      toolResult = await tool.execute(ctx, toolInput);
+    } catch (e) {
+      toolResult = {
+        ok: false,
+        message: `tool execution failed: ${e instanceof Error ? e.message : String(e)}`,
       };
     }
-  }
 
-  if (!thought) thought = "(no reasoning offered)";
-
-  // No tool — observe only
-  if (!toolUseBlock) {
-    recordAgentTick({
-      agentId: agent.id,
-      thought,
-      decision: { action: "observe" },
-    });
-    return { ok: true, thought };
-  }
-
-  // Execute tool
-  const tool = getTool(toolUseBlock.name);
-  if (!tool) {
-    recordAgentTick({
-      agentId: agent.id,
-      thought: `${thought} [unknown tool: ${toolUseBlock.name}]`,
-      decision: { action: "observe" },
-    });
-    return { ok: true, thought };
-  }
-
-  let toolResult;
-  try {
-    toolResult = await tool.execute(ctx, toolUseBlock.input);
-  } catch (e) {
-    toolResult = {
-      ok: false,
-      message: `tool execution failed: ${e instanceof Error ? e.message : String(e)}`,
+    const decision: AgentDecision = {
+      action: "tool_call",
+      toolId: tool.id,
+      toolInput,
+      toolResult,
     };
+
+    recordAgentTick({
+      agentId: agent.id,
+      thought: reasoning,
+      decision,
+      signature: toolResult.signature ?? null,
+      amountUsd: toolResult.amountUsd ?? null,
+      counterparty: toolResult.counterparty ?? null,
+      mode: "llm",
+    });
+
+    if (firstThought === null) firstThought = reasoning;
+    lastToolUsed = tool.id;
+    if (toolResult.signature) lastSignature = toolResult.signature;
+
+    // Append the assistant's tool call + the tool's result so the
+    // next LLM round sees what just happened and can decide what to
+    // do next (e.g. surface signals after a watch_url returned items).
+    messages.push({
+      role: "assistant",
+      content: msg.content ?? "",
+      tool_calls: [
+        {
+          id: call.id,
+          type: "function",
+          function: {
+            name: call.function.name,
+            arguments: call.function.arguments,
+          },
+        },
+      ],
+    });
+    messages.push({
+      role: "tool",
+      tool_call_id: call.id,
+      content: JSON.stringify(toolResult).slice(0, 4000), // cap payload to keep context lean
+      name: call.function.name,
+    });
   }
-
-  const decision: AgentDecision = {
-    action: "tool_call",
-    toolId: tool.id,
-    toolInput: toolUseBlock.input,
-    toolResult,
-  };
-
-  recordAgentTick({
-    agentId: agent.id,
-    thought,
-    decision,
-    signature: toolResult.signature ?? null,
-    amountUsd: toolResult.amountUsd ?? null,
-    counterparty: toolResult.counterparty ?? null,
-  });
 
   return {
     ok: true,
-    thought,
-    toolUsed: tool.id,
-    signature: toolResult.signature,
+    thought: firstThought ?? "(idle)",
+    toolUsed: lastToolUsed ?? undefined,
+    signature: lastSignature ?? undefined,
   };
 }
 
