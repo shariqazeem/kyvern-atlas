@@ -2,6 +2,21 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Sprint 4 mobile guardrails — Apple HIG compliance baseline.
+   Suppress double-tap zoom on every interactive element so the
+   spawn-flow chips, drawer buttons, and the activation banner all
+   feel native on iPhone Safari. The "manipulation" value still
+   permits pan + pinch on regular content. */
+button,
+a,
+[role="button"],
+input[type="button"],
+input[type="submit"],
+input[type="reset"] {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
 /* ═══════════════════════════════════════════════════════
    KyvernLabs Design System
 

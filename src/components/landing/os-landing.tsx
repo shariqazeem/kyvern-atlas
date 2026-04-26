@@ -123,63 +123,71 @@ export function LandingPage({ initialAtlas }: Props) {
             transition={{ duration: 0.8, ease: spring }}
             className="flex-1 max-w-[520px]"
           >
-            <p className="text-[12px] font-medium text-[#9CA3AF] uppercase tracking-wider mb-4">
-              A device you own
+            <p className="text-[11px] font-mono text-[#9CA3AF] uppercase tracking-[0.14em] mb-4">
+              Live on Solana devnet
             </p>
+
+            {/* Manifesto — Sprint 5 hero. JetBrains Mono, big. */}
             <h1
-              className="text-[36px] sm:text-[48px] font-semibold tracking-[-0.035em] leading-[1.05]"
-              style={{ color: "#111" }}
+              className="font-mono leading-[1.1] tracking-tight"
+              style={{
+                color: "#111",
+                fontSize: "clamp(28px, 5vw, 48px)",
+                fontWeight: 500,
+              }}
             >
-              A device you own.
+              Agents shouldn&apos;t have keys.
               <br />
-              <span style={{ color: "#9CA3AF" }}>Workers that earn while you sleep.</span>
+              <span style={{ color: "#16A34A" }}>They should have budgets.</span>
             </h1>
+
             <p
               className="mt-5 text-[16px] leading-[1.65] max-w-[440px]"
               style={{ color: "#6B7280" }}
             >
-              No code. Pick a personality, give it a job, watch it think and pay
-              other workers in real USDC. Atlas — the reference device — has been alive{" "}
-              {s ? `${Math.floor((s.uptimeMs ?? 0) / 86400000)} days` : "since April 20"},{" "}
-              earned ${s?.totalEarnedUsd?.toFixed(2) ?? "5.60"}, and survived{" "}
-              {s?.totalAttacksBlocked ?? 524} attacks.
+              A device on Solana with on-chain budgets that workers can&apos;t
+              bypass. Spawn a worker, give it a job, watch it earn USDC.
+              Atlas — the reference device — has been alive{" "}
+              {s ? `${Math.floor((s.uptimeMs ?? 0) / 86400000)} days` : "since April 20"}.
             </p>
-            <div className="mt-8 flex flex-wrap items-center gap-3">
+
+            {/* Single primary CTA + small text link */}
+            <div className="mt-8 flex flex-wrap items-center gap-4">
               <Link
                 href="/app"
                 className="group inline-flex items-center gap-2 h-12 px-6 rounded-[12px] text-[15px] font-semibold transition-all hover:opacity-90 active:scale-[0.98]"
-                style={{ background: "#111", color: "#fff" }}
+                style={{
+                  background: "#111",
+                  color: "#fff",
+                  touchAction: "manipulation",
+                }}
               >
-                Get started
+                Get your device
                 <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
               </Link>
               <Link
                 href="/atlas"
-                className="inline-flex items-center gap-2 h-12 px-6 rounded-[12px] text-[15px] font-medium transition-colors"
-                style={{
-                  color: "#6B7280",
-                  border: "1px solid rgba(0,0,0,0.08)",
-                }}
+                className="text-[13px] font-medium transition-colors hover:text-[#111]"
+                style={{ color: "#6B7280", touchAction: "manipulation" }}
               >
-                Watch Atlas live
+                Watch Atlas →
               </Link>
             </div>
 
-            {/* Live stats below CTA */}
+            {/* Live stats — uptime · lost · attacks blocked, the three from /atlas */}
             {s && (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.5, duration: 0.6 }}
-                className="mt-8 flex flex-wrap items-center gap-6"
+                className="mt-10 flex flex-wrap items-baseline gap-x-8 gap-y-3"
               >
-                <Stat label="Uptime" value={fmtUptime(uptime)} />
-                <Stat label="Transactions" value={String(s.totalSettled)} />
+                <Stat label="alive" value={fmtUptime(uptime)} />
+                <Stat label="funds lost" value="$0.00" accent="#16A34A" />
                 <Stat
-                  label="Attacks blocked"
-                  value={String(s.totalAttacksBlocked)}
+                  label="attacks blocked"
+                  value={(s.totalAttacksBlocked ?? 0).toLocaleString()}
                 />
-                <Stat label="Lost" value="$0" accent="#22C55E" />
               </motion.div>
             )}
           </motion.div>
@@ -499,15 +507,25 @@ function Stat({
   accent?: string;
 }) {
   return (
-    <div>
-      <p className="text-[10px] text-[#9CA3AF] uppercase tracking-wider">
-        {label}
-      </p>
+    <div className="flex flex-col">
       <p
-        className="text-[14px] font-semibold font-mono"
-        style={{ color: accent ?? "#111" }}
+        className="font-mono text-[18px] tracking-tight"
+        style={{
+          color: accent ?? "#111",
+          fontWeight: 500,
+          fontVariantNumeric: "tabular-nums",
+        }}
       >
         {value}
+      </p>
+      <p
+        className="font-mono text-[10px] uppercase mt-1"
+        style={{
+          color: "#9CA3AF",
+          letterSpacing: "0.12em",
+        }}
+      >
+        {label}
       </p>
     </div>
   );
