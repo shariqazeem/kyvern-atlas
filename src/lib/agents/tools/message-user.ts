@@ -30,11 +30,14 @@ const VALID_SIGNAL_KINDS: SignalKind[] = [
 ];
 
 function isStructuredSignal(input: Record<string, unknown>): boolean {
+  const evidenceOk =
+    Array.isArray(input.evidence)
+      ? input.evidence.length > 0
+      : typeof input.evidence === "string" && input.evidence.trim().length > 0;
   return (
     typeof input.kind === "string" &&
     typeof input.subject === "string" &&
-    Array.isArray(input.evidence) &&
-    input.evidence.length > 0
+    evidenceOk
   );
 }
 
