@@ -124,22 +124,22 @@ export function LandingPage({ initialAtlas }: Props) {
             className="flex-1 max-w-[520px]"
           >
             <p className="text-[12px] font-medium text-[#9CA3AF] uppercase tracking-wider mb-4">
-              Living agents on Solana
+              A device you own
             </p>
             <h1
               className="text-[36px] sm:text-[48px] font-semibold tracking-[-0.035em] leading-[1.05]"
               style={{ color: "#111" }}
             >
-              Spawn an AI worker.
+              A device you own.
               <br />
-              <span style={{ color: "#9CA3AF" }}>Watch it earn while you sleep.</span>
+              <span style={{ color: "#9CA3AF" }}>Workers that earn while you sleep.</span>
             </h1>
             <p
               className="mt-5 text-[16px] leading-[1.65] max-w-[440px]"
               style={{ color: "#6B7280" }}
             >
               No code. Pick a personality, give it a job, watch it think and pay
-              other agents in real USDC. Atlas — Device #0000 — has been alive{" "}
+              other workers in real USDC. Atlas — the reference device — has been alive{" "}
               {s ? `${Math.floor((s.uptimeMs ?? 0) / 86400000)} days` : "since April 20"},{" "}
               earned ${s?.totalEarnedUsd?.toFixed(2) ?? "5.60"}, and survived{" "}
               {s?.totalAttacksBlocked ?? 524} attacks.

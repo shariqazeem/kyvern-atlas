@@ -3,8 +3,28 @@
 @tailwind utilities;
 
 /* ═══════════════════════════════════════════════════════
-   KyvernLabs Design System — Apple-grade premium light
-   Adapted from EarnFlow design language
+   KyvernLabs Design System
+
+   ── VISUAL REGISTER (locked rule) ──────────────────────
+   DARK = hardware. The device card, /atlas, the birth
+   animation, the Customize drawer, the top-up drawer —
+   anywhere we are showing the device itself doing work.
+   Surfaces use the charcoal→deep-navy radial gradient.
+
+   LIGHT = OS / workspace. The agent detail page, spawn
+   screens, chat, tasks, activity, settings — anywhere the
+   owner is doing something on top of the device. Surfaces
+   use the light tokens below. Don't mix them.
+
+   ── ANIMATION (locked) ─────────────────────────────────
+   Entrance:  cubic-bezier(0.16, 1, 0.3, 1)   200–300ms
+   Exit:      cubic-bezier(0.7,  0, 0.84, 0)  200–300ms
+   No springs, no Framer Motion defaults outside scrambles.
+
+   ── TYPOGRAPHY (locked) ────────────────────────────────
+   JetBrains Mono — 11 / 14 / 18 / 24 / 36 / 48 / 72 px
+   Inter         — 13 / 16 / 22 px
+   Anything outside this set snaps to the nearest valid step.
    ═══════════════════════════════════════════════════════ */
 
 :root {

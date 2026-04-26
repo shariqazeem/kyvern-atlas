@@ -1,41 +1,90 @@
 "use client";
 
 /* ════════════════════════════════════════════════════════════════════
-   /app/settings — lightweight settings hub.
+   /app/settings — settings + devices.
 
-   Shows the connected wallet, the cluster the whole app talks to, and a
-   pointer out to Pulse's deeper settings (billing, webhooks, alerts)
-   for users who want the advanced surface.
+   Sprint 3 (Don't List enforcement) collapsed the standalone
+   /app/devices route into a Devices section at the top of this page.
+   The bottom nav stays at four items: Home / Tasks / Activity /
+   Settings.
+
+   Sections, top to bottom:
+     1. Devices    — Atlas (reference) + the owner's own KVN-XXXX
+     2. Account    — connected wallet, sign-out
+     3. Network    — cluster + on-chain Budget program + Squads program
+     4. Disclaimer — pre-alpha, devnet-only
    ════════════════════════════════════════════════════════════════════ */
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
   ArrowUpRight,
   Copy,
   Check,
   LogOut,
-  Bell,
-  Webhook,
-  CreditCard,
   Shield,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 
-const EASE = [0.25, 0.1, 0.25, 1] as const;
+const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
+
+interface VaultBrief {
+  vault: {
+    id: string;
+    name: string;
+    emoji: string;
+    network: string;
+    pausedAt: string | null;
+  };
+}
+
+interface AtlasMini {
+  totalCycles: number;
+  totalAttacksBlocked: number;
+  totalSettled: number;
+  uptimeMs: number;
+}
+
+function devWallet(): string {
+  if (typeof window === "undefined") return "";
+  return window.localStorage.getItem("kyvern:dev-wallet") ?? "";
+}
+
+function deriveSerial(vaultId: string): string {
+  return `KVN-${vaultId.replace("vlt_", "").slice(0, 8).toUpperCase()}`;
+}
 
 export default function AppSettingsPage() {
   const { wallet, signOut } = useAuth();
   const [copied, setCopied] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
 
-  /**
-   * Sign out button handler. Actual sign-out + redirect is done inside
-   * useAuth's `signOut()` — see the hook for why the redirect happens
-   * there instead of here. This wrapper exists just to drive the
-   * `signingOut` state so the button shows a proper label.
-   */
+  const [myDevices, setMyDevices] = useState<VaultBrief[]>([]);
+  const [atlas, setAtlas] = useState<AtlasMini | null>(null);
+
+  useEffect(() => {
+    const owner = wallet ?? devWallet();
+    if (!owner) return;
+    fetch(`/api/vault/list?ownerWallet=${encodeURIComponent(owner)}`)
+      .then((r) => (r.ok ? r.json() : { vaults: [] }))
+      .then((d) => setMyDevices((d?.vaults ?? []) as VaultBrief[]))
+      .catch(() => {});
+    fetch("/api/atlas/status")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d && typeof d === "object" && !("error" in d)) {
+          setAtlas({
+            totalCycles: d.totalCycles ?? 0,
+            totalAttacksBlocked: d.totalAttacksBlocked ?? 0,
+            totalSettled: d.totalSettled ?? 0,
+            uptimeMs: d.uptimeMs ?? 0,
+          });
+        }
+      })
+      .catch(() => {});
+  }, [wallet]);
+
   const onSignOut = async () => {
     if (signingOut) return;
     setSigningOut(true);
@@ -59,36 +108,199 @@ export default function AppSettingsPage() {
 
   return (
     <div className="space-y-7 pb-16">
+      {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, ease: EASE }}
+        transition={{ duration: 0.5, ease: EASE }}
         className="pt-2"
       >
         <p
           className="text-[11px] font-semibold uppercase tracking-[0.1em] mb-1.5"
           style={{ color: "var(--text-quaternary)" }}
         >
-          Shared · account
+          Your Kyvern · settings
         </p>
         <h1
           className="tracking-[-0.035em] text-balance"
           style={{
-            fontSize: "clamp(30px, 4.2vw, 42px)",
-            lineHeight: 1.02,
+            fontSize: "clamp(28px, 4.2vw, 36px)",
+            lineHeight: 1.05,
             fontWeight: 600,
             color: "var(--text-primary)",
           }}
         >
-          Settings.
+          Settings
         </h1>
       </motion.div>
 
-      {/* Account */}
-      <motion.div
+      {/* 1. Devices */}
+      <motion.section
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.05, ease: EASE }}
+        className="p-6 rounded-[18px]"
+        style={{
+          background: "var(--surface)",
+          border: "0.5px solid var(--border-subtle)",
+          boxShadow: "0 1px 2px rgba(0,0,0,0.03)",
+        }}
+      >
+        <div className="flex items-center justify-between mb-4">
+          <h2
+            className="text-[16px] font-semibold tracking-tight"
+            style={{ color: "var(--text-primary)" }}
+          >
+            Devices
+          </h2>
+          <span className="text-[11px]" style={{ color: "var(--text-tertiary)" }}>
+            {myDevices.length === 0
+              ? "1 reference device"
+              : `${myDevices.length} of yours · plus Atlas`}
+          </span>
+        </div>
+
+        {/* Atlas — the reference device */}
+        <Link
+          href="/atlas"
+          className="block mb-2 rounded-[12px] p-3 transition-colors hover:bg-[var(--surface-2)]"
+          style={{
+            background: "var(--surface-2)",
+            border: "0.5px solid var(--border-subtle)",
+          }}
+        >
+          <div className="flex items-center gap-3">
+            <div
+              className="w-10 h-10 rounded-[12px] flex items-center justify-center text-[20px] shrink-0"
+              style={{ background: "#fff", border: "0.5px solid var(--border-subtle)" }}
+            >
+              🧭
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span
+                  className="text-[14px] font-semibold"
+                  style={{ color: "var(--text-primary)" }}
+                >
+                  Atlas
+                </span>
+                <span
+                  className="font-mono text-[10px] px-1.5 py-0.5 rounded"
+                  style={{
+                    background: "rgba(0,0,0,0.04)",
+                    color: "var(--text-tertiary)",
+                  }}
+                >
+                  KVN-0000
+                </span>
+                <span
+                  className="text-[10px] font-medium"
+                  style={{ color: "#16A34A" }}
+                >
+                  · alive
+                </span>
+              </div>
+              <div
+                className="text-[11.5px] mt-0.5"
+                style={{ color: "var(--text-tertiary)" }}
+              >
+                Reference device · running since April 20, 2026
+                {atlas && (
+                  <>
+                    {" · "}
+                    {atlas.totalSettled} settled · {atlas.totalAttacksBlocked} attacks blocked · $0 lost
+                  </>
+                )}
+              </div>
+            </div>
+            <ArrowUpRight className="w-4 h-4 shrink-0" style={{ color: "var(--text-tertiary)" }} />
+          </div>
+        </Link>
+
+        {/* Owner's devices */}
+        {myDevices.length === 0 ? (
+          <div
+            className="rounded-[12px] p-3 text-center"
+            style={{
+              background: "var(--surface-2)",
+              border: "0.5px dashed var(--border-subtle)",
+              color: "var(--text-tertiary)",
+              fontSize: "12px",
+            }}
+          >
+            You haven&apos;t deployed your own device yet.{" "}
+            <Link
+              href="/vault/new"
+              className="font-semibold"
+              style={{ color: "var(--text-primary)" }}
+            >
+              Get one →
+            </Link>
+          </div>
+        ) : (
+          myDevices.map((d) => (
+            <Link
+              key={d.vault.id}
+              href={`/vault/${d.vault.id}`}
+              className="block mt-2 rounded-[12px] p-3 transition-colors hover:bg-[var(--surface-2)]"
+              style={{
+                background: "var(--surface-2)",
+                border: "0.5px solid var(--border-subtle)",
+              }}
+            >
+              <div className="flex items-center gap-3">
+                <div
+                  className="w-10 h-10 rounded-[12px] flex items-center justify-center text-[20px] shrink-0"
+                  style={{ background: "#fff", border: "0.5px solid var(--border-subtle)" }}
+                >
+                  {d.vault.emoji || "🧭"}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="text-[14px] font-semibold"
+                      style={{ color: "var(--text-primary)" }}
+                    >
+                      {d.vault.name || "Device"}
+                    </span>
+                    <span
+                      className="font-mono text-[10px] px-1.5 py-0.5 rounded"
+                      style={{
+                        background: "rgba(0,0,0,0.04)",
+                        color: "var(--text-tertiary)",
+                      }}
+                    >
+                      {deriveSerial(d.vault.id)}
+                    </span>
+                    {d.vault.pausedAt ? (
+                      <span className="text-[10px]" style={{ color: "var(--text-tertiary)" }}>
+                        · paused
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-medium" style={{ color: "#16A34A" }}>
+                        · alive
+                      </span>
+                    )}
+                  </div>
+                  <div
+                    className="text-[11.5px] mt-0.5 font-mono"
+                    style={{ color: "var(--text-tertiary)" }}
+                  >
+                    {d.vault.network}
+                  </div>
+                </div>
+                <ArrowUpRight className="w-4 h-4 shrink-0" style={{ color: "var(--text-tertiary)" }} />
+              </div>
+            </Link>
+          ))
+        )}
+      </motion.section>
+
+      {/* 2. Account */}
+      <motion.section
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.1, ease: EASE }}
         className="p-6 rounded-[18px]"
         style={{
           background: "var(--surface)",
@@ -125,12 +337,12 @@ export default function AppSettingsPage() {
                 className="text-[12.5px]"
                 style={{ color: "var(--text-tertiary)" }}
               >
-                Using a local dev fallback wallet.
+                Local fallback wallet (dev mode).
               </span>
             )}
           </SettingRow>
 
-          <SettingRow label="Cluster">
+          <SettingRow label="Network">
             <span
               className="inline-flex items-center gap-1.5 text-[12.5px] font-mono"
               style={{ color: "var(--text-primary)" }}
@@ -143,7 +355,7 @@ export default function AppSettingsPage() {
             </span>
           </SettingRow>
 
-          <SettingRow label="Kyvern program">
+          <SettingRow label="Budget program">
             <a
               href="https://explorer.solana.com/address/PpmZErWfT5zpeo1fJtTbpqezFGbRUamaNNRWViaMSqc?cluster=devnet"
               target="_blank"
@@ -185,7 +397,7 @@ export default function AppSettingsPage() {
                 className="text-[11.5px]"
                 style={{ color: "var(--text-tertiary)" }}
               >
-                Ends your Privy session. Your vaults stay on-chain.
+                Ends your Privy session. Your devices stay on-chain.
               </p>
             </div>
             <button
@@ -202,46 +414,13 @@ export default function AppSettingsPage() {
             </button>
           </div>
         )}
-      </motion.div>
+      </motion.section>
 
-      {/* Deeper settings */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.12, ease: EASE }}
-      >
-        <h2
-          className="text-[13.5px] font-semibold tracking-tight mb-3"
-          style={{ color: "var(--text-primary)" }}
-        >
-          Deeper settings
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <DeeperLink
-            href="/pulse/dashboard/billing"
-            icon={CreditCard}
-            title="Billing"
-            desc="Plan, invoices, usage."
-          />
-          <DeeperLink
-            href="/pulse/dashboard/webhooks"
-            icon={Webhook}
-            title="Webhooks"
-            desc="Push payment events to your own backend."
-          />
-          <DeeperLink
-            href="/pulse/dashboard/alerts"
-            icon={Bell}
-            title="Alerts"
-            desc="Slack, email, on-chain triggers."
-          />
-        </div>
-      </motion.div>
-
+      {/* Disclaimer */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ duration: 0.5, delay: 0.2 }}
+        transition={{ duration: 0.5, delay: 0.18 }}
         className="p-4 rounded-[12px] flex items-center gap-2 text-[12px]"
         style={{
           background: "var(--surface-2)",
@@ -281,50 +460,6 @@ function SettingRow({
       </p>
       <div>{children}</div>
     </div>
-  );
-}
-
-function DeeperLink({
-  href,
-  icon: Icon,
-  title,
-  desc,
-}: {
-  href: string;
-  icon: React.ComponentType<{ className?: string }>;
-  title: string;
-  desc: string;
-}) {
-  return (
-    <Link
-      href={href}
-      className="group p-4 rounded-[12px] block transition-colors hover:bg-[var(--surface-2)]"
-      style={{
-        background: "var(--surface)",
-        border: "0.5px solid var(--border-subtle)",
-      }}
-    >
-      <Icon className="w-4 h-4 mb-2" />
-      <p
-        className="text-[13px] font-semibold"
-        style={{ color: "var(--text-primary)" }}
-      >
-        {title}
-      </p>
-      <p
-        className="mt-0.5 text-[11.5px]"
-        style={{ color: "var(--text-tertiary)" }}
-      >
-        {desc}
-      </p>
-      <div
-        className="mt-2 inline-flex items-center gap-1 text-[11.5px] font-medium transition-transform group-hover:translate-x-0.5"
-        style={{ color: "var(--text-secondary)" }}
-      >
-        Open
-        <ArrowUpRight className="w-3 h-3" />
-      </div>
-    </Link>
   );
 }
 

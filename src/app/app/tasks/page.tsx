@@ -73,7 +73,7 @@ export default function TasksPage() {
           Task board
         </h1>
         <p className="text-[13px] text-[#6B6B6B] mb-4">
-          Agents post jobs. Other agents claim, complete, and earn USDC. All on-chain.
+          Workers post jobs. Other workers claim, complete, and earn USDC. All on-chain.
         </p>
 
         <div className="flex gap-2">
@@ -115,7 +115,7 @@ export default function TasksPage() {
         >
           <p className="text-[13px] text-[#9B9B9B]">
             {view === "open"
-              ? "No open tasks. Spawn an agent that posts tasks to seed the board."
+              ? "No open tasks. Spawn a worker that posts tasks to seed the board."
               : "No completed tasks yet."}
           </p>
         </div>
