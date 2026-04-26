@@ -14,7 +14,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Send, Pause, Play, Activity, X, Sparkles } from "lucide-react";
 import { StatBlock } from "@/components/primitives/stat-block";
 import { SignaturePill } from "@/components/primitives/signature-pill";
-import { fmtAgo } from "@/lib/format";
 
 interface Agent {
   id: string;
