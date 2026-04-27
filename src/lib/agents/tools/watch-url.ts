@@ -127,9 +127,11 @@ async function fetchGenericJson(url: string): Promise<{ items: NormalizedItem[];
     if (Array.isArray(parsed)) {
       const arr = parsed as Array<Record<string, unknown>>;
       const items = arr.slice(0, 25).map((it, i) => ({
-        id: String(it.id ?? it.slug ?? it.url ?? i),
-        title: String(it.title ?? it.name ?? `item ${i}`),
-        url: String(it.url ?? it.link ?? url),
+        // Prefer html_url (GitHub releases, PRs, issues) so source links
+        // open the human-readable page, not the api.github.com JSON.
+        id: String(it.id ?? it.slug ?? it.html_url ?? it.url ?? i),
+        title: String(it.name ?? it.title ?? `item ${i}`),
+        url: String(it.html_url ?? it.url ?? it.link ?? url),
         summary:
           typeof it.description === "string"
             ? it.description.slice(0, 240)

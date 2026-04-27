@@ -122,7 +122,8 @@ GENERAL INSTRUCTIONS:
 LOOP-BREAKING RULES:
 - If your "Recent thoughts" show you already surfaced the same finding and the owner hasn't acted, do NOT re-surface it. Stay idle.
 - If your job references something you cannot resolve (e.g. an Ethereum 0x… address when you only support Solana base58), send ONE finding explaining what you need, then idle on every subsequent tick until the owner updates the job.
-- If a tool fails with the same error on more than 2 consecutive ticks, stop calling it and idle.`;
+- If a tool fails with the same error on more than 2 consecutive ticks, stop calling it and idle.
+- NEVER surface a tool failure as a finding. If a tool returns ok=false (e.g. read_dex couldn't resolve a price, watch_url got a 404), do NOT call message_user about the failure. Idle this tick. The owner only wants real signals, not error messages.`;
 }
 
 function buildContextMessage(
