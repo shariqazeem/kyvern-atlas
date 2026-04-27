@@ -1,29 +1,30 @@
 "use client";
 
 /**
- * /app/agents/spawn — two-screen worker hiring flow.
+ * /app/agents/spawn — two-screen worker hiring flow, rebuilt as a
+ * physical "module install" ritual.
  *
- * Section 2B of the Grand Champion plan.
+ *   Screen 1 ("module")    — 5 cartridge tiles. Tap = pick the module.
+ *   Screen 2 ("calibrate") — name + emoji + job + cadence calibration,
+ *                            then INSTALL MODULE primary action.
+ *   Screen 3 ("installing") — physical install animation overlay (the
+ *                             worker icon literally slides into a slot
+ *                             on a mini chassis), then router.push to
+ *                             /app/agents/[id]?fresh=true.
  *
- *   Screen 1 ("template")  — 4-card 2x2 picker. Tap → screen 2.
- *   Screen 2 ("configure") — name + emoji + job (chips + textarea),
- *                            primary Spawn button, "Customize" link
- *                            opens the depth drawer.
- *   On Spawn               — Birth animation overlay plays for ~1.6s,
- *                            then router.push to /app/agents/[id]?fresh=true
- *                            (the activation banner from 3C takes over).
+ * Most users finish in 3 taps: pick module → tap chip → install. The 5%
+ * who care about depth tap "Customize ↗" — sliders, abilities, cadence,
+ * on-chain budget callout (still in the existing CustomizeDrawer).
  *
- * Most users finish in 3 taps: pick template → tap chip → Spawn.
- * The 5% who care about depth tap Customize — sliders, abilities,
- * cadence, and the on-chain budget callout that flips a judge from
- * "consumer UI" to "wait, this is a smart contract."
+ * Light premium register everywhere; the dark birth-animation surface
+ * has been replaced by a chassis-style installer.
  */
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, ChevronRight, RefreshCw, Sliders } from "lucide-react";
+import { ArrowLeft, RefreshCw, Sliders } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import {
   getPickerTemplates,
@@ -36,7 +37,10 @@ import {
   CustomizeDrawer,
   derivePersonalityPrompt,
 } from "@/components/spawn/customize-drawer";
-import { BirthAnimation } from "@/components/spawn/birth-animation";
+import { CartridgePicker } from "@/components/spawn/cartridge-picker";
+import { InstallAnimation } from "@/components/spawn/install-animation";
+
+const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
 interface VaultBrief {
   vault: {
@@ -77,7 +81,6 @@ function devWallet(): string {
 
 const PICKER = getPickerTemplates();
 
-/** Slider defaults per template — Hunter starts aggressive, Earner cautious. */
 function defaultSliders(template: AgentTemplate): { lc: number; ca: number } {
   switch (template) {
     case "scout":
@@ -93,7 +96,7 @@ function defaultSliders(template: AgentTemplate): { lc: number; ca: number } {
 
 function estimateDailyCostUsd(seconds: number): number {
   const ticksPerDay = 86_400 / Math.max(60, seconds);
-  return ticksPerDay * 0.00003; // gpt-oss-120b per-tick estimate
+  return ticksPerDay * 0.00003;
 }
 
 function fmtCost(usd: number): string {
@@ -112,15 +115,12 @@ export default function SpawnPage() {
   const [vaults, setVaults] = useState<VaultBrief[]>([]);
   const [allTools, setAllTools] = useState<ToolMeta[]>([]);
 
-  // Step machine
   const [screen, setScreen] = useState<"template" | "configure" | "spawning">(
     "template",
   );
 
-  // Picked template
   const [template, setTemplate] = useState<AgentTemplate | null>(null);
 
-  // Configure state
   const [name, setName] = useState("");
   const [emoji, setEmoji] = useState("🔭");
   const [job, setJob] = useState("");
@@ -139,7 +139,6 @@ export default function SpawnPage() {
     [template],
   );
 
-  // Load vaults + tools
   useEffect(() => {
     if (isLoading) return;
     const owner = wallet ?? devWallet();
@@ -152,7 +151,6 @@ export default function SpawnPage() {
       .then((d) => setAllTools(d?.tools ?? []));
   }, [wallet, isLoading]);
 
-  // When user picks a template → pre-fill configure state, advance screen
   const pickTemplate = (id: AgentTemplate) => {
     const t = getTemplate(id);
     if (!t) return;
@@ -218,8 +216,6 @@ export default function SpawnPage() {
       });
       const data = await res.json();
       if (!res.ok || !data.agent) throw new Error(data.error ?? "spawn failed");
-      // Hold on the birth animation a beat — onComplete will redirect.
-      // Stash the new id; the BirthAnimation onComplete callback navigates.
       sessionStorage.setItem("kyvern:last-spawn-id", data.agent.id);
     } catch (e) {
       setError(e instanceof Error ? e.message : "spawn failed");
@@ -233,24 +229,22 @@ export default function SpawnPage() {
       sessionStorage.removeItem("kyvern:last-spawn-id");
       router.push(`/app/agents/${id}?fresh=true`);
     } else {
-      // POST is still pending or failed — fall back gracefully
       setScreen("configure");
     }
   };
 
-  // No-device state — keep the existing nudge to /vault/new
   if (vaults.length === 0 && !isLoading) {
     return (
       <div className="py-16 text-center">
         <p className="text-[14px] text-[#6B6B6B] mb-3">
-          You need a device before hiring workers.
+          You need a device before installing modules.
         </p>
         <Link
           href="/vault/new"
           className="inline-flex items-center gap-1.5 h-10 px-5 rounded-[12px] text-[13px] font-semibold"
           style={{ background: "#0A0A0A", color: "#fff" }}
         >
-          Get your Kyvern <ChevronRight className="w-3.5 h-3.5" />
+          Get your Kyvern
         </Link>
       </div>
     );
@@ -258,7 +252,6 @@ export default function SpawnPage() {
 
   return (
     <div className="py-2 pb-16">
-      {/* Top: back link */}
       <Link
         href="/app"
         className="inline-flex items-center gap-1.5 text-[12px] font-medium text-[#9B9B9B] mb-4 hover:text-[#6B6B6B]"
@@ -268,216 +261,195 @@ export default function SpawnPage() {
       </Link>
 
       <AnimatePresence mode="wait">
-        {/* ───────── SCREEN 1: Hire a worker ───────── */}
+        {/* ───────── SCREEN 1: Module library ───────── */}
         {screen === "template" && (
           <motion.div
             key="screen1"
             initial={{ opacity: 0, x: 8 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -8 }}
-            transition={{ duration: 0.22 }}
+            transition={{ duration: 0.24, ease: EASE }}
           >
-            <h1 className="text-[26px] font-semibold tracking-tight text-[#0A0A0A]">
-              Hire a worker
-            </h1>
-            <p className="text-[13px] text-[#6B6B6B] mb-6">
-              For{" "}
-              <span className="font-mono text-[#0A0A0A]">{serial}</span>. Pick the
-              shape — you can fine-tune the rest in the next step.
-            </p>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {PICKER.map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => pickTemplate(t.id)}
-                  className="text-left rounded-[16px] p-4 transition-all active:scale-[0.99] hover:shadow-md"
-                  style={{
-                    background: "#fff",
-                    border: "1px solid rgba(0,0,0,0.06)",
-                    boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
-                  }}
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div
-                      className="w-12 h-12 rounded-[14px] flex items-center justify-center text-[26px]"
-                      style={{
-                        background: "linear-gradient(135deg, #F9FAFB, #F3F4F6)",
-                        border: "1px solid rgba(0,0,0,0.04)",
-                      }}
-                    >
-                      {t.emoji}
-                    </div>
-                    <ChevronRight className="w-4 h-4 text-[#D1D5DB] mt-1" />
-                  </div>
-                  <h3 className="text-[16px] font-semibold text-[#0A0A0A] mb-1">
-                    {t.name}
-                  </h3>
-                  <p className="text-[12px] text-[#6B6B6B] leading-[1.5] mb-3">
-                    {t.description}
-                  </p>
-                  <div className="flex flex-col gap-1 mt-1">
-                    <span
-                      className="text-[11px] inline-flex items-center gap-1.5"
-                      style={{ color: "#6B7280" }}
-                    >
-                      <span
-                        className="font-mono uppercase"
-                        style={{
-                          color: "#9CA3AF",
-                          fontSize: "9px",
-                          letterSpacing: "0.1em",
-                        }}
-                      >
-                        Watches
-                      </span>
-                      {t.watches}
-                    </span>
-                    <span
-                      className="text-[11px] inline-flex items-center gap-1.5"
-                      style={{ color: "#6B7280" }}
-                    >
-                      <span
-                        className="font-mono uppercase"
-                        style={{
-                          color: "#9CA3AF",
-                          fontSize: "9px",
-                          letterSpacing: "0.1em",
-                        }}
-                      >
-                        Pings
-                      </span>
-                      {t.pings}
-                    </span>
-                  </div>
-                </button>
-              ))}
-            </div>
+            <CartridgePicker
+              templates={PICKER}
+              serial={serial}
+              onPick={pickTemplate}
+            />
           </motion.div>
         )}
 
-        {/* ───────── SCREEN 2: Configure ───────── */}
+        {/* ───────── SCREEN 2: Calibrate ───────── */}
         {screen === "configure" && selectedTemplate && (
           <motion.div
             key="screen2"
             initial={{ opacity: 0, x: 8 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -8 }}
-            transition={{ duration: 0.22 }}
+            transition={{ duration: 0.24, ease: EASE }}
           >
             <button
               onClick={() => setScreen("template")}
-              className="inline-flex items-center gap-1.5 text-[11px] font-medium text-[#9B9B9B] mb-2 hover:text-[#6B6B6B]"
+              className="inline-flex items-center gap-1.5 text-[11px] font-medium text-[#9B9B9B] mb-3 hover:text-[#6B6B6B]"
             >
               <ArrowLeft className="w-3 h-3" />
-              All workers
+              All modules
             </button>
-            <div className="flex items-center gap-3 mb-5">
+
+            {/* Module preview header — small chassis-feel card showing the
+                picked module about to dock with KVN-XXXX. */}
+            <div
+              className="relative rounded-[18px] overflow-hidden mb-5"
+              style={{
+                background: "linear-gradient(180deg, #FFFFFF 0%, #F8F8FA 100%)",
+                border: "1px solid rgba(15,23,42,0.06)",
+                boxShadow: [
+                  "inset 0 1px 0 rgba(255,255,255,1)",
+                  "0 1px 2px rgba(15,23,42,0.04)",
+                  "0 8px 24px -10px rgba(15,23,42,0.08)",
+                ].join(", "),
+              }}
+            >
               <div
-                className="w-12 h-12 rounded-[14px] flex items-center justify-center text-[26px]"
+                aria-hidden
+                className="absolute top-0 left-6 right-6 pointer-events-none"
                 style={{
-                  background: "linear-gradient(135deg, #F9FAFB, #F3F4F6)",
-                  border: "1px solid rgba(0,0,0,0.04)",
+                  height: 1,
+                  background:
+                    "linear-gradient(to right, transparent, rgba(255,255,255,1), transparent)",
                 }}
-              >
-                {emoji}
-              </div>
-              <div>
-                <h1 className="text-[22px] font-semibold tracking-tight text-[#0A0A0A] leading-tight">
-                  Configure {selectedTemplate.name}
-                </h1>
-                <p className="text-[12px] text-[#9B9B9B]">
-                  {selectedTemplate.description}
-                </p>
+              />
+              <div className="relative px-5 py-4 flex items-center gap-4">
+                <div
+                  className="w-14 h-14 rounded-[18px] flex items-center justify-center text-[28px]"
+                  style={{
+                    background: "linear-gradient(180deg, #F2F3F5 0%, #FFFFFF 100%)",
+                    border: "1px solid rgba(15,23,42,0.06)",
+                    boxShadow:
+                      "inset 0 1px 2px rgba(15,23,42,0.06), inset 0 -1px 0 rgba(255,255,255,0.8)",
+                  }}
+                >
+                  {emoji}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div
+                    className="font-mono text-[9px] uppercase tracking-[0.16em] mb-1"
+                    style={{ color: "#9CA3AF" }}
+                  >
+                    Module · {selectedTemplate.name}
+                  </div>
+                  <h1 className="text-[20px] font-semibold tracking-tight text-[#0A0A0A] leading-tight">
+                    Calibrate before install
+                  </h1>
+                  <p className="text-[12px] text-[#6B6B6B] mt-0.5">
+                    Docking into{" "}
+                    <span className="font-mono text-[#374151]">{serial}</span>
+                  </p>
+                </div>
               </div>
             </div>
 
-            {/* Name + emoji */}
-            <div className="mb-5">
-              <label className="block text-[11px] font-medium text-[#6B6B6B] mb-1.5">
-                Name
-              </label>
-              <div className="flex items-center gap-1.5 mb-3">
+            {/* Name */}
+            <Field label="Name">
+              <div className="flex items-center gap-1.5">
                 <input
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Sentinel"
-                  className="flex-1 px-3 py-2 rounded-[10px] text-[14px] outline-none"
-                  style={{ background: "#fff", border: "1px solid rgba(0,0,0,0.08)" }}
+                  className="flex-1 px-3 py-2.5 rounded-[10px] text-[14px] outline-none focus:border-[#0A0A0A] transition"
+                  style={{
+                    background: "#FFFFFF",
+                    border: "1px solid rgba(15,23,42,0.08)",
+                    boxShadow: "inset 0 1px 1px rgba(15,23,42,0.03)",
+                  }}
                 />
                 <button
                   type="button"
                   onClick={cycleName}
-                  className="w-9 h-9 rounded-[10px] flex items-center justify-center"
-                  style={{ background: "#F5F5F5", color: "#6B6B6B" }}
+                  className="w-10 h-10 rounded-[10px] flex items-center justify-center transition active:scale-[0.95]"
+                  style={{
+                    background: "#FFFFFF",
+                    border: "1px solid rgba(15,23,42,0.08)",
+                    color: "#6B6B6B",
+                  }}
                   aria-label="Suggest another name"
                 >
                   <RefreshCw className="w-3.5 h-3.5" />
                 </button>
               </div>
-              <div className="flex flex-wrap gap-1.5">
+              <div className="flex flex-wrap gap-1.5 mt-2.5">
                 {EMOJI_PALETTE.map((e) => {
                   const active = e === emoji;
                   return (
-                    <button
+                    <motion.button
                       key={e}
                       type="button"
                       onClick={() => setEmoji(e)}
-                      className="w-9 h-9 rounded-full flex items-center justify-center text-[18px] transition active:scale-[0.95]"
+                      whileTap={{ scale: 0.92 }}
+                      transition={{
+                        type: "spring",
+                        stiffness: 320,
+                        damping: 22,
+                        mass: 0.6,
+                      }}
+                      className="w-9 h-9 rounded-full flex items-center justify-center text-[18px]"
                       style={{
-                        background: active ? "#0A0A0A" : "#fff",
+                        background: active ? "#0A0A0A" : "#FFFFFF",
                         border: active
                           ? "1px solid #0A0A0A"
-                          : "1px solid rgba(0,0,0,0.08)",
+                          : "1px solid rgba(15,23,42,0.08)",
+                        boxShadow: active
+                          ? "0 1px 2px rgba(15,23,42,0.20)"
+                          : "0 1px 2px rgba(15,23,42,0.03)",
                       }}
                     >
                       {e}
-                    </button>
+                    </motion.button>
                   );
                 })}
               </div>
-            </div>
+            </Field>
 
             {/* Job */}
-            <div className="mb-5">
-              <label className="block text-[11px] font-medium text-[#6B6B6B] mb-1.5">
-                What&apos;s the job?
-              </label>
+            <Field label="What's the job?">
               <div className="flex flex-wrap gap-1.5 mb-2">
                 {selectedTemplate.jobSuggestions.map((s) => {
                   const active = activeChip === s.label;
                   return (
-                    <button
+                    <motion.button
                       key={s.label}
                       type="button"
                       onClick={() => onChip(s)}
-                      className="text-[11px] px-2.5 py-1 rounded-full transition active:scale-[0.97]"
+                      whileTap={{ scale: 0.95 }}
+                      transition={{
+                        type: "spring",
+                        stiffness: 320,
+                        damping: 22,
+                        mass: 0.6,
+                      }}
+                      className="text-[11.5px] px-3 py-1.5 rounded-full"
                       style={{
-                        background: active ? "#0A0A0A" : "#fff",
-                        color: active ? "#fff" : "#0A0A0A",
+                        background: active ? "#0A0A0A" : "#FFFFFF",
+                        color: active ? "#FFFFFF" : "#0A0A0A",
                         border: active
                           ? "1px solid #0A0A0A"
-                          : "1px solid rgba(0,0,0,0.1)",
+                          : "1px solid rgba(15,23,42,0.10)",
                       }}
                     >
                       {s.label}
-                    </button>
+                    </motion.button>
                   );
                 })}
-                {/* Always-present escape hatch — empty slots become a
-                    "write your own" affordance, never a fake/dummy chip. */}
                 <button
                   type="button"
                   onClick={() => {
                     setJob("");
                     setActiveChip(null);
                   }}
-                  className="text-[11px] px-2.5 py-1 rounded-full transition active:scale-[0.97]"
+                  className="text-[11.5px] px-3 py-1.5 rounded-full transition active:scale-[0.97]"
                   style={{
-                    background: "#fff",
+                    background: "#FFFFFF",
                     color: "#6B6B6B",
-                    border: "1px dashed rgba(0,0,0,0.18)",
+                    border: "1px dashed rgba(15,23,42,0.18)",
                   }}
                 >
                   Custom job →
@@ -491,8 +463,12 @@ export default function SpawnPage() {
                 }}
                 rows={5}
                 placeholder={selectedTemplate.jobPromptPlaceholder}
-                className="w-full px-3 py-2.5 rounded-[10px] text-[13px] outline-none leading-[1.5] resize-none"
-                style={{ background: "#fff", border: "1px solid rgba(0,0,0,0.08)" }}
+                className="w-full px-3 py-2.5 rounded-[10px] text-[13px] outline-none leading-[1.5] resize-none focus:border-[#0A0A0A] transition"
+                style={{
+                  background: "#FFFFFF",
+                  border: "1px solid rgba(15,23,42,0.08)",
+                  boxShadow: "inset 0 1px 1px rgba(15,23,42,0.03)",
+                }}
               />
               {/^.*0x[0-9a-fA-F]{40}.*$/m.test(job) && (
                 <div
@@ -505,35 +481,47 @@ export default function SpawnPage() {
                 >
                   <strong>That looks like an Ethereum address (0x…).</strong>{" "}
                   Workers run on Solana — wallets here are base58. Replace the
-                  address before spawning, or your worker will loop asking your
-                  owner for a Solana address.
+                  address before installing, or your worker will loop asking
+                  your owner for a Solana address.
                 </div>
               )}
-            </div>
+            </Field>
 
-            {/* Abilities granted (collapsed summary) */}
+            {/* Hardware-spec strip — links into the Customize drawer */}
             <button
               type="button"
               onClick={() => setDrawerOpen(true)}
-              className="w-full flex items-center justify-between rounded-[12px] px-3 py-3 mb-5 transition active:scale-[0.99]"
+              className="w-full flex items-center justify-between rounded-[14px] px-4 py-3.5 mb-5 transition active:scale-[0.99] hover:border-[#0A0A0A]"
               style={{
-                background: "#fff",
-                border: "1px solid rgba(0,0,0,0.08)",
+                background: "#FFFFFF",
+                border: "1px solid rgba(15,23,42,0.08)",
+                boxShadow: "0 1px 2px rgba(15,23,42,0.03)",
               }}
             >
-              <div className="flex items-center gap-2">
-                <Sliders className="w-3.5 h-3.5 text-[#6B6B6B]" />
+              <div className="flex items-center gap-2.5">
+                <div
+                  className="w-8 h-8 rounded-[10px] flex items-center justify-center"
+                  style={{
+                    background:
+                      "linear-gradient(180deg, #F2F3F5 0%, #FFFFFF 100%)",
+                    border: "1px solid rgba(15,23,42,0.06)",
+                  }}
+                >
+                  <Sliders className="w-3.5 h-3.5 text-[#374151]" strokeWidth={1.7} />
+                </div>
                 <div className="text-left">
                   <div className="text-[12.5px] font-medium text-[#0A0A0A]">
-                    {tools.length} {tools.length === 1 ? "ability" : "abilities"} granted
+                    {tools.length}{" "}
+                    {tools.length === 1 ? "ability" : "abilities"} granted ·{" "}
+                    every {Math.max(1, Math.round(frequency / 60))} min
                   </div>
-                  <div className="text-[11px] text-[#9B9B9B]">
-                    Cadence: every {Math.round(frequency / 60) || frequency / 60} min ·
-                    on-chain caps inherited from {serial}
+                  <div className="text-[11px] text-[#9B9B9B] mt-0.5">
+                    On-chain caps inherit from{" "}
+                    <span className="font-mono">{serial}</span>
                   </div>
                 </div>
               </div>
-              <span className="text-[11px] text-[#6B6B6B] font-medium">
+              <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#6B6B6B]">
                 Customize ↗
               </span>
             </button>
@@ -551,30 +539,40 @@ export default function SpawnPage() {
               </div>
             )}
 
-            {/* Primary spawn button */}
-            <button
+            {/* INSTALL MODULE primary action */}
+            <motion.button
               type="button"
               onClick={handleSpawn}
               disabled={!canSpawn}
-              className="w-full h-12 rounded-[12px] text-[14px] font-semibold transition active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
-              style={{ background: "#0A0A0A", color: "#fff" }}
+              whileTap={canSpawn ? { scale: 0.985 } : undefined}
+              transition={{ type: "spring", stiffness: 320, damping: 22, mass: 0.6 }}
+              className="w-full h-[52px] rounded-[14px] text-[14px] font-semibold transition disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{
+                background: "#0A0A0A",
+                color: "#FFFFFF",
+                boxShadow: canSpawn
+                  ? "inset 0 1px 0 rgba(255,255,255,0.18), 0 1px 2px rgba(15,23,42,0.10), 0 8px 18px -6px rgba(15,23,42,0.30)"
+                  : undefined,
+              }}
             >
               {canSpawn ? (
-                <>
-                  Spawn {name || "worker"}
-                  <span className="ml-1.5 font-mono opacity-70">
+                <span className="inline-flex items-center gap-2">
+                  <span className="font-mono text-[10px] uppercase tracking-[0.18em] opacity-60">
+                    Install ↓
+                  </span>
+                  <span>{name || "module"}</span>
+                  <span className="font-mono text-[11px] opacity-60">
                     · ~{fmtCost(dailyCostUsd)}/day
                   </span>
-                </>
+                </span>
               ) : (
-                "Fill in name + job to spawn"
+                "Fill in name + job to install"
               )}
-            </button>
+            </motion.button>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Customize drawer (overlays configure screen) */}
       {selectedTemplate && (
         <CustomizeDrawer
           open={drawerOpen}
@@ -595,12 +593,35 @@ export default function SpawnPage() {
         />
       )}
 
-      {/* Birth animation overlay (during spawn) */}
       <AnimatePresence>
         {screen === "spawning" && (
-          <BirthAnimation name={name} emoji={emoji} onComplete={onBirthComplete} />
+          <InstallAnimation
+            name={name}
+            emoji={emoji}
+            serial={serial}
+            perTxMaxUsd={perTxMaxUsd}
+            dailyLimitUsd={dailyLimitUsd}
+            onComplete={onBirthComplete}
+          />
         )}
       </AnimatePresence>
+    </div>
+  );
+}
+
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="mb-5">
+      <label className="block font-mono text-[10px] uppercase tracking-[0.14em] text-[#9CA3AF] mb-2">
+        {label}
+      </label>
+      {children}
     </div>
   );
 }
