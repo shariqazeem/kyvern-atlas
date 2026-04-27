@@ -247,7 +247,11 @@ export default function AgentDetailPage({ params }: { params: { id: string } }) 
   const net = agent.totalEarnedUsd - agent.totalSpentUsd;
 
   return (
-    <div className="pb-32">
+    // Bottom padding has to clear the fixed chat overlay below — chat
+    // grows to ~430px when bubbles fill (max-h-[280px] bubbles + chips
+    // + input + gradient + tab-bar gap). Without this, the last few
+    // thoughts get hidden behind the chat once it has messages.
+    <div className="pb-[480px]">
       {/* Back */}
       <Link
         href="/app"
