@@ -213,6 +213,11 @@ export interface AgentTemplateDef {
    *  These are display copy, not enum-strict, so future templates can riff. */
   earningStyle: "Steady" | "Opportunistic" | "Hands-on" | "Your call";
   activityLevel: "Chill" | "Balanced" | "Aggressive" | "Your call";
+  /** Path C picker copy — replaces the earningStyle/activityLevel pills.
+   *  Format: short noun phrase. The picker renders "Watches {watches} ·
+   *  Pings {pings}" beneath the description. */
+  watches: string;
+  pings: string;
   /** Whether this template appears in the spawn picker. False for legacy
    *  templates kept around for backwards-compat with existing DB rows
    *  (e.g. greeter, analyst), and for atlas which is forked from /atlas. */

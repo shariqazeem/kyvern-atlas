@@ -3,6 +3,20 @@ const nextConfig = {
   // Transpile ESM-only deep deps that otherwise trip Next.js's server bundler.
   transpilePackages: ["@coinbase/wallet-sdk"],
 
+  // Path C — Activity tab died; permanent redirect to the new Inbox.
+  redirects: async () => [
+    {
+      source: "/app/payments",
+      destination: "/app/inbox",
+      permanent: true,
+    },
+    {
+      source: "/app/payments/:path*",
+      destination: "/app/inbox",
+      permanent: true,
+    },
+  ],
+
   headers: async () => [
     {
       source: "/(.*)",

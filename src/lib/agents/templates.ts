@@ -49,7 +49,9 @@ export const TEMPLATES: AgentTemplateDef[] = [
     description: "Watches wallets and tokens. Sells signals.",
     earningStyle: "Steady",
     activityLevel: "Balanced",
-    inPicker: true,
+    watches: "Wallets and tokens",
+    pings: "Movements and price",
+    inPicker: false,
     jobSuggestions: [
       {
         label: "Whale-watcher",
@@ -83,7 +85,9 @@ export const TEMPLATES: AgentTemplateDef[] = [
     description: "Exposes paid endpoints. Claims small tasks.",
     earningStyle: "Steady",
     activityLevel: "Chill",
-    inPicker: true,
+    watches: "Open tasks",
+    pings: "Small earnings",
+    inPicker: false,
     jobSuggestions: [
       {
         label: "Cheap SOL price feed",
@@ -117,7 +121,9 @@ export const TEMPLATES: AgentTemplateDef[] = [
     description: "Finds opportunities. Posts and claims bounties.",
     earningStyle: "Opportunistic",
     activityLevel: "Aggressive",
-    inPicker: true,
+    watches: "On-chain opportunities",
+    pings: "Setups and verifications",
+    inPicker: false,
     jobSuggestions: [
       {
         label: "Whale-mover hunter",
@@ -149,10 +155,12 @@ export const TEMPLATES: AgentTemplateDef[] = [
     description: "Build your own from scratch.",
     earningStyle: "Your call",
     activityLevel: "Your call",
-    inPicker: true,
+    watches: "Whatever you tell it",
+    pings: "Your call",
+    inPicker: false,
     jobSuggestions: [],
   },
-  /* ── Path C templates — promoted to picker in Sprint 2 ─────────── */
+  /* ── Path C picker templates ──────────────────────────────────── */
   {
     id: "bounty_hunter",
     name: "Bounty Hunter",
@@ -168,7 +176,9 @@ export const TEMPLATES: AgentTemplateDef[] = [
     description: "Watches bounty boards. Pings you when a fit drops.",
     earningStyle: "Steady",
     activityLevel: "Chill",
-    inPicker: false,
+    watches: "Bounty boards & hackathons",
+    pings: "When a fit drops",
+    inPicker: true,
     jobSuggestions: [
       {
         label: "Superteam Frontend >$500",
@@ -187,6 +197,150 @@ export const TEMPLATES: AgentTemplateDef[] = [
       },
     ],
   },
+  {
+    id: "ecosystem_watcher",
+    name: "Ecosystem Watcher",
+    emoji: "📡",
+    suggestedName: "Echo",
+    personalityPrompt:
+      "You watch the rooms where ecosystem news drops first — official accounts, foundation feeds, hackathon platforms. You don't speculate. You surface the announcement and the link.",
+    jobPromptPlaceholder: "Which ecosystem accounts or feeds should I watch?",
+    jobPromptExample:
+      "Every cycle, watch_url https://nitter.net/SolanaFndn/rss with format=rss. Surface any new post as an ecosystem_announcement finding. Subject = post title (≤80 chars), evidence = excerpt + handle, sourceUrl = the post URL.",
+    recommendedTools: ["watch_url", "message_user"],
+    defaultFrequencySeconds: 600,
+    description: "Watches Solana accounts and feeds. Pings on hackathons, grants, and launches.",
+    earningStyle: "Steady",
+    activityLevel: "Balanced",
+    watches: "Ecosystem accounts & feeds",
+    pings: "Hackathons, grants, launches",
+    inPicker: true,
+    jobSuggestions: [
+      {
+        label: "@SolanaFndn @Colosseum @SuperteamDAO",
+        job:
+          "Every cycle, call watch_url on https://nitter.net/SolanaFndn/rss with format='rss' and sinceLastCheck=true. Repeat for https://nitter.net/Colosseum/rss and https://nitter.net/SuperteamDAO/rss. For each new post mentioning hackathon, grant, mainnet, or launch, surface an ecosystem_announcement with the post title as subject, the post excerpt + handle as evidence, and the post URL as sourceUrl.",
+      },
+      {
+        label: "Solana Foundation blog",
+        job:
+          "Every cycle, watch_url on https://solana.com/news/rss.xml with format='rss' and sinceLastCheck=true. Surface every new post as an ecosystem_announcement. Subject = title, evidence = excerpt + author + date, sourceUrl = post URL.",
+      },
+      {
+        label: "Magic Eden, Tensor, Phantom drops",
+        job:
+          "Every cycle, watch_url on https://nitter.net/MagicEden/rss, https://nitter.net/tensor_hq/rss, https://nitter.net/phantom/rss with format='rss'. When a post mentions launch, drop, mint, or release, surface an ecosystem_announcement.",
+      },
+    ],
+  },
+  {
+    id: "whale_tracker",
+    name: "Whale Tracker",
+    emoji: "🐋",
+    suggestedName: "Drift",
+    personalityPrompt:
+      "You track wallets. You watch their on-chain moves with patience and surface the moments they move size. Your evidence is the signature, the tokens, the dollar amount, the time. No commentary unless asked.",
+    jobPromptPlaceholder: "Which wallets should I track, and at what size threshold?",
+    jobPromptExample:
+      "Every cycle, watch_wallet_swaps on the Solana wallet 7Yk8cPDKL5h4QnQiVhHcvWg9HXKJpQfTmnK9zTzk5bWqA with minUsdThreshold 5000. For each new swap, surface a wallet_move finding with subject summarising amount + tokens, evidence with signature + token pair + USD value, sourceUrl = Solana Explorer tx URL.",
+    recommendedTools: ["watch_wallet_swaps", "watch_wallet", "read_dex", "message_user"],
+    defaultFrequencySeconds: 240,
+    description: "Tracks wallets. Pings you when they move size.",
+    earningStyle: "Opportunistic",
+    activityLevel: "Balanced",
+    watches: "Specific wallets",
+    pings: "Big swaps & rotations",
+    inPicker: true,
+    jobSuggestions: [
+      {
+        label: "Track a whale for Jupiter swaps >$50k",
+        job:
+          "Every cycle, watch_wallet_swaps on the Solana wallet 7Yk8cPDKL5h4QnQiVhHcvWg9HXKJpQfTmnK9zTzk5bWqA with lookbackCount=20 and minUsdThreshold=50000. For each new swap, surface a wallet_move finding. Subject = '<amount in> <tokenIn> → <amount out> <tokenOut> · ~$<usd>'. Evidence = signature, token pair, USD value, time. sourceUrl = https://explorer.solana.com/tx/<signature>?cluster=devnet (or mainnet if applicable).",
+      },
+      {
+        label: "Top 5 SOL holders for outflows",
+        job:
+          "Pick 5 known top SOL holders. Every cycle, call watch_wallet on each. Surface a wallet_move finding when net SOL outflow > 1000 SOL is detected. Evidence = signature + amount + counterparty.",
+      },
+      {
+        label: "Watch this wallet for any swap >$10k",
+        job:
+          "Every cycle, watch_wallet_swaps on a single wallet with minUsdThreshold=10000. Surface every qualifying swap as a wallet_move finding.",
+      },
+    ],
+  },
+  {
+    id: "token_pulse",
+    name: "Token Pulse",
+    emoji: "📈",
+    suggestedName: "Pulse",
+    personalityPrompt:
+      "You watch a token's heartbeat — price + volume. You ping the owner only on configured threshold breaks. You write tight, factual price summaries.",
+    jobPromptPlaceholder: "Which token, what threshold, what window?",
+    jobPromptExample:
+      "Every cycle, read_dex with 'SOL'. Track price across cycles in your recent thoughts. If SOL moves >5% in either direction over 30 minutes, surface a price_trigger finding with the percent change and current price as subject, evidence with start price, end price, and time window.",
+    recommendedTools: ["read_dex", "watch_wallet_swaps", "message_user"],
+    defaultFrequencySeconds: 180,
+    description: "Watches a token's price + volume. Pings you on configured moves.",
+    earningStyle: "Opportunistic",
+    activityLevel: "Aggressive",
+    watches: "Token price & volume",
+    pings: "Price spikes & volume jumps",
+    inPicker: true,
+    jobSuggestions: [
+      {
+        label: "SOL >5% in 30min",
+        job:
+          "Every cycle, read_dex with 'SOL'. Track price across cycles using your recent thoughts. If SOL moves >5% in either direction over 30 minutes, surface a price_trigger finding. Subject = 'SOL <up/down> X% in 30min: $<currentPrice>'. Evidence = start price, current price, % change, source. sourceUrl = a CoinGecko or DexScreener link for SOL.",
+      },
+      {
+        label: "Whale-buys on a meme coin",
+        job:
+          "Every cycle, watch_wallet_swaps for a specific meme coin's known whale wallets with minUsdThreshold=10000. Surface a price_trigger finding for each big buy detected.",
+      },
+      {
+        label: "Any swap >$10k on a token",
+        job:
+          "Every cycle, watch_wallet_swaps on a token's top liquidity wallet with minUsdThreshold=10000. Surface a price_trigger for each large swap.",
+      },
+    ],
+  },
+  {
+    id: "github_watcher",
+    name: "GitHub Watcher",
+    emoji: "🛠️",
+    suggestedName: "Forge",
+    personalityPrompt:
+      "You watch repositories with the patience of a long-time contributor. You only ping the owner when something they'd care about ships — a release, a fresh commit on main, a new issue thread.",
+    jobPromptPlaceholder: "Which repo or org should I watch?",
+    jobPromptExample:
+      "Every cycle, watch_url on https://api.github.com/repos/anchor-lang/anchor/releases with format='json' and sinceLastCheck=true. For each new release, surface a github_release finding with the tag as subject, body excerpt as evidence, and the release URL as sourceUrl.",
+    recommendedTools: ["watch_url", "message_user"],
+    defaultFrequencySeconds: 900,
+    description: "Watches a GitHub repo or org. Pings on releases and fresh commits.",
+    earningStyle: "Steady",
+    activityLevel: "Chill",
+    watches: "GitHub repos & orgs",
+    pings: "Releases & fresh commits",
+    inPicker: true,
+    jobSuggestions: [
+      {
+        label: "solana-labs/solana releases",
+        job:
+          "Every cycle, watch_url on https://api.github.com/repos/solana-labs/solana/releases with format='json' and sinceLastCheck=true. For each new release, surface a github_release finding. Subject = release name, evidence = tag + body excerpt + author + published date, sourceUrl = release URL.",
+      },
+      {
+        label: "anchor-lang/anchor releases",
+        job:
+          "Every cycle, watch_url on https://api.github.com/repos/coral-xyz/anchor/releases with format='json' and sinceLastCheck=true. Surface each new release as a github_release finding.",
+      },
+      {
+        label: "magic-eden/magic-eden releases",
+        job:
+          "Every cycle, watch_url on https://api.github.com/repos/magic-eden/magic-eden/releases with format='json'. Surface each new release as a github_release finding.",
+      },
+    ],
+  },
   /* ── Hidden / legacy templates kept for backwards-compat ────────── */
   {
     id: "analyst",
@@ -202,6 +356,8 @@ export const TEMPLATES: AgentTemplateDef[] = [
     description: "Answers paid questions. Claims tasks.",
     earningStyle: "Steady",
     activityLevel: "Balanced",
+    watches: "Open tasks",
+    pings: "Paid queries",
     inPicker: false,
     jobSuggestions: [],
   },
@@ -219,6 +375,8 @@ export const TEMPLATES: AgentTemplateDef[] = [
     description: "Lightweight earner.",
     earningStyle: "Steady",
     activityLevel: "Chill",
+    watches: "Tiny tasks",
+    pings: "Small earnings",
     inPicker: false,
     jobSuggestions: [],
   },
@@ -246,6 +404,8 @@ export const ATLAS_TEMPLATE_DEF: AgentTemplateDef = {
   description: "Fork of the original Atlas. Same personality. Fresh memory. Your vault.",
   earningStyle: "Steady",
   activityLevel: "Balanced",
+  watches: "Solana ecosystem",
+  pings: "Decisions and findings",
   inPicker: false,
   jobSuggestions: [],
 };

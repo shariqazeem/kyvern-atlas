@@ -317,24 +317,38 @@ export default function SpawnPage() {
                   <p className="text-[12px] text-[#6B6B6B] leading-[1.5] mb-3">
                     {t.description}
                   </p>
-                  <div className="flex flex-wrap gap-1.5">
+                  <div className="flex flex-col gap-1 mt-1">
                     <span
-                      className="text-[10px] px-2 py-0.5 rounded-full"
-                      style={{
-                        background: "#F3F4F6",
-                        color: "#374151",
-                      }}
+                      className="text-[11px] inline-flex items-center gap-1.5"
+                      style={{ color: "#6B7280" }}
                     >
-                      {t.earningStyle}
+                      <span
+                        className="font-mono uppercase"
+                        style={{
+                          color: "#9CA3AF",
+                          fontSize: "9px",
+                          letterSpacing: "0.1em",
+                        }}
+                      >
+                        Watches
+                      </span>
+                      {t.watches}
                     </span>
                     <span
-                      className="text-[10px] px-2 py-0.5 rounded-full"
-                      style={{
-                        background: "#F3F4F6",
-                        color: "#374151",
-                      }}
+                      className="text-[11px] inline-flex items-center gap-1.5"
+                      style={{ color: "#6B7280" }}
                     >
-                      {t.activityLevel}
+                      <span
+                        className="font-mono uppercase"
+                        style={{
+                          color: "#9CA3AF",
+                          fontSize: "9px",
+                          letterSpacing: "0.1em",
+                        }}
+                      >
+                        Pings
+                      </span>
+                      {t.pings}
                     </span>
                   </div>
                 </button>
