@@ -75,7 +75,9 @@ function createTestVault(): string {
     velocity_window: 3600,
     allowed_merchants: JSON.stringify([]),
     require_memo: 0,
-    squads_address: null,
+    // Schema requires NOT NULL — placeholder PDA, never used because the
+    // verification chips are read-only (no pay/settle path).
+    squads_address: "11111111111111111111111111111111",
     network: "devnet",
   });
   db.close();
