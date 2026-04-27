@@ -257,11 +257,6 @@ export const TEMPLATES: AgentTemplateDef[] = [
         job:
           "Every cycle, watch_wallet on Kraken's Solana hot wallet FWznbcNXWQuHTawe9RxvQ2LdCENssh12dsznf4RiouN5 with lookbackCount=10. The tool returns a list of recent on-chain entries (each with type, signature, tokenChanges, programs). On the FIRST tick, when the tool returns ANY entries, you MUST surface the most recent one as a wallet_move finding — do NOT filter by size or type, every Kraken movement is meaningful for an exchange-watching pipeline. Subject = '<type>: <token/program> · <signature[:10]>…'. Evidence = signature, type, tokenChanges (if any), programs, time. sourceUrl = https://explorer.solana.com/tx/<signature>. Idle only when the tool returned zero entries.",
       },
-      {
-        label: "Active Jupiter swappers (any size)",
-        job:
-          "Every cycle, call watch_wallet_swaps on each of these two recurring Jupiter swappers with minUsdThreshold=0 and lookbackCount=25: 8SwGCSPc26dMzLFtdimQd9NroaDobtTbfeMdd99ga7go and FExezs2b4wUbJV4dKoNBE8xZCiH3bVcDnT569fTmkLyj. For each new swap returned (any size), surface a wallet_move finding. Subject = '<amount in> <tokenIn> → <amount out> <tokenOut> · ~$<usd>'. Evidence = signature, token pair, USD value, wallet, time. sourceUrl = https://explorer.solana.com/tx/<signature>. Idle only when both wallets returned zero swaps.",
-      },
     ],
   },
   {
