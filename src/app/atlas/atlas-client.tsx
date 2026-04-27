@@ -30,6 +30,7 @@ import type { AtlasState, AtlasDecision, AtlasAttack } from "@/lib/atlas/schema"
 
 import type { Signal } from "@/lib/agents/types";
 import { ManifestoBlock } from "@/components/atlas/manifesto-block";
+import { AtlasDevicePlinth } from "@/components/atlas/atlas-device-plinth";
 import { AtlasHeroStats } from "@/components/atlas/atlas-hero-stats";
 import { AtlasMicroStats } from "@/components/atlas/atlas-micro-stats";
 import { AtlasPnlSparkline } from "@/components/atlas/atlas-pnl-sparkline";
@@ -128,7 +129,14 @@ export default function AtlasClient({
           {/* 1. Manifesto */}
           <ManifestoBlock />
 
-          {/* 2. Hero stats */}
+          {/* 2. Museum centrepiece — Atlas device on a plinth */}
+          <AtlasDevicePlinth
+            firstIgnitionAt={state?.firstIgnitionAt ?? null}
+            totalCycles={state?.totalCycles ?? 0}
+            totalAttacksBlocked={state?.totalAttacksBlocked ?? 0}
+          />
+
+          {/* 3. Hero stats */}
           {state ? (
             <AtlasHeroStats
               firstIgnitionAt={state.firstIgnitionAt}
