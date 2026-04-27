@@ -186,14 +186,14 @@ export const TEMPLATES: AgentTemplateDef[] = [
           "Every cycle, call watch_url on https://superteam.fun/api/listings?category=Development&order=desc&take=15 with minPrize=500 and sinceLastCheck=true. For each new listing returned, call message_user in Finding mode with kind='bounty', subject= the listing title (≤80 chars), evidence including the reward in USD, the deadline, and any required skills, and sourceUrl set to the listing URL. If no new listings, idle.",
       },
       {
-        label: "Superteam high-bar >$2k",
+        label: "Superteam high-bar ≥$2k",
         job:
-          "Every cycle, call watch_url on https://superteam.fun/api/listings?category=Development&order=desc&take=15 with minPrize=2000 and sinceLastCheck=true. Only surface bounties with reward ≥$2000 — the high-bar set worth a focused submission. For each new listing, call message_user in Finding mode with kind='bounty', subject= the listing title (≤80 chars), evidence: reward in USD, deadline, sponsor name, and any required skills. sourceUrl = the listing URL. Idle when nothing new.",
+          "Every cycle, call watch_url on https://superteam.fun/api/listings?take=25 with minPrize=2000 and sinceLastCheck=true. NO category filter — the high-bar set spans design, content, development, and grants. Only surface bounties with reward ≥$2000. For each new listing, call message_user in Finding mode with kind='bounty', subject= the listing title (≤80 chars), evidence: reward in USD, deadline, sponsor name, type, and any required skills. sourceUrl = the listing URL. Idle when nothing new.",
       },
       {
-        label: "Anchor releases",
+        label: "All Superteam bounties ≥$300",
         job:
-          "Every cycle, watch_url on https://api.github.com/repos/coral-xyz/anchor/releases with format='json' and sinceLastCheck=true. For each new release, call message_user in Finding mode with kind='github_release', subject= the release tag (e.g. 'anchor v1.0.1'), evidence: tag + body excerpt + author + published date, sourceUrl = the release URL. Idle when nothing new.",
+          "Every cycle, call watch_url on https://superteam.fun/api/listings?take=15 with minPrize=300 and sinceLastCheck=true. This is the WHOLE Superteam board (design, content, development, research, etc.) — broader than the Development-only chip. For each new listing, call message_user in Finding mode with kind='bounty', subject= the listing title (≤80 chars), evidence: reward in USD, deadline, sponsor, type. sourceUrl = the listing URL. Idle when nothing new.",
       },
     ],
   },
@@ -258,9 +258,9 @@ export const TEMPLATES: AgentTemplateDef[] = [
           "Every cycle, watch_wallet on Kraken's Solana hot wallet FWznbcNXWQuHTawe9RxvQ2LdCENssh12dsznf4RiouN5 with lookbackCount=20. For each new transfer, swap, or program call returned, call message_user in Finding mode with kind='wallet_move', subject summarising the action (e.g. 'Kraken transferred 12,000 USDC out'), evidence: signature, amount, token, type, time. sourceUrl = https://explorer.solana.com/tx/<signature>. Idle when no new movement.",
       },
       {
-        label: "Active Jupiter swappers >$1k",
+        label: "Active Jupiter swappers ≥$200",
         job:
-          "Every cycle, call watch_wallet_swaps on each of these two recurring Jupiter swappers with minUsdThreshold=1000: 8SwGCSPc26dMzLFtdimQd9NroaDobtTbfeMdd99ga7go and FExezs2b4wUbJV4dKoNBE8xZCiH3bVcDnT569fTmkLyj. For each new qualifying swap returned, surface a wallet_move finding. Subject = '<amount in> <tokenIn> → <amount out> <tokenOut> · ~$<usd>'. Evidence = signature, token pair, USD value, wallet, time. sourceUrl = https://explorer.solana.com/tx/<signature>. Idle when neither wallet has a new swap.",
+          "Every cycle, call watch_wallet_swaps on each of these two recurring Jupiter swappers with minUsdThreshold=200: 8SwGCSPc26dMzLFtdimQd9NroaDobtTbfeMdd99ga7go and FExezs2b4wUbJV4dKoNBE8xZCiH3bVcDnT569fTmkLyj. For each new qualifying swap returned, surface a wallet_move finding. Subject = '<amount in> <tokenIn> → <amount out> <tokenOut> · ~$<usd>'. Evidence = signature, token pair, USD value, wallet, time. sourceUrl = https://explorer.solana.com/tx/<signature>. Idle when neither wallet has a new swap above the threshold.",
       },
     ],
   },
@@ -294,9 +294,9 @@ export const TEMPLATES: AgentTemplateDef[] = [
           "Every cycle, call read_dex with 'BONK'. If the returned price is below $0.0000180 OR above $0.0000300, surface a price_trigger finding. Subject = 'BONK outside band: $<price>'. Evidence: current price, band, source, and whether it's the upper or lower break. sourceUrl = https://www.coingecko.com/en/coins/bonk. Idle when inside band.",
       },
       {
-        label: "WIF outside $1.40–$2.20 band",
+        label: "JUP outside $0.25–$0.50 band",
         job:
-          "Every cycle, call read_dex with 'WIF'. If the returned price is below $1.40 OR above $2.20, surface a price_trigger finding. Subject = 'WIF outside band: $<price>'. Evidence: current price, band, source, and whether it's the upper or lower break. sourceUrl = https://www.coingecko.com/en/coins/dogwifcoin. Idle when inside band.",
+          "Every cycle, call read_dex with 'JUP'. If the returned price is below $0.25 OR above $0.50, surface a price_trigger finding. Subject = 'JUP outside band: $<price>'. Evidence: current price, band, source, and whether it's the upper or lower break. sourceUrl = https://www.coingecko.com/en/coins/jupiter-exchange-solana. Idle when inside band.",
       },
     ],
   },
