@@ -84,8 +84,9 @@ async function fetchSuperteam(url: string): Promise<{ items: NormalizedItem[]; o
       : (parsed as { listings?: ListingItem[] }).listings ?? [];
     const items: NormalizedItem[] = arr.map((it) => {
       const slug = it.slug ?? it.id ?? md5(String(it.title ?? Math.random()));
-      // Superteam canonical listing URL pattern post-2026 migration.
-      const listingUrl = `https://superteam.fun/listing/${slug}`;
+      // Superteam canonical listing URL post-2026 migration. The bare
+      // /listing/<slug> path 404s; the real route is /earn/listing/<slug>.
+      const listingUrl = `https://superteam.fun/earn/listing/${slug}`;
       return {
         id: String(slug),
         title: String(it.title ?? "Untitled listing"),
