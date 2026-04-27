@@ -12,6 +12,7 @@ import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import { KyvernDevice } from "@/components/device/kyvern-device";
 import { HeroDeviceStage } from "@/components/landing/hero-device-stage";
+import { KyvernMark } from "@/components/brand/kyvern-mark";
 import type { DeviceAtlasState, DeviceFeedItem } from "@/components/device/kyvern-device";
 import type { AtlasSnapshot } from "@/lib/atlas/ssr";
 import { EASE_PREMIUM as ease, EASE_SPRING as spring } from "@/lib/motion";
@@ -88,9 +89,16 @@ export function LandingPage({ initialAtlas }: Props) {
     <div className="min-h-screen" style={{ background: "#FAFAFA" }}>
       {/* Nav */}
       <nav className="flex items-center justify-between px-5 sm:px-8 h-14 max-w-[1100px] mx-auto">
-        <span className="text-[13px] font-semibold tracking-tight text-[#111]">
-          Kyvern
-        </span>
+        <Link
+          href="/"
+          className="flex items-center gap-2 transition active:scale-[0.97]"
+          aria-label="Kyvern"
+        >
+          <KyvernMark size={26} radius={7} />
+          <span className="text-[13px] font-semibold tracking-tight text-[#111]">
+            Kyvern
+          </span>
+        </Link>
         <div className="flex items-center gap-5">
           <Link
             href="/atlas"

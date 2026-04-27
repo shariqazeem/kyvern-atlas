@@ -113,7 +113,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         appearance: {
           theme: "light",
           accentColor: "#3b82f6",
-          logo: "/og-image.jpg",
+          logo: "/kyvernlabs_logo.jpg",
           landingHeader: "Sign in to Kyvern",
           showWalletLoginFirst: false,
           walletChainType: "ethereum-and-solana",

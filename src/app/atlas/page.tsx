@@ -18,7 +18,7 @@ import { readInitialAtlasSnapshot } from "@/lib/atlas/ssr";
 export const dynamic = "force-dynamic"; // Atlas state changes every cycle
 
 export const metadata: Metadata = {
-  title: "Atlas — live on Solana · Kyvern",
+  title: "Atlas · Kyvern",
   description:
     "Atlas is the first autonomous agent on Kyvern. It operates real USDC on Solana devnet — pays for its own data, publishes forecasts, gets attacked, and survives. Watch every decision live.",
   alternates: { canonical: "https://kyvernlabs.com/atlas" },

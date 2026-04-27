@@ -43,7 +43,7 @@ export const metadata: Metadata = {
     type: "website",
     locale: "en_US",
     url: SITE_URL,
-    siteName: "KyvernLabs",
+    siteName: "Kyvern",
     title: "Kyvern — Let your AI agents run free.",
     description:
       "The Solana program that lets AI agents operate real money autonomously. Budgets enforced by consensus. Watch Atlas run live on devnet.",
@@ -53,6 +53,12 @@ export const metadata: Metadata = {
         width: 1200,
         height: 630,
         alt: "Kyvern — Let your AI agents run free.",
+      },
+      {
+        url: "/kyvernlabs_logo.jpg",
+        width: 512,
+        height: 512,
+        alt: "Kyvern",
       },
     ],
   },
@@ -78,10 +84,8 @@ export const metadata: Metadata = {
   alternates: {
     canonical: SITE_URL,
   },
-  icons: {
-    icon: "/favicon.ico",
-    apple: "/og-image.jpg",
-  },
+  // icons: omitted on purpose — Next.js auto-detects src/app/icon.jpg
+  // and src/app/apple-icon.jpg for favicon + Apple touch icon.
 };
 
 export default function RootLayout({
@@ -98,9 +102,9 @@ export default function RootLayout({
             __html: JSON.stringify({
               "@context": "https://schema.org",
               "@type": "Organization",
-              name: "KyvernLabs",
+              name: "Kyvern",
               url: SITE_URL,
-              logo: `${SITE_URL}/og-image.jpg`,
+              logo: `${SITE_URL}/kyvernlabs_logo.jpg`,
               description:
                 "Kyvern is the Solana program that gives AI agents real economic autonomy. Replaces private keys with budgets, allowlists, and velocity caps enforced by consensus. Atlas — our reference agent — operates autonomously on devnet.",
               founder: { "@type": "Person", name: "Shariq Azeem" },
@@ -117,7 +121,7 @@ export default function RootLayout({
             __html: JSON.stringify({
               "@context": "https://schema.org",
               "@type": "SoftwareApplication",
-              name: "KyvernLabs Vault",
+              name: "Kyvern",
               applicationCategory: "FinanceApplication",
               operatingSystem: "Web",
               url: `${SITE_URL}/vault`,

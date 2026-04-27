@@ -2,7 +2,10 @@ import type { Metadata } from "next";
 import { KyvernOS } from "@/components/os/kyvern-os";
 
 export const metadata: Metadata = {
-  title: "Kyvern",
+  title: {
+    default: "Your device · Kyvern",
+    template: "%s · Kyvern",
+  },
   description: "The operating system for your AI agents on Solana.",
   robots: { index: false, follow: false },
 };
