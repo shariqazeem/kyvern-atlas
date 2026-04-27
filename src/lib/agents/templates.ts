@@ -255,12 +255,12 @@ export const TEMPLATES: AgentTemplateDef[] = [
       {
         label: "Kraken hot wallet movements",
         job:
-          "Every cycle, watch_wallet on Kraken's Solana hot wallet FWznbcNXWQuHTawe9RxvQ2LdCENssh12dsznf4RiouN5 with lookbackCount=20. For each new transfer, swap, or program call returned, call message_user in Finding mode with kind='wallet_move', subject summarising the action (e.g. 'Kraken transferred 12,000 USDC out'), evidence: signature, amount, token, type, time. sourceUrl = https://explorer.solana.com/tx/<signature>. Idle when no new movement.",
+          "Every cycle, watch_wallet on Kraken's Solana hot wallet FWznbcNXWQuHTawe9RxvQ2LdCENssh12dsznf4RiouN5 with lookbackCount=10. The tool returns a list of recent on-chain entries (each with type, signature, tokenChanges, programs). On the FIRST tick, when the tool returns ANY entries, you MUST surface the most recent one as a wallet_move finding — do NOT filter by size or type, every Kraken movement is meaningful for an exchange-watching pipeline. Subject = '<type>: <token/program> · <signature[:10]>…'. Evidence = signature, type, tokenChanges (if any), programs, time. sourceUrl = https://explorer.solana.com/tx/<signature>. Idle only when the tool returned zero entries.",
       },
       {
-        label: "Active Jupiter swappers ≥$200",
+        label: "Active Jupiter swappers (any size)",
         job:
-          "Every cycle, call watch_wallet_swaps on each of these two recurring Jupiter swappers with minUsdThreshold=200: 8SwGCSPc26dMzLFtdimQd9NroaDobtTbfeMdd99ga7go and FExezs2b4wUbJV4dKoNBE8xZCiH3bVcDnT569fTmkLyj. For each new qualifying swap returned, surface a wallet_move finding. Subject = '<amount in> <tokenIn> → <amount out> <tokenOut> · ~$<usd>'. Evidence = signature, token pair, USD value, wallet, time. sourceUrl = https://explorer.solana.com/tx/<signature>. Idle when neither wallet has a new swap above the threshold.",
+          "Every cycle, call watch_wallet_swaps on each of these two recurring Jupiter swappers with minUsdThreshold=0 and lookbackCount=25: 8SwGCSPc26dMzLFtdimQd9NroaDobtTbfeMdd99ga7go and FExezs2b4wUbJV4dKoNBE8xZCiH3bVcDnT569fTmkLyj. For each new swap returned (any size), surface a wallet_move finding. Subject = '<amount in> <tokenIn> → <amount out> <tokenOut> · ~$<usd>'. Evidence = signature, token pair, USD value, wallet, time. sourceUrl = https://explorer.solana.com/tx/<signature>. Idle only when both wallets returned zero swaps.",
       },
     ],
   },
@@ -294,9 +294,9 @@ export const TEMPLATES: AgentTemplateDef[] = [
           "Every cycle, call read_dex with 'BONK'. If the returned price is below $0.0000180 OR above $0.0000300, surface a price_trigger finding. Subject = 'BONK outside band: $<price>'. Evidence: current price, band, source, and whether it's the upper or lower break. sourceUrl = https://www.coingecko.com/en/coins/bonk. Idle when inside band.",
       },
       {
-        label: "JUP outside $0.25–$0.50 band",
+        label: "JUP outside $0.30–$0.80 band",
         job:
-          "Every cycle, call read_dex with 'JUP'. If the returned price is below $0.25 OR above $0.50, surface a price_trigger finding. Subject = 'JUP outside band: $<price>'. Evidence: current price, band, source, and whether it's the upper or lower break. sourceUrl = https://www.coingecko.com/en/coins/jupiter-exchange-solana. Idle when inside band.",
+          "Every cycle, call read_dex with 'JUP' (Jupiter token). The tool returns the current USD price. Compare it to the band: lower bound $0.30, upper bound $0.80. If the price is strictly less than $0.30 OR strictly greater than $0.80, you MUST surface a price_trigger finding with subject='JUP outside band: $<price>', evidence covering current price + band + source, sourceUrl=https://www.coingecko.com/en/coins/jupiter-exchange-solana. If the price is within [$0.30, $0.80] inclusive, idle.",
       },
     ],
   },
