@@ -11,6 +11,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import { KyvernDevice } from "@/components/device/kyvern-device";
+import { HeroDeviceStage } from "@/components/landing/hero-device-stage";
 import type { DeviceAtlasState, DeviceFeedItem } from "@/components/device/kyvern-device";
 import type { AtlasSnapshot } from "@/lib/atlas/ssr";
 import { EASE_PREMIUM as ease, EASE_SPRING as spring } from "@/lib/motion";
@@ -159,10 +160,12 @@ export function LandingPage({ initialAtlas }: Props) {
                 style={{
                   background: "#111",
                   color: "#fff",
+                  boxShadow:
+                    "inset 0 1px 0 rgba(255,255,255,0.18), 0 1px 2px rgba(15,23,42,0.10), 0 10px 22px -8px rgba(15,23,42,0.32)",
                   touchAction: "manipulation",
                 }}
               >
-                Get your device
+                Get your Kyvern
                 <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
               </Link>
               <Link
@@ -192,7 +195,7 @@ export function LandingPage({ initialAtlas }: Props) {
             )}
           </motion.div>
 
-          {/* Right: The Device */}
+          {/* Right: The Device on its stage — workers orbiting, ambient sway */}
           <motion.div
             initial={{ opacity: 0, y: 30, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -207,13 +210,15 @@ export function LandingPage({ initialAtlas }: Props) {
                   "radial-gradient(ellipse at center, rgba(0,0,0,0.06) 0%, transparent 70%)",
               }}
             />
-            <KyvernDevice
-              state={atlasState}
-              feed={feed}
-              agentName="ATLAS"
-              onProbe={handleProbe}
-              bootDelay={1500}
-            />
+            <HeroDeviceStage>
+              <KyvernDevice
+                state={atlasState}
+                feed={feed}
+                agentName="ATLAS"
+                onProbe={handleProbe}
+                bootDelay={1500}
+              />
+            </HeroDeviceStage>
             {/* Probe result */}
             {probeResult && (
               <motion.div
