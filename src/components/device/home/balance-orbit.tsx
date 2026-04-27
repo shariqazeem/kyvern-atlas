@@ -159,12 +159,8 @@ export function BalanceOrbit({
     const list: Array<
       | { kind: "worker"; w: OrbitWorker }
       | { kind: "hire" }
-      | { kind: "empty"; idx: number }
     > = workers.slice(0, 7).map((w) => ({ kind: "worker", w }));
     list.push({ kind: "hire" });
-    // Always render at least 6 slots so the ring reads as a circle even with
-    // 1–2 workers — empty slots become faint placeholder dots.
-    while (list.length < 6) list.push({ kind: "empty", idx: list.length });
     return list;
   }, [workers]);
 
@@ -214,7 +210,7 @@ export function BalanceOrbit({
         className="relative mx-auto"
         style={{
           width: "100%",
-          maxWidth: 360,
+          maxWidth: 420,
           aspectRatio: "1 / 1",
         }}
       >
@@ -272,10 +268,15 @@ export function BalanceOrbit({
 
         {/* Workers placed on the ring */}
         {items.map((it, i) => {
-          const angle = (-90 + (360 / items.length) * i) * (Math.PI / 180);
-          // radius as % of half-width — sized so worker tiles clear the
-          // hero balance text on a 300px-wide chassis (iPhone SE).
-          const r = 0.46;
+          // With only 1 item (just the hire tile, 0 workers), pin it to
+          // the top so it doesn't float dead-centre over the balance.
+          const baseAngle = items.length === 1 ? -90 : -90 + (360 / items.length) * i;
+          const angle = baseAngle * (Math.PI / 180);
+          // Workers sit ON the dashed orbit ring (32% of stage from
+          // centre, matching `inset-[18%]` ring border). Pushed outward
+          // from the previous 0.46 so they clear the hero balance text
+          // on every viewport.
+          const r = 0.64;
           const x = Math.cos(angle) * r * 100;
           const y = Math.sin(angle) * r * 100;
           const positionStyle: React.CSSProperties = {
@@ -339,43 +340,32 @@ export function BalanceOrbit({
             );
           }
 
-          if (it.kind === "hire") {
-            return (
-              <div key="hire" style={positionStyle}>
-                <Link
-                  href={hireHref}
-                  aria-label="Hire a worker"
-                  className="block"
-                >
-                  <motion.div
-                    whileTap={{ scale: 0.92 }}
-                    transition={{
-                      type: "spring",
-                      stiffness: 320,
-                      damping: 22,
-                      mass: 0.6,
-                    }}
-                    className="w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center"
-                    style={{
-                      background: "rgba(15,23,42,0.02)",
-                      border: "1px dashed rgba(15,23,42,0.18)",
-                      color: "#6B7280",
-                    }}
-                  >
-                    <Plus className="w-4 h-4" strokeWidth={1.8} />
-                  </motion.div>
-                </Link>
-              </div>
-            );
-          }
-
-          // empty slot — barely visible placeholder
+          // hire slot
           return (
-            <div key={`e-${it.idx}`} style={positionStyle} aria-hidden>
-              <div
-                className="w-2 h-2 rounded-full"
-                style={{ background: "rgba(15,23,42,0.06)" }}
-              />
+            <div key="hire" style={positionStyle}>
+              <Link
+                href={hireHref}
+                aria-label="Hire a worker"
+                className="block"
+              >
+                <motion.div
+                  whileTap={{ scale: 0.92 }}
+                  transition={{
+                    type: "spring",
+                    stiffness: 320,
+                    damping: 22,
+                    mass: 0.6,
+                  }}
+                  className="w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center"
+                  style={{
+                    background: "rgba(15,23,42,0.02)",
+                    border: "1px dashed rgba(15,23,42,0.22)",
+                    color: "#6B7280",
+                  }}
+                >
+                  <Plus className="w-4 h-4" strokeWidth={1.8} />
+                </motion.div>
+              </Link>
             </div>
           );
         })}
