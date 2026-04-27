@@ -1,22 +1,25 @@
 "use client";
 
 /**
- * /app/inbox — Path C surface.
+ * /app/inbox — the device's notification center.
  *
- * Workers find things in the world, format them as structured signals,
- * and surface them here. Each card is a finding the owner should read.
+ * Top: LED-strip header showing online dot · KVN-XXXX serial · counts.
+ * Below: filter pills (All / Unread). Below that: the "Still on watch"
+ * status row — workers that are looking but haven't surfaced anything
+ * yet — rendered as a small LED strip so an empty inbox doesn't read
+ * as broken. Then the signal feed.
  *
- * Light/OS register. Polls /api/devices/[id]/inbox every 5s. New signals
- * slide in from the top via the SignalCard's AnimatePresence entrance.
+ * When a brand-new signal arrives, the page bezel briefly flashes
+ * green and a "new notification" pulse plays at the top of the feed.
  *
- * Empty state: a dark hardware card that nudges to /app/agents/spawn.
- * Tab bar handles the unread-count badge separately.
+ * Light premium register everywhere. Polls /api/devices/[id]/inbox +
+ * live-status every 5s. Backend untouched.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { Inbox as InboxIcon, ArrowRight } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { SignalCard } from "@/components/inbox/signal-card";
 import type { Signal } from "@/lib/agents/types";
@@ -40,6 +43,13 @@ interface WorkerBrief {
   totalThoughts: number;
 }
 
+interface LiveStatus {
+  serial: string;
+  network: "devnet" | "mainnet";
+  paused: boolean;
+  workers?: WorkerBrief[];
+}
+
 type Filter = "all" | "unread";
 
 function fmtAgo(ms: number | null): string {
@@ -59,12 +69,17 @@ function devWallet(): string {
 export default function InboxPage() {
   const { wallet, isLoading } = useAuth();
   const [deviceId, setDeviceId] = useState<string | null>(null);
+  const [serial, setSerial] = useState<string | null>(null);
+  const [paused, setPaused] = useState(false);
   const [signals, setSignals] = useState<SignalWithWorker[]>([]);
   const [workers, setWorkers] = useState<WorkerBrief[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<Filter>("all");
+  const [arrivalFlash, setArrivalFlash] = useState(false);
+  const seenIds = useRef<Set<string>>(new Set());
+  const isFirstLoad = useRef(true);
 
   // Find the user's primary device
   useEffect(() => {
@@ -84,11 +99,7 @@ export default function InboxPage() {
       .catch(() => setLoading(false));
   }, [isLoading, wallet]);
 
-  // Poll inbox + workers every 5s. Workers come from live-status — we
-  // need their template + lastThoughtAt to render the "watching" pulse
-  // for whale-tracker workers that haven't surfaced anything yet (the
-  // signal:silence ratio there is high by design — a 0/0 inbox should
-  // read as "still on watch", not "broken").
+  // Poll inbox + live-status every 5s.
   const load = useCallback(async () => {
     if (!deviceId) return;
     try {
@@ -102,13 +113,35 @@ export default function InboxPage() {
           unreadCount: number;
           totalCount: number;
         };
-        setSignals(d.signals ?? []);
+        const incoming = d.signals ?? [];
+
+        // Detect "first time we see this signal id" since the page mounted
+        if (isFirstLoad.current) {
+          for (const s of incoming) seenIds.current.add(s.id);
+          isFirstLoad.current = false;
+        } else {
+          let hadNew = false;
+          for (const s of incoming) {
+            if (!seenIds.current.has(s.id)) {
+              seenIds.current.add(s.id);
+              hadNew = true;
+            }
+          }
+          if (hadNew) {
+            setArrivalFlash(true);
+            window.setTimeout(() => setArrivalFlash(false), 1400);
+          }
+        }
+
+        setSignals(incoming);
         setUnreadCount(d.unreadCount ?? 0);
         setTotalCount(d.totalCount ?? 0);
       }
       if (statusRes.ok) {
-        const s = (await statusRes.json()) as { workers?: WorkerBrief[] };
+        const s = (await statusRes.json()) as LiveStatus;
         setWorkers(s.workers ?? []);
+        setSerial(s.serial ?? null);
+        setPaused(!!s.paused);
       }
     } catch {
       /* silent */
@@ -127,11 +160,6 @@ export default function InboxPage() {
     return signals;
   }, [signals, filter]);
 
-  // Whale-tracker workers that haven't yet produced a signal — render
-  // a "still on watch" pulse so the empty inbox doesn't read as broken.
-  // Variance is the nature of these chips; the wallet may be quiet for
-  // hours. A pulse with a real "last check" timestamp tells the owner
-  // their worker is alive and looking.
   const watchingWorkers = useMemo(() => {
     if (workers.length === 0) return [];
     const idsWithSignals = new Set(signals.map((s) => s.agentId));
@@ -164,45 +192,154 @@ export default function InboxPage() {
 
   return (
     <div className="py-2 pb-24">
-      {/* Header */}
+      {/* Bezel-flash overlay — fires when a brand-new signal lands */}
+      <AnimatePresence>
+        {arrivalFlash && (
+          <motion.div
+            key="arrival-flash"
+            aria-hidden
+            className="pointer-events-none fixed inset-0 z-30"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: [0, 1, 0] }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 1.4, ease: "easeOut" }}
+            style={{
+              boxShadow:
+                "inset 0 0 0 2px rgba(34,197,94,0.55), inset 0 0 60px rgba(34,197,94,0.18)",
+            }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* LED-strip status header */}
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, ease: EASE }}
-        className="mb-5"
+        transition={{ duration: 0.45, ease: EASE }}
+        className="relative rounded-[18px] overflow-hidden mb-4"
+        style={{
+          background: "linear-gradient(180deg, #FFFFFF 0%, #F8F8FA 100%)",
+          border: "1px solid rgba(15,23,42,0.06)",
+          boxShadow: [
+            "inset 0 1px 0 rgba(255,255,255,1)",
+            "0 1px 2px rgba(15,23,42,0.04)",
+            "0 8px 24px -10px rgba(15,23,42,0.08)",
+          ].join(", "),
+        }}
       >
-        <div className="flex items-baseline justify-between mb-1">
-          <h1 className="text-[28px] font-semibold tracking-[-0.025em] text-[#0A0A0A]">
-            Inbox
-          </h1>
-          <span className="text-[11px] font-mono" style={{ color: "#9CA3AF" }}>
-            {totalCount} total · {unreadCount} unread
+        <div
+          aria-hidden
+          className="absolute top-0 left-6 right-6 pointer-events-none"
+          style={{
+            height: 1,
+            background:
+              "linear-gradient(to right, transparent, rgba(255,255,255,1), transparent)",
+          }}
+        />
+
+        {/* LED strip top — online dot · KVN-XXXX */}
+        <div
+          className="relative flex items-center justify-between px-5 pt-3 pb-2.5"
+          style={{ borderBottom: "1px solid rgba(15,23,42,0.05)" }}
+        >
+          <div className="flex items-center gap-2">
+            <motion.span
+              className="rounded-full"
+              style={{
+                width: 7,
+                height: 7,
+                background: paused ? "#EF4444" : "#22C55E",
+                boxShadow: paused
+                  ? "0 0 0 3px rgba(239,68,68,0.12), 0 0 8px rgba(239,68,68,0.55)"
+                  : "0 0 0 3px rgba(34,197,94,0.12), 0 0 8px rgba(34,197,94,0.55)",
+              }}
+              animate={paused ? {} : { opacity: [0.55, 1, 0.55] }}
+              transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+            />
+            <span
+              className="font-mono text-[10px] uppercase"
+              style={{
+                color: paused ? "#B91C1C" : "#15803D",
+                letterSpacing: "0.14em",
+              }}
+            >
+              Notification Center
+            </span>
+          </div>
+          <span
+            className="font-mono text-[11px] tracking-[0.08em]"
+            style={{
+              color: "#374151",
+              textShadow: "0 1px 0 rgba(255,255,255,0.9)",
+            }}
+          >
+            {serial ?? "KVN-————————"}
           </span>
         </div>
-        <p className="text-[13px] text-[#6B6B6B]">
-          What your workers found while you were away.
-        </p>
+
+        {/* Title + counts */}
+        <div className="relative px-5 pt-3 pb-3.5 flex items-end justify-between">
+          <div>
+            <h1 className="text-[24px] font-semibold tracking-tight text-[#0A0A0A] leading-none">
+              Inbox
+            </h1>
+            <p className="text-[12.5px] text-[#6B6B6B] mt-1.5">
+              What your workers found while you were away.
+            </p>
+          </div>
+          <div
+            className="font-mono flex items-center gap-2.5 mb-0.5"
+            style={{ color: "#9CA3AF", fontSize: 11 }}
+          >
+            <span>
+              <span style={{ color: "#0A0A0A", fontWeight: 600 }}>
+                {totalCount}
+              </span>{" "}
+              total
+            </span>
+            <span style={{ color: "#D1D5DB" }}>·</span>
+            <span>
+              <span
+                style={{
+                  color: unreadCount > 0 ? "#15803D" : "#0A0A0A",
+                  fontWeight: 600,
+                }}
+              >
+                {unreadCount}
+              </span>{" "}
+              unread
+            </span>
+          </div>
+        </div>
       </motion.div>
 
       {/* Filter pills */}
-      <div className="flex gap-2 mb-5">
+      <div className="flex gap-2 mb-4">
         <FilterPill active={filter === "all"} onClick={() => setFilter("all")}>
           All ({totalCount})
         </FilterPill>
-        <FilterPill active={filter === "unread"} onClick={() => setFilter("unread")}>
+        <FilterPill
+          active={filter === "unread"}
+          onClick={() => setFilter("unread")}
+        >
           Unread ({unreadCount})
         </FilterPill>
       </div>
+
+      {/* "Still on watch" LED strip — pinned at the top so an empty
+          inbox immediately reads as "your workers are alive". */}
+      {watchingWorkers.length > 0 && (
+        <WatchingStrip workers={watchingWorkers} />
+      )}
 
       {/* Signal feed */}
       {visible.length === 0 ? (
         <EmptyInbox
           unread={filter === "unread"}
           hasAnySignals={signals.length > 0}
-          watching={watchingWorkers}
         />
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-3 mt-1">
           <AnimatePresence initial={false}>
             {visible.map((s) => (
               <SignalCard key={s.id} signal={s} onMarkRead={onMarkRead} />
@@ -224,104 +361,115 @@ function FilterPill({
   children: React.ReactNode;
 }) {
   return (
-    <button
+    <motion.button
       type="button"
       onClick={onClick}
-      className="h-8 px-4 rounded-full text-[12px] font-medium transition-colors active:scale-[0.97]"
+      whileTap={{ scale: 0.96 }}
+      transition={{ type: "spring", stiffness: 320, damping: 22, mass: 0.6 }}
+      className="h-8 px-4 rounded-full text-[12px] font-medium transition-colors"
       style={{
-        background: active ? "#0A0A0A" : "transparent",
-        color: active ? "#fff" : "#6B7280",
-        border: active ? "none" : "1px solid rgba(0,0,0,0.08)",
+        background: active ? "#0A0A0A" : "#FFFFFF",
+        color: active ? "#FFFFFF" : "#6B7280",
+        border: active
+          ? "1px solid #0A0A0A"
+          : "1px solid rgba(15,23,42,0.08)",
+        boxShadow: active
+          ? "inset 0 1px 0 rgba(255,255,255,0.18), 0 1px 2px rgba(15,23,42,0.10)"
+          : "0 1px 1px rgba(15,23,42,0.03)",
       }}
     >
       {children}
-    </button>
+    </motion.button>
   );
 }
 
 function EmptyInbox({
   unread,
   hasAnySignals,
-  watching,
 }: {
   unread: boolean;
   hasAnySignals: boolean;
-  watching: WorkerBrief[];
 }) {
   if (unread && hasAnySignals) {
     return (
-      <div className="space-y-3">
-        <div
-          className="rounded-[16px] py-10 text-center"
-          style={{
-            background: "#fff",
-            border: "1px solid rgba(0,0,0,0.05)",
-            boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
-          }}
-        >
-          <p className="text-[13px]" style={{ color: "#6B7280" }}>
-            Nothing new. Caught up.
-          </p>
-        </div>
-        {watching.length > 0 && <WatchingStrip workers={watching} />}
+      <div
+        className="rounded-[16px] py-10 text-center mt-2"
+        style={{
+          background: "#FFFFFF",
+          border: "1px solid rgba(15,23,42,0.05)",
+          boxShadow: "0 1px 2px rgba(15,23,42,0.03)",
+        }}
+      >
+        <p className="text-[13px]" style={{ color: "#6B7280" }}>
+          Nothing new. Caught up.
+        </p>
       </div>
     );
   }
 
-  // True empty state — dark hardware card to invite the spawn flow
+  // Light empty state — premium register, nudges to spawn flow
   return (
-    <div className="space-y-3">
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: EASE }}
-        className="rounded-[20px] overflow-hidden"
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, ease: EASE }}
+      className="relative rounded-[20px] overflow-hidden mt-2"
+      style={{
+        background: "linear-gradient(180deg, #FFFFFF 0%, #F8F8FA 100%)",
+        border: "1px solid rgba(15,23,42,0.06)",
+        boxShadow: [
+          "inset 0 1px 0 rgba(255,255,255,1)",
+          "0 1px 2px rgba(15,23,42,0.04)",
+          "0 12px 32px -12px rgba(15,23,42,0.10)",
+        ].join(", "),
+      }}
+    >
+      <div
+        aria-hidden
+        className="absolute top-0 left-8 right-8 pointer-events-none"
         style={{
+          height: 1,
           background:
-            "radial-gradient(120% 100% at 30% 0%, #1B2230 0%, #0E1320 55%, #080B14 100%)",
-          border: "1px solid rgba(255,255,255,0.08)",
-          boxShadow: "0 12px 40px -12px rgba(0,0,0,0.45)",
+            "linear-gradient(to right, transparent, rgba(255,255,255,1), transparent)",
         }}
-      >
-        <div className="px-6 py-10 text-center">
-          <div
-            className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4"
-            style={{
-              background: "rgba(255,255,255,0.05)",
-              border: "1px solid rgba(255,255,255,0.1)",
-            }}
-          >
-            <InboxIcon className="w-5 h-5" style={{ color: "rgba(255,255,255,0.7)" }} />
-          </div>
-          <h3
-            className="font-mono mb-2"
-            style={{
-              color: "rgba(255,255,255,0.95)",
-              fontSize: "16px",
-              letterSpacing: "0.01em",
-            }}
-          >
-            Your workers haven&apos;t found anything yet.
-          </h3>
-          <p
-            className="text-[13px] mb-5 max-w-[320px] mx-auto leading-relaxed"
-            style={{ color: "rgba(255,255,255,0.55)" }}
-          >
-            Spawn one and point it at a wallet, a bounty board, or a feed
-            you&apos;d normally check yourself.
-          </p>
-          <Link
-            href="/app/agents/spawn"
-            className="inline-flex items-center gap-2 h-10 px-5 rounded-[12px] text-[13px] font-semibold transition active:scale-[0.97]"
-            style={{ background: "white", color: "#0A0A0A" }}
-          >
-            Hire a worker
-            <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
+      />
+      <div className="relative px-6 py-12 text-center">
+        <div
+          className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4 text-[26px]"
+          style={{
+            background: "linear-gradient(180deg, #FFFFFF 0%, #F2F3F5 100%)",
+            border: "1px solid rgba(15,23,42,0.06)",
+            boxShadow:
+              "inset 0 1px 2px rgba(15,23,42,0.04), 0 1px 2px rgba(15,23,42,0.04)",
+          }}
+        >
+          🌱
         </div>
-      </motion.div>
-      {watching.length > 0 && <WatchingStrip workers={watching} />}
-    </div>
+        <h3 className="text-[18px] font-semibold text-[#0A0A0A] tracking-tight mb-1.5">
+          Your workers haven&apos;t found anything yet.
+        </h3>
+        <p
+          className="text-[13px] mb-5 max-w-[320px] mx-auto leading-relaxed"
+          style={{ color: "#6B7280" }}
+        >
+          Hire one and point it at a wallet, a bounty board, or a feed
+          you&apos;d normally check yourself.
+        </p>
+        <Link
+          href="/app/agents/spawn"
+          className="inline-flex items-center gap-2 h-10 px-5 rounded-[12px] text-[13px] font-semibold transition active:scale-[0.97]"
+          style={{
+            background: "#0A0A0A",
+            color: "#fff",
+            boxShadow:
+              "inset 0 1px 0 rgba(255,255,255,0.18), 0 1px 2px rgba(15,23,42,0.10), 0 8px 18px -6px rgba(15,23,42,0.30)",
+          }}
+        >
+          Hire a worker
+          <ArrowRight className="w-3.5 h-3.5" />
+        </Link>
+      </div>
+    </motion.div>
   );
 }
 
@@ -331,49 +479,68 @@ function WatchingStrip({ workers }: { workers: WorkerBrief[] }) {
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: EASE, delay: 0.1 }}
-      className="rounded-[14px] px-4 py-3"
+      className="rounded-[14px] mb-3 overflow-hidden"
       style={{
-        background: "#fff",
-        border: "1px solid rgba(0,0,0,0.05)",
-        boxShadow: "0 1px 2px rgba(0,0,0,0.03)",
+        background: "#FFFFFF",
+        border: "1px solid rgba(15,23,42,0.06)",
+        boxShadow:
+          "inset 0 1px 0 rgba(255,255,255,1), 0 1px 2px rgba(15,23,42,0.03)",
       }}
     >
       <div
-        className="font-mono uppercase mb-2"
-        style={{
-          color: "#9CA3AF",
-          fontSize: "10px",
-          letterSpacing: "0.12em",
-        }}
+        className="flex items-center justify-between px-4 pt-2.5 pb-1.5"
+        style={{ borderBottom: "1px solid rgba(15,23,42,0.04)" }}
       >
-        Still on watch
+        <div
+          className="font-mono uppercase flex items-center gap-1.5"
+          style={{
+            color: "#9CA3AF",
+            fontSize: "9.5px",
+            letterSpacing: "0.14em",
+          }}
+        >
+          <motion.span
+            className="rounded-full"
+            style={{
+              width: 6,
+              height: 6,
+              background: "#22C55E",
+              boxShadow: "0 0 0 2px rgba(34,197,94,0.14)",
+            }}
+            animate={{ opacity: [0.5, 1, 0.5] }}
+            transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+          />
+          Still on watch
+        </div>
+        <span
+          className="font-mono"
+          style={{ color: "#9CA3AF", fontSize: "10px" }}
+        >
+          {workers.length} {workers.length === 1 ? "worker" : "workers"}
+        </span>
       </div>
-      <ul className="space-y-1.5">
+      <ul className="divide-y" style={{ borderColor: "rgba(15,23,42,0.04)" }}>
         {workers.map((w) => (
-          <li key={w.id} className="flex items-center gap-2.5 text-[12.5px]">
+          <li
+            key={w.id}
+            className="flex items-center gap-2.5 px-4 py-2"
+            style={{ borderTop: "1px solid rgba(15,23,42,0.04)" }}
+          >
             <span
-              className="w-5 h-5 rounded-full flex items-center justify-center text-[12px] shrink-0"
+              className="w-6 h-6 rounded-full flex items-center justify-center text-[13px] shrink-0"
               style={{
-                background: "linear-gradient(135deg, #F9FAFB, #F3F4F6)",
-                border: "1px solid rgba(0,0,0,0.04)",
+                background:
+                  "linear-gradient(180deg, #FFFFFF 0%, #F2F3F5 100%)",
+                border: "1px solid rgba(15,23,42,0.06)",
+                boxShadow: "inset 0 1px 1px rgba(15,23,42,0.04)",
               }}
             >
               {w.emoji}
             </span>
-            <span style={{ color: "#0A0A0A", fontWeight: 500 }}>{w.name}</span>
-            <span
-              className="inline-flex items-center gap-1 ml-1"
-              style={{ color: "#6B7280", fontSize: "11.5px" }}
-            >
-              <motion.span
-                className="w-1.5 h-1.5 rounded-full"
-                style={{ background: "#10B981" }}
-                animate={{ opacity: [0.35, 1, 0.35] }}
-                transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
-              />
-              watching
+            <span className="text-[12.5px] text-[#0A0A0A]" style={{ fontWeight: 500 }}>
+              {w.name}
             </span>
-            <span className="ml-auto font-mono" style={{ color: "#9CA3AF", fontSize: "11px" }}>
+            <span className="ml-auto font-mono text-[10.5px]" style={{ color: "#9CA3AF" }}>
               last check {fmtAgo(w.lastThoughtAt)}
             </span>
           </li>

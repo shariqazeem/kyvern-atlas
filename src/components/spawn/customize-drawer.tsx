@@ -218,7 +218,7 @@ export function CustomizeDrawer({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-40"
+            className="fixed inset-0 z-[55]"
             style={{ background: "rgba(8,11,20,0.6)", backdropFilter: "blur(4px)" }}
             onClick={onClose}
           />
@@ -228,7 +228,8 @@ export function CustomizeDrawer({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 60 }}
             transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
-            className="fixed inset-x-0 bottom-0 z-50 sm:inset-0 sm:flex sm:items-center sm:justify-center sm:px-4"
+            className="fixed inset-x-0 bottom-0 z-[60] sm:inset-0 sm:flex sm:items-center sm:justify-center sm:px-4"
+            style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
           >
             <div
               className="mx-auto w-full max-w-[520px] max-h-[90vh] flex flex-col rounded-t-[20px] sm:rounded-[20px] overflow-hidden relative"
