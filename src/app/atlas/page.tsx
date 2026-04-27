@@ -32,6 +32,8 @@ export default function AtlasPage() {
       initialFeed={snapshot.recentFeed ?? []}
       initialAttacks={snapshot.recentAttacks ?? []}
       initialPnl24h={snapshot.pnl24h ?? new Array(24).fill(0)}
+      initialFindings={snapshot.recentFindings ?? []}
+      initialFindingsThisWeek={snapshot.findingsThisWeek ?? 0}
     />
   );
 }

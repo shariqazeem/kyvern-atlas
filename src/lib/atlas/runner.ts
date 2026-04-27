@@ -35,6 +35,7 @@ import {
 } from "./db";
 import { decide } from "./decide";
 import { autoDripIfLow } from "./auto-drip";
+import { produceAtlasFindings } from "./findings";
 
 // Config via env — keeps the runner hackable on the VM.
 const BASE_URL =
@@ -65,6 +66,24 @@ async function runAutoDrip(cycle: number): Promise<void> {
     }
   } catch (e) {
     log("cycle", cycle, "· auto-drip error:", e instanceof Error ? e.message : String(e));
+  }
+}
+
+/** Path C — Atlas signal-production layer. Two birds: the existing
+ *  decide-and-pay loop continues unchanged; on top, we periodically
+ *  surface ecosystem findings into the `signals` table so /atlas can
+ *  show "Atlas surfaced N signals this week" alongside the attacks. */
+async function runFindings(cycle: number): Promise<void> {
+  try {
+    const r = await produceAtlasFindings(cycle);
+    if (!r) return;
+    if (r.produced === 0) {
+      log(`cycle ${cycle} · findings: ${r.source} — fetched ${r.fetched}, no new`);
+    } else {
+      log(`cycle ${cycle} · FINDINGS: ${r.source} — surfaced ${r.produced} new signals (${r.signalIds.join(", ")})`);
+    }
+  } catch (e) {
+    log("cycle", cycle, "· findings error:", e instanceof Error ? e.message : String(e));
   }
 }
 
@@ -115,6 +134,14 @@ async function doOneCycle() {
   // configured or the transfer errors, we log and move on.
   if (cycle % 30 === 0) {
     void runAutoDrip(cycle);
+  }
+
+  // Path C — Atlas findings layer. Every 5 cycles (~15 min on 3-min
+  // cycles), rotate through ecosystem sources and write any new items
+  // as signals into the Inbox. Fire-and-forget; never blocks the
+  // existing decide → pay → record cycle.
+  if (cycle % 5 === 0) {
+    void runFindings(cycle);
   }
 
   const proposal = await decide();

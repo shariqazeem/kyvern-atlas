@@ -28,10 +28,12 @@ import { Navbar } from "@/components/landing/navbar";
 import { Footer } from "@/components/landing/footer";
 import type { AtlasState, AtlasDecision, AtlasAttack } from "@/lib/atlas/schema";
 
+import type { Signal } from "@/lib/agents/types";
 import { ManifestoBlock } from "@/components/atlas/manifesto-block";
 import { AtlasHeroStats } from "@/components/atlas/atlas-hero-stats";
 import { AtlasMicroStats } from "@/components/atlas/atlas-micro-stats";
 import { AtlasPnlSparkline } from "@/components/atlas/atlas-pnl-sparkline";
+import { AtlasFindings } from "@/components/atlas/atlas-findings";
 import { AttackWall } from "@/components/atlas/attack-wall";
 import { ThreeLayerDiagram } from "@/components/atlas/three-layer-diagram";
 import { TopUpAtlas } from "@/components/atlas/top-up-atlas";
@@ -48,12 +50,16 @@ interface AtlasClientProps {
   initialFeed: FeedItem[];
   initialAttacks: AtlasAttack[];
   initialPnl24h: number[];
+  initialFindings: Signal[];
+  initialFindingsThisWeek: number;
 }
 
 export default function AtlasClient({
   initialState,
   initialAttacks,
   initialPnl24h,
+  initialFindings,
+  initialFindingsThisWeek,
 }: AtlasClientProps) {
   const [state, setState] = useState<AtlasState | null>(initialState);
   const [attacks, setAttacks] = useState<AtlasAttack[]>(initialAttacks);
@@ -165,7 +171,13 @@ export default function AtlasClient({
             </div>
           </motion.div>
 
-          {/* 4. Attack wall */}
+          {/* 4. Atlas Findings (Path C — above the Attack Wall) */}
+          <AtlasFindings
+            initialFindings={initialFindings}
+            initialThisWeek={initialFindingsThisWeek}
+          />
+
+          {/* 5. Attack wall */}
           <motion.div
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}

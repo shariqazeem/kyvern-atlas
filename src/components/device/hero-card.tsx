@@ -41,6 +41,13 @@ interface LiveStatus {
     totalThoughts: number;
     totalEarnedUsd: number;
   }>;
+  /** Path C — today's signal counts for the home card stat row. */
+  signalsToday?: {
+    total: number;
+    unread: number;
+    read: number;
+    actionable: number;
+  };
 }
 
 /* ── ScrambleNumber ─────────────────────────────────────────────────
@@ -472,6 +479,53 @@ export function DeviceHeroCard({ deviceId }: { deviceId: string }) {
             height={36}
           />
         </div>
+
+        {/* Path C — Today's signal stat row */}
+        {status?.signalsToday && status.signalsToday.total > 0 && (
+          <Link
+            href="/app/inbox"
+            className="flex items-center justify-between mt-3 pt-3 group transition"
+            style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}
+          >
+            <div
+              className="text-[10px] font-mono uppercase"
+              style={{ color: "rgba(255,255,255,0.4)", letterSpacing: "0.12em" }}
+            >
+              Today
+            </div>
+            <div
+              className="font-mono text-[12px] flex items-center gap-2"
+              style={{ color: "rgba(255,255,255,0.85)" }}
+            >
+              <span>
+                <span style={{ fontWeight: 600 }}>{status.signalsToday.total}</span>{" "}
+                signal{status.signalsToday.total === 1 ? "" : "s"}
+              </span>
+              {status.signalsToday.actionable > 0 && (
+                <>
+                  <span style={{ color: "rgba(255,255,255,0.25)" }}>·</span>
+                  <span style={{ color: "#86EFAC" }}>
+                    {status.signalsToday.actionable} actionable
+                  </span>
+                </>
+              )}
+              {status.signalsToday.read > 0 && (
+                <>
+                  <span style={{ color: "rgba(255,255,255,0.25)" }}>·</span>
+                  <span style={{ color: "rgba(255,255,255,0.5)" }}>
+                    {status.signalsToday.read} read
+                  </span>
+                </>
+              )}
+              <span
+                className="opacity-0 group-hover:opacity-100 transition"
+                style={{ color: "rgba(255,255,255,0.5)" }}
+              >
+                →
+              </span>
+            </div>
+          </Link>
+        )}
       </div>
 
       <TopUpDrawer

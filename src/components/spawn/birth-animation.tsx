@@ -139,7 +139,7 @@ export function BirthAnimation({
                 className="mt-1 font-mono text-[12px]"
                 style={{ color: "rgba(255,255,255,0.55)" }}
               >
-                First thought in 0:0{Math.floor(Math.random() * 9) + 4}
+                First finding incoming…
               </motion.div>
             )}
           </div>

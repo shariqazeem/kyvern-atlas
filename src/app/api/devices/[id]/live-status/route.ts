@@ -100,10 +100,12 @@ function verbFor(toolUsed: string | null): string {
       return "checked DEX price";
     case "read_onchain":
       return "read on-chain data";
+    case "watch_url":
+      return "scanned a feed";
     case "watch_wallet":
       return "watched a wallet";
     case "watch_wallet_swaps":
-      return "scanned for Jupiter swaps";
+      return "scanned for swaps";
     case "message_user":
       return "messaged owner";
     case "expose_paywall":
@@ -116,6 +118,27 @@ function verbFor(toolUsed: string | null): string {
       return "claimed a task";
     default:
       return toolUsed.replace(/_/g, " ");
+  }
+}
+
+/** Path C — verb for finding-mode signals. The pill prefers "found X"
+ *  over "thought" / "scanned" because it tells the owner what landed,
+ *  not what the worker did. */
+function verbForSignalKind(kind: string): string {
+  switch (kind) {
+    case "bounty":
+      return "found a bounty";
+    case "ecosystem_announcement":
+      return "spotted an announcement";
+    case "wallet_move":
+      return "flagged a whale move";
+    case "price_trigger":
+      return "triggered on price";
+    case "github_release":
+      return "found a release";
+    case "observation":
+    default:
+      return "logged an observation";
   }
 }
 
@@ -157,7 +180,36 @@ export async function GET(
     totalEarnedUsd: a.total_earned_usd,
   }));
 
-  // Last action across all workers on this device
+  // Path C — Today's signal counts (pulls from `signals` table for this device)
+  const todayMidnight = new Date();
+  todayMidnight.setUTCHours(0, 0, 0, 0);
+  const todayMs = todayMidnight.getTime();
+  const todayCounts = db
+    .prepare(
+      `SELECT
+        COUNT(*) AS total,
+        SUM(CASE WHEN status = 'unread' THEN 1 ELSE 0 END) AS unread,
+        SUM(CASE WHEN status = 'read' THEN 1 ELSE 0 END) AS read,
+        SUM(CASE WHEN status = 'unread' AND source_url IS NOT NULL THEN 1 ELSE 0 END) AS actionable
+       FROM signals
+       WHERE device_id = ? AND created_at >= ?`,
+    )
+    .get(params.id, todayMs) as {
+    total: number;
+    unread: number;
+    read: number;
+    actionable: number;
+  };
+  const signalsToday = {
+    total: todayCounts?.total ?? 0,
+    unread: todayCounts?.unread ?? 0,
+    read: todayCounts?.read ?? 0,
+    actionable: todayCounts?.actionable ?? 0,
+  };
+
+  // Last action across all workers on this device — checks both signals
+  // (Path C, finding mode) and thoughts (general worker activity), uses
+  // whichever is newer. Signal-based verbs read better in the pill.
   let lastAction: {
     worker: string;
     emoji: string;
@@ -167,6 +219,7 @@ export async function GET(
   if (agents.length > 0) {
     const ids = agents.map((a) => a.id);
     const placeholders = ids.map(() => "?").join(",");
+
     const lastThought = db
       .prepare(
         `SELECT agent_id, thought, tool_used, timestamp
@@ -175,7 +228,34 @@ export async function GET(
          ORDER BY timestamp DESC LIMIT 1`,
       )
       .get(...ids) as ThoughtRow | undefined;
-    if (lastThought) {
+
+    const lastSignal = db
+      .prepare(
+        `SELECT agent_id, kind, created_at
+         FROM signals
+         WHERE agent_id IN (${placeholders})
+         ORDER BY created_at DESC LIMIT 1`,
+      )
+      .get(...ids) as { agent_id: string; kind: string; created_at: number } | undefined;
+
+    const thoughtTs = lastThought?.timestamp ?? 0;
+    const signalTs = lastSignal?.created_at ?? 0;
+
+    // Prefer signal verb when within 60s of the latest thought (so a
+    // signal that landed alongside a tool call wins). Fall back to
+    // thought-based verb otherwise.
+    if (signalTs > 0 && signalTs >= thoughtTs - 60_000) {
+      const a = agents.find((x) => x.id === lastSignal!.agent_id);
+      if (a) {
+        lastAction = {
+          worker: a.name,
+          emoji: a.emoji,
+          verb: verbForSignalKind(lastSignal!.kind),
+          agoSeconds: Math.floor((now - signalTs) / 1000),
+        };
+      }
+    }
+    if (!lastAction && lastThought) {
       const a = agents.find((x) => x.id === lastThought.agent_id);
       if (a) {
         lastAction = {
@@ -256,5 +336,7 @@ export async function GET(
     earningPerMinUsd,
     lastAction,
     workers,
+    // Path C — today's signal stats for the home card's third stat row
+    signalsToday,
   });
 }

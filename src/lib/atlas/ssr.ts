@@ -21,6 +21,7 @@
 
 import "server-only";
 import type { AtlasState, AtlasDecision, AtlasAttack } from "./schema";
+import type { Signal } from "@/lib/agents/types";
 
 export interface AtlasSnapshot {
   state: AtlasState | null;
@@ -36,6 +37,12 @@ export interface AtlasSnapshot {
    *  Atlas mostly spends, so the line typically slopes downward; that's
    *  the right honest picture. */
   pnl24h: number[] | null;
+  /** Path C — Atlas's findings from the last 7 days, newest first.
+   *  Powers the new Findings section above the Attack Wall on /atlas. */
+  recentFindings: Signal[] | null;
+  /** Total findings Atlas surfaced in the last 7 days (for the
+   *  "Atlas surfaced N signals this week" credibility line). */
+  findingsThisWeek: number;
 }
 
 /**
@@ -85,12 +92,39 @@ export function readInitialAtlasSnapshot(): AtlasSnapshot {
     let cum = 0;
     const pnl24h = buckets.map((b) => (cum += b));
 
-    return { state, recentFeed, recentAttacks, pnl24h };
+    // Atlas findings — Path C. Read from the pulse.db `signals` table,
+    // not atlas.db. Last 7 days, scoped to agent_id=agt_atlas.
+    let recentFindings: Signal[] | null = null;
+    let findingsThisWeek = 0;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { listInbox, countSignals } = require("@/lib/agents/store") as typeof import("@/lib/agents/store");
+      const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+      // listInbox is by deviceId; Atlas's deviceId is vlt_QcCPbp3XTzHtF5
+      const all = listInbox("vlt_QcCPbp3XTzHtF5", { limit: 100, since: sevenDaysAgo });
+      recentFindings = all.filter((s) => s.agentId === "agt_atlas").slice(0, 30);
+      findingsThisWeek = recentFindings.length;
+      // countSignals is total per device — we want agt_atlas only over 7 days,
+      // which is what we just computed; no extra query needed.
+      void countSignals;
+    } catch {
+      recentFindings = null;
+      findingsThisWeek = 0;
+    }
+
+    return { state, recentFeed, recentAttacks, pnl24h, recentFindings, findingsThisWeek };
   } catch (e) {
     console.warn(
       "[atlas/ssr] could not read initial snapshot:",
       e instanceof Error ? e.message : String(e),
     );
-    return { state: null, recentFeed: null, recentAttacks: null, pnl24h: null };
+    return {
+      state: null,
+      recentFeed: null,
+      recentAttacks: null,
+      pnl24h: null,
+      recentFindings: null,
+      findingsThisWeek: 0,
+    };
   }
 }

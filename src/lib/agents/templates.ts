@@ -393,10 +393,11 @@ export const ATLAS_TEMPLATE_DEF: AgentTemplateDef = {
   jobPromptExample:
     "Buy intelligence from research APIs. Cross-check signals. Publish a forecast to permanent storage. Self-report each cycle.",
   recommendedTools: [
+    "watch_url",
     "read_onchain",
+    "message_user",
     "subscribe_to_agent",
     "expose_paywall",
-    "message_user",
     "post_task",
     "claim_task",
   ],
