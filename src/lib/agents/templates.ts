@@ -181,19 +181,19 @@ export const TEMPLATES: AgentTemplateDef[] = [
     inPicker: true,
     jobSuggestions: [
       {
-        label: "Superteam Frontend >$500",
+        label: "Superteam Dev >$500",
         job:
           "Every cycle, call watch_url on https://superteam.fun/api/listings?category=Development&order=desc&take=15 with minPrize=500 and sinceLastCheck=true. For each new listing returned, call message_user in Finding mode with kind='bounty', subject= the listing title (≤80 chars), evidence including the reward in USD, the deadline, and any required skills, and sourceUrl set to the listing URL. If no new listings, idle.",
       },
       {
-        label: "Colosseum Frontier announcements",
+        label: "Superteam high-bar >$2k",
         job:
-          "Watch https://arena.colosseum.org/api/events?status=open with watch_url every cycle. When a new hackathon or grant track drops, surface it as a finding with kind='ecosystem_announcement', subject= the event name, evidence with prize pool, deadline, and category, and the event URL as sourceUrl.",
+          "Every cycle, call watch_url on https://superteam.fun/api/listings?category=Development&order=desc&take=15 with minPrize=2000 and sinceLastCheck=true. Only surface bounties with reward ≥$2000 — the high-bar set worth a focused submission. For each new listing, call message_user in Finding mode with kind='bounty', subject= the listing title (≤80 chars), evidence: reward in USD, deadline, sponsor name, and any required skills. sourceUrl = the listing URL. Idle when nothing new.",
       },
       {
-        label: "GitHub releases for tools you use",
+        label: "Anchor releases",
         job:
-          "Watch https://api.github.com/repos/anchor-lang/anchor/releases with watch_url every cycle. When a new release lands, surface a github_release finding with the release tag as subject, body excerpt as evidence, and the release URL as sourceUrl.",
+          "Every cycle, watch_url on https://api.github.com/repos/coral-xyz/anchor/releases with format='json' and sinceLastCheck=true. For each new release, call message_user in Finding mode with kind='github_release', subject= the release tag (e.g. 'anchor v1.0.1'), evidence: tag + body excerpt + author + published date, sourceUrl = the release URL. Idle when nothing new.",
       },
     ],
   },
@@ -204,9 +204,9 @@ export const TEMPLATES: AgentTemplateDef[] = [
     suggestedName: "Echo",
     personalityPrompt:
       "You watch the rooms where ecosystem news drops first — official accounts, foundation feeds, hackathon platforms. You don't speculate. You surface the announcement and the link.",
-    jobPromptPlaceholder: "Which ecosystem accounts or feeds should I watch?",
+    jobPromptPlaceholder: "Which ecosystem feeds should I watch?",
     jobPromptExample:
-      "Every cycle, watch_url https://nitter.net/SolanaFndn/rss with format=rss. Surface any new post as an ecosystem_announcement finding. Subject = post title (≤80 chars), evidence = excerpt + handle, sourceUrl = the post URL.",
+      "Every cycle, watch_url https://solana.com/news/rss.xml with format='rss' and sinceLastCheck=true. Surface every new post as an ecosystem_announcement. Subject = title, evidence = excerpt + author + date, sourceUrl = post URL.",
     recommendedTools: ["watch_url", "message_user"],
     defaultFrequencySeconds: 600,
     description: "Watches Solana accounts and feeds. Pings on hackathons, grants, and launches.",
@@ -217,9 +217,9 @@ export const TEMPLATES: AgentTemplateDef[] = [
     inPicker: true,
     jobSuggestions: [
       {
-        label: "@SolanaFndn @Colosseum @SuperteamDAO",
+        label: "Multi-feed: Solana + Helius + Superteam",
         job:
-          "Every cycle, call watch_url on https://nitter.net/SolanaFndn/rss with format='rss' and sinceLastCheck=true. Repeat for https://nitter.net/Colosseum/rss and https://nitter.net/SuperteamDAO/rss. For each new post mentioning hackathon, grant, mainnet, or launch, surface an ecosystem_announcement with the post title as subject, the post excerpt + handle as evidence, and the post URL as sourceUrl.",
+          "Every cycle, fan out across three feeds for redundancy: (1) watch_url on https://solana.com/news/rss.xml format='rss', (2) watch_url on https://www.helius.dev/blog/rss.xml format='rss', (3) watch_url on https://superteam.fun/api/listings?category=Development&order=desc&take=15 format='json'. All three with sinceLastCheck=true. For each new item across the three feeds, call message_user in Finding mode with kind='ecosystem_announcement' (or kind='bounty' if it came from Superteam), subject= the title (≤80 chars), evidence= source feed + excerpt + date, sourceUrl = the item URL. Idle if all three return no new items.",
       },
       {
         label: "Solana Foundation blog",
@@ -227,9 +227,9 @@ export const TEMPLATES: AgentTemplateDef[] = [
           "Every cycle, watch_url on https://solana.com/news/rss.xml with format='rss' and sinceLastCheck=true. Surface every new post as an ecosystem_announcement. Subject = title, evidence = excerpt + author + date, sourceUrl = post URL.",
       },
       {
-        label: "Magic Eden, Tensor, Phantom drops",
+        label: "Colosseum blog (judge feed)",
         job:
-          "Every cycle, watch_url on https://nitter.net/MagicEden/rss, https://nitter.net/tensor_hq/rss, https://nitter.net/phantom/rss with format='rss'. When a post mentions launch, drop, mint, or release, surface an ecosystem_announcement.",
+          "Every cycle, watch_url on https://blog.colosseum.com/rss with format='rss' and sinceLastCheck=true. This is the hackathon's own newsroom — judge announcements, prize updates, ecosystem highlights from the org running this contest. For each new post, surface an ecosystem_announcement. Subject = title, evidence = excerpt + date, sourceUrl = post URL.",
       },
     ],
   },
@@ -242,7 +242,7 @@ export const TEMPLATES: AgentTemplateDef[] = [
       "You track wallets. You watch their on-chain moves with patience and surface the moments they move size. Your evidence is the signature, the tokens, the dollar amount, the time. No commentary unless asked.",
     jobPromptPlaceholder: "Which wallets should I track, and at what size threshold?",
     jobPromptExample:
-      "Every cycle, watch_wallet_swaps on the Solana wallet 7Yk8cPDKL5h4QnQiVhHcvWg9HXKJpQfTmnK9zTzk5bWqA with minUsdThreshold 5000. For each new swap, surface a wallet_move finding with subject summarising amount + tokens, evidence with signature + token pair + USD value, sourceUrl = Solana Explorer tx URL.",
+      "Every cycle, watch_wallet on Kraken's Solana hot wallet FWznbcNXWQuHTawe9RxvQ2LdCENssh12dsznf4RiouN5 with lookbackCount=20. For each new transfer or swap, surface a wallet_move finding with subject summarising the action, evidence: signature + amount + token + time, sourceUrl = https://explorer.solana.com/tx/<signature>.",
     recommendedTools: ["watch_wallet_swaps", "watch_wallet", "read_dex", "message_user"],
     defaultFrequencySeconds: 240,
     description: "Tracks wallets. Pings you when they move size.",
@@ -253,19 +253,14 @@ export const TEMPLATES: AgentTemplateDef[] = [
     inPicker: true,
     jobSuggestions: [
       {
-        label: "Track a whale for Jupiter swaps >$50k",
+        label: "Kraken hot wallet movements",
         job:
-          "Every cycle, watch_wallet_swaps on the Solana wallet 7Yk8cPDKL5h4QnQiVhHcvWg9HXKJpQfTmnK9zTzk5bWqA with lookbackCount=20 and minUsdThreshold=50000. For each new swap, surface a wallet_move finding. Subject = '<amount in> <tokenIn> → <amount out> <tokenOut> · ~$<usd>'. Evidence = signature, token pair, USD value, time. sourceUrl = https://explorer.solana.com/tx/<signature>?cluster=devnet (or mainnet if applicable).",
+          "Every cycle, watch_wallet on Kraken's Solana hot wallet FWznbcNXWQuHTawe9RxvQ2LdCENssh12dsznf4RiouN5 with lookbackCount=20. For each new transfer, swap, or program call returned, call message_user in Finding mode with kind='wallet_move', subject summarising the action (e.g. 'Kraken transferred 12,000 USDC out'), evidence: signature, amount, token, type, time. sourceUrl = https://explorer.solana.com/tx/<signature>. Idle when no new movement.",
       },
       {
-        label: "Top 5 SOL holders for outflows",
+        label: "Active Jupiter swappers >$1k",
         job:
-          "Pick 5 known top SOL holders. Every cycle, call watch_wallet on each. Surface a wallet_move finding when net SOL outflow > 1000 SOL is detected. Evidence = signature + amount + counterparty.",
-      },
-      {
-        label: "Watch this wallet for any swap >$10k",
-        job:
-          "Every cycle, watch_wallet_swaps on a single wallet with minUsdThreshold=10000. Surface every qualifying swap as a wallet_move finding.",
+          "Every cycle, call watch_wallet_swaps on each of these two recurring Jupiter swappers with minUsdThreshold=1000: 8SwGCSPc26dMzLFtdimQd9NroaDobtTbfeMdd99ga7go and FExezs2b4wUbJV4dKoNBE8xZCiH3bVcDnT569fTmkLyj. For each new qualifying swap returned, surface a wallet_move finding. Subject = '<amount in> <tokenIn> → <amount out> <tokenOut> · ~$<usd>'. Evidence = signature, token pair, USD value, wallet, time. sourceUrl = https://explorer.solana.com/tx/<signature>. Idle when neither wallet has a new swap.",
       },
     ],
   },
@@ -289,19 +284,19 @@ export const TEMPLATES: AgentTemplateDef[] = [
     inPicker: true,
     jobSuggestions: [
       {
-        label: "SOL >5% in 30min",
+        label: "SOL outside $140–$160 band",
         job:
-          "Every cycle, read_dex with 'SOL'. Track price across cycles using your recent thoughts. If SOL moves >5% in either direction over 30 minutes, surface a price_trigger finding. Subject = 'SOL <up/down> X% in 30min: $<currentPrice>'. Evidence = start price, current price, % change, source. sourceUrl = a CoinGecko or DexScreener link for SOL.",
+          "Every cycle, call read_dex with 'SOL'. If the returned price is below $140 OR above $160, surface a price_trigger finding. Subject = 'SOL outside band: $<price>'. Evidence: current price, band ($140–$160), source (CoinGecko or DexScreener), and whether it's the upper or lower break. sourceUrl = https://www.coingecko.com/en/coins/solana. If price is inside the band, idle.",
       },
       {
-        label: "Whale-buys on a meme coin",
+        label: "BONK outside $0.0000180–$0.0000300 band",
         job:
-          "Every cycle, watch_wallet_swaps for a specific meme coin's known whale wallets with minUsdThreshold=10000. Surface a price_trigger finding for each big buy detected.",
+          "Every cycle, call read_dex with 'BONK'. If the returned price is below $0.0000180 OR above $0.0000300, surface a price_trigger finding. Subject = 'BONK outside band: $<price>'. Evidence: current price, band, source, and whether it's the upper or lower break. sourceUrl = https://www.coingecko.com/en/coins/bonk. Idle when inside band.",
       },
       {
-        label: "Any swap >$10k on a token",
+        label: "WIF outside $1.40–$2.20 band",
         job:
-          "Every cycle, watch_wallet_swaps on a token's top liquidity wallet with minUsdThreshold=10000. Surface a price_trigger for each large swap.",
+          "Every cycle, call read_dex with 'WIF'. If the returned price is below $1.40 OR above $2.20, surface a price_trigger finding. Subject = 'WIF outside band: $<price>'. Evidence: current price, band, source, and whether it's the upper or lower break. sourceUrl = https://www.coingecko.com/en/coins/dogwifcoin. Idle when inside band.",
       },
     ],
   },
@@ -314,7 +309,7 @@ export const TEMPLATES: AgentTemplateDef[] = [
       "You watch repositories with the patience of a long-time contributor. You only ping the owner when something they'd care about ships — a release, a fresh commit on main, a new issue thread.",
     jobPromptPlaceholder: "Which repo or org should I watch?",
     jobPromptExample:
-      "Every cycle, watch_url on https://api.github.com/repos/anchor-lang/anchor/releases with format='json' and sinceLastCheck=true. For each new release, surface a github_release finding with the tag as subject, body excerpt as evidence, and the release URL as sourceUrl.",
+      "Every cycle, watch_url on https://api.github.com/repos/coral-xyz/anchor/releases with format='json' and sinceLastCheck=true. For each new release, surface a github_release finding with the tag as subject, body excerpt as evidence, and the release URL as sourceUrl.",
     recommendedTools: ["watch_url", "message_user"],
     defaultFrequencySeconds: 900,
     description: "Watches a GitHub repo or org. Pings on releases and fresh commits.",
@@ -330,14 +325,14 @@ export const TEMPLATES: AgentTemplateDef[] = [
           "Every cycle, watch_url on https://api.github.com/repos/solana-labs/solana/releases with format='json' and sinceLastCheck=true. For each new release, surface a github_release finding. Subject = release name, evidence = tag + body excerpt + author + published date, sourceUrl = release URL.",
       },
       {
-        label: "anchor-lang/anchor releases",
+        label: "coral-xyz/anchor releases",
         job:
-          "Every cycle, watch_url on https://api.github.com/repos/coral-xyz/anchor/releases with format='json' and sinceLastCheck=true. Surface each new release as a github_release finding.",
+          "Every cycle, watch_url on https://api.github.com/repos/coral-xyz/anchor/releases with format='json' and sinceLastCheck=true. Surface each new release as a github_release finding. Subject = release name, evidence = tag + body excerpt + published date, sourceUrl = release URL.",
       },
       {
-        label: "magic-eden/magic-eden releases",
+        label: "metaplex/mpl-core releases",
         job:
-          "Every cycle, watch_url on https://api.github.com/repos/magic-eden/magic-eden/releases with format='json'. Surface each new release as a github_release finding.",
+          "Every cycle, watch_url on https://api.github.com/repos/metaplex-foundation/mpl-core/releases with format='json' and sinceLastCheck=true. Surface each new release as a github_release finding. Subject = release name, evidence = tag + body excerpt + published date, sourceUrl = release URL.",
       },
     ],
   },

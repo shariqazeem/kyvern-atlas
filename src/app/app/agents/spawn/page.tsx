@@ -444,30 +444,45 @@ export default function SpawnPage() {
               <label className="block text-[11px] font-medium text-[#6B6B6B] mb-1.5">
                 What&apos;s the job?
               </label>
-              {selectedTemplate.jobSuggestions.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 mb-2">
-                  {selectedTemplate.jobSuggestions.map((s) => {
-                    const active = activeChip === s.label;
-                    return (
-                      <button
-                        key={s.label}
-                        type="button"
-                        onClick={() => onChip(s)}
-                        className="text-[11px] px-2.5 py-1 rounded-full transition active:scale-[0.97]"
-                        style={{
-                          background: active ? "#0A0A0A" : "#fff",
-                          color: active ? "#fff" : "#0A0A0A",
-                          border: active
-                            ? "1px solid #0A0A0A"
-                            : "1px solid rgba(0,0,0,0.1)",
-                        }}
-                      >
-                        {s.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {selectedTemplate.jobSuggestions.map((s) => {
+                  const active = activeChip === s.label;
+                  return (
+                    <button
+                      key={s.label}
+                      type="button"
+                      onClick={() => onChip(s)}
+                      className="text-[11px] px-2.5 py-1 rounded-full transition active:scale-[0.97]"
+                      style={{
+                        background: active ? "#0A0A0A" : "#fff",
+                        color: active ? "#fff" : "#0A0A0A",
+                        border: active
+                          ? "1px solid #0A0A0A"
+                          : "1px solid rgba(0,0,0,0.1)",
+                      }}
+                    >
+                      {s.label}
+                    </button>
+                  );
+                })}
+                {/* Always-present escape hatch — empty slots become a
+                    "write your own" affordance, never a fake/dummy chip. */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setJob("");
+                    setActiveChip(null);
+                  }}
+                  className="text-[11px] px-2.5 py-1 rounded-full transition active:scale-[0.97]"
+                  style={{
+                    background: "#fff",
+                    color: "#6B6B6B",
+                    border: "1px dashed rgba(0,0,0,0.18)",
+                  }}
+                >
+                  Custom job →
+                </button>
+              </div>
               <textarea
                 value={job}
                 onChange={(e) => {
