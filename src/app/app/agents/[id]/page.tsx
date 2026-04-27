@@ -1,19 +1,36 @@
 "use client";
 
 /**
- * /app/agents/[id] — Agent detail page.
+ * /app/agents/[id] — Worker detail.
  *
- * The agent's home: identity + status + PnL + thought feed + sticky chat.
- * Polls thoughts and chat every 5s for live updates.
+ * The page IS the module — wrapped in a chassis bezel that matches the
+ * device home, with the worker's status LED at the top and the worker
+ * docked into a recessed slot below. Stats + spec card form the body.
+ * Thought feed renders as the "internal log screen" — terminal-feel
+ * mono header, hairline rows, cycle # gutter. Sticky chat at bottom is
+ * a hardware-style "Talk to module" drawer with a handle and chassis
+ * top-edge.
+ *
+ * Same APIs, same polling cadence (2s while activation banner is up,
+ * 5s otherwise).
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Send, Pause, Play, Activity, X, Sparkles } from "lucide-react";
-import { StatBlock } from "@/components/primitives/stat-block";
+import {
+  ArrowLeft,
+  Pause,
+  Play,
+  Activity,
+  X,
+  Sparkles,
+} from "lucide-react";
 import { SignaturePill } from "@/components/primitives/signature-pill";
+import { ChatDrawer, type ChatMessage } from "@/components/agent/chat-drawer";
+
+const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
 interface Agent {
   id: string;
@@ -44,11 +61,18 @@ interface Thought {
   mode: "llm" | "scripted";
 }
 
-interface ChatMessage {
-  id: string;
-  role: "user" | "agent";
-  content: string;
-  timestamp: number;
+const QUICK_REPLIES = [
+  "How are you doing?",
+  "Show me what you found",
+  "Take a break",
+];
+
+function deriveSerial(deviceId: string): string {
+  return `KVN-${deviceId.replace("vlt_", "").slice(0, 8).toUpperCase()}`;
+}
+
+function moduleId(template: string): string {
+  return `KVN-MOD-${template.toUpperCase().replace(/[^A-Z0-9]/g, "-").slice(0, 14)}`;
 }
 
 export default function AgentDetailPage({ params }: { params: { id: string } }) {
@@ -61,17 +85,12 @@ export default function AgentDetailPage({ params }: { params: { id: string } }) 
 
   const [inputValue, setInputValue] = useState("");
   const [sending, setSending] = useState(false);
-  const chatEndRef = useRef<HTMLDivElement>(null);
 
-  // Section 3C — fresh-spawn activation banner. Shows when the user
-  // landed here from the spawn flow (?fresh=true) and the agent
-  // hasn't produced its first thought yet. Disappears the moment
-  // total_thoughts goes from 0 to 1.
   const isFreshParam = searchParams.get("fresh") === "true";
   const showActivation =
     isFreshParam && !!agent && agent.totalThoughts === 0 && agent.status === "alive";
 
-  // Load agent + thoughts + chat
+  // Initial load
   const load = useCallback(async () => {
     try {
       const [agentRes, thoughtsRes, chatRes] = await Promise.all([
@@ -79,17 +98,14 @@ export default function AgentDetailPage({ params }: { params: { id: string } }) 
         fetch(`/api/agents/${params.id}/thoughts?limit=30`),
         fetch(`/api/agents/${params.id}/chat?limit=30`),
       ]);
-
       if (agentRes.status === 404) {
         setError("Agent not found");
         setLoading(false);
         return;
       }
-
       const agentJson = await agentRes.json();
       const thoughtsJson = await thoughtsRes.json();
       const chatJson = await chatRes.json();
-
       setAgent(agentJson.agent);
       setThoughts(thoughtsJson.thoughts ?? []);
       setChat(chatJson.messages ?? []);
@@ -104,9 +120,7 @@ export default function AgentDetailPage({ params }: { params: { id: string } }) 
     void load();
   }, [load]);
 
-  // Poll for updates. While the activation banner is showing, poll the
-  // agent endpoint every 2s so the banner clears the instant the first
-  // thought lands. After that, ease off to 5s.
+  // Poll
   useEffect(() => {
     const intervalMs = showActivation ? 2000 : 5000;
     const iv = setInterval(() => {
@@ -126,18 +140,11 @@ export default function AgentDetailPage({ params }: { params: { id: string } }) 
     return () => clearInterval(iv);
   }, [params.id, showActivation]);
 
-  // Auto-scroll chat to bottom on new messages
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [chat.length]);
-
   const handleSend = useCallback(async () => {
     const text = inputValue.trim();
     if (!text || sending) return;
     setSending(true);
     setInputValue("");
-
-    // Optimistic user message
     const optimistic: ChatMessage = {
       id: `tmp_${Date.now()}`,
       role: "user",
@@ -145,7 +152,6 @@ export default function AgentDetailPage({ params }: { params: { id: string } }) 
       timestamp: Date.now(),
     };
     setChat((prev) => [...prev, optimistic]);
-
     try {
       const res = await fetch(`/api/agents/${params.id}/chat`, {
         method: "POST",
@@ -155,13 +161,11 @@ export default function AgentDetailPage({ params }: { params: { id: string } }) 
       const data = await res.json();
       if (data.userMessage && data.agentMessage) {
         setChat((prev) => {
-          // Replace optimistic + add agent response
           const filtered = prev.filter((m) => m.id !== optimistic.id);
           return [...filtered, data.userMessage, data.agentMessage];
         });
       }
     } catch {
-      // Add error bubble
       setChat((prev) => [
         ...prev,
         {
@@ -185,9 +189,7 @@ export default function AgentDetailPage({ params }: { params: { id: string } }) 
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ status: next }),
         });
-        if (res.ok) {
-          setAgent((a) => (a ? { ...a, status: next } : a));
-        }
+        if (res.ok) setAgent((a) => (a ? { ...a, status: next } : a));
       } catch {
         /* ignore */
       }
@@ -226,8 +228,13 @@ export default function AgentDetailPage({ params }: { params: { id: string } }) 
   if (error || !agent) {
     return (
       <div className="py-20 text-center">
-        <p className="text-[14px] text-[#6B6B6B]">{error ?? "Agent not found"}</p>
-        <Link href="/app" className="text-[13px] text-[#0A0A0A] underline mt-2 inline-block">
+        <p className="text-[14px] text-[#6B6B6B]">
+          {error ?? "Agent not found"}
+        </p>
+        <Link
+          href="/app"
+          className="text-[13px] text-[#0A0A0A] underline mt-2 inline-block"
+        >
           Back home
         </Link>
       </div>
@@ -247,155 +254,258 @@ export default function AgentDetailPage({ params }: { params: { id: string } }) 
   const net = agent.totalEarnedUsd - agent.totalSpentUsd;
 
   return (
-    // Bottom padding has to clear the fixed chat overlay below — chat
-    // grows to ~430px when bubbles fill (max-h-[280px] bubbles + chips
-    // + input + gradient + tab-bar gap). Without this, the last few
-    // thoughts get hidden behind the chat once it has messages.
     <div className="pb-[480px]">
-      {/* Back */}
       <Link
         href="/app"
-        className="inline-flex items-center gap-1.5 text-[12px] font-medium text-[#9B9B9B] mb-4 hover:text-[#6B6B6B]"
+        className="inline-flex items-center gap-1.5 text-[12px] font-medium text-[#9B9B9B] mb-3 hover:text-[#6B6B6B]"
       >
         <ArrowLeft className="w-3.5 h-3.5" />
         Home
       </Link>
 
-      {/* Header */}
+      {/* Chassis */}
       <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        className="rounded-[20px] p-5 mb-4"
+        initial={{ opacity: 0, y: 10, scale: 0.99 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.5, ease: EASE }}
+        className="relative w-full overflow-hidden mb-4"
         style={{
-          background: "#fff",
-          boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
-          border: "1px solid rgba(0,0,0,0.05)",
+          borderRadius: 24,
+          background: "linear-gradient(180deg, #FFFFFF 0%, #F8F8FA 100%)",
+          border: "1px solid rgba(15,23,42,0.06)",
+          boxShadow: [
+            "inset 0 1px 0 rgba(255,255,255,1)",
+            "0 1px 2px rgba(15,23,42,0.04)",
+            "0 8px 24px -8px rgba(15,23,42,0.06)",
+            "0 24px 56px -20px rgba(15,23,42,0.10)",
+          ].join(", "),
         }}
       >
-        <div className="flex items-center gap-3 mb-4">
+        {/* Top edge highlight */}
+        <div
+          aria-hidden
+          className="absolute top-0 left-8 right-8 pointer-events-none"
+          style={{
+            height: 1,
+            background:
+              "linear-gradient(to right, transparent, rgba(255,255,255,1), transparent)",
+          }}
+        />
+
+        {/* LED strip */}
+        <div
+          className="relative flex items-center justify-between px-5 pt-4 pb-3"
+          style={{ borderBottom: "1px solid rgba(15,23,42,0.05)" }}
+        >
+          <div className="flex items-center gap-2">
+            <motion.span
+              className="rounded-full"
+              style={{
+                width: 7,
+                height: 7,
+                background:
+                  agent.status === "alive"
+                    ? "#22C55E"
+                    : agent.status === "paused"
+                      ? "#F59E0B"
+                      : "#9CA3AF",
+                boxShadow:
+                  agent.status === "alive"
+                    ? "0 0 0 3px rgba(34,197,94,0.12), 0 0 8px rgba(34,197,94,0.55)"
+                    : agent.status === "paused"
+                      ? "0 0 0 3px rgba(245,158,11,0.12), 0 0 8px rgba(245,158,11,0.55)"
+                      : "0 0 0 3px rgba(156,163,175,0.12)",
+              }}
+              animate={isAlive ? { opacity: [0.55, 1, 0.55] } : {}}
+              transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+            />
+            <span
+              className="font-mono text-[10px] uppercase"
+              style={{
+                color:
+                  agent.status === "alive"
+                    ? "#15803D"
+                    : agent.status === "paused"
+                      ? "#B45309"
+                      : "#6B7280",
+                letterSpacing: "0.14em",
+              }}
+            >
+              {agent.status === "alive"
+                ? "ONLINE"
+                : agent.status === "paused"
+                  ? "PAUSED"
+                  : "RETIRED"}
+            </span>
+          </div>
           <span
-            className="w-14 h-14 rounded-[16px] flex items-center justify-center text-[28px]"
-            style={{ background: "#F5F5F5" }}
+            className="font-mono text-[11px] tracking-[0.08em]"
+            style={{ color: "#374151", textShadow: "0 1px 0 rgba(255,255,255,0.9)" }}
           >
-            {agent.emoji}
+            {moduleId(agent.template)}
           </span>
-          <div className="flex-1 min-w-0">
-            <h1 className="text-[22px] font-semibold tracking-tight text-[#0A0A0A]">
-              {agent.name}
-            </h1>
-            <div className="flex items-center gap-2 mt-0.5">
-              <motion.span
-                className="w-[6px] h-[6px] rounded-full"
-                style={{ background: isAlive ? "#00A86B" : "#9B9B9B" }}
-                animate={isAlive ? { opacity: [0.5, 1, 0.5] } : {}}
-                transition={{ duration: 2, repeat: Infinity }}
-              />
-              <span className="text-[11px] font-medium" style={{ color: isAlive ? "#00A86B" : "#9B9B9B" }}>
-                {isAlive ? "Alive" : agent.status}
-              </span>
-              <span className="text-[10px] text-[#D1D5DB]">·</span>
-              <span className="text-[11px] text-[#9B9B9B]">{aliveLabel} alive</span>
-              <span className="text-[10px] text-[#D1D5DB]">·</span>
-              <span className="text-[11px] text-[#9B9B9B] font-mono">{agent.template}</span>
+          <span
+            className="font-mono text-[10px] uppercase"
+            style={{ color: "#9CA3AF", letterSpacing: "0.12em" }}
+          >
+            Up {aliveLabel}
+          </span>
+        </div>
+
+        {/* Identity row */}
+        <div className="relative px-5 pt-5 pb-4">
+          <div className="flex items-start gap-3 mb-4">
+            <div
+              className="w-14 h-14 rounded-[18px] flex items-center justify-center text-[28px] shrink-0"
+              style={{
+                background: "linear-gradient(180deg, #F2F3F5 0%, #FFFFFF 100%)",
+                border: "1px solid rgba(15,23,42,0.06)",
+                boxShadow:
+                  "inset 0 1px 2px rgba(15,23,42,0.06), inset 0 -1px 0 rgba(255,255,255,0.8)",
+              }}
+            >
+              {agent.emoji}
+            </div>
+            <div className="flex-1 min-w-0">
+              <h1 className="text-[22px] font-semibold tracking-tight text-[#0A0A0A] leading-tight">
+                {agent.name}
+              </h1>
+              <div
+                className="font-mono text-[11px] mt-1 flex flex-wrap items-center gap-1.5"
+                style={{ color: "#9CA3AF" }}
+              >
+                <span className="text-[#374151]">{agent.template}</span>
+                <span style={{ color: "#D1D5DB" }}>·</span>
+                <span>docked into</span>
+                <Link
+                  href="/app"
+                  className="text-[#374151] hover:text-[#0A0A0A] transition"
+                >
+                  {deriveSerial(agent.deviceId)}
+                </Link>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              {agent.status !== "retired" && (
+                <motion.button
+                  onClick={handlePauseResume}
+                  whileTap={{ scale: 0.92 }}
+                  transition={{ type: "spring", stiffness: 320, damping: 22, mass: 0.6 }}
+                  title={isAlive ? "Pause worker" : "Resume worker"}
+                  className="w-9 h-9 rounded-[10px] flex items-center justify-center"
+                  style={{
+                    background: "#FFFFFF",
+                    color: "#374151",
+                    border: "1px solid rgba(15,23,42,0.08)",
+                    boxShadow: "0 1px 2px rgba(15,23,42,0.04)",
+                  }}
+                >
+                  {isAlive ? (
+                    <Pause className="w-4 h-4" strokeWidth={1.7} />
+                  ) : (
+                    <Play className="w-4 h-4" strokeWidth={1.7} />
+                  )}
+                </motion.button>
+              )}
+              {agent.status !== "retired" && (
+                <motion.button
+                  onClick={handleRetire}
+                  whileTap={{ scale: 0.92 }}
+                  transition={{ type: "spring", stiffness: 320, damping: 22, mass: 0.6 }}
+                  title="Retire worker (permanent)"
+                  className="w-9 h-9 rounded-[10px] flex items-center justify-center"
+                  style={{
+                    background: "#FEF2F2",
+                    color: "#B91C1C",
+                    border: "1px solid rgba(185,28,28,0.18)",
+                  }}
+                >
+                  <X className="w-4 h-4" strokeWidth={1.8} />
+                </motion.button>
+              )}
             </div>
           </div>
-          <div className="flex items-center gap-1.5">
-            {agent.status !== "retired" && (
-              <button
-                onClick={handlePauseResume}
-                title={isAlive ? "Pause worker" : "Resume worker"}
-                className="w-9 h-9 rounded-[10px] flex items-center justify-center transition-colors active:scale-[0.95]"
-                style={{ background: "#F5F5F5", color: "#6B6B6B" }}
-              >
-                {isAlive ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-              </button>
-            )}
-            {agent.status !== "retired" && (
-              <button
-                onClick={handleRetire}
-                title="Retire worker (permanent)"
-                className="w-9 h-9 rounded-[10px] flex items-center justify-center transition-colors active:scale-[0.95]"
-                style={{ background: "#FEE2E2", color: "#B91C1C" }}
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
+
+          {/* Stat row */}
+          <div
+            className="grid grid-cols-4 rounded-[12px] overflow-hidden"
+            style={{
+              background: "rgba(15,23,42,0.025)",
+              border: "1px solid rgba(15,23,42,0.05)",
+            }}
+          >
+            <Stat label="Thoughts" value={String(agent.totalThoughts)} />
+            <Stat
+              label="Earned"
+              value={`+$${agent.totalEarnedUsd.toFixed(2)}`}
+              tone="#15803D"
+              divider
+            />
+            <Stat
+              label="Spent"
+              value={`$${agent.totalSpentUsd.toFixed(2)}`}
+              divider
+            />
+            <Stat
+              label="Net"
+              value={`${net >= 0 ? "+" : ""}$${net.toFixed(2)}`}
+              tone={net >= 0 ? "#15803D" : "#B91C1C"}
+              divider
+            />
           </div>
-        </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-4 gap-3 pt-4" style={{ borderTop: "1px solid #F5F5F5" }}>
-          <StatBlock value={String(agent.totalThoughts)} label="Thoughts" size="md" />
-          <StatBlock
-            value={`$${agent.totalEarnedUsd.toFixed(2)}`}
-            label="Earned"
-            color="#00A86B"
-            size="md"
-          />
-          <StatBlock
-            value={`$${agent.totalSpentUsd.toFixed(2)}`}
-            label="Spent"
-            color="#0A0A0A"
-            size="md"
-          />
-          <StatBlock
-            value={`${net >= 0 ? "+" : ""}$${net.toFixed(2)}`}
-            label="Net"
-            color={net >= 0 ? "#00A86B" : "#D92D20"}
-            size="md"
-          />
+          {/* Last-thought line */}
+          {lastThoughtMins !== null && (
+            <p className="mt-3 font-mono text-[10.5px]" style={{ color: "#9CA3AF" }}>
+              Last thought {lastThoughtMins}m ago · ticks every{" "}
+              {agent.frequencySeconds}s
+            </p>
+          )}
         </div>
-
-        {/* Last thought */}
-        {lastThoughtMins !== null && (
-          <p className="mt-3 text-[11px] text-[#9B9B9B]">
-            Last thought: {lastThoughtMins}m ago · ticks every {agent.frequencySeconds}s
-          </p>
-        )}
       </motion.div>
 
-      {/* Personality + Job */}
+      {/* Spec card — Personality / Job / Tools */}
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.05, duration: 0.4 }}
+        transition={{ delay: 0.05, duration: 0.45, ease: EASE }}
         className="rounded-[16px] p-4 mb-4"
         style={{
-          background: "#fff",
-          boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
-          border: "1px solid rgba(0,0,0,0.05)",
+          background: "#FFFFFF",
+          border: "1px solid rgba(15,23,42,0.06)",
+          boxShadow: "0 1px 2px rgba(15,23,42,0.03)",
         }}
       >
-        <p className="text-[10px] font-medium text-[#9B9B9B] uppercase tracking-[0.08em] mb-1">
-          Personality
-        </p>
-        <p className="text-[13px] text-[#0A0A0A] leading-[1.5] mb-3">
-          {agent.personalityPrompt}
-        </p>
-        <p className="text-[10px] font-medium text-[#9B9B9B] uppercase tracking-[0.08em] mb-1">
-          Job
-        </p>
-        <p className="text-[13px] text-[#0A0A0A] leading-[1.5] mb-3">{agent.jobPrompt}</p>
-        <p className="text-[10px] font-medium text-[#9B9B9B] uppercase tracking-[0.08em] mb-1">
-          Tools
-        </p>
-        <div className="flex flex-wrap gap-1.5">
-          {agent.allowedTools.map((t) => (
-            <span
-              key={t}
-              className="text-[10px] font-mono px-2 py-0.5 rounded-md"
-              style={{ background: "#F5F5F5", color: "#6B6B6B" }}
-            >
-              {t}
-            </span>
-          ))}
-        </div>
+        <SpecBlock label="Personality">
+          <p className="text-[13px] text-[#0A0A0A] leading-[1.55]">
+            {agent.personalityPrompt}
+          </p>
+        </SpecBlock>
+        <SpecBlock label="Job">
+          <p className="text-[13px] text-[#0A0A0A] leading-[1.55]">
+            {agent.jobPrompt}
+          </p>
+        </SpecBlock>
+        <SpecBlock label="Tools" last>
+          <div className="flex flex-wrap gap-1.5">
+            {agent.allowedTools.map((t) => (
+              <span
+                key={t}
+                className="font-mono text-[10px] px-2 py-0.5 rounded-md"
+                style={{
+                  background: "rgba(15,23,42,0.04)",
+                  color: "#374151",
+                  border: "1px solid rgba(15,23,42,0.05)",
+                }}
+              >
+                {t}
+              </span>
+            ))}
+          </div>
+        </SpecBlock>
       </motion.div>
 
-      {/* Activation banner — appears between hero and thought feed when
-          the user just spawned this worker and the first thought hasn't
-          landed yet. Auto-dissolves the moment totalThoughts hits 1. */}
+      {/* Activation banner — light premium */}
       <AnimatePresence>
         {showActivation && (
           <motion.div
@@ -403,96 +513,115 @@ export default function AgentDetailPage({ params }: { params: { id: string } }) 
             initial={{ opacity: 0, y: -8, height: 0 }}
             animate={{ opacity: 1, y: 0, height: "auto" }}
             exit={{ opacity: 0, y: -8, height: 0, marginBottom: 0 }}
-            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            transition={{ duration: 0.35, ease: EASE }}
             className="mb-4 rounded-[16px] overflow-hidden"
             style={{
               background:
-                "radial-gradient(120% 100% at 30% 0%, #1B2230 0%, #0E1320 55%, #080B14 100%)",
-              border: "1px solid rgba(74,222,128,0.25)",
-              boxShadow: "0 0 24px rgba(74,222,128,0.12)",
+                "linear-gradient(180deg, #FFFFFF 0%, #F4F8F4 100%)",
+              border: "1px solid rgba(34,197,94,0.30)",
+              boxShadow:
+                "inset 0 1px 0 rgba(255,255,255,1), 0 1px 2px rgba(15,23,42,0.04), 0 0 0 4px rgba(34,197,94,0.08)",
             }}
           >
-            <div className="px-5 py-4 flex items-center gap-3">
+            <div className="px-4 py-3.5 flex items-center gap-3">
               <motion.div
-                className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
+                className="w-9 h-9 rounded-full flex items-center justify-center shrink-0"
                 style={{
-                  background: "rgba(74,222,128,0.12)",
-                  border: "1px solid rgba(74,222,128,0.45)",
+                  background:
+                    "radial-gradient(closest-side, rgba(34,197,94,0.18) 0%, rgba(34,197,94,0.04) 70%)",
+                  border: "1px solid rgba(34,197,94,0.45)",
                 }}
                 animate={{ scale: [1, 1.08, 1] }}
                 transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
               >
-                <Sparkles className="w-4 h-4" style={{ color: "#4ADE80" }} />
+                <Sparkles className="w-4 h-4" style={{ color: "#15803D" }} strokeWidth={1.8} />
               </motion.div>
               <div className="flex-1 min-w-0">
                 <div
-                  className="text-[10px] font-mono uppercase mb-0.5"
-                  style={{ color: "rgba(74,222,128,0.85)", letterSpacing: "0.12em" }}
+                  className="font-mono text-[10px] uppercase tracking-[0.14em] mb-0.5"
+                  style={{ color: "#15803D" }}
                 >
                   Activating
                 </div>
-                <div className="text-[15px] font-semibold text-white">
-                  {agent?.name} is waking up · first thought arriving
+                <div
+                  className="text-[14px] font-semibold tracking-tight"
+                  style={{ color: "#0A0A0A" }}
+                >
+                  {agent.name} is waking up · first thought arriving
                 </div>
               </div>
-              <motion.div
-                className="font-mono text-[11px]"
-                style={{ color: "rgba(255,255,255,0.55)" }}
+              <motion.span
+                className="rounded-full"
+                style={{
+                  width: 7,
+                  height: 7,
+                  background: "#22C55E",
+                  boxShadow: "0 0 0 3px rgba(34,197,94,0.12)",
+                }}
                 animate={{ opacity: [0.4, 1, 0.4] }}
                 transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
-              >
-                ●
-              </motion.div>
-            </div>
-            <div
-              className="h-[2px] origin-left"
-              style={{
-                background:
-                  "linear-gradient(to right, #4ADE80, rgba(74,222,128,0.05))",
-              }}
-            >
-              <motion.div
-                className="h-full"
-                style={{ background: "rgba(255,255,255,0.18)" }}
-                initial={{ width: "0%" }}
-                animate={{ width: "100%" }}
-                transition={{ duration: 60, ease: "linear" }}
               />
             </div>
+            <div
+              className="h-[2px]"
+              style={{
+                background:
+                  "linear-gradient(to right, rgba(34,197,94,0.55), rgba(34,197,94,0.05))",
+              }}
+            />
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Thought feed — Section 2C. Reasoning is the hero. */}
+      {/* Internal log screen */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.1, duration: 0.4 }}
-        className="mb-4"
+        className="rounded-[16px] overflow-hidden"
+        style={{
+          background: "#FFFFFF",
+          border: "1px solid rgba(15,23,42,0.06)",
+          boxShadow: "0 1px 2px rgba(15,23,42,0.03)",
+        }}
       >
-        <div className="flex items-center gap-2 mb-3">
-          <Activity className="w-3.5 h-3.5 text-[#9B9B9B]" />
-          <h2 className="text-[12px] font-semibold text-[#9B9B9B] uppercase tracking-[0.08em]">
-            Thoughts
-          </h2>
+        <div
+          className="flex items-center justify-between px-4 pt-3 pb-2.5"
+          style={{ borderBottom: "1px solid rgba(15,23,42,0.05)" }}
+        >
+          <div className="flex items-center gap-1.5">
+            <Activity className="w-3 h-3 text-[#9CA3AF]" strokeWidth={2} />
+            <span
+              className="font-mono uppercase"
+              style={{
+                color: "#9CA3AF",
+                fontSize: 9.5,
+                letterSpacing: "0.16em",
+              }}
+            >
+              Internal log
+            </span>
+          </div>
+          <span
+            className="font-mono"
+            style={{ color: "#9CA3AF", fontSize: 10 }}
+          >
+            {agent.totalThoughts} cycles
+          </span>
         </div>
 
         {thoughts.length === 0 ? (
           <div
-            className="rounded-[14px] py-8 text-center text-[13px] text-[#9B9B9B]"
-            style={{
-              background: "#fff",
-              border: "1px solid rgba(0,0,0,0.05)",
-              boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
-            }}
+            className="py-10 text-center text-[13px] font-mono"
+            style={{ color: "#9CA3AF" }}
           >
             {isAlive ? "Waiting for first thought…" : "Worker is paused."}
           </div>
         ) : (
-          <div className="space-y-2.5">
+          <div className="divide-y" style={{ borderColor: "rgba(15,23,42,0.04)" }}>
             <AnimatePresence initial={false}>
               {thoughts.map((t, i) => (
-                <ThoughtCard
+                <ThoughtRow
                   key={t.id}
                   thought={t}
                   cycleNumber={agent.totalThoughts - i}
@@ -503,110 +632,92 @@ export default function AgentDetailPage({ params }: { params: { id: string } }) 
         )}
       </motion.div>
 
-      {/* Sticky chat — Section 2C. Bubbles + breathing avatar + quick replies. */}
-      <div
-        className="fixed bottom-[72px] inset-x-0 z-40 px-5 sm:px-8 max-w-[680px] mx-auto"
-        style={{
-          background: "linear-gradient(to top, #FAFAFA 70%, rgba(250,250,250,0))",
-          paddingTop: "40px",
-          paddingBottom: "12px",
-        }}
-      >
-        {/* Bubbles */}
-        {(chat.length > 0 || sending) && (
-          <div className="space-y-2 mb-2.5 max-h-[280px] overflow-y-auto">
-            <AnimatePresence initial={false}>
-              {chat.slice(-6).map((m) => (
-                <ChatBubble key={m.id} message={m} agentEmoji={agent.emoji} />
-              ))}
-              {sending && (chat.length === 0 || chat[chat.length - 1].role === "user") && (
-                <TypingBubble key="__typing" agentEmoji={agent.emoji} />
-              )}
-            </AnimatePresence>
-            <div ref={chatEndRef} />
-          </div>
-        )}
-
-        {/* Quick reply chips */}
-        {!sending && (
-          <div className="flex flex-wrap gap-1.5 mb-2">
-            {QUICK_REPLIES.map((q) => (
-              <button
-                key={q}
-                type="button"
-                onClick={() => setInputValue(q)}
-                className="text-[11px] px-2.5 py-1 rounded-full transition active:scale-[0.97]"
-                style={{
-                  background: "rgba(255,255,255,0.85)",
-                  border: "1px solid rgba(0,0,0,0.08)",
-                  color: "#374151",
-                  backdropFilter: "blur(4px)",
-                }}
-              >
-                {q}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Input */}
-        <div
-          className="flex items-center gap-2 rounded-[16px] p-2"
-          style={{
-            background: "#fff",
-            boxShadow: "0 4px 16px rgba(0,0,0,0.06)",
-            border: "1px solid rgba(0,0,0,0.06)",
-          }}
-        >
-          <input
-            type="text"
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                void handleSend();
-              }
-            }}
-            placeholder={`Talk to ${agent.name}...`}
-            disabled={sending}
-            className="flex-1 px-2 text-[14px] outline-none bg-transparent text-[#0A0A0A] placeholder:text-[#9B9B9B]"
-          />
-          <button
-            onClick={handleSend}
-            disabled={sending || !inputValue.trim()}
-            className="w-9 h-9 rounded-[10px] flex items-center justify-center transition-all active:scale-[0.95] disabled:opacity-30"
-            style={{
-              background: inputValue.trim() ? "#0A0A0A" : "#F5F5F5",
-              color: inputValue.trim() ? "#fff" : "#9B9B9B",
-            }}
-          >
-            {sending ? (
-              <motion.span
-                className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full"
-                animate={{ rotate: 360 }}
-                transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }}
-              />
-            ) : (
-              <Send className="w-4 h-4" />
-            )}
-          </button>
-        </div>
-      </div>
+      {/* Sticky chat drawer */}
+      <ChatDrawer
+        agentName={agent.name}
+        agentEmoji={agent.emoji}
+        chat={chat}
+        sending={sending}
+        inputValue={inputValue}
+        onChangeInput={setInputValue}
+        onSend={handleSend}
+        quickReplies={QUICK_REPLIES}
+      />
     </div>
   );
 }
 
-/* ── Quick replies ───────────────────────────────────────────────── */
-const QUICK_REPLIES = [
-  "How are you doing?",
-  "Show me what you found",
-  "Take a break",
-];
+/* ── Stat ─────────────────────────────────────────────────────────── */
 
-/* ── ThoughtCard ─────────────────────────────────────────────────── */
+function Stat({
+  label,
+  value,
+  tone,
+  divider,
+}: {
+  label: string;
+  value: string;
+  tone?: string;
+  divider?: boolean;
+}) {
+  return (
+    <div
+      className="px-2 py-2.5 flex flex-col items-center text-center"
+      style={
+        divider
+          ? { borderLeft: "1px solid rgba(15,23,42,0.05)" }
+          : undefined
+      }
+    >
+      <span
+        className="font-mono text-[14px]"
+        style={{
+          color: tone ?? "#0A0A0A",
+          fontVariantNumeric: "tabular-nums",
+          fontWeight: 500,
+        }}
+      >
+        {value}
+      </span>
+      <span
+        className="font-mono text-[9px] uppercase tracking-[0.14em] mt-0.5"
+        style={{ color: "#9CA3AF" }}
+      >
+        {label}
+      </span>
+    </div>
+  );
+}
 
-function ThoughtCard({
+/* ── SpecBlock ────────────────────────────────────────────────────── */
+
+function SpecBlock({
+  label,
+  children,
+  last,
+}: {
+  label: string;
+  children: React.ReactNode;
+  last?: boolean;
+}) {
+  return (
+    <div
+      className={last ? "" : "mb-3 pb-3"}
+      style={
+        last ? undefined : { borderBottom: "1px solid rgba(15,23,42,0.04)" }
+      }
+    >
+      <p className="font-mono text-[9.5px] uppercase tracking-[0.14em] text-[#9CA3AF] mb-1.5">
+        {label}
+      </p>
+      {children}
+    </div>
+  );
+}
+
+/* ── ThoughtRow ───────────────────────────────────────────────────── */
+
+function ThoughtRow({
   thought,
   cycleNumber,
 }: {
@@ -621,62 +732,73 @@ function ThoughtCard({
 
   const moneyKind = moneyDirection(thought.toolUsed);
   const hasFooter =
-    !!thought.toolUsed || !!thought.signature || (thought.amountUsd != null && thought.amountUsd > 0);
+    !!thought.toolUsed ||
+    !!thought.signature ||
+    (thought.amountUsd != null && thought.amountUsd > 0);
 
   return (
     <motion.article
       layout
-      initial={{ opacity: 0, y: -8 }}
+      initial={{ opacity: 0, y: -6 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.98 }}
-      transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-      className="rounded-[14px] p-4"
-      style={{
-        background: "#fff",
-        border: "1px solid rgba(0,0,0,0.05)",
-        boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
-      }}
+      transition={{ duration: 0.25, ease: EASE }}
+      className="px-4 py-3.5"
     >
-      {/* Top row */}
-      <div className="flex items-center gap-2 mb-2.5">
-        <span className="font-mono text-[11px]" style={{ color: "#9CA3AF" }}>
+      {/* Top row — cycle # gutter, time, mode */}
+      <div className="flex items-center gap-2 mb-1.5">
+        <span
+          className="font-mono"
+          style={{
+            color: "#0A0A0A",
+            fontSize: 10.5,
+            fontWeight: 500,
+            letterSpacing: "0.04em",
+          }}
+        >
+          #{String(cycleNumber).padStart(4, "0")}
+        </span>
+        <span
+          className="font-mono"
+          style={{ color: "#9CA3AF", fontSize: 10.5 }}
+        >
           {time}
         </span>
         <ModePill mode={thought.mode} />
-        <span
-          className="font-mono text-[10px] ml-auto"
-          style={{ color: "#9CA3AF" }}
-        >
-          #{cycleNumber}
-        </span>
       </div>
 
-      {/* Body — reasoning is the hero */}
+      {/* Reasoning text */}
       <p
         className="text-[#0A0A0A]"
-        style={{ fontSize: "16px", lineHeight: 1.6 }}
+        style={{ fontSize: 14.5, lineHeight: 1.55 }}
       >
         {thought.thought}
       </p>
 
       {/* Footer */}
       {hasFooter && (
-        <div
-          className="flex items-center gap-2 mt-3 pt-3 flex-wrap"
-          style={{ borderTop: "1px solid rgba(0,0,0,0.04)" }}
-        >
+        <div className="flex items-center gap-2 mt-2 flex-wrap">
           {thought.toolUsed && (
             <span
-              className="font-mono text-[10px] px-2 py-0.5 rounded"
-              style={{ background: "#F3F4F6", color: "#6B7280" }}
+              className="font-mono px-2 py-0.5 rounded"
+              style={{
+                background: "rgba(15,23,42,0.04)",
+                color: "#374151",
+                fontSize: 10,
+                border: "1px solid rgba(15,23,42,0.05)",
+              }}
             >
               {thought.toolUsed.replace(/_/g, " ")}
             </span>
           )}
-          {thought.signature && <SignaturePill signature={thought.signature} />}
-          {thought.amountUsd != null && thought.amountUsd > 0 && moneyKind && (
-            <MoneyDelta amount={thought.amountUsd} kind={moneyKind} />
+          {thought.signature && (
+            <SignaturePill signature={thought.signature} />
           )}
+          {thought.amountUsd != null &&
+            thought.amountUsd > 0 &&
+            moneyKind && (
+              <MoneyDelta amount={thought.amountUsd} kind={moneyKind} />
+            )}
         </div>
       )}
     </motion.article>
@@ -687,11 +809,11 @@ function ModePill({ mode }: { mode: "llm" | "scripted" }) {
   if (mode === "llm") {
     return (
       <span
-        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-mono uppercase"
+        className="inline-flex items-center gap-1 px-1.5 py-[1px] rounded font-mono uppercase"
         style={{
-          background: "rgba(74,222,128,0.12)",
+          background: "rgba(34,197,94,0.10)",
           color: "#15803D",
-          fontSize: "9.5px",
+          fontSize: 9,
           letterSpacing: "0.06em",
         }}
       >
@@ -699,21 +821,21 @@ function ModePill({ mode }: { mode: "llm" | "scripted" }) {
           className="w-1.5 h-1.5 rounded-full"
           style={{ background: "#22C55E" }}
         />
-        mode: llm
+        llm
       </span>
     );
   }
   return (
     <span
-      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-mono uppercase"
+      className="inline-flex items-center gap-1 px-1.5 py-[1px] rounded font-mono uppercase"
       style={{
-        background: "rgba(0,0,0,0.05)",
+        background: "rgba(15,23,42,0.04)",
         color: "#6B7280",
-        fontSize: "9.5px",
+        fontSize: 9,
         letterSpacing: "0.06em",
       }}
     >
-      mode: scripted
+      scripted
     </span>
   );
 }
@@ -728,11 +850,12 @@ function MoneyDelta({
   const earned = kind === "earned";
   return (
     <span
-      className="font-mono font-medium"
+      className="font-mono"
       style={{
-        color: earned ? "#16A34A" : "#D97706",
-        fontSize: "12px",
+        color: earned ? "#15803D" : "#B45309",
+        fontSize: 11.5,
         fontVariantNumeric: "tabular-nums",
+        fontWeight: 500,
       }}
     >
       {earned ? "+" : "−"}${amount.toFixed(3)} {earned ? "earned" : "spent"}
@@ -740,105 +863,9 @@ function MoneyDelta({
   );
 }
 
-/** Maps a tool id to whether it earns or spends (or neither). */
 function moneyDirection(tool: string | null): "earned" | "spent" | null {
   if (!tool) return null;
   if (tool === "claim_task") return "earned";
   if (tool === "subscribe_to_agent" || tool === "post_task") return "spent";
   return null;
-}
-
-/* ── Chat bubbles ────────────────────────────────────────────────── */
-
-function ChatBubble({
-  message,
-  agentEmoji,
-}: {
-  message: ChatMessage;
-  agentEmoji: string;
-}) {
-  const isUser = message.role === "user";
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.22 }}
-      className={`flex items-end gap-2 ${isUser ? "justify-end" : "justify-start"}`}
-    >
-      {!isUser && (
-        <div
-          className="w-7 h-7 rounded-full flex items-center justify-center text-[14px] shrink-0 mb-0.5"
-          style={{
-            background: "linear-gradient(135deg, #F9FAFB, #F3F4F6)",
-            border: "1px solid rgba(0,0,0,0.06)",
-          }}
-        >
-          {agentEmoji || "✨"}
-        </div>
-      )}
-      <div
-        className="max-w-[85%] rounded-[16px] px-3.5 py-2 text-[13px] leading-[1.5]"
-        style={{
-          background: isUser ? "#0A0A0A" : "#fff",
-          color: isUser ? "#fff" : "#0A0A0A",
-          border: isUser ? "none" : "1px solid rgba(0,0,0,0.06)",
-          boxShadow: isUser ? "none" : "0 1px 3px rgba(0,0,0,0.04)",
-          whiteSpace: "pre-wrap",
-          borderBottomLeftRadius: isUser ? 16 : 6,
-          borderBottomRightRadius: isUser ? 6 : 16,
-        }}
-      >
-        {message.content}
-      </div>
-    </motion.div>
-  );
-}
-
-function TypingBubble({ agentEmoji }: { agentEmoji: string }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.22 }}
-      className="flex items-end gap-2 justify-start"
-    >
-      <motion.div
-        className="w-7 h-7 rounded-full flex items-center justify-center text-[14px] shrink-0 mb-0.5"
-        style={{
-          background: "linear-gradient(135deg, #F9FAFB, #F3F4F6)",
-          border: "1px solid rgba(0,0,0,0.06)",
-        }}
-        animate={{ scale: [1, 1.06, 1] }}
-        transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
-      >
-        {agentEmoji || "✨"}
-      </motion.div>
-      <div
-        className="rounded-[16px] px-3.5 py-2 flex items-center gap-1"
-        style={{
-          background: "#fff",
-          border: "1px solid rgba(0,0,0,0.06)",
-          boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
-          borderBottomLeftRadius: 6,
-        }}
-      >
-        {[0, 1, 2].map((i) => (
-          <motion.span
-            key={i}
-            className="w-1.5 h-1.5 rounded-full"
-            style={{ background: "#9CA3AF" }}
-            animate={{ opacity: [0.3, 1, 0.3], y: [0, -2, 0] }}
-            transition={{
-              duration: 1.0,
-              repeat: Infinity,
-              ease: "easeInOut",
-              delay: i * 0.15,
-            }}
-          />
-        ))}
-      </div>
-    </motion.div>
-  );
 }
