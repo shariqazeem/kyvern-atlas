@@ -31,7 +31,25 @@ interface SignalWithWorker extends Signal {
   worker: { name: string; emoji: string };
 }
 
+interface WorkerBrief {
+  id: string;
+  name: string;
+  emoji: string;
+  template: string;
+  lastThoughtAt: number | null;
+  totalThoughts: number;
+}
+
 type Filter = "all" | "unread";
+
+function fmtAgo(ms: number | null): string {
+  if (ms == null) return "warming up";
+  const diff = Math.max(0, Date.now() - ms) / 1000;
+  if (diff < 60) return `${Math.floor(diff)}s ago`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
+}
 
 function devWallet(): string {
   if (typeof window === "undefined") return "";
@@ -42,6 +60,7 @@ export default function InboxPage() {
   const { wallet, isLoading } = useAuth();
   const [deviceId, setDeviceId] = useState<string | null>(null);
   const [signals, setSignals] = useState<SignalWithWorker[]>([]);
+  const [workers, setWorkers] = useState<WorkerBrief[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -65,20 +84,32 @@ export default function InboxPage() {
       .catch(() => setLoading(false));
   }, [isLoading, wallet]);
 
-  // Poll inbox every 5s
+  // Poll inbox + workers every 5s. Workers come from live-status — we
+  // need their template + lastThoughtAt to render the "watching" pulse
+  // for whale-tracker workers that haven't surfaced anything yet (the
+  // signal:silence ratio there is high by design — a 0/0 inbox should
+  // read as "still on watch", not "broken").
   const load = useCallback(async () => {
     if (!deviceId) return;
     try {
-      const res = await fetch(`/api/devices/${deviceId}/inbox?status=all&limit=100`);
-      if (!res.ok) return;
-      const d = (await res.json()) as {
-        signals: SignalWithWorker[];
-        unreadCount: number;
-        totalCount: number;
-      };
-      setSignals(d.signals ?? []);
-      setUnreadCount(d.unreadCount ?? 0);
-      setTotalCount(d.totalCount ?? 0);
+      const [inboxRes, statusRes] = await Promise.all([
+        fetch(`/api/devices/${deviceId}/inbox?status=all&limit=100`),
+        fetch(`/api/devices/${deviceId}/live-status`),
+      ]);
+      if (inboxRes.ok) {
+        const d = (await inboxRes.json()) as {
+          signals: SignalWithWorker[];
+          unreadCount: number;
+          totalCount: number;
+        };
+        setSignals(d.signals ?? []);
+        setUnreadCount(d.unreadCount ?? 0);
+        setTotalCount(d.totalCount ?? 0);
+      }
+      if (statusRes.ok) {
+        const s = (await statusRes.json()) as { workers?: WorkerBrief[] };
+        setWorkers(s.workers ?? []);
+      }
     } catch {
       /* silent */
     }
@@ -95,6 +126,19 @@ export default function InboxPage() {
     if (filter === "unread") return signals.filter((s) => s.status === "unread");
     return signals;
   }, [signals, filter]);
+
+  // Whale-tracker workers that haven't yet produced a signal — render
+  // a "still on watch" pulse so the empty inbox doesn't read as broken.
+  // Variance is the nature of these chips; the wallet may be quiet for
+  // hours. A pulse with a real "last check" timestamp tells the owner
+  // their worker is alive and looking.
+  const watchingWorkers = useMemo(() => {
+    if (workers.length === 0) return [];
+    const idsWithSignals = new Set(signals.map((s) => s.agentId));
+    return workers.filter(
+      (w) => w.template === "whale_tracker" && !idsWithSignals.has(w.id),
+    );
+  }, [workers, signals]);
 
   const onMarkRead = (id: string) => {
     setSignals((prev) =>
@@ -152,7 +196,11 @@ export default function InboxPage() {
 
       {/* Signal feed */}
       {visible.length === 0 ? (
-        <EmptyInbox unread={filter === "unread"} hasAnySignals={signals.length > 0} />
+        <EmptyInbox
+          unread={filter === "unread"}
+          hasAnySignals={signals.length > 0}
+          watching={watchingWorkers}
+        />
       ) : (
         <div className="space-y-3">
           <AnimatePresence initial={false}>
@@ -194,77 +242,143 @@ function FilterPill({
 function EmptyInbox({
   unread,
   hasAnySignals,
+  watching,
 }: {
   unread: boolean;
   hasAnySignals: boolean;
+  watching: WorkerBrief[];
 }) {
   if (unread && hasAnySignals) {
     return (
-      <div
-        className="rounded-[16px] py-10 text-center"
-        style={{
-          background: "#fff",
-          border: "1px solid rgba(0,0,0,0.05)",
-          boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
-        }}
-      >
-        <p className="text-[13px]" style={{ color: "#6B7280" }}>
-          Nothing new. Caught up.
-        </p>
+      <div className="space-y-3">
+        <div
+          className="rounded-[16px] py-10 text-center"
+          style={{
+            background: "#fff",
+            border: "1px solid rgba(0,0,0,0.05)",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+          }}
+        >
+          <p className="text-[13px]" style={{ color: "#6B7280" }}>
+            Nothing new. Caught up.
+          </p>
+        </div>
+        {watching.length > 0 && <WatchingStrip workers={watching} />}
       </div>
     );
   }
 
   // True empty state — dark hardware card to invite the spawn flow
   return (
+    <div className="space-y-3">
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: EASE }}
+        className="rounded-[20px] overflow-hidden"
+        style={{
+          background:
+            "radial-gradient(120% 100% at 30% 0%, #1B2230 0%, #0E1320 55%, #080B14 100%)",
+          border: "1px solid rgba(255,255,255,0.08)",
+          boxShadow: "0 12px 40px -12px rgba(0,0,0,0.45)",
+        }}
+      >
+        <div className="px-6 py-10 text-center">
+          <div
+            className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4"
+            style={{
+              background: "rgba(255,255,255,0.05)",
+              border: "1px solid rgba(255,255,255,0.1)",
+            }}
+          >
+            <InboxIcon className="w-5 h-5" style={{ color: "rgba(255,255,255,0.7)" }} />
+          </div>
+          <h3
+            className="font-mono mb-2"
+            style={{
+              color: "rgba(255,255,255,0.95)",
+              fontSize: "16px",
+              letterSpacing: "0.01em",
+            }}
+          >
+            Your workers haven&apos;t found anything yet.
+          </h3>
+          <p
+            className="text-[13px] mb-5 max-w-[320px] mx-auto leading-relaxed"
+            style={{ color: "rgba(255,255,255,0.55)" }}
+          >
+            Spawn one and point it at a wallet, a bounty board, or a feed
+            you&apos;d normally check yourself.
+          </p>
+          <Link
+            href="/app/agents/spawn"
+            className="inline-flex items-center gap-2 h-10 px-5 rounded-[12px] text-[13px] font-semibold transition active:scale-[0.97]"
+            style={{ background: "white", color: "#0A0A0A" }}
+          >
+            Hire a worker
+            <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+      </motion.div>
+      {watching.length > 0 && <WatchingStrip workers={watching} />}
+    </div>
+  );
+}
+
+function WatchingStrip({ workers }: { workers: WorkerBrief[] }) {
+  return (
     <motion.div
-      initial={{ opacity: 0, y: 8 }}
+      initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, ease: EASE }}
-      className="rounded-[20px] overflow-hidden"
+      transition={{ duration: 0.4, ease: EASE, delay: 0.1 }}
+      className="rounded-[14px] px-4 py-3"
       style={{
-        background:
-          "radial-gradient(120% 100% at 30% 0%, #1B2230 0%, #0E1320 55%, #080B14 100%)",
-        border: "1px solid rgba(255,255,255,0.08)",
-        boxShadow: "0 12px 40px -12px rgba(0,0,0,0.45)",
+        background: "#fff",
+        border: "1px solid rgba(0,0,0,0.05)",
+        boxShadow: "0 1px 2px rgba(0,0,0,0.03)",
       }}
     >
-      <div className="px-6 py-10 text-center">
-        <div
-          className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4"
-          style={{
-            background: "rgba(255,255,255,0.05)",
-            border: "1px solid rgba(255,255,255,0.1)",
-          }}
-        >
-          <InboxIcon className="w-5 h-5" style={{ color: "rgba(255,255,255,0.7)" }} />
-        </div>
-        <h3
-          className="font-mono mb-2"
-          style={{
-            color: "rgba(255,255,255,0.95)",
-            fontSize: "16px",
-            letterSpacing: "0.01em",
-          }}
-        >
-          Your workers haven&apos;t found anything yet.
-        </h3>
-        <p
-          className="text-[13px] mb-5 max-w-[320px] mx-auto leading-relaxed"
-          style={{ color: "rgba(255,255,255,0.55)" }}
-        >
-          Spawn one and point it at a wallet, a bounty board, or a feed
-          you&apos;d normally check yourself.
-        </p>
-        <Link
-          href="/app/agents/spawn"
-          className="inline-flex items-center gap-2 h-10 px-5 rounded-[12px] text-[13px] font-semibold transition active:scale-[0.97]"
-          style={{ background: "white", color: "#0A0A0A" }}
-        >
-          Hire a worker
-          <ArrowRight className="w-3.5 h-3.5" />
-        </Link>
+      <div
+        className="font-mono uppercase mb-2"
+        style={{
+          color: "#9CA3AF",
+          fontSize: "10px",
+          letterSpacing: "0.12em",
+        }}
+      >
+        Still on watch
       </div>
+      <ul className="space-y-1.5">
+        {workers.map((w) => (
+          <li key={w.id} className="flex items-center gap-2.5 text-[12.5px]">
+            <span
+              className="w-5 h-5 rounded-full flex items-center justify-center text-[12px] shrink-0"
+              style={{
+                background: "linear-gradient(135deg, #F9FAFB, #F3F4F6)",
+                border: "1px solid rgba(0,0,0,0.04)",
+              }}
+            >
+              {w.emoji}
+            </span>
+            <span style={{ color: "#0A0A0A", fontWeight: 500 }}>{w.name}</span>
+            <span
+              className="inline-flex items-center gap-1 ml-1"
+              style={{ color: "#6B7280", fontSize: "11.5px" }}
+            >
+              <motion.span
+                className="w-1.5 h-1.5 rounded-full"
+                style={{ background: "#10B981" }}
+                animate={{ opacity: [0.35, 1, 0.35] }}
+                transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
+              />
+              watching
+            </span>
+            <span className="ml-auto font-mono" style={{ color: "#9CA3AF", fontSize: "11px" }}>
+              last check {fmtAgo(w.lastThoughtAt)}
+            </span>
+          </li>
+        ))}
+      </ul>
     </motion.div>
   );
 }

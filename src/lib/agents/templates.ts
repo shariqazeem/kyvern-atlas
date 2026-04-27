@@ -253,9 +253,9 @@ export const TEMPLATES: AgentTemplateDef[] = [
     inPicker: true,
     jobSuggestions: [
       {
-        label: "Kraken hot wallet movements",
+        label: "Major exchange wallets",
         job:
-          "Every cycle, watch_wallet on Kraken's Solana hot wallet FWznbcNXWQuHTawe9RxvQ2LdCENssh12dsznf4RiouN5 with lookbackCount=10. The tool returns a list of recent on-chain entries (each with type, signature, tokenChanges, programs). On the FIRST tick, when the tool returns ANY entries, you MUST surface the most recent one as a wallet_move finding — do NOT filter by size or type, every Kraken movement is meaningful for an exchange-watching pipeline. Subject = '<type>: <token/program> · <signature[:10]>…'. Evidence = signature, type, tokenChanges (if any), programs, time. sourceUrl = https://explorer.solana.com/tx/<signature>. Idle only when the tool returned zero entries.",
+          "Track major Solana exchange wallets quietly — watch and only ping when something stands out. Every cycle, watch_wallet on Kraken's Solana hot wallet FWznbcNXWQuHTawe9RxvQ2LdCENssh12dsznf4RiouN5 with lookbackCount=10. The tool returns recent on-chain entries (type, signature, tokenChanges, programs). When you spot a movement worth flagging — a swap, a sizeable transfer, an unusual program call — surface it as a wallet_move finding with subject summarising the action, evidence: signature + type + tokenChanges + programs + time, and sourceUrl = https://explorer.solana.com/tx/<signature>. Most cycles, the wallet is quiet — that's normal; idle and check again next cycle.",
       },
     ],
   },

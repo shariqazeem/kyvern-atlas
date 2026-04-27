@@ -34,6 +34,7 @@ interface AgentRow {
   name: string;
   emoji: string;
   status: string;
+  template: string;
   total_thoughts: number;
   total_earned_usd: number;
   total_spent_usd: number;
@@ -159,7 +160,7 @@ export async function GET(
   // Workers on this device
   const agents = db
     .prepare(
-      `SELECT id, name, emoji, status, total_thoughts, total_earned_usd, total_spent_usd, last_thought_at
+      `SELECT id, name, emoji, status, template, total_thoughts, total_earned_usd, total_spent_usd, last_thought_at
        FROM agents
        WHERE device_id = ? AND status != 'retired'`,
     )
@@ -170,12 +171,14 @@ export async function GET(
     id: a.id,
     name: a.name,
     emoji: a.emoji,
+    template: a.template,
     // "thinking" if alive AND ticked recently — wide enough that the orbit
     // ring is reliably visible in screenshots, narrow enough to mean it
     isThinking:
       a.status === "alive" &&
       a.last_thought_at != null &&
       now - a.last_thought_at < 90_000,
+    lastThoughtAt: a.last_thought_at,
     totalThoughts: a.total_thoughts,
     totalEarnedUsd: a.total_earned_usd,
   }));
