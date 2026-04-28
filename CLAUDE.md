@@ -1,6 +1,8 @@
 # Kyvern — Agent policy program on Solana (Colosseum Frontier)
 
-**This is the active hackathon codebase.** If you're reading this cold, orient yourself here before anything else. For the Stellar/Pulse side, see `~/projects/myowncompany/kyvernlabs/` (different product, different domain, different VM process — don't confuse them).
+**This is the active hackathon codebase.** If you're reading this cold, orient yourself here before anything else.
+
+**Stellar/Pulse has been retired (2026-04-28).** The old `~/kyvernlabs` directory and the stopped `kyvernlabs` pm2 process on the VM are dead weight — leave them alone, don't pull, don't restart. Both `kyvernlabs.com` AND `app.kyvernlabs.com` now serve **this** repo via the `kyvern-commerce` pm2 process on port 3001.
 
 ---
 
@@ -45,17 +47,18 @@ ssh -i ~/Documents/ssh-key3.key ubuntu@80.225.209.190
 
 | Path | Role | Don't touch? |
 |---|---|---|
-| `/home/ubuntu/kyvernlabs-commerce/` | **Kyvern (this repo)** — serves `app.kyvernlabs.com` | No — this is where you deploy |
-| `/home/ubuntu/kyvernlabs/` | **Stellar/Pulse (different repo)** — serves `kyvernlabs.com` | **YES — never deploy here** |
+| `/home/ubuntu/kyvernlabs-commerce/` | **Kyvern (this repo)** — serves both `kyvernlabs.com` AND `app.kyvernlabs.com` | No — this is where you deploy |
+| `/home/ubuntu/kyvernlabs/` | Abandoned Stellar repo (retired 2026-04-28) | **Don't pull, don't build, don't deploy** |
 
-**pm2 processes (4 total, all must stay online):**
+**pm2 processes:**
 
 | id | name | cwd | port | purpose |
 |---|---|---|---|---|
-| 1 | `kyvern-commerce` | `~/kyvernlabs-commerce` | 3001 | Kyvern Next.js app |
+| 8 | `kyvern-commerce` | `~/kyvernlabs-commerce` | 3001 | Kyvern Next.js app — serves both domains via nginx |
 | 2 | `atlas` | `~/kyvernlabs-commerce` | — | `scripts/atlas-runner.ts` — autonomous agent loop (3 min cycles) |
 | 3 | `atlas-attacker` | `~/kyvernlabs-commerce` | — | `scripts/atlas-attacker.ts` — adversarial probes every ~8 min |
-| 4 | `kyvernlabs` | `~/kyvernlabs` | 3000 | **Stellar Next.js — do not touch from this repo's workflow** |
+| 5 | `agent-pool` | `~/kyvernlabs-commerce` | — | user-spawned agent ticker |
+| 4 | `kyvernlabs` | `~/kyvernlabs` | 3000 | **Stopped — retired Stellar process. Do not restart.** |
 
 **Required env vars on kyvern-commerce + atlas + atlas-attacker:**
 ```
@@ -103,15 +106,15 @@ ssh -i ~/Documents/ssh-key3.key ubuntu@80.225.209.190 '
 ```bash
 ssh -i ~/Documents/ssh-key3.key ubuntu@80.225.209.190 '
   echo "disk:"; df -h / | tail -1
-  echo "stellar (must stay at eabd252):"; cd ~/kyvernlabs && git log -1 --oneline
   echo "kyvern HEAD:"; cd ~/kyvernlabs-commerce && git log -1 --oneline
-  pm2 list | grep -E "kyvernlabs|kyvern-commerce|atlas" | head -6
+  pm2 list | grep -E "kyvern-commerce|atlas|agent-pool" | head -6
 '
 ```
 
-If `~/kyvernlabs` shows a Kyvern commit, **STOP** — the Stellar directory got contaminated. Fix:
+After deploy, smoke-test BOTH domains since they share the same backend now:
 ```bash
-ssh ... 'cd ~/kyvernlabs && git checkout eabd252 && npm install --legacy-peer-deps && npm run build && pm2 restart kyvernlabs'
+curl -sS -o /dev/null -w "kyvernlabs.com: %{http_code}\napp.kyvernlabs.com: %{http_code}\n" \
+  https://kyvernlabs.com/ https://app.kyvernlabs.com/
 ```
 
 ---
