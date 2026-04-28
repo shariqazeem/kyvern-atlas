@@ -26,7 +26,7 @@ import { useDeviceStore } from "@/hooks/use-device-store";
 import { DeviceChassis } from "@/components/device/home/chassis";
 import { BalanceOrbit } from "@/components/device/home/balance-orbit";
 import { TodayStrip } from "@/components/device/home/today-strip";
-import { InboxPreview } from "@/components/device/home/inbox-preview";
+import { WorkersFoundStrip } from "@/components/device/home/workers-found-strip";
 import { DeviceFAB } from "@/components/device/home/device-fab";
 import { TopUpDrawer } from "@/components/device/top-up-drawer";
 
@@ -148,6 +148,11 @@ export default function DeviceHome() {
           network={status?.network ?? "devnet"}
         >
           <div className="flex flex-col gap-5">
+            {/* Findings first — what your workers found while you were
+                away is the daily reason the owner opens this page.
+                Balance is the proof, not the headline. */}
+            {deviceId && <WorkersFoundStrip deviceId={deviceId} />}
+
             <BalanceOrbit
               usdcBalance={status?.usdcBalance ?? 0}
               pnlNet={status?.pnlToday.net ?? 0}
@@ -163,8 +168,6 @@ export default function DeviceHome() {
               signalsToday={status?.signalsToday?.total ?? 0}
               workersActive={status?.workersActive ?? 0}
             />
-
-            {deviceId && <InboxPreview deviceId={deviceId} />}
 
             <div className="flex items-center justify-center pt-1">
               <Link
@@ -212,10 +215,10 @@ function NoDeviceState() {
         <span className="text-[32px]">🧭</span>
       </div>
       <h2 className="text-[22px] font-semibold text-[#0A0A0A] tracking-tight">
-        Get your Kyvern.
+        A device that finds you opportunities.
       </h2>
-      <p className="mt-2 text-[14px] text-[#6B6B6B] max-w-[300px] leading-[1.6]">
-        A device you own. Workers that earn. Money you control.
+      <p className="mt-2 text-[14px] text-[#6B6B6B] max-w-[340px] leading-[1.6]">
+        Workers watch the world. Send you findings. Spend within budget.
       </p>
       <Link
         href="/app/agents/spawn"
