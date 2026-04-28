@@ -58,34 +58,49 @@ function LoginInner() {
   // Privy modal/redirect cycle (Privy can swap windows mid-flow).
   const [pickedMode, setPickedMode] = useState<OnboardMode | null>(null);
 
-  // Honor an explicit ?redirect= override (e.g. when middleware sent
-  // them here from a deep link). Otherwise route by mode.
+  // ?redirect= comes from ConnectGate when an unauthenticated user
+  // lands on a deep-linked /app route — we want to bounce them back
+  // there once Privy finishes. But the explicit "Get a Kyvern device"
+  // pick should ALWAYS win over a stale redirect — otherwise the
+  // unboxing cinematic gets skipped because the user was sent to
+  // /login from /app and the redirect param wins.
   const explicitRedirect = params.get("redirect");
 
   useEffect(() => {
     if (!ready) return;
     if (!(authenticated || isAuthenticated)) return;
 
-    // Prefer explicit ?redirect= if the user was bounced here from a deep link.
-    if (explicitRedirect) {
-      router.replace(explicitRedirect);
-      return;
-    }
-
-    // Read the mode that was set when they clicked one of the two cards.
-    // Default to /app if no mode (e.g. they were already auth'd from a
-    // prior session and just landed on /login).
+    // Read the picker mode the user just set by clicking one of the
+    // two cards. This is the strongest signal — it's a fresh user
+    // intent, set milliseconds ago.
     let mode: OnboardMode | null = null;
     if (typeof window !== "undefined") {
       const raw = sessionStorage.getItem(ONBOARD_MODE_KEY);
       if (raw === "fresh" || raw === "returning") mode = raw;
     }
 
+    // "Fresh" → always /unbox, even if a ?redirect= is present. The
+    // cinematic is the whole point of picking the fresh card.
     if (mode === "fresh") {
+      if (typeof window !== "undefined") {
+        sessionStorage.removeItem(ONBOARD_MODE_KEY);
+      }
       router.replace("/unbox");
-    } else {
-      router.replace("/app");
+      return;
     }
+
+    // "Returning" → respect the deep link if present, else /app.
+    if (mode === "returning") {
+      if (typeof window !== "undefined") {
+        sessionStorage.removeItem(ONBOARD_MODE_KEY);
+      }
+      router.replace(explicitRedirect || "/app");
+      return;
+    }
+
+    // No picker mode (e.g. already-auth'd user lands on /login from a
+    // bookmark) — pure redirect or /app.
+    router.replace(explicitRedirect || "/app");
   }, [ready, authenticated, isAuthenticated, router, explicitRedirect]);
 
   const handlePick = (mode: OnboardMode) => {
