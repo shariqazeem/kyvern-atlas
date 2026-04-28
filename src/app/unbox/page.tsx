@@ -83,6 +83,9 @@ export default function UnboxPage() {
   const [stage, setStage] = useState<Stage>("closed");
   const [pasted, setPasted] = useState("");
   const [exportError, setExportError] = useState<string | null>(null);
+  const [justPasted, setJustPasted] = useState(false);
+  const [provisioning, setProvisioning] = useState(false);
+  const [provisionError, setProvisionError] = useState<string | null>(null);
 
   // Auth gate: only authenticated users see the cinematic. Send
   // unauth'd users back to /login. While loading, render the
@@ -192,9 +195,76 @@ export default function UnboxPage() {
     setStage("managed");
   }, []);
 
-  const handleContinue = useCallback(() => {
-    router.push("/app");
-  }, [router]);
+  const handlePasteEvent = useCallback(() => {
+    // Brief flash so the user gets visible confirmation that paste
+    // was captured. Live validation kicks in immediately after.
+    setJustPasted(true);
+    window.setTimeout(() => setJustPasted(false), 1500);
+  }, []);
+
+  // "Open Kyvern" — silently provisions a Squads vault on the user's
+  // wallet if they don't already have one. The vault is the device's
+  // budget enforcer; user shouldn't have to think about it. We hide
+  // the Squads concept entirely behind the device unboxing.
+  const handleContinue = useCallback(async () => {
+    if (!wallet) {
+      router.push("/app");
+      return;
+    }
+    setProvisioning(true);
+    setProvisionError(null);
+    try {
+      // 1. Check for existing vault first — idempotency. If they
+      //    already have one (e.g. came back to /unbox after a prior
+      //    session), don't double-create.
+      const list = await fetch(
+        `/api/vault/list?ownerWallet=${encodeURIComponent(wallet)}`,
+      );
+      const listJson = list.ok ? await list.json() : { vaults: [] };
+      const existing = Array.isArray(listJson?.vaults) ? listJson.vaults : [];
+      if (existing.length > 0) {
+        router.push("/app");
+        return;
+      }
+
+      // 2. No vault yet → create with sensible defaults. The user can
+      //    raise budgets later in /app/settings if they want more
+      //    headroom for their workers.
+      const res = await fetch("/api/vault/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ownerWallet: wallet,
+          name: deriveSerial(wallet).replace("KVN-", "Kyvern "),
+          emoji: "🧭",
+          purpose: "research",
+          dailyLimitUsd: 5,
+          weeklyLimitUsd: 25,
+          perTxMaxUsd: 0.5,
+          maxCallsPerWindow: 60,
+          velocityWindow: "1h",
+          allowedMerchants: [],
+          requireMemo: true,
+          network: "devnet",
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(
+          data?.message ||
+            data?.error ||
+            "Vault provisioning failed",
+        );
+      }
+      router.push("/app");
+    } catch (e) {
+      console.warn("[unbox] vault provisioning failed:", e);
+      setProvisionError(
+        e instanceof Error ? e.message : "Setup failed. Try again.",
+      );
+      setProvisioning(false);
+    }
+  }, [wallet, router]);
 
   // Visual gate helpers — many UI blocks need to stay visible across
   // any post-boot stage (ready / verify / claimed / managed), so we
@@ -298,6 +368,8 @@ export default function UnboxPage() {
               key="verify"
               pasted={pasted}
               onChange={setPasted}
+              onPaste={handlePasteEvent}
+              justPasted={justPasted}
               valid={pasteIsValid}
               wrong={pasteShownButWrong}
               onConfirm={handleConfirmPaste}
@@ -315,6 +387,8 @@ export default function UnboxPage() {
               variant={stage === "managed" ? "managed" : "claimed"}
               walletLabel={externalWalletLabel}
               onContinue={handleContinue}
+              provisioning={provisioning}
+              provisionError={provisionError}
             />
           )}
         </AnimatePresence>
@@ -874,6 +948,8 @@ function ManagedCard({
 function VerifyCard({
   pasted,
   onChange,
+  onPaste,
+  justPasted,
   valid,
   wrong,
   onConfirm,
@@ -882,6 +958,8 @@ function VerifyCard({
 }: {
   pasted: string;
   onChange: (s: string) => void;
+  onPaste: () => void;
+  justPasted: boolean;
   valid: boolean;
   wrong: boolean;
   onConfirm: () => void;
@@ -913,7 +991,11 @@ function VerifyCard({
           letterSpacing: "0.18em",
         }}
       >
-        {valid ? "Match — your device is yours" : "Confirm you saved it"}
+        {valid
+          ? "Match — your device is yours"
+          : justPasted
+            ? "Key captured · checking…"
+            : "Confirm you saved it"}
       </div>
       <p
         className="text-[13.5px] leading-[1.55] mb-3 text-center"
@@ -925,6 +1007,7 @@ function VerifyCard({
       <textarea
         value={pasted}
         onChange={(e) => onChange(e.target.value)}
+        onPaste={onPaste}
         placeholder="Paste base58 device key…"
         spellCheck={false}
         autoCorrect="off"
@@ -934,8 +1017,11 @@ function VerifyCard({
         style={{
           background: "rgba(0,0,0,0.40)",
           color: "#E7E9EE",
-          border: "1px solid rgba(231,233,238,0.12)",
+          border: justPasted
+            ? "1px solid rgba(34,197,94,0.45)"
+            : "1px solid rgba(231,233,238,0.12)",
           letterSpacing: "0.01em",
+          transition: "border-color 0.3s ease",
         }}
       />
 
@@ -1024,10 +1110,14 @@ function ClaimedCard({
   variant,
   walletLabel,
   onContinue,
+  provisioning,
+  provisionError,
 }: {
   variant: "claimed" | "managed";
   walletLabel: string;
   onContinue: () => void;
+  provisioning: boolean;
+  provisionError: string | null;
 }) {
   const isManaged = variant === "managed";
   return (
@@ -1087,19 +1177,51 @@ function ClaimedCard({
       <motion.button
         type="button"
         onClick={onContinue}
-        whileHover={{ y: -1 }}
-        whileTap={{ scale: 0.98 }}
-        className="inline-flex items-center gap-2 h-[48px] px-6 rounded-[12px] text-[13.5px] font-semibold tracking-[-0.005em]"
+        disabled={provisioning}
+        whileHover={provisioning ? undefined : { y: -1 }}
+        whileTap={provisioning ? undefined : { scale: 0.98 }}
+        className="inline-flex items-center gap-2 h-[48px] px-6 rounded-[12px] text-[13.5px] font-semibold tracking-[-0.005em] disabled:cursor-wait"
         style={{
           background: "#FFFFFF",
           color: "#0A0B10",
           boxShadow:
             "0 1px 0 rgba(255,255,255,0.18), 0 12px 28px rgba(0,0,0,0.45)",
+          opacity: provisioning ? 0.85 : 1,
         }}
       >
-        Open Kyvern
-        <ArrowRight className="w-4 h-4" strokeWidth={1.8} />
+        {provisioning ? (
+          <>
+            <motion.span
+              className="w-3.5 h-3.5 border-2 rounded-full"
+              style={{
+                borderColor: "rgba(10,11,16,0.18)",
+                borderTopColor: "#0A0B10",
+              }}
+              animate={{ rotate: 360 }}
+              transition={{ duration: 0.9, repeat: Infinity, ease: "linear" }}
+            />
+            Setting up your device on Solana…
+          </>
+        ) : (
+          <>
+            Open Kyvern
+            <ArrowRight className="w-4 h-4" strokeWidth={1.8} />
+          </>
+        )}
       </motion.button>
+
+      {provisionError && (
+        <div
+          className="mt-3 font-mono"
+          style={{
+            fontSize: 11,
+            color: "#F59E0B",
+            letterSpacing: "0.04em",
+          }}
+        >
+          {provisionError}
+        </div>
+      )}
     </motion.div>
   );
 }

@@ -218,7 +218,7 @@ function NoDeviceState() {
         A device you own. Workers that earn. Money you control.
       </p>
       <Link
-        href="/vault/new"
+        href="/app/agents/spawn"
         className="group mt-6 inline-flex items-center gap-2 h-11 px-6 rounded-[14px] text-[14px] font-semibold transition-all active:scale-[0.97]"
         style={{ background: "#0A0A0A", color: "#fff" }}
       >
