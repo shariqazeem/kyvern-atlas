@@ -20,7 +20,7 @@
  * has been replaced by a chassis-style installer.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
@@ -134,6 +134,16 @@ export default function SpawnPage() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Auto-provisioning state — when a user lands here without a vault
+  // (e.g. they came back to /app via direct URL after closing /unbox
+  // mid-flow, or their session pre-dates the auto-vault feature),
+  // we silently create one with default budgets so they never see
+  // the old "you need a device" wizard detour.
+  const [provisioning, setProvisioning] = useState(false);
+  const [provisionError, setProvisionError] = useState<string | null>(null);
+  const [vaultsLoaded, setVaultsLoaded] = useState(false);
+  const provisionAttemptedRef = useRef(false);
+
   const selectedTemplate: AgentTemplateDef | null = useMemo(
     () => (template ? getTemplate(template) ?? null : null),
     [template],
@@ -145,11 +155,79 @@ export default function SpawnPage() {
     if (!owner) return;
     fetch(`/api/vault/list?ownerWallet=${encodeURIComponent(owner)}`)
       .then((r) => (r.ok ? r.json() : { vaults: [] }))
-      .then((d) => setVaults(d?.vaults ?? []));
+      .then((d) => {
+        setVaults(d?.vaults ?? []);
+        setVaultsLoaded(true);
+      });
     fetch("/api/tools")
       .then((r) => (r.ok ? r.json() : { tools: [] }))
       .then((d) => setAllTools(d?.tools ?? []));
   }, [wallet, isLoading]);
+
+  // Auto-provision a vault if the user lands here without one. Same
+  // defaults as /unbox's handleContinue — daily $5, weekly $25,
+  // per-tx $0.50, devnet. Idempotent: gated by provisionAttemptedRef
+  // so a transient network blip doesn't spawn duplicates.
+  const provisionVault = useCallback(async (owner: string) => {
+    setProvisioning(true);
+    setProvisionError(null);
+    try {
+      const res = await fetch("/api/vault/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ownerWallet: owner,
+          name: `Kyvern ${owner.slice(0, 8).toUpperCase()}`,
+          emoji: "🧭",
+          purpose: "research",
+          dailyLimitUsd: 5,
+          weeklyLimitUsd: 25,
+          perTxMaxUsd: 0.5,
+          maxCallsPerWindow: 60,
+          velocityWindow: "1h",
+          allowedMerchants: [],
+          requireMemo: true,
+          network: "devnet",
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(
+          data?.message || data?.error || "Vault provisioning failed",
+        );
+      }
+      // Refetch the vault list so the picker can render.
+      const list = await fetch(
+        `/api/vault/list?ownerWallet=${encodeURIComponent(owner)}`,
+      );
+      const j = list.ok ? await list.json() : { vaults: [] };
+      setVaults(j?.vaults ?? []);
+    } catch (e) {
+      console.warn("[spawn] auto-provision failed:", e);
+      setProvisionError(
+        e instanceof Error ? e.message : "Setup failed. Try again.",
+      );
+    } finally {
+      setProvisioning(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isLoading || !vaultsLoaded || provisioning) return;
+    if (provisionAttemptedRef.current) return;
+    if (vaults.length > 0) return;
+    const owner = wallet ?? devWallet();
+    if (!owner) return;
+    provisionAttemptedRef.current = true;
+    void provisionVault(owner);
+  }, [isLoading, vaultsLoaded, vaults.length, wallet, provisioning, provisionVault]);
+
+  const retryProvision = useCallback(() => {
+    const owner = wallet ?? devWallet();
+    if (!owner) return;
+    provisionAttemptedRef.current = true;
+    void provisionVault(owner);
+  }, [wallet, provisionVault]);
 
   const pickTemplate = (id: AgentTemplate) => {
     const t = getTemplate(id);
@@ -233,19 +311,72 @@ export default function SpawnPage() {
     }
   };
 
+  // No-vault states — auto-provisioning, error, or pre-fetch idle.
+  // The user shouldn't see the old "Get your Kyvern → /vault/new"
+  // wizard handoff anymore; we set up their device inline.
   if (vaults.length === 0 && !isLoading) {
     return (
-      <div className="py-16 text-center">
-        <p className="text-[14px] text-[#6B6B6B] mb-3">
-          You need a device before installing modules.
-        </p>
-        <Link
-          href="/vault/new"
-          className="inline-flex items-center gap-1.5 h-10 px-5 rounded-[12px] text-[13px] font-semibold"
-          style={{ background: "#0A0A0A", color: "#fff" }}
+      <div className="py-20 flex flex-col items-center text-center">
+        <div
+          className="w-[64px] h-[64px] rounded-[18px] mb-5 flex items-center justify-center"
+          style={{
+            background: "linear-gradient(135deg, #FFFFFF, #F3F4F6)",
+            border: "1px solid rgba(15,23,42,0.06)",
+            boxShadow: "0 8px 24px -10px rgba(15,23,42,0.10)",
+          }}
         >
-          Get your Kyvern
-        </Link>
+          <span className="text-[26px]">🧭</span>
+        </div>
+
+        {provisioning ? (
+          <>
+            <div className="flex items-center gap-2 mb-2">
+              <motion.span
+                className="w-3.5 h-3.5 border-2 rounded-full"
+                style={{
+                  borderColor: "rgba(15,23,42,0.16)",
+                  borderTopColor: "#0A0A0A",
+                }}
+                animate={{ rotate: 360 }}
+                transition={{ duration: 0.9, repeat: Infinity, ease: "linear" }}
+              />
+              <h2 className="text-[18px] font-semibold text-[#0A0A0A] tracking-tight">
+                Setting up your device on Solana
+              </h2>
+            </div>
+            <p className="text-[13.5px] text-[#6B6B6B] max-w-[340px] leading-[1.55]">
+              Provisioning a Squads vault with default budgets — daily $5,
+              per-tx $0.50, on devnet. About 5 seconds.
+            </p>
+          </>
+        ) : provisionError ? (
+          <>
+            <h2 className="text-[18px] font-semibold text-[#0A0A0A] tracking-tight mb-2">
+              Setup hit a snag
+            </h2>
+            <p className="text-[13px] text-[#B45309] max-w-[340px] leading-[1.55] font-mono mb-4">
+              {provisionError}
+            </p>
+            <button
+              type="button"
+              onClick={retryProvision}
+              className="inline-flex items-center gap-1.5 h-10 px-5 rounded-[12px] text-[13px] font-semibold"
+              style={{ background: "#0A0A0A", color: "#fff" }}
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              Try again
+            </button>
+          </>
+        ) : (
+          <>
+            <h2 className="text-[18px] font-semibold text-[#0A0A0A] tracking-tight mb-1">
+              Preparing your device
+            </h2>
+            <p className="text-[13px] text-[#6B6B6B]">
+              One moment…
+            </p>
+          </>
+        )}
       </div>
     );
   }
