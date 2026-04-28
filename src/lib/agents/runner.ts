@@ -115,7 +115,7 @@ If you autonomously want to tell the owner something, it goes through
 Finding mode. Chat mode is only for back-and-forth.
 
 GENERAL INSTRUCTIONS:
-- Each tick is one decision. Think briefly (1-3 sentences), then either use a tool or stay idle.
+- Each tick is ONE tool call followed by optional follow-ups. Always call a tool — that's how you do work. "Idle" only happens AFTER a tool returned no qualifying matches.
 - Stay in character. Be concise. Don't repeat past actions.
 - Tools that cost money cannot exceed your daily budget — enforced on-chain.
 
@@ -128,7 +128,18 @@ LOOP-BREAKING RULES:
 FIRST-TICK RULE (very important):
 - When "Recent thoughts" shows "(none — first tick)", the owner just spawned you and is watching for the first finding. After your data-gathering tool call:
   * If the tool returned any new items / activity / qualifying matches at all → you MUST call message_user (Finding mode) with at least the FIRST new item before idling. Do not "wait for something more notable" on the first tick.
-  * Only idle on the first tick if the tool genuinely returned zero new items, or returned ok=false.`;
+  * Only idle on the first tick if the tool genuinely returned zero new items, or returned ok=false.
+
+HARD RULE — TOOL CALL ON STEP 1:
+- The FIRST output of every tick must be a tool_call. Reasoning-only
+  responses on step 1 are forbidden — they waste a tick and produce no
+  useful work for the owner. If you're unsure what to do, default to
+  the data-gathering tool that matches your job (watch_url for feed
+  watchers, watch_wallet for wallet trackers, read_dex for token
+  watchers).
+- "Stay idle" only happens AFTER a tool returned zero qualifying
+  matches, never before. If you have not called a tool this tick, you
+  are not idling — you are stuck. Pick a tool and call it.`;
 }
 
 function buildContextMessage(
@@ -235,6 +246,12 @@ async function llmTick(agent: Agent, ctx: AgentToolContext): Promise<LlmTickOutc
   let lastSignature: string | null = null;
 
   for (let step = 0; step < MAX_STEPS_PER_TICK; step++) {
+    // STEP 1 must call a tool. Reasoning-only ticks were wasting workers
+    // (Sentinel: 189 ticks in 17h, 0 watch_url calls). tool_choice="required"
+    // forces the model to emit a tool_call on the first step. Subsequent
+    // steps can choose to stop ("auto") so the loop exits cleanly after
+    // the model has finished its work.
+    const toolChoice = step === 0 ? "required" : "auto";
     let response;
     try {
       response = await c.chat.completions.create({
@@ -242,7 +259,7 @@ async function llmTick(agent: Agent, ctx: AgentToolContext): Promise<LlmTickOutc
         max_tokens: 600,
         messages: messages as never,
         tools: openaiTools,
-        tool_choice: "auto",
+        tool_choice: toolChoice,
       });
     } catch (e) {
       const status = (e as { status?: number })?.status;
@@ -272,8 +289,15 @@ async function llmTick(agent: Agent, ctx: AgentToolContext): Promise<LlmTickOutc
     const hasToolCall = !!(toolCalls && toolCalls.length > 0);
 
     if (!hasToolCall) {
-      // LLM is done. Record an observe thought only if this is the
-      // first step (otherwise we already have step-thoughts from prior loops).
+      // STEP 1 with no tool call = the model ignored tool_choice="required".
+      // Don't record an observe thought; bail to scripted instead so this
+      // tick produces real work. (Without this fallback, the LLM can chat
+      // with itself for hours without ever calling a tool — exactly the
+      // 189-ticks-zero-actions failure mode.)
+      if (step === 0) {
+        return { ok: false, error: "no_tool_on_step_0" };
+      }
+      // LLM finished after at least one prior tool_call this tick — clean exit.
       if (firstThought === null) {
         recordAgentTick({
           agentId: agent.id,

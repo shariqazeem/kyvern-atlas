@@ -289,7 +289,7 @@ export default function AgentDetailPage({ params }: { params: { id: string } }) 
   const net = agent.totalEarnedUsd - agent.totalSpentUsd;
 
   return (
-    <div className="pb-[480px]">
+    <div className="pb-[420px]">
       <Link
         href="/app"
         className="inline-flex items-center gap-1.5 text-[12px] font-medium text-[#9B9B9B] mb-3 hover:text-[#6B6B6B]"

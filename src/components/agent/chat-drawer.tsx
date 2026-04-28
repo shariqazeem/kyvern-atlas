@@ -58,21 +58,23 @@ export function ChatDrawer({
 
   return (
     <div
-      className="fixed bottom-[72px] inset-x-0 z-40 px-5 sm:px-8 max-w-[680px] mx-auto"
+      className="fixed bottom-[72px] inset-x-0 z-30 px-5 sm:px-8 max-w-[560px] mx-auto pointer-events-none"
       style={{
         // Soft fade above the drawer so thoughts behind it dissolve into
-        // the page background instead of cutting off sharply.
+        // the page background instead of cutting off sharply. Kept short
+        // so it doesn't visually swallow content above the drawer.
         background:
-          "linear-gradient(to top, #FAFAFA 78%, rgba(250,250,250,0))",
-        paddingTop: 36,
+          "linear-gradient(to top, rgba(250,250,250,0.92) 60%, rgba(250,250,250,0))",
+        paddingTop: 18,
         paddingBottom: 12,
       }}
     >
-      {/* The drawer card itself */}
+      {/* The drawer card itself — pointer events re-enabled so the
+          surrounding fade region doesn't block clicks on page content. */}
       <motion.div
         layout
         transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
-        className="relative rounded-[18px] overflow-hidden"
+        className="relative rounded-[18px] overflow-hidden pointer-events-auto"
         style={{
           background: "linear-gradient(180deg, #FFFFFF 0%, #FBFBFD 100%)",
           border: "1px solid rgba(15,23,42,0.06)",
@@ -141,7 +143,7 @@ export function ChatDrawer({
         {showBubbles && (
           <div
             className="px-4 py-3 space-y-2 overflow-y-auto"
-            style={{ maxHeight: 220 }}
+            style={{ maxHeight: 160 }}
           >
             <AnimatePresence initial={false}>
               {chat.slice(-6).map((m) => (
