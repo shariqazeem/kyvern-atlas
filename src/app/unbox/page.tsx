@@ -10,13 +10,20 @@
    on completion the user lands in /app.
 
    Stages:
-     1. Closed-box stage — tap or click to open
-     2. Lid lifts, device slides up, soft glow blooms
-     3. Serial KVN-XXXXXXXX stamps in (typewriter, ~80ms/char)
-     4. LEDs sequentially light: auth → vault → ready (~3s)
-     5. CTA appears — "Continue" routes to /app
-        (Phase 3 will replace the CTA with the device-key reveal +
-        confirm quiz before continue.)
+     1. closed   — closed Kyvern box, "tap to begin" hint
+     2. opening  — lid lifts (rotateX -118°), device slides up out of glow
+     3. serial   — KVN-XXXXXXXX typewrites in (~80ms/char) under device
+     4. boot     — three-dot LED boot: auth → vault → ready (~2.6s)
+     5. ready    — device is alive; "Reveal your device key" CTA shown
+     6. verify   — Privy modal closed; user pastes the base58 key back
+                   into our dark register input, validated locally with
+                   Keypair.fromSecretKey + base58 decode + pubkey compare.
+                   No bytes ever go to the server.
+     7. claimed  — paste verified; "Your device is yours" → /app
+     8. managed  — alternate ready terminus for users who signed in with
+                   an external Solana wallet (Phantom/Solflare/Backpack).
+                   Their key already lives in that wallet; skip the
+                   reveal+verify ritual entirely.
 
    The cinematic deliberately gates progress on the click/tap. No
    auto-play. The whole point of unboxing is the agency of opening
@@ -26,12 +33,41 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Check, Eye, RefreshCw } from "lucide-react";
+import { Keypair } from "@solana/web3.js";
+import bs58 from "bs58";
 import { useAuth } from "@/hooks/use-auth";
+import { usePrivy } from "@privy-io/react-auth";
+import { useWallets as useSolanaWallets } from "@privy-io/react-auth/solana";
+import { useExportWallet } from "@privy-io/react-auth/solana";
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
-type Stage = "closed" | "opening" | "serial" | "boot" | "ready";
+type Stage =
+  | "closed"
+  | "opening"
+  | "serial"
+  | "boot"
+  | "ready"
+  | "verify"
+  | "claimed"
+  | "managed";
+
+/** Verifies a pasted base58 string is the secret key for `expectedPubkey`.
+ *  Pure local check — bytes never leave the browser. */
+function verifyDeviceKey(pasted: string, expectedPubkey: string): boolean {
+  try {
+    const trimmed = pasted.trim();
+    if (!trimmed) return false;
+    const secret = bs58.decode(trimmed);
+    // Solana ed25519 secret keys are 64 bytes (priv + pub concatenated).
+    if (secret.length !== 64) return false;
+    const kp = Keypair.fromSecretKey(secret);
+    return kp.publicKey.toBase58() === expectedPubkey;
+  } catch {
+    return false;
+  }
+}
 
 function deriveSerial(wallet: string | null): string {
   if (!wallet) return "KVN-________";
@@ -41,7 +77,13 @@ function deriveSerial(wallet: string | null): string {
 export default function UnboxPage() {
   const router = useRouter();
   const { wallet, isAuthenticated, isLoading } = useAuth();
+  const { user } = usePrivy();
+  const { wallets: solanaWallets } = useSolanaWallets();
+  const { exportWallet } = useExportWallet();
   const [stage, setStage] = useState<Stage>("closed");
+  const [pasted, setPasted] = useState("");
+  const [exportError, setExportError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   // Auth gate: only authenticated users see the cinematic. Send
   // unauth'd users back to /login. While loading, render the
@@ -50,6 +92,37 @@ export default function UnboxPage() {
     if (isLoading) return;
     if (!isAuthenticated) router.replace("/login");
   }, [isLoading, isAuthenticated, router]);
+
+  // Embedded vs external wallet detection. The connected wallet shape
+  // from useWallets() (Solana subpath) intentionally hides connector
+  // details — `walletClientType` lives on the linked account in
+  // `user.linkedAccounts`, not on the connected wallet directly. We
+  // match by address.
+  const activeWallet = useMemo(() => {
+    if (!wallet || !solanaWallets) return null;
+    return solanaWallets.find((w) => w.address === wallet) ?? null;
+  }, [wallet, solanaWallets]);
+
+  const walletClientType = useMemo(() => {
+    if (!wallet || !user?.linkedAccounts) return null;
+    for (const acct of user.linkedAccounts) {
+      if (
+        acct.type === "wallet" &&
+        "address" in acct &&
+        acct.address === wallet &&
+        "walletClientType" in acct
+      ) {
+        return (acct as { walletClientType?: string }).walletClientType ?? null;
+      }
+    }
+    return null;
+  }, [wallet, user]);
+
+  const isEmbedded = walletClientType === "privy" || walletClientType === "privy-v2";
+  const externalWalletLabel = useMemo(() => {
+    if (!walletClientType) return "your wallet";
+    return walletClientType.charAt(0).toUpperCase() + walletClientType.slice(1);
+  }, [walletClientType]);
 
   const serial = useMemo(() => deriveSerial(wallet), [wallet]);
 
@@ -67,11 +140,52 @@ export default function UnboxPage() {
     );
   }, [stage, serial.length]);
 
+  const handleReveal = useCallback(async () => {
+    if (!activeWallet || !isEmbedded) return;
+    setExporting(true);
+    setExportError(null);
+    try {
+      // Privy opens its own modal showing the base58 secret key.
+      // The promise resolves once the user dismisses the modal.
+      // Bytes never leave Privy's iframe — we only know "the user
+      // saw the key and closed the modal".
+      await exportWallet({ address: activeWallet.address });
+      setStage("verify");
+    } catch (e) {
+      setExportError(e instanceof Error ? e.message : "Export was cancelled.");
+    } finally {
+      setExporting(false);
+    }
+  }, [activeWallet, isEmbedded, exportWallet]);
+
+  // Once the user has pasted a valid key, advance to claimed.
+  const pasteIsValid = useMemo(
+    () => (wallet ? verifyDeviceKey(pasted, wallet) : false),
+    [pasted, wallet],
+  );
+  const pasteShownButWrong = pasted.trim().length > 0 && !pasteIsValid;
+
+  const handleConfirmPaste = useCallback(() => {
+    if (!pasteIsValid) return;
+    setStage("claimed");
+    // Burn the paste from memory so it doesn't sit in React state.
+    setPasted("");
+  }, [pasteIsValid]);
+
+  const handleSkipExternal = useCallback(() => {
+    // External-wallet users skip the reveal+verify ritual — their
+    // device key already lives in their existing wallet app.
+    setStage("managed");
+  }, []);
+
   const handleContinue = useCallback(() => {
-    // Phase 3 will swap this for the device-key reveal flow. For now,
-    // the unboxing just hands off to /app.
     router.push("/app");
   }, [router]);
+
+  // Visual gate helpers — many UI blocks need to stay visible across
+  // any post-boot stage (ready / verify / claimed / managed), so we
+  // factor it once.
+  const postBoot = stage === "ready" || stage === "verify" || stage === "claimed" || stage === "managed";
 
   return (
     <main
@@ -111,12 +225,12 @@ export default function UnboxPage() {
         </span>
       </div>
 
-      {/* Stage stack — box → device → serial → boot → CTA */}
-      <div className="relative z-10 w-full max-w-[420px] flex flex-col items-center gap-7">
-        <BoxAndDevice stage={stage} onOpen={openBox} />
+      {/* Stage stack — box → device → serial → boot → reveal/verify/claimed */}
+      <div className="relative z-10 w-full max-w-[460px] flex flex-col items-center gap-7">
+        <BoxAndDevice stage={stage} onOpen={openBox} postBoot={postBoot} />
 
         <AnimatePresence>
-          {(stage === "serial" || stage === "boot" || stage === "ready") && (
+          {(stage === "serial" || stage === "boot" || postBoot) && (
             <motion.div
               key="serial-block"
               initial={{ opacity: 0, y: 6 }}
@@ -132,7 +246,7 @@ export default function UnboxPage() {
         </AnimatePresence>
 
         <AnimatePresence>
-          {(stage === "boot" || stage === "ready") && (
+          {(stage === "boot" || postBoot) && (
             <motion.div
               key="boot-block"
               initial={{ opacity: 0, y: 6 }}
@@ -140,33 +254,55 @@ export default function UnboxPage() {
               exit={{ opacity: 0 }}
               transition={{ duration: 0.4, ease: EASE, delay: 0.1 }}
             >
-              <LedBoot stageReady={stage === "ready"} />
+              <LedBoot stageReady={postBoot} />
             </motion.div>
           )}
         </AnimatePresence>
 
+        {/* READY — embedded wallet → reveal-key CTA. External wallet → managed pill. */}
         <AnimatePresence>
-          {stage === "ready" && (
-            <motion.button
-              key="continue"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.5, ease: EASE, delay: 0.2 }}
-              onClick={handleContinue}
-              whileHover={{ y: -1 }}
-              whileTap={{ scale: 0.98 }}
-              className="inline-flex items-center gap-2 h-[52px] px-7 rounded-[14px] text-[14.5px] font-semibold tracking-[-0.01em]"
-              style={{
-                background: "#FFFFFF",
-                color: "#0A0B10",
-                boxShadow:
-                  "0 1px 0 rgba(255,255,255,0.18), 0 12px 28px rgba(0,0,0,0.45)",
-              }}
-            >
-              Continue
-              <ArrowRight className="w-4 h-4" />
-            </motion.button>
+          {stage === "ready" && isEmbedded && (
+            <RevealCard
+              key="reveal"
+              busy={exporting}
+              error={exportError}
+              onReveal={handleReveal}
+              onAlreadySaved={() => setStage("verify")}
+            />
+          )}
+          {stage === "ready" && !isEmbedded && activeWallet && (
+            <ManagedCard
+              key="managed-prompt"
+              walletLabel={externalWalletLabel}
+              onContinue={handleSkipExternal}
+            />
+          )}
+        </AnimatePresence>
+
+        {/* VERIFY — paste-back input, validated locally. */}
+        <AnimatePresence>
+          {stage === "verify" && (
+            <VerifyCard
+              key="verify"
+              pasted={pasted}
+              onChange={setPasted}
+              valid={pasteIsValid}
+              wrong={pasteShownButWrong}
+              onConfirm={handleConfirmPaste}
+              onShowAgain={handleReveal}
+            />
+          )}
+        </AnimatePresence>
+
+        {/* CLAIMED / MANAGED — final success card */}
+        <AnimatePresence>
+          {(stage === "claimed" || stage === "managed") && (
+            <ClaimedCard
+              key="claimed"
+              variant={stage === "managed" ? "managed" : "claimed"}
+              walletLabel={externalWalletLabel}
+              onContinue={handleContinue}
+            />
           )}
         </AnimatePresence>
 
@@ -195,9 +331,11 @@ export default function UnboxPage() {
 function BoxAndDevice({
   stage,
   onOpen,
+  postBoot,
 }: {
   stage: Stage;
   onOpen: () => void;
+  postBoot: boolean;
 }) {
   const isOpenStarted = stage !== "closed";
 
@@ -231,8 +369,8 @@ function BoxAndDevice({
           ].join(", "),
         }}
         animate={{
-          opacity: stage === "ready" ? 0 : 1,
-          y: stage === "ready" ? 24 : 0,
+          opacity: postBoot ? 0 : 1,
+          y: postBoot ? 24 : 0,
         }}
         transition={{ duration: 0.6, ease: EASE }}
       >
@@ -273,8 +411,8 @@ function BoxAndDevice({
           isOpenStarted
             ? {
                 rotateX: -118,
-                opacity: stage === "ready" ? 0 : 1,
-                y: stage === "ready" ? -10 : 0,
+                opacity: postBoot ? 0 : 1,
+                y: postBoot ? -10 : 0,
               }
             : { rotateX: 0, opacity: 1, y: 0 }
         }
@@ -484,9 +622,13 @@ function BornLine() {
    ──────────────────────────────────────────────────────────────────── */
 
 function LedBoot({ stageReady }: { stageReady: boolean }) {
-  const [step, setStep] = useState(0);
+  const [step, setStep] = useState(stageReady ? 3 : 0);
 
   useEffect(() => {
+    if (stageReady) {
+      setStep(3);
+      return;
+    }
     const t1 = window.setTimeout(() => setStep(1), 0);
     const t2 = window.setTimeout(() => setStep(2), 850);
     const t3 = window.setTimeout(() => setStep(3), 1700);
@@ -495,7 +637,7 @@ function LedBoot({ stageReady }: { stageReady: boolean }) {
       clearTimeout(t2);
       clearTimeout(t3);
     };
-  }, []);
+  }, [stageReady]);
 
   // After ready stage, all dots are solid green
   const final = stageReady;
@@ -551,5 +693,385 @@ function LedBoot({ stageReady }: { stageReady: boolean }) {
         );
       })}
     </div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────────
+   RevealCard — stage="ready", embedded wallet path. Frames the
+   moment + triggers Privy's exportWallet modal. Includes an
+   "already saved" escape hatch for users who want to skip directly
+   to the verify screen.
+   ──────────────────────────────────────────────────────────────────── */
+
+function RevealCard({
+  busy,
+  error,
+  onReveal,
+  onAlreadySaved,
+}: {
+  busy: boolean;
+  error: string | null;
+  onReveal: () => void;
+  onAlreadySaved: () => void;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -8 }}
+      transition={{ duration: 0.5, ease: EASE, delay: 0.2 }}
+      className="w-full rounded-[16px] px-5 py-5"
+      style={{
+        background: "rgba(231,233,238,0.04)",
+        border: "1px solid rgba(231,233,238,0.10)",
+        boxShadow: "0 8px 24px rgba(0,0,0,0.35)",
+      }}
+    >
+      <div className="text-center">
+        <div
+          className="font-mono uppercase mb-2"
+          style={{
+            color: "rgba(231,233,238,0.55)",
+            fontSize: 10.5,
+            letterSpacing: "0.18em",
+          }}
+        >
+          Your device key is ready
+        </div>
+        <p
+          className="text-[13.5px] leading-[1.55] mb-4"
+          style={{ color: "rgba(231,233,238,0.78)" }}
+        >
+          Your Kyvern device is a Solana wallet. The key below is the
+          only way to recover it. <strong style={{ color: "#FFFFFF" }}>We can&apos;t recover it for you.</strong>
+        </p>
+
+        <motion.button
+          type="button"
+          onClick={onReveal}
+          disabled={busy}
+          whileHover={busy ? undefined : { y: -1 }}
+          whileTap={busy ? undefined : { scale: 0.98 }}
+          className="inline-flex items-center gap-2 h-[48px] px-6 rounded-[12px] text-[13.5px] font-semibold tracking-[-0.005em] disabled:opacity-60 disabled:cursor-not-allowed"
+          style={{
+            background: "#FFFFFF",
+            color: "#0A0B10",
+            boxShadow:
+              "0 1px 0 rgba(255,255,255,0.18), 0 12px 28px rgba(0,0,0,0.45)",
+          }}
+        >
+          <Eye className="w-4 h-4" strokeWidth={1.8} />
+          {busy ? "Opening Privy…" : "Reveal device key"}
+        </motion.button>
+
+        {error && (
+          <div
+            className="mt-3 font-mono"
+            style={{
+              fontSize: 11,
+              color: "#F59E0B",
+              letterSpacing: "0.04em",
+            }}
+          >
+            {error}
+          </div>
+        )}
+
+        <button
+          type="button"
+          onClick={onAlreadySaved}
+          className="mt-4 font-mono uppercase tracking-[0.16em] hover:underline"
+          style={{
+            fontSize: 9.5,
+            color: "rgba(231,233,238,0.45)",
+          }}
+        >
+          Already saved? Skip to verify
+        </button>
+      </div>
+    </motion.div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────────
+   ManagedCard — stage="ready", external wallet path. The user signed
+   in with Phantom/Solflare/Backpack; their key already lives there.
+   Skip the export+verify ritual entirely.
+   ──────────────────────────────────────────────────────────────────── */
+
+function ManagedCard({
+  walletLabel,
+  onContinue,
+}: {
+  walletLabel: string;
+  onContinue: () => void;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -8 }}
+      transition={{ duration: 0.5, ease: EASE, delay: 0.2 }}
+      className="w-full rounded-[16px] px-5 py-5 text-center"
+      style={{
+        background: "rgba(231,233,238,0.04)",
+        border: "1px solid rgba(231,233,238,0.10)",
+        boxShadow: "0 8px 24px rgba(0,0,0,0.35)",
+      }}
+    >
+      <div
+        className="font-mono uppercase mb-2"
+        style={{
+          color: "rgba(231,233,238,0.55)",
+          fontSize: 10.5,
+          letterSpacing: "0.18em",
+        }}
+      >
+        Managed by {walletLabel}
+      </div>
+      <p
+        className="text-[13.5px] leading-[1.55] mb-4"
+        style={{ color: "rgba(231,233,238,0.78)" }}
+      >
+        Your device key already lives in {walletLabel}. Sign there
+        when your worker spends — Kyvern stays out of the way.
+      </p>
+      <motion.button
+        type="button"
+        onClick={onContinue}
+        whileHover={{ y: -1 }}
+        whileTap={{ scale: 0.98 }}
+        className="inline-flex items-center gap-2 h-[48px] px-6 rounded-[12px] text-[13.5px] font-semibold tracking-[-0.005em]"
+        style={{
+          background: "#FFFFFF",
+          color: "#0A0B10",
+          boxShadow:
+            "0 1px 0 rgba(255,255,255,0.18), 0 12px 28px rgba(0,0,0,0.45)",
+        }}
+      >
+        Open Kyvern
+        <ArrowRight className="w-4 h-4" strokeWidth={1.8} />
+      </motion.button>
+    </motion.div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────────
+   VerifyCard — stage="verify". User pastes the base58 device key
+   they (hopefully) saved from Privy's modal. We validate locally
+   with Keypair.fromSecretKey + base58 decode and compare the derived
+   public key to their wallet address. No bytes go to the server.
+   ──────────────────────────────────────────────────────────────────── */
+
+function VerifyCard({
+  pasted,
+  onChange,
+  valid,
+  wrong,
+  onConfirm,
+  onShowAgain,
+}: {
+  pasted: string;
+  onChange: (s: string) => void;
+  valid: boolean;
+  wrong: boolean;
+  onConfirm: () => void;
+  onShowAgain: () => void;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -8 }}
+      transition={{ duration: 0.45, ease: EASE }}
+      className="w-full rounded-[16px] px-5 py-5"
+      style={{
+        background: "rgba(231,233,238,0.04)",
+        border: valid
+          ? "1px solid rgba(34,197,94,0.45)"
+          : wrong
+            ? "1px solid rgba(245,158,11,0.45)"
+            : "1px solid rgba(231,233,238,0.10)",
+        boxShadow: "0 8px 24px rgba(0,0,0,0.35)",
+      }}
+    >
+      <div
+        className="font-mono uppercase mb-2 text-center"
+        style={{
+          color: valid ? "#22C55E" : "rgba(231,233,238,0.55)",
+          fontSize: 10.5,
+          letterSpacing: "0.18em",
+        }}
+      >
+        {valid ? "Match — your device is yours" : "Confirm you saved it"}
+      </div>
+      <p
+        className="text-[13.5px] leading-[1.55] mb-3 text-center"
+        style={{ color: "rgba(231,233,238,0.78)" }}
+      >
+        Paste your device key here to prove you&apos;ve got it.
+      </p>
+
+      <textarea
+        value={pasted}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="Paste base58 device key…"
+        spellCheck={false}
+        autoCorrect="off"
+        autoCapitalize="off"
+        rows={3}
+        className="w-full font-mono text-[12px] leading-[1.4] outline-none resize-none rounded-[10px] px-3 py-2.5"
+        style={{
+          background: "rgba(0,0,0,0.40)",
+          color: "#E7E9EE",
+          border: "1px solid rgba(231,233,238,0.12)",
+          letterSpacing: "0.01em",
+        }}
+      />
+
+      <div className="flex items-center justify-between mt-3 gap-3">
+        <button
+          type="button"
+          onClick={onShowAgain}
+          className="inline-flex items-center gap-1.5 font-mono uppercase tracking-[0.16em] hover:underline"
+          style={{
+            fontSize: 9.5,
+            color: "rgba(231,233,238,0.55)",
+          }}
+        >
+          <RefreshCw className="w-3 h-3" />
+          Show me the key again
+        </button>
+
+        <motion.button
+          type="button"
+          onClick={onConfirm}
+          disabled={!valid}
+          whileHover={valid ? { y: -1 } : undefined}
+          whileTap={valid ? { scale: 0.97 } : undefined}
+          className="inline-flex items-center gap-1.5 h-9 px-4 rounded-[10px] text-[12.5px] font-semibold tracking-[-0.005em] disabled:cursor-not-allowed"
+          style={{
+            background: valid ? "#22C55E" : "rgba(231,233,238,0.10)",
+            color: valid ? "#04050A" : "rgba(231,233,238,0.45)",
+            border: valid ? "none" : "1px solid rgba(231,233,238,0.10)",
+            boxShadow: valid
+              ? "0 6px 16px rgba(34,197,94,0.35)"
+              : "none",
+          }}
+        >
+          {valid ? (
+            <>
+              <Check className="w-3.5 h-3.5" strokeWidth={2.5} />
+              Confirm
+            </>
+          ) : (
+            "Confirm"
+          )}
+        </motion.button>
+      </div>
+
+      {wrong && !valid && (
+        <div
+          className="mt-3 text-center font-mono"
+          style={{
+            fontSize: 10.5,
+            color: "#F59E0B",
+            letterSpacing: "0.04em",
+          }}
+        >
+          Hmm — that&apos;s not your device key. Try again, or click <em>Show me the key again</em>.
+        </div>
+      )}
+    </motion.div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────────
+   ClaimedCard — stage="claimed" (saved + verified) or "managed"
+   (external wallet, no verify needed). Final success card. Single
+   primary CTA: Open Kyvern → /app.
+   ──────────────────────────────────────────────────────────────────── */
+
+function ClaimedCard({
+  variant,
+  walletLabel,
+  onContinue,
+}: {
+  variant: "claimed" | "managed";
+  walletLabel: string;
+  onContinue: () => void;
+}) {
+  const isManaged = variant === "managed";
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.6, ease: EASE }}
+      className="w-full rounded-[16px] px-5 py-6 text-center"
+      style={{
+        background:
+          "linear-gradient(180deg, rgba(34,197,94,0.10) 0%, rgba(231,233,238,0.04) 100%)",
+        border: "1px solid rgba(34,197,94,0.30)",
+        boxShadow:
+          "0 8px 28px rgba(0,0,0,0.40), 0 0 0 4px rgba(34,197,94,0.06)",
+      }}
+    >
+      <motion.div
+        initial={{ scale: 0.6, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ duration: 0.6, ease: EASE, delay: 0.15 }}
+        className="mx-auto mb-3 w-12 h-12 rounded-full flex items-center justify-center"
+        style={{
+          background:
+            "radial-gradient(closest-side, rgba(34,197,94,0.30) 0%, rgba(34,197,94,0.05) 70%)",
+          border: "1px solid rgba(34,197,94,0.55)",
+        }}
+      >
+        <Check className="w-6 h-6" strokeWidth={2} style={{ color: "#22C55E" }} />
+      </motion.div>
+
+      <div
+        className="font-mono uppercase mb-1.5"
+        style={{
+          color: "#22C55E",
+          fontSize: 10.5,
+          letterSpacing: "0.18em",
+        }}
+      >
+        {isManaged ? "Welcome back" : "Saved · Sealed · Solana-native"}
+      </div>
+      <h2
+        className="text-[20px] font-semibold tracking-[-0.015em] mb-3"
+        style={{ color: "#FFFFFF" }}
+      >
+        Your device is yours.
+      </h2>
+      <p
+        className="text-[13px] leading-[1.55] mb-4"
+        style={{ color: "rgba(231,233,238,0.72)" }}
+      >
+        {isManaged
+          ? `Signed in via ${walletLabel}. Your workers are waiting.`
+          : "Your key is yours alone. Time to spawn your first worker."}
+      </p>
+
+      <motion.button
+        type="button"
+        onClick={onContinue}
+        whileHover={{ y: -1 }}
+        whileTap={{ scale: 0.98 }}
+        className="inline-flex items-center gap-2 h-[48px] px-6 rounded-[12px] text-[13.5px] font-semibold tracking-[-0.005em]"
+        style={{
+          background: "#FFFFFF",
+          color: "#0A0B10",
+          boxShadow:
+            "0 1px 0 rgba(255,255,255,0.18), 0 12px 28px rgba(0,0,0,0.45)",
+        }}
+      >
+        Open Kyvern
+        <ArrowRight className="w-4 h-4" strokeWidth={1.8} />
+      </motion.button>
+    </motion.div>
   );
 }
