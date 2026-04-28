@@ -104,11 +104,19 @@ function LoginInner() {
   }, [ready, authenticated, isAuthenticated, router, explicitRedirect]);
 
   const handlePick = (mode: OnboardMode) => {
-    if (typeof window !== "undefined") {
-      sessionStorage.setItem(ONBOARD_MODE_KEY, mode);
-    }
     setPickedMode(mode);
-    login();
+    if (mode === "fresh") {
+      // Get a Kyvern device → Privy modal → /unbox cinematic
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem(ONBOARD_MODE_KEY, mode);
+      }
+      login();
+    } else {
+      // I own a Kyvern device → /recover (paste your device key).
+      // No Privy modal yet — /recover handles silent guest auth +
+      // importWallet under the hood once they paste a valid key.
+      router.push("/recover");
+    }
   };
 
   const isBusy = !ready || isLoading;
@@ -208,7 +216,7 @@ function LoginInner() {
             cta={pickedMode === "fresh" ? "Opening modal…" : "Get a device"}
             primary
           />
-          {/* I own a device — secondary */}
+          {/* I own a device — secondary, routes to /recover */}
           <DeviceCard
             kind="returning"
             picked={pickedMode === "returning"}
@@ -216,8 +224,8 @@ function LoginInner() {
             onClick={() => handlePick("returning")}
             icon={<KeyRound className="w-5 h-5" strokeWidth={1.7} />}
             label="I own a Kyvern device"
-            description="Recover with your device key, or sign back in to your account."
-            cta={pickedMode === "returning" ? "Opening modal…" : "I own a device"}
+            description="Paste your device key to recover. Or sign back in with your account."
+            cta={pickedMode === "returning" ? "Opening recover…" : "Recover device"}
           />
         </div>
 
