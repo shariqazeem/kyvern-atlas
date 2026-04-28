@@ -489,6 +489,35 @@ function migrate(db: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_thoughts_signature ON agent_thoughts(signature);
   `);
 
+  // Agent status updates — ephemeral, narrate-the-worker rows used by
+  // the agent detail page during the first-60s "boot sequence". Each
+  // row is a single line shown in the BootSequence stack ("waking up",
+  // "checking the source you pointed me at", etc).
+  //
+  // kind:
+  //   'boot' — pre-scripted timeline beats written by /api/agents/spawn,
+  //            with future created_at offsets that unfold across ~45s
+  //   'tick' — real activity beats written by the runner during a tick
+  //            (used for the LiveWorkerCard state pill after first
+  //            thought lands)
+  //
+  // GC: rows older than 5 minutes are deleted on read.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS agent_status_updates (
+      id          TEXT PRIMARY KEY,
+      agent_id    TEXT NOT NULL,
+      message     TEXT NOT NULL,
+      kind        TEXT NOT NULL DEFAULT 'boot',
+      step_index  INTEGER NOT NULL DEFAULT 0,
+      created_at  INTEGER NOT NULL,
+      FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_status_updates_agent_time
+      ON agent_status_updates(agent_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_status_updates_kind
+      ON agent_status_updates(agent_id, kind, step_index);
+  `);
+
   // Agent chat — synchronous user ↔ agent conversations.
   db.exec(`
     CREATE TABLE IF NOT EXISTS agent_chat_messages (

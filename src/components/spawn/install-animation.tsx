@@ -257,9 +257,14 @@ export function InstallAnimation({
                 initial={{ opacity: 0, y: 4 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4 }}
-                className="mt-1 font-mono text-[12px] text-[#6B7280]"
+                className="mt-1 text-center"
               >
-                First finding incoming…
+                <div className="font-mono text-[12px] text-[#6B7280]">
+                  First finding incoming…
+                </div>
+                <div className="font-mono text-[10.5px] text-[#9CA3AF] mt-1">
+                  {name || "Worker"} will introduce themselves in a moment.
+                </div>
               </motion.div>
             )}
           </AnimatePresence>

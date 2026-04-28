@@ -3,6 +3,8 @@ import { createAgent } from "@/lib/agents/store";
 import { getTemplate } from "@/lib/agents/templates";
 import { getVault, writeDeviceLog } from "@/lib/vault-store";
 import type { AgentTemplate } from "@/lib/agents/types";
+import { buildFirstSixtySeconds, BOOT_BEAT_OFFSETS_MS } from "@/lib/agents/first-messages";
+import { writeBootBeats } from "@/lib/agents/status-updates";
 
 /**
  * POST /api/agents/spawn
@@ -58,16 +60,45 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "invalid template" }, { status: 400 });
     }
 
+    const trimmedName = body.name.trim();
+    const trimmedJob = body.jobPrompt.trim();
+    const frequencySeconds = body.frequencySeconds ?? template.defaultFrequencySeconds;
+    const templateId = body.template as AgentTemplate;
+
+    // First-60s artifacts — hand-written, in-character. Persisted to
+    // metadata so the detail page can render the typewriter bubble
+    // without re-parsing on every poll.
+    const firstSixty = buildFirstSixtySeconds({
+      name: trimmedName,
+      template: templateId,
+      jobPrompt: trimmedJob,
+      frequencySeconds,
+    });
+
     const agent = createAgent({
       deviceId: body.deviceId,
-      name: body.name.trim(),
+      name: trimmedName,
       emoji: body.emoji?.trim() || template.emoji,
       personalityPrompt: body.personalityPrompt?.trim() || template.personalityPrompt,
-      jobPrompt: body.jobPrompt.trim(),
+      jobPrompt: trimmedJob,
       allowedTools: body.allowedTools ?? template.recommendedTools,
-      template: body.template as AgentTemplate,
-      frequencySeconds: body.frequencySeconds ?? template.defaultFrequencySeconds,
+      template: templateId,
+      frequencySeconds,
       isPublic: body.isPublic !== false,
+      metadata: {
+        firstMessage: firstSixty.firstMessage,
+        watchingTarget: firstSixty.watchingTarget,
+      },
+    });
+
+    // Schedule the 7-beat boot timeline. Each beat carries a future
+    // created_at offset; the client polls /status-stream and unwraps
+    // them as time passes.
+    writeBootBeats({
+      agentId: agent.id,
+      spawnedAt: agent.createdAt,
+      beats: firstSixty.bootBeats,
+      offsetsMs: BOOT_BEAT_OFFSETS_MS,
     });
 
     // Log the spawn to device_log so it shows in the activity feed

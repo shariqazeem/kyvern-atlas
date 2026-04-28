@@ -15,7 +15,7 @@
  * 5s otherwise).
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -25,10 +25,14 @@ import {
   Play,
   Activity,
   X,
-  Sparkles,
 } from "lucide-react";
 import { SignaturePill } from "@/components/primitives/signature-pill";
 import { ChatDrawer, type ChatMessage } from "@/components/agent/chat-drawer";
+import { WelcomeNote } from "@/components/agent/welcome-note";
+import { FirstMessage } from "@/components/agent/first-message";
+import { BootSequence } from "@/components/agent/boot-sequence";
+import { LiveWorkerCard } from "@/components/agent/live-worker-card";
+import { FirstSignalToast } from "@/components/agent/first-signal-toast";
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
@@ -48,6 +52,7 @@ interface Agent {
   totalThoughts: number;
   totalEarnedUsd: number;
   totalSpentUsd: number;
+  metadata?: { firstMessage?: string; watchingTarget?: string } | Record<string, unknown>;
 }
 
 interface Thought {
@@ -89,6 +94,31 @@ export default function AgentDetailPage({ params }: { params: { id: string } }) 
   const isFreshParam = searchParams.get("fresh") === "true";
   const showActivation =
     isFreshParam && !!agent && agent.totalThoughts === 0 && agent.status === "alive";
+
+  // First-signal reveal: detect totalThoughts transition 0 → 1.
+  // The toast pops once, the boot sequence dissolves, and the page
+  // settles into steady-state. After that we don't fire again.
+  const prevThoughtsRef = useRef<number | null>(null);
+  const [firstSignalReveal, setFirstSignalReveal] = useState(false);
+  const [showToast, setShowToast] = useState(false);
+  useEffect(() => {
+    if (!agent) return;
+    const prev = prevThoughtsRef.current;
+    if (prev === 0 && agent.totalThoughts > 0 && isFreshParam) {
+      setFirstSignalReveal(true);
+      setShowToast(true);
+      // Optional chime. Browser autoplay policy may swallow it; that's
+      // fine — visuals carry the moment.
+      try {
+        const audio = new Audio("/chime.mp3");
+        audio.volume = 0.3;
+        void audio.play().catch(() => {});
+      } catch {
+        /* ignore */
+      }
+    }
+    prevThoughtsRef.current = agent.totalThoughts;
+  }, [agent, isFreshParam]);
 
   // Initial load
   const load = useCallback(async () => {
@@ -246,6 +276,11 @@ export default function AgentDetailPage({ params }: { params: { id: string } }) 
   const aliveHours = Math.floor((aliveSeconds % 86400) / 3600);
   const aliveLabel =
     aliveDays > 0 ? `${aliveDays}d ${aliveHours}h` : `${aliveHours}h`;
+
+  const firstMessageText =
+    typeof (agent.metadata as { firstMessage?: string } | undefined)?.firstMessage === "string"
+      ? ((agent.metadata as { firstMessage?: string }).firstMessage as string)
+      : "";
 
   const lastThoughtMins = agent.lastThoughtAt
     ? Math.floor((Date.now() - agent.lastThoughtAt) / 60000)
@@ -505,73 +540,46 @@ export default function AgentDetailPage({ params }: { params: { id: string } }) 
         </SpecBlock>
       </motion.div>
 
-      {/* Activation banner — light premium */}
-      <AnimatePresence>
-        {showActivation && (
-          <motion.div
-            key="activation"
-            initial={{ opacity: 0, y: -8, height: 0 }}
-            animate={{ opacity: 1, y: 0, height: "auto" }}
-            exit={{ opacity: 0, y: -8, height: 0, marginBottom: 0 }}
-            transition={{ duration: 0.35, ease: EASE }}
-            className="mb-4 rounded-[16px] overflow-hidden"
-            style={{
-              background:
-                "linear-gradient(180deg, #FFFFFF 0%, #F4F8F4 100%)",
-              border: "1px solid rgba(34,197,94,0.30)",
-              boxShadow:
-                "inset 0 1px 0 rgba(255,255,255,1), 0 1px 2px rgba(15,23,42,0.04), 0 0 0 4px rgba(34,197,94,0.08)",
-            }}
-          >
-            <div className="px-4 py-3.5 flex items-center gap-3">
-              <motion.div
-                className="w-9 h-9 rounded-full flex items-center justify-center shrink-0"
-                style={{
-                  background:
-                    "radial-gradient(closest-side, rgba(34,197,94,0.18) 0%, rgba(34,197,94,0.04) 70%)",
-                  border: "1px solid rgba(34,197,94,0.45)",
-                }}
-                animate={{ scale: [1, 1.08, 1] }}
-                transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
-              >
-                <Sparkles className="w-4 h-4" style={{ color: "#15803D" }} strokeWidth={1.8} />
-              </motion.div>
-              <div className="flex-1 min-w-0">
-                <div
-                  className="font-mono text-[10px] uppercase tracking-[0.14em] mb-0.5"
-                  style={{ color: "#15803D" }}
-                >
-                  Activating
-                </div>
-                <div
-                  className="text-[14px] font-semibold tracking-tight"
-                  style={{ color: "#0A0A0A" }}
-                >
-                  {agent.name} is waking up · first thought arriving
-                </div>
-              </div>
-              <motion.span
-                className="rounded-full"
-                style={{
-                  width: 7,
-                  height: 7,
-                  background: "#22C55E",
-                  boxShadow: "0 0 0 3px rgba(34,197,94,0.12)",
-                }}
-                animate={{ opacity: [0.4, 1, 0.4] }}
-                transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
-              />
-            </div>
-            <div
-              className="h-[2px]"
-              style={{
-                background:
-                  "linear-gradient(to right, rgba(34,197,94,0.55), rgba(34,197,94,0.05))",
-              }}
+      {/* First-60s region — replaces the old activation banner.
+          Desktop: two-column (welcome+message+boot on left, live card on right).
+          Mobile: vertical stack with the live card as a collapsible pill.
+          The Live Worker Card and First Message persist past first
+          signal — they're owner-feeling artifacts that survive boot. */}
+      {firstMessageText && (
+        <div className="mb-4 grid grid-cols-1 md:grid-cols-[3fr_2fr] gap-4">
+          <div className="min-w-0">
+            <WelcomeNote
+              name={agent.name}
+              serial={deriveSerial(agent.deviceId)}
+              hiredAt={agent.createdAt}
+              alive={agent.totalThoughts > 0}
             />
-          </motion.div>
-        )}
-      </AnimatePresence>
+            <FirstMessage
+              emoji={agent.emoji}
+              message={firstMessageText}
+              instant={agent.totalThoughts > 0 && !firstSignalReveal}
+            />
+            {showActivation && (
+              <BootSequence
+                agentId={agent.id}
+                spawnedAt={agent.createdAt}
+                dissolveSignal={firstSignalReveal}
+              />
+            )}
+          </div>
+          <div className="min-w-0">
+            <div className="md:sticky md:top-4">
+              {/* Mobile renders pill; desktop renders the full card. */}
+              <div className="md:hidden">
+                <LiveWorkerCard agentId={agent.id} variant="pill" />
+              </div>
+              <div className="hidden md:block">
+                <LiveWorkerCard agentId={agent.id} variant="card" />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Internal log screen */}
       <motion.div
@@ -642,6 +650,14 @@ export default function AgentDetailPage({ params }: { params: { id: string } }) 
         onChangeInput={setInputValue}
         onSend={handleSend}
         quickReplies={QUICK_REPLIES}
+      />
+
+      {/* First-signal toast — only fires on the totalThoughts 0→1
+          transition during a fresh load. Auto-dismisses after 6s. */}
+      <FirstSignalToast
+        show={showToast}
+        agentName={agent.name}
+        onDismiss={() => setShowToast(false)}
       />
     </div>
   );
