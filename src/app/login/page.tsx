@@ -1,21 +1,32 @@
 "use client";
 
 /* ════════════════════════════════════════════════════════════════════
-   /login — premium sign-in page.
+   /login — pick-up-your-device entry surface.
 
-   One-screen, one-primary action. Privy handles the modal; this page
-   owns the aesthetic around it. Supports email, Google, and wallet.
+   Two cards. One picks "Get a Kyvern device" (fresh) and routes to
+   /unbox after Privy login completes. The other picks "I own a Kyvern
+   device" (returning) and routes to /app with a brief welcome.
+
+   Privy still owns the auth modal — this page owns the framing only.
+   The fresh-vs-returning split is held in sessionStorage so it
+   survives the Privy modal redirect cycle, and consumed once on
+   landing in /unbox or /app.
    ════════════════════════════════════════════════════════════════════ */
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowRight, CheckCircle2, Lock, ShieldCheck, Sparkles } from "lucide-react";
+import { ArrowRight, KeyRound, Package, ShieldCheck } from "lucide-react";
 import { usePrivy } from "@privy-io/react-auth";
 import { useAuth } from "@/hooks/use-auth";
 
 const ease = [0.25, 0.1, 0.25, 1] as const;
+
+/** sessionStorage flag — read once on /unbox or /app entry to know
+ *  whether to play the unboxing cinematic. */
+const ONBOARD_MODE_KEY = "kyvern:onboard-mode";
+type OnboardMode = "fresh" | "returning";
 
 export default function LoginPage() {
   return (
@@ -42,20 +53,50 @@ function LoginInner() {
   const { login, ready, authenticated } = usePrivy();
   const { isAuthenticated, isLoading } = useAuth();
 
-  const redirectTo = params.get("redirect") || "/app";
+  // Track the mode the user chose so we can pick the right post-auth
+  // destination. The flag lives in sessionStorage so it survives the
+  // Privy modal/redirect cycle (Privy can swap windows mid-flow).
+  const [pickedMode, setPickedMode] = useState<OnboardMode | null>(null);
 
-  // If they're already signed in, bounce them to where they were headed.
+  // Honor an explicit ?redirect= override (e.g. when middleware sent
+  // them here from a deep link). Otherwise route by mode.
+  const explicitRedirect = params.get("redirect");
+
   useEffect(() => {
     if (!ready) return;
-    if (authenticated || isAuthenticated) {
-      router.replace(redirectTo);
-    }
-  }, [ready, authenticated, isAuthenticated, router, redirectTo]);
+    if (!(authenticated || isAuthenticated)) return;
 
-  const onSignIn = () => {
-    // Privy handles its own modal — email, google, wallet.
+    // Prefer explicit ?redirect= if the user was bounced here from a deep link.
+    if (explicitRedirect) {
+      router.replace(explicitRedirect);
+      return;
+    }
+
+    // Read the mode that was set when they clicked one of the two cards.
+    // Default to /app if no mode (e.g. they were already auth'd from a
+    // prior session and just landed on /login).
+    let mode: OnboardMode | null = null;
+    if (typeof window !== "undefined") {
+      const raw = sessionStorage.getItem(ONBOARD_MODE_KEY);
+      if (raw === "fresh" || raw === "returning") mode = raw;
+    }
+
+    if (mode === "fresh") {
+      router.replace("/unbox");
+    } else {
+      router.replace("/app");
+    }
+  }, [ready, authenticated, isAuthenticated, router, explicitRedirect]);
+
+  const handlePick = (mode: OnboardMode) => {
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem(ONBOARD_MODE_KEY, mode);
+    }
+    setPickedMode(mode);
     login();
   };
+
+  const isBusy = !ready || isLoading;
 
   return (
     <main
@@ -78,9 +119,9 @@ function LoginInner() {
         initial={{ opacity: 0, y: 16, scale: 0.985 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.7, ease }}
-        className="relative w-full max-w-[460px]"
+        className="relative w-full max-w-[860px]"
       >
-        {/* Brand mark — links home */}
+        {/* Brand mark */}
         <div className="flex items-center justify-center mb-10">
           <Link
             href="/"
@@ -104,121 +145,80 @@ function LoginInner() {
           </Link>
         </div>
 
-        {/* Card */}
-        <div
-          className="card-elevated p-8 sm:p-10"
-          style={{ background: "var(--surface)" }}
-        >
-          {/* Eyebrow pill */}
-          <div className="flex justify-center mb-5">
-            <span
-              className="inline-flex items-center gap-1.5 h-7 px-3 rounded-full text-[11px] font-semibold tracking-[0.02em]"
-              style={{
-                background: "var(--surface-2)",
-                color: "var(--text-secondary)",
-                border: "0.5px solid var(--border-subtle)",
-              }}
-            >
-              <Sparkles className="w-3 h-3" />
-              SIGN IN
-            </span>
-          </div>
-
-          <h1
-            className="text-center mb-2"
+        {/* Eyebrow + headline */}
+        <div className="text-center mb-9">
+          <span
+            className="inline-flex items-center gap-1.5 h-7 px-3 rounded-full text-[11px] font-semibold tracking-[0.06em] uppercase mb-5"
             style={{
-              fontSize: "30px",
-              fontWeight: 600,
-              lineHeight: 1.1,
-              letterSpacing: "-0.025em",
+              background: "var(--surface-2)",
+              color: "var(--text-secondary)",
+              border: "0.5px solid var(--border-subtle)",
             }}
           >
-            Your agents are one click away.
+            <ShieldCheck className="w-3 h-3" />
+            Pick up your device
+          </span>
+          <h1
+            className="mb-2"
+            style={{
+              fontSize: "32px",
+              fontWeight: 600,
+              lineHeight: 1.08,
+              letterSpacing: "-0.025em",
+              color: "var(--text-primary)",
+            }}
+          >
+            Your Kyvern device.
           </h1>
           <p
-            className="text-center text-[14.5px] leading-[1.5] mb-8"
+            className="text-[14.5px] leading-[1.55] mx-auto max-w-[420px]"
             style={{ color: "var(--text-secondary)" }}
           >
-            Email, Google, or wallet. No passwords. First vault deploys in
-            under a minute.
+            Each Kyvern device is a real Solana wallet with workers
+            living inside it. Pick one up — or recover one you already own.
           </p>
-
-          {/* Primary CTA */}
-          <button
-            onClick={onSignIn}
-            disabled={!ready || isLoading}
-            className="group w-full inline-flex items-center justify-center gap-2 h-[52px] rounded-[14px] text-[15px] font-semibold tracking-[-0.01em] transition-all duration-300 disabled:opacity-70 disabled:cursor-not-allowed"
-            style={{
-              background: "var(--text-primary)",
-              color: "var(--background)",
-              boxShadow:
-                "0 1px 2px rgba(0,0,0,0.04), 0 10px 28px rgba(0,0,0,0.10)",
-            }}
-          >
-            {!ready ? "Loading…" : "Continue"}
-            <ArrowRight className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-0.5" />
-          </button>
-
-          {/* Method row */}
-          <div className="mt-5 grid grid-cols-3 gap-2">
-            {(["Email", "Google", "Wallet"] as const).map((label) => (
-              <div
-                key={label}
-                className="flex items-center justify-center h-9 rounded-[10px] text-[11.5px] font-semibold tracking-[-0.005em]"
-                style={{
-                  background: "var(--surface-2)",
-                  color: "var(--text-secondary)",
-                  border: "0.5px solid var(--border-subtle)",
-                }}
-              >
-                {label}
-              </div>
-            ))}
-          </div>
-
-          {/* Trust strip */}
-          <div
-            className="mt-8 pt-6 border-t space-y-2.5"
-            style={{ borderColor: "var(--border-subtle)" }}
-          >
-            <TrustRow
-              icon={<ShieldCheck className="w-3.5 h-3.5" />}
-              text="Your wallet never leaves your device"
-            />
-            <TrustRow
-              icon={<Lock className="w-3.5 h-3.5" />}
-              text="Every vault is a Squads v4 smart account"
-            />
-            <TrustRow
-              icon={<CheckCircle2 className="w-3.5 h-3.5" />}
-              text="Agents get budgets, not keys"
-            />
-          </div>
         </div>
 
-        {/* Below-card sub-links */}
+        {/* Two cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          {/* Get a device — primary */}
+          <DeviceCard
+            kind="fresh"
+            picked={pickedMode === "fresh"}
+            disabled={isBusy}
+            onClick={() => handlePick("fresh")}
+            icon={<Package className="w-5 h-5" strokeWidth={1.7} />}
+            label="Get a Kyvern device"
+            description="Unbox a fresh device. Save the device key. Spawn your first worker."
+            cta={pickedMode === "fresh" ? "Opening modal…" : "Get a device"}
+            primary
+          />
+          {/* I own a device — secondary */}
+          <DeviceCard
+            kind="returning"
+            picked={pickedMode === "returning"}
+            disabled={isBusy}
+            onClick={() => handlePick("returning")}
+            icon={<KeyRound className="w-5 h-5" strokeWidth={1.7} />}
+            label="I own a Kyvern device"
+            description="Recover with your device key, or sign back in to your account."
+            cta={pickedMode === "returning" ? "Opening modal…" : "I own a device"}
+          />
+        </div>
+
+        {/* Below-cards sub-links */}
         <div
-          className="mt-6 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[12.5px]"
+          className="mt-7 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[12.5px]"
           style={{ color: "var(--text-tertiary)" }}
         >
-          <span>
-            New here?{" "}
-            <Link
-              href="/vault/new"
-              className="font-semibold hover:underline underline-offset-4"
-              style={{ color: "var(--text-primary)" }}
-            >
-              Create a vault
-            </Link>
-          </span>
+          <Link href="/docs" className="hover:underline underline-offset-4">
+            Docs
+          </Link>
           <span className="hidden sm:inline" aria-hidden>
             ·
           </span>
-          <Link
-            href="/docs"
-            className="hover:underline underline-offset-4"
-          >
-            Docs
+          <Link href="/atlas" className="hover:underline underline-offset-4">
+            See Atlas live
           </Link>
           <span className="hidden sm:inline" aria-hidden>
             ·
@@ -232,22 +232,106 @@ function LoginInner() {
   );
 }
 
-function TrustRow({ icon, text }: { icon: React.ReactNode; text: string }) {
+/* ────────────────────────────────────────────────────────────────────
+   DeviceCard — both options share this shape. Primary uses a dark
+   pill CTA, secondary uses a hairline outline. Hover lifts the card
+   ~2px and the icon glows.
+   ──────────────────────────────────────────────────────────────────── */
+
+function DeviceCard({
+  picked,
+  disabled,
+  onClick,
+  icon,
+  label,
+  description,
+  cta,
+  primary,
+}: {
+  kind: OnboardMode;
+  picked: boolean;
+  disabled: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+  label: string;
+  description: string;
+  cta: string;
+  primary?: boolean;
+}) {
   return (
-    <div
-      className="flex items-center gap-2.5 text-[12.5px]"
-      style={{ color: "var(--text-secondary)" }}
+    <motion.button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      whileHover={disabled ? undefined : { y: -2 }}
+      whileTap={disabled ? undefined : { scale: 0.99 }}
+      transition={{ duration: 0.25, ease }}
+      className="card-elevated text-left p-6 disabled:opacity-70 disabled:cursor-not-allowed group"
+      style={{
+        background: "var(--surface)",
+        opacity: picked ? 0.92 : 1,
+      }}
     >
-      <span
-        className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0"
-        style={{
-          background: "var(--surface-2)",
-          color: "var(--text-primary)",
-        }}
+      <div className="flex items-start justify-between mb-5">
+        <div
+          className="w-11 h-11 rounded-[12px] flex items-center justify-center transition-all duration-300 group-hover:scale-105"
+          style={{
+            background: primary ? "var(--text-primary)" : "var(--surface-2)",
+            color: primary ? "var(--background)" : "var(--text-primary)",
+            boxShadow: primary
+              ? "0 6px 16px -6px rgba(0,0,0,0.25)"
+              : "inset 0 0 0 0.5px var(--border-subtle)",
+          }}
+        >
+          {icon}
+        </div>
+        {primary && (
+          <span
+            className="font-mono text-[9.5px] uppercase tracking-[0.16em] px-2 py-0.5 rounded-full"
+            style={{
+              background: "rgba(34,197,94,0.10)",
+              color: "#15803D",
+              border: "1px solid rgba(34,197,94,0.20)",
+            }}
+          >
+            New
+          </span>
+        )}
+      </div>
+
+      <h3
+        className="text-[18px] font-semibold tracking-[-0.015em] mb-1.5"
+        style={{ color: "var(--text-primary)" }}
       >
-        {icon}
-      </span>
-      <span>{text}</span>
-    </div>
+        {label}
+      </h3>
+      <p
+        className="text-[13.5px] leading-[1.5] mb-5"
+        style={{ color: "var(--text-secondary)" }}
+      >
+        {description}
+      </p>
+
+      <div
+        className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-[10px] text-[13px] font-semibold tracking-[-0.005em]"
+        style={
+          primary
+            ? {
+                background: "var(--text-primary)",
+                color: "var(--background)",
+                boxShadow:
+                  "0 1px 2px rgba(0,0,0,0.04), 0 6px 16px rgba(0,0,0,0.10)",
+              }
+            : {
+                background: "transparent",
+                color: "var(--text-primary)",
+                border: "0.5px solid var(--border-subtle)",
+              }
+        }
+      >
+        {cta}
+        <ArrowRight className="w-3.5 h-3.5 transition-transform duration-300 group-hover:translate-x-0.5" />
+      </div>
+    </motion.button>
   );
 }
