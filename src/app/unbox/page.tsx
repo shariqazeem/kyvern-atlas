@@ -83,7 +83,6 @@ export default function UnboxPage() {
   const [stage, setStage] = useState<Stage>("closed");
   const [pasted, setPasted] = useState("");
   const [exportError, setExportError] = useState<string | null>(null);
-  const [exporting, setExporting] = useState(false);
 
   // Auth gate: only authenticated users see the cinematic. Send
   // unauth'd users back to /login. While loading, render the
@@ -140,23 +139,38 @@ export default function UnboxPage() {
     );
   }, [stage, serial.length]);
 
-  const handleReveal = useCallback(async () => {
+  const handleReveal = useCallback(() => {
     if (!activeWallet || !isEmbedded) return;
-    setExporting(true);
     setExportError(null);
-    try {
-      // Privy opens its own modal showing the base58 secret key.
-      // The promise resolves once the user dismisses the modal.
-      // Bytes never leave Privy's iframe — we only know "the user
-      // saw the key and closed the modal".
-      await exportWallet({ address: activeWallet.address });
-      setStage("verify");
-    } catch (e) {
-      setExportError(e instanceof Error ? e.message : "Export was cancelled.");
-    } finally {
-      setExporting(false);
-    }
+    // Fire-and-forget. If we await on exportWallet's promise (which only
+    // resolves when the user dismisses the modal), a stuck/blocked
+    // Privy modal locks the whole page on "Opening Privy…". Instead
+    // we trigger the modal AND advance to the verify card immediately:
+    //   - If the modal opens, user copies the key from Privy's UI, closes
+    //     it, and is already on the verify card ready to paste.
+    //   - If the modal hangs/fails (Privy dashboard misconfig, popup
+    //     blocker, etc.), the user can re-trigger via the verify card's
+    //     "Show me the key again" button or use the bypass link.
+    void exportWallet({ address: activeWallet.address }).catch((e) => {
+      console.warn("[unbox] exportWallet failed:", e);
+    });
+    setStage("verify");
   }, [activeWallet, isEmbedded, exportWallet]);
+
+  const handleBypassVerify = useCallback(() => {
+    if (typeof window === "undefined") return;
+    const confirmed = window.confirm(
+      "Skip device-key verification?\n\n" +
+        "You can still use Kyvern, but if you ever lose this browser " +
+        "without saving the key, you'll have to recover via your account " +
+        "(email/Google) and the wallet won't be portable to another app.\n\n" +
+        "Continue without saving the key?",
+    );
+    if (confirmed) {
+      setPasted("");
+      setStage("claimed");
+    }
+  }, []);
 
   // Once the user has pasted a valid key, advance to claimed.
   const pasteIsValid = useMemo(
@@ -264,10 +278,8 @@ export default function UnboxPage() {
           {stage === "ready" && isEmbedded && (
             <RevealCard
               key="reveal"
-              busy={exporting}
               error={exportError}
               onReveal={handleReveal}
-              onAlreadySaved={() => setStage("verify")}
             />
           )}
           {stage === "ready" && !isEmbedded && activeWallet && (
@@ -290,6 +302,7 @@ export default function UnboxPage() {
               wrong={pasteShownButWrong}
               onConfirm={handleConfirmPaste}
               onShowAgain={handleReveal}
+              onBypass={handleBypassVerify}
             />
           )}
         </AnimatePresence>
@@ -704,15 +717,11 @@ function LedBoot({ stageReady }: { stageReady: boolean }) {
    ──────────────────────────────────────────────────────────────────── */
 
 function RevealCard({
-  busy,
   error,
   onReveal,
-  onAlreadySaved,
 }: {
-  busy: boolean;
   error: string | null;
   onReveal: () => void;
-  onAlreadySaved: () => void;
 }) {
   return (
     <motion.div
@@ -749,10 +758,9 @@ function RevealCard({
         <motion.button
           type="button"
           onClick={onReveal}
-          disabled={busy}
-          whileHover={busy ? undefined : { y: -1 }}
-          whileTap={busy ? undefined : { scale: 0.98 }}
-          className="inline-flex items-center gap-2 h-[48px] px-6 rounded-[12px] text-[13.5px] font-semibold tracking-[-0.005em] disabled:opacity-60 disabled:cursor-not-allowed"
+          whileHover={{ y: -1 }}
+          whileTap={{ scale: 0.98 }}
+          className="inline-flex items-center gap-2 h-[48px] px-6 rounded-[12px] text-[13.5px] font-semibold tracking-[-0.005em]"
           style={{
             background: "#FFFFFF",
             color: "#0A0B10",
@@ -761,7 +769,7 @@ function RevealCard({
           }}
         >
           <Eye className="w-4 h-4" strokeWidth={1.8} />
-          {busy ? "Opening Privy…" : "Reveal device key"}
+          Reveal device key
         </motion.button>
 
         {error && (
@@ -777,17 +785,17 @@ function RevealCard({
           </div>
         )}
 
-        <button
-          type="button"
-          onClick={onAlreadySaved}
-          className="mt-4 font-mono uppercase tracking-[0.16em] hover:underline"
+        <p
+          className="mt-4 font-mono"
           style={{
-            fontSize: 9.5,
-            color: "rgba(231,233,238,0.45)",
+            fontSize: 10,
+            color: "rgba(231,233,238,0.40)",
+            letterSpacing: "0.06em",
           }}
         >
-          Already saved? Skip to verify
-        </button>
+          A Privy modal will open with your key. Copy it, then close
+          the modal to verify.
+        </p>
       </div>
     </motion.div>
   );
@@ -870,6 +878,7 @@ function VerifyCard({
   wrong,
   onConfirm,
   onShowAgain,
+  onBypass,
 }: {
   pasted: string;
   onChange: (s: string) => void;
@@ -877,6 +886,7 @@ function VerifyCard({
   wrong: boolean;
   onConfirm: () => void;
   onShowAgain: () => void;
+  onBypass: () => void;
 }) {
   return (
     <motion.div
@@ -982,6 +992,24 @@ function VerifyCard({
           Hmm — that&apos;s not your device key. Try again, or click <em>Show me the key again</em>.
         </div>
       )}
+
+      {/* Last-resort bypass — for the case where Privy's modal won't
+          open at all (dashboard misconfig, popup blocker, etc.) and
+          the user can't get their key into the textarea. They can
+          still use Kyvern; their wallet stays recoverable via account. */}
+      <div className="mt-4 pt-3 text-center" style={{ borderTop: "1px solid rgba(231,233,238,0.08)" }}>
+        <button
+          type="button"
+          onClick={onBypass}
+          className="font-mono uppercase tracking-[0.16em] hover:underline"
+          style={{
+            fontSize: 9.5,
+            color: "rgba(231,233,238,0.40)",
+          }}
+        >
+          Modal not opening? Continue without saving
+        </button>
+      </div>
     </motion.div>
   );
 }
