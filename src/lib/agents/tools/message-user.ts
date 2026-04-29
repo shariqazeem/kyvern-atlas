@@ -118,7 +118,7 @@ export const messageUserTool: AgentTool = {
           ? String(input.sourceUrl).trim()
           : null;
 
-      const sig = writeSignal({
+      const result = writeSignal({
         agentId: ctx.agent.id,
         deviceId: ctx.agent.deviceId,
         kind,
@@ -128,6 +128,28 @@ export const messageUserTool: AgentTool = {
         sourceUrl,
       });
 
+      // Dedup hit — the same (kind + subject) was already surfaced
+      // inside the per-kind dedup window. Don't log a new
+      // "Surfaced signal" event and tell the LLM honestly so its next
+      // step can idle instead of retrying. This is the storage-layer
+      // gate that closes the loop-breaking-rule failure mode where
+      // the model knew it had surfaced and surfaced again anyway.
+      if (!result.created) {
+        const ageMs = result.duplicateAgeMs ?? 0;
+        const ageMin = Math.max(1, Math.round(ageMs / 60_000));
+        return {
+          ok: true,
+          message: `Already surfaced ${kind} "${subject.slice(0, 60)}${subject.length > 60 ? "…" : ""}" ${ageMin}m ago — no new alert sent. Idle this cycle.`,
+          data: {
+            signalId: result.signal.id,
+            kind,
+            subject,
+            deduped: true,
+            duplicateAgeMinutes: ageMin,
+          },
+        };
+      }
+
       ctx.log({
         description: `Surfaced signal: ${subject.slice(0, 60)}${subject.length > 60 ? "…" : ""}`,
       });
@@ -135,7 +157,7 @@ export const messageUserTool: AgentTool = {
       return {
         ok: true,
         message: `Surfaced ${kind} to inbox: "${subject.slice(0, 60)}${subject.length > 60 ? "…" : ""}"`,
-        data: { signalId: sig.id, kind, subject },
+        data: { signalId: result.signal.id, kind, subject },
       };
     }
 

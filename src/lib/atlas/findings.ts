@@ -191,7 +191,7 @@ export async function produceAtlasFindings(cycleNumber: number): Promise<AtlasFi
 
   const signalIds: string[] = [];
   for (const it of newItems) {
-    const sig = writeSignal({
+    const result = writeSignal({
       agentId: ATLAS_AGENT_ID,
       deviceId: ATLAS_DEVICE_ID,
       kind: source.kind,
@@ -199,7 +199,14 @@ export async function produceAtlasFindings(cycleNumber: number): Promise<AtlasFi
       evidence: it.evidence,
       sourceUrl: it.url,
     });
-    signalIds.push(sig.id);
+    // writeSignal now returns { signal, created, duplicateAgeMs? }
+    // for server-side dedup. Atlas's per-source watch cache already
+    // dedupes upstream (we filter by seenSet a few lines up), but if
+    // the storage-layer gate also fires we still get back the
+    // existing signal id — append it so the response stays
+    // consistent with the user-facing meaning of "the signal
+    // associated with this item".
+    signalIds.push(result.signal.id);
   }
 
   // Always update cache — including items we didn't surface (cap reached

@@ -626,6 +626,29 @@ function migrate(db: Database.Database) {
   // page can render the green "mode: llm" pill on cards that came from
   // the LLM path and a subtle muted pill on the scripted fallback.
   tryAlter(`ALTER TABLE agent_thoughts ADD COLUMN mode TEXT DEFAULT 'llm'`);
+
+  // signals.subject_hash — used for server-side dedup at writeSignal()
+  // time. Workers (especially Token Pulse) sometimes re-emit the same
+  // finding many times even though the system prompt forbids it. We
+  // gate at the storage layer: same (agent_id, kind, subject_hash)
+  // within the per-kind dedup window → drop, return existing signal.
+  // Hash matches the JS hashSubject(): lower(trim(subject)) trimmed
+  // to 80 chars. Using SQL lower(trim()) on the substring would clip
+  // BEFORE casing, producing a different hash, so do it in this order.
+  tryAlter(`ALTER TABLE signals ADD COLUMN subject_hash TEXT`);
+  tryAlter(
+    `CREATE INDEX IF NOT EXISTS idx_signals_dedup ON signals(agent_id, kind, subject_hash, created_at)`,
+  );
+  // Backfill — one-time, idempotent (only updates rows where the
+  // column is still NULL). Cheap on the production signals table
+  // (~hundreds of rows). Matches the JS implementation exactly.
+  try {
+    db.exec(
+      `UPDATE signals SET subject_hash = substr(lower(trim(subject)), 1, 80) WHERE subject_hash IS NULL`,
+    );
+  } catch {
+    /* if the column doesn't exist yet on a stale connection, retry next boot */
+  }
 }
 
 // --- Benchmark Queries (cross-user market intelligence) ---

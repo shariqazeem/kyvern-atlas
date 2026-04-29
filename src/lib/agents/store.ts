@@ -410,6 +410,40 @@ function rowToSignal(r: SignalRow): Signal {
   };
 }
 
+/** Subject hash for dedup. Matches the SQL backfill exactly:
+ *  lower → trim → first 80 chars. Two signals from the same worker
+ *  with the same kind hash to the same value → dedup hit. */
+function hashSubject(subject: string): string {
+  return subject.toLowerCase().trim().slice(0, 80);
+}
+
+/** Per-kind dedup windows. Tuned for the noise patterns we saw in
+ *  production: token_pulse re-emits the same band-break every tick
+ *  while a price stays out-of-band, so a 30-min window collapses
+ *  ~55 of those 72 dupes; bounty/release/announcement are slower-
+ *  moving and warrant a 24-hour window so reposts don't re-surface. */
+const DEDUPE_WINDOW_MS_BY_KIND: Record<SignalKind, number> = {
+  bounty: 24 * 60 * 60 * 1000,                  // 24h
+  ecosystem_announcement: 24 * 60 * 60 * 1000,  // 24h
+  github_release: 24 * 60 * 60 * 1000,          // 24h
+  wallet_move: 60 * 60 * 1000,                  // 1h
+  price_trigger: 30 * 60 * 1000,                // 30m
+  observation: 60 * 60 * 1000,                  // 1h
+};
+
+interface WriteSignalResult {
+  signal: Signal;
+  /** false = a brand-new signal was inserted.
+   *  true  = the same finding (by agent + kind + subject) was already
+   *          surfaced inside the per-kind dedup window; the existing
+   *          signal is returned and no new row is written. */
+  created: boolean;
+  /** When created=false, how long ago the existing signal was written.
+   *  Used by the message_user tool to render an honest "already
+   *  surfaced X minutes ago" tool result back to the LLM. */
+  duplicateAgeMs?: number;
+}
+
 export function writeSignal(input: {
   agentId: string;
   deviceId: string;
@@ -419,44 +453,70 @@ export function writeSignal(input: {
   suggestion?: string | null;
   signature?: string | null;
   sourceUrl?: string | null;
-}): Signal {
-  const id = `sig_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+}): WriteSignalResult {
   const now = Date.now();
   const subject = input.subject.slice(0, 200);
   const evidence = input.evidence.map((e) => String(e).slice(0, 400)).slice(0, 8);
+  const subjectHash = hashSubject(subject);
+  const db = getDb();
 
-  getDb()
+  // Dedup gate — same (agent, kind, subject_hash) inside window → drop.
+  const windowMs =
+    DEDUPE_WINDOW_MS_BY_KIND[input.kind] ?? 60 * 60 * 1000;
+  const cutoff = now - windowMs;
+  const existing = db
     .prepare(
-      `INSERT INTO signals (
-        id, agent_id, device_id, kind, subject, evidence_json,
-        suggestion, signature, source_url, status, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'unread', ?)`,
+      `SELECT * FROM signals
+       WHERE agent_id = ? AND kind = ? AND subject_hash = ? AND created_at >= ?
+       ORDER BY created_at DESC LIMIT 1`,
     )
-    .run(
-      id,
-      input.agentId,
-      input.deviceId,
-      input.kind,
-      subject,
-      JSON.stringify(evidence),
-      input.suggestion ?? null,
-      input.signature ?? null,
-      input.sourceUrl ?? null,
-      now,
-    );
+    .get(input.agentId, input.kind, subjectHash, cutoff) as
+    | SignalRow
+    | undefined;
+  if (existing) {
+    return {
+      signal: rowToSignal(existing),
+      created: false,
+      duplicateAgeMs: now - existing.created_at,
+    };
+  }
+
+  const id = `sig_${now.toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+
+  db.prepare(
+    `INSERT INTO signals (
+      id, agent_id, device_id, kind, subject, subject_hash, evidence_json,
+      suggestion, signature, source_url, status, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'unread', ?)`,
+  ).run(
+    id,
+    input.agentId,
+    input.deviceId,
+    input.kind,
+    subject,
+    subjectHash,
+    JSON.stringify(evidence),
+    input.suggestion ?? null,
+    input.signature ?? null,
+    input.sourceUrl ?? null,
+    now,
+  );
 
   return {
-    id,
-    agentId: input.agentId,
-    deviceId: input.deviceId,
-    kind: input.kind,
-    subject,
-    evidence,
-    suggestion: input.suggestion ?? null,
-    signature: input.signature ?? null,
-    sourceUrl: input.sourceUrl ?? null,
-    status: "unread",
-    createdAt: now,
+    created: true,
+    signal: {
+      id,
+      agentId: input.agentId,
+      deviceId: input.deviceId,
+      kind: input.kind,
+      subject,
+      evidence,
+      suggestion: input.suggestion ?? null,
+      signature: input.signature ?? null,
+      sourceUrl: input.sourceUrl ?? null,
+      status: "unread",
+      createdAt: now,
+    },
   };
 }
 
