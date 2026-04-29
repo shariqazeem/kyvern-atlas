@@ -40,6 +40,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { usePrivy } from "@privy-io/react-auth";
 import { useWallets as useSolanaWallets } from "@privy-io/react-auth/solana";
 import { useExportWallet } from "@privy-io/react-auth/solana";
+import { seedDefaultWorkersIfEmpty } from "@/lib/onboarding/seed-workers";
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
@@ -214,48 +215,60 @@ export default function UnboxPage() {
     setProvisioning(true);
     setProvisionError(null);
     try {
-      // 1. Check for existing vault first — idempotency. If they
-      //    already have one (e.g. came back to /unbox after a prior
-      //    session), don't double-create.
+      // 1. Resolve the device — existing vault wins, otherwise
+      //    create a fresh one. Either way we end up with a deviceId
+      //    we can seed workers onto.
+      let deviceId: string | null = null;
       const list = await fetch(
         `/api/vault/list?ownerWallet=${encodeURIComponent(wallet)}`,
       );
       const listJson = list.ok ? await list.json() : { vaults: [] };
       const existing = Array.isArray(listJson?.vaults) ? listJson.vaults : [];
       if (existing.length > 0) {
-        router.push("/app");
-        return;
+        deviceId = existing[0]?.vault?.id ?? null;
+      } else {
+        // No vault yet → create with sensible defaults. The user
+        // can raise budgets later in /app/settings if they want
+        // more headroom for their workers.
+        const res = await fetch("/api/vault/create", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ownerWallet: wallet,
+            name: deriveSerial(wallet).replace("KVN-", "Kyvern "),
+            emoji: "🧭",
+            purpose: "research",
+            dailyLimitUsd: 5,
+            weeklyLimitUsd: 25,
+            perTxMaxUsd: 0.5,
+            maxCallsPerWindow: 60,
+            velocityWindow: "1h",
+            allowedMerchants: [],
+            requireMemo: true,
+            network: "devnet",
+          }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => null);
+          throw new Error(
+            data?.message ||
+              data?.error ||
+              "Vault provisioning failed",
+          );
+        }
+        const created = await res.json();
+        deviceId = created?.vault?.id ?? null;
       }
 
-      // 2. No vault yet → create with sensible defaults. The user can
-      //    raise budgets later in /app/settings if they want more
-      //    headroom for their workers.
-      const res = await fetch("/api/vault/create", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ownerWallet: wallet,
-          name: deriveSerial(wallet).replace("KVN-", "Kyvern "),
-          emoji: "🧭",
-          purpose: "research",
-          dailyLimitUsd: 5,
-          weeklyLimitUsd: 25,
-          perTxMaxUsd: 0.5,
-          maxCallsPerWindow: 60,
-          velocityWindow: "1h",
-          allowedMerchants: [],
-          requireMemo: true,
-          network: "devnet",
-        }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => null);
-        throw new Error(
-          data?.message ||
-            data?.error ||
-            "Vault provisioning failed",
-        );
+      // 2. Seed the demo trio onto the device — Sentinel/Bounty
+      //    Hunter on Superteam Dev >$500, Wren/Whale Tracker on
+      //    Kraken hot wallet, Pulse/Token Pulse on SOL band. The
+      //    user lands on /app with three workers already running;
+      //    the first finding hits within ~90s. Idempotent.
+      if (deviceId) {
+        await seedDefaultWorkersIfEmpty(deviceId);
       }
+
       router.push("/app");
     } catch (e) {
       console.warn("[unbox] vault provisioning failed:", e);
@@ -1209,7 +1222,7 @@ function ClaimedCard({
               animate={{ rotate: 360 }}
               transition={{ duration: 0.9, repeat: Infinity, ease: "linear" }}
             />
-            Setting up your device on Solana…
+            Provisioning device + 3 starter workers…
           </>
         ) : (
           <>

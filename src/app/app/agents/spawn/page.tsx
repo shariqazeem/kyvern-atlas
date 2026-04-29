@@ -39,6 +39,7 @@ import {
 } from "@/components/spawn/customize-drawer";
 import { CartridgePicker } from "@/components/spawn/cartridge-picker";
 import { InstallAnimation } from "@/components/spawn/install-animation";
+import { seedDefaultWorkersIfEmpty } from "@/lib/onboarding/seed-workers";
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
@@ -195,6 +196,15 @@ export default function SpawnPage() {
         throw new Error(
           data?.message || data?.error || "Vault provisioning failed",
         );
+      }
+      // Read the new vault id off the create response so we can
+      // immediately seed the demo trio. Don't wait for the list
+      // refetch — seedDefaultWorkersIfEmpty's idempotency check
+      // handles the case where the user already had workers.
+      const created = await res.json().catch(() => null);
+      const newDeviceId = created?.vault?.id as string | undefined;
+      if (newDeviceId) {
+        await seedDefaultWorkersIfEmpty(newDeviceId);
       }
       // Refetch the vault list so the picker can render.
       const list = await fetch(

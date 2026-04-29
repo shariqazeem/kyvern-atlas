@@ -36,6 +36,7 @@ import { AtlasMicroStats } from "@/components/atlas/atlas-micro-stats";
 import { AtlasPnlSparkline } from "@/components/atlas/atlas-pnl-sparkline";
 import { AtlasFindings } from "@/components/atlas/atlas-findings";
 import { AttackWall } from "@/components/atlas/attack-wall";
+import { DrainAtlasCallout } from "@/components/atlas/drain-atlas-callout";
 import { ThreeLayerDiagram } from "@/components/atlas/three-layer-diagram";
 import { TopUpAtlas } from "@/components/atlas/top-up-atlas";
 
@@ -185,12 +186,19 @@ export default function AtlasClient({
             initialThisWeek={initialFindingsThisWeek}
           />
 
+          {/* 4b. Drain Atlas dare — primes the attack wall below.
+                The chain refuses, the receipt is public. */}
+          <DrainAtlasCallout
+            attacksBlocked={state?.totalAttacksBlocked ?? 0}
+          />
+
           {/* 5. Attack wall */}
           <motion.div
+            id="attack-wall"
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.55, delay: 0.32, ease: EASE }}
-            className="mb-14"
+            className="mb-14 scroll-mt-24"
           >
             <AttackWall attacks={attacks} limit={60} />
             <div

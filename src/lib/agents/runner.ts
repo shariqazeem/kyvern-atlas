@@ -23,6 +23,7 @@ import {
 import { getTool } from "./tools";
 import { tryAcquireTickSlot } from "./rate-limit";
 import { scriptedTick } from "./scripted";
+import { cleanReasoning } from "./reasoning-clean";
 import type {
   Agent,
   AgentDecision,
@@ -283,7 +284,12 @@ async function llmTick(agent: Agent, ctx: AgentToolContext): Promise<LlmTickOutc
     const msg = choice.message as ChatMessageWithReasoning;
     const contentText = (msg.content ?? "").trim();
     const reasoningText = (msg.reasoning_content ?? "").trim();
-    const reasoning = (contentText || reasoningText || "(no reasoning offered)").trim();
+    // Run the raw text through cleanReasoning() — strips "Let me
+    // think about…" preambles + bare tool IDs so the thought feed
+    // reads as intentional output instead of internal monologue.
+    const reasoning = cleanReasoning(
+      contentText || reasoningText || "(no reasoning offered)",
+    );
 
     const toolCalls = choice.message?.tool_calls;
     const hasToolCall = !!(toolCalls && toolCalls.length > 0);
