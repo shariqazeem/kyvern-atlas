@@ -273,8 +273,12 @@ export default function UnboxPage() {
 
   return (
     <main
-      className="fixed inset-0 overflow-hidden flex items-center justify-center px-6 select-none"
+      className="relative flex items-center justify-center px-5 py-10 sm:px-6 sm:py-14 overflow-x-hidden"
       style={{
+        // dvh = dynamic viewport height — accounts for iOS Safari's
+        // collapsing toolbar so the cinematic doesn't get clipped or
+        // pushed under the home indicator.
+        minHeight: "100dvh",
         background:
           "radial-gradient(ellipse 90% 60% at 50% 50%, #161821 0%, #0A0B10 70%, #04050A 100%)",
         color: "#E7E9EE",
@@ -1013,7 +1017,7 @@ function VerifyCard({
         autoCorrect="off"
         autoCapitalize="off"
         rows={3}
-        className="w-full font-mono text-[12px] leading-[1.4] outline-none resize-none rounded-[10px] px-3 py-2.5"
+        className="w-full font-mono text-[13px] leading-[1.4] outline-none resize-none rounded-[10px] px-3 py-3"
         style={{
           background: "rgba(0,0,0,0.40)",
           color: "#E7E9EE",
@@ -1022,17 +1026,22 @@ function VerifyCard({
             : "1px solid rgba(231,233,238,0.12)",
           letterSpacing: "0.01em",
           transition: "border-color 0.3s ease",
+          // Belt-and-suspenders: explicit text selection so iOS
+          // Safari's long-press paste menu always shows up here,
+          // even if any ancestor sets user-select.
+          userSelect: "text",
+          WebkitUserSelect: "text",
         }}
       />
 
-      <div className="flex items-center justify-between mt-3 gap-3">
+      <div className="flex items-center justify-between mt-3 gap-3 flex-wrap">
         <button
           type="button"
           onClick={onShowAgain}
-          className="inline-flex items-center gap-1.5 font-mono uppercase tracking-[0.16em] hover:underline"
+          className="inline-flex items-center gap-1.5 font-mono uppercase tracking-[0.16em] hover:underline min-h-[36px] px-1.5"
           style={{
-            fontSize: 9.5,
-            color: "rgba(231,233,238,0.55)",
+            fontSize: 10.5,
+            color: "rgba(231,233,238,0.65)",
           }}
         >
           <RefreshCw className="w-3 h-3" />
@@ -1045,7 +1054,7 @@ function VerifyCard({
           disabled={!valid}
           whileHover={valid ? { y: -1 } : undefined}
           whileTap={valid ? { scale: 0.97 } : undefined}
-          className="inline-flex items-center gap-1.5 h-9 px-4 rounded-[10px] text-[12.5px] font-semibold tracking-[-0.005em] disabled:cursor-not-allowed"
+          className="inline-flex items-center gap-1.5 h-11 px-5 rounded-[10px] text-[13px] font-semibold tracking-[-0.005em] disabled:cursor-not-allowed"
           style={{
             background: valid ? "#22C55E" : "rgba(231,233,238,0.10)",
             color: valid ? "#04050A" : "rgba(231,233,238,0.45)",
@@ -1087,10 +1096,10 @@ function VerifyCard({
         <button
           type="button"
           onClick={onBypass}
-          className="font-mono uppercase tracking-[0.16em] hover:underline"
+          className="font-mono uppercase tracking-[0.16em] hover:underline min-h-[40px] px-2 inline-flex items-center justify-center"
           style={{
-            fontSize: 9.5,
-            color: "rgba(231,233,238,0.40)",
+            fontSize: 10.5,
+            color: "rgba(231,233,238,0.55)",
           }}
         >
           Modal not opening? Continue without saving

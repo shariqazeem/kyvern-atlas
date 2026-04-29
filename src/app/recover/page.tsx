@@ -129,8 +129,12 @@ export default function RecoverPage() {
 
   return (
     <main
-      className="fixed inset-0 overflow-y-auto flex items-center justify-center px-6 py-12 select-none"
+      className="relative flex items-center justify-center px-5 py-12 sm:px-6 sm:py-16 overflow-x-hidden"
       style={{
+        // dvh = dynamic viewport height — accounts for iOS Safari's
+        // collapsing toolbar so the recover surface doesn't get
+        // clipped behind the keyboard.
+        minHeight: "100dvh",
         background:
           "radial-gradient(ellipse 90% 60% at 50% 50%, #161821 0%, #0A0B10 70%, #04050A 100%)",
         color: "#E7E9EE",
@@ -154,10 +158,10 @@ export default function RecoverPage() {
       {/* Back to /login */}
       <Link
         href="/login"
-        className="absolute top-6 left-6 inline-flex items-center gap-1.5 font-mono uppercase tracking-[0.16em] hover:opacity-80"
-        style={{ color: "rgba(231,233,238,0.55)", fontSize: 10 }}
+        className="absolute top-5 left-4 sm:top-6 sm:left-6 inline-flex items-center gap-1.5 font-mono uppercase tracking-[0.16em] hover:opacity-80 min-h-[40px] px-1"
+        style={{ color: "rgba(231,233,238,0.65)", fontSize: 11 }}
       >
-        <ArrowLeft className="w-3 h-3" />
+        <ArrowLeft className="w-3.5 h-3.5" />
         Back
       </Link>
 
@@ -314,12 +318,16 @@ function PasteCard({
           autoCorrect="off"
           autoCapitalize="off"
           rows={3}
-          className="w-full font-mono text-[12.5px] leading-[1.4] outline-none resize-none rounded-[10px] px-3 py-3"
+          className="w-full font-mono text-[13px] leading-[1.4] outline-none resize-none rounded-[10px] px-3 py-3"
           style={{
             background: "rgba(0,0,0,0.40)",
             color: "#E7E9EE",
             border: "1px solid rgba(231,233,238,0.12)",
             letterSpacing: "0.01em",
+            // Belt-and-suspenders: explicit text selection so iOS
+            // Safari's long-press paste menu always shows up here.
+            userSelect: "text",
+            WebkitUserSelect: "text",
           }}
         />
 
@@ -370,21 +378,21 @@ function PasteCard({
       <div className="mt-6 text-center">
         <div
           className="font-mono uppercase tracking-[0.18em] mb-2"
-          style={{ color: "rgba(231,233,238,0.40)", fontSize: 9.5 }}
+          style={{ color: "rgba(231,233,238,0.40)", fontSize: 10 }}
         >
           Lost your key?
         </div>
         <button
           type="button"
           onClick={onAccountFallback}
-          className="text-[13px] font-medium hover:underline underline-offset-4"
-          style={{ color: "rgba(231,233,238,0.78)" }}
+          className="text-[14px] font-medium hover:underline underline-offset-4 min-h-[40px] px-3 inline-flex items-center justify-center"
+          style={{ color: "rgba(231,233,238,0.85)" }}
         >
           Sign in with your account instead
         </button>
         <p
-          className="mt-1.5 text-[11.5px]"
-          style={{ color: "rgba(231,233,238,0.45)" }}
+          className="mt-1.5 text-[12px]"
+          style={{ color: "rgba(231,233,238,0.50)" }}
         >
           Email or Google. Your existing Kyvern restores via account.
         </p>
