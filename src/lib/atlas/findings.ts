@@ -11,9 +11,16 @@
  * Atlas continues to be the proof unit; it now also produces real
  * signals into the Inbox the same way user workers do.
  *
- * Sources rotate so we don't hammer one feed: Solana Foundation blog
- * (RSS), Solana Labs releases (GitHub JSON), Anchor releases (GitHub
- * JSON). If a source fails, we silently move on — never blocks Atlas.
+ * Sources rotate (one source per pass, ~15-min cadence, full cycle
+ * across 6 sources every ~90 min):
+ *   1. Solana Foundation blog (RSS)
+ *   2. Helius blog (RSS) — infra ecosystem
+ *   3. Colosseum blog (RSS) — judge / hackathon feed
+ *   4. Solana Labs releases (GitHub JSON)
+ *   5. Anchor releases (GitHub JSON)
+ *   6. Metaplex mpl-core releases (GitHub JSON)
+ *
+ * If a source fails, we silently move on — never blocks Atlas.
  */
 
 import { createHash } from "crypto";
@@ -45,6 +52,18 @@ const SOURCES: FindingSource[] = [
     label: "Solana Foundation blog",
   },
   {
+    url: "https://www.helius.dev/blog/rss.xml",
+    format: "rss",
+    kind: "ecosystem_announcement",
+    label: "Helius blog",
+  },
+  {
+    url: "https://blog.colosseum.com/rss",
+    format: "rss",
+    kind: "ecosystem_announcement",
+    label: "Colosseum blog",
+  },
+  {
     url: "https://api.github.com/repos/solana-labs/solana/releases",
     format: "github-releases",
     kind: "github_release",
@@ -55,6 +74,12 @@ const SOURCES: FindingSource[] = [
     format: "github-releases",
     kind: "github_release",
     label: "Anchor releases",
+  },
+  {
+    url: "https://api.github.com/repos/metaplex-foundation/mpl-core/releases",
+    format: "github-releases",
+    kind: "github_release",
+    label: "Metaplex mpl-core releases",
   },
 ];
 

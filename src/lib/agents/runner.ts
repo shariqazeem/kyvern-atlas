@@ -92,6 +92,30 @@ PERSONALITY: ${agent.personalityPrompt}
 
 YOUR JOB: ${agent.jobPrompt}
 
+HOW TO WRITE YOUR REASONING TEXT (very important):
+The reasoning text you emit on each tool call is shown to the owner as
+a worker's notebook entry on /app/agents/[id]. Write it as a ONE-LINE
+WORKER NOTE about what you observed this cycle — in your own voice,
+like a security guard filing a brief log entry. NOT chess analysis,
+NOT model self-reasoning, NOT meta-commentary on the prompt.
+
+GOOD notes (write like these):
+  "Pulled SOL price · $145.21 · inside band · idle."
+  "Kraken hot wallet moved $52k SOL → USDC · surfacing."
+  "Superteam returned 3 new listings · 2 under $500 · 1 worth flagging."
+  "BONK at $0.0000063 · breach lower · already surfaced 22m ago · idle."
+  "Watched anchor releases · no new tag · idle."
+
+BAD notes (NEVER write like these — the owner will see this verbatim):
+  "We need to decide based on recent thoughts..." (talking as a model)
+  "The user gave us a summary..." (referencing the prompt)
+  "Let me think about whether to call watch_url..." (thinking out loud)
+  "I should check, but per the instruction we already..." (meta)
+  "The recent thoughts indicate that previously we..." (third-person plural)
+
+Use first-person if you must ("checked SOL"), but write the way an
+employee writes notes between tasks — not the way an AI deliberates.
+
 WHAT WORKERS DO:
 You watch the world for things your owner cares about and surface them as
 findings. When you find something, you do NOT chat about it — you call
@@ -148,25 +172,37 @@ function buildContextMessage(
   recentThoughts: { thought: string; timestamp: number; toolUsed: string | null }[],
 ): string {
   // VOLATILE part — user message, after the cached prefix.
+  // Clean recent thoughts before injecting them back so legacy
+  // meta-narration ("We need to decide…") doesn't contaminate the
+  // current tick. Acts like a one-way membrane: messy old → clean
+  // new.
   const lastThoughtsText = recentThoughts
     .slice(0, 5)
     .reverse()
     .map((t) => {
       const mins = Math.round((Date.now() - t.timestamp) / 60000);
       const tool = t.toolUsed ? ` [used: ${t.toolUsed}]` : "";
-      return `- ${mins}m ago${tool}: ${t.thought.slice(0, 200)}`;
+      const cleaned = cleanReasoning(t.thought).slice(0, 200);
+      return `- ${mins}m ago${tool}: ${cleaned}`;
     })
     .join("\n");
 
-  return `Current status:
-- Total thoughts: ${agent.totalThoughts}
+  // Framing intentionally avoids "make your next decision" — that
+  // language pulled the model into chess-engine mode where it would
+  // narrate its own deliberation. New framing is "what's new this
+  // cycle, what did you note, file your one-line entry now".
+  return `WHAT'S NEW FOR ${agent.name.toUpperCase()} THIS CYCLE:
+- Total notes filed so far: ${agent.totalThoughts}
 - Earned: $${agent.totalEarnedUsd.toFixed(3)} · Spent: $${agent.totalSpentUsd.toFixed(3)}
-- Tick frequency: every ${agent.frequencySeconds}s
+- Cadence: every ${agent.frequencySeconds}s
 
-Recent thoughts:
-${lastThoughtsText || "(none — first tick)"}
+LAST 5 NOTES YOU FILED:
+${lastThoughtsText || "(none — first cycle on duty)"}
 
-Make your next decision. Brief reasoning + optional tool call.`;
+Now: call the data-gathering tool that matches your job, then file
+your one-line worker note for this cycle. Keep it in the voice of
+an employee filing a brief log entry — not a model explaining its
+reasoning.`;
 }
 
 function toOpenAITool(tool: AgentTool) {
