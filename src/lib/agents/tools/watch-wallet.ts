@@ -318,7 +318,7 @@ export const watchWalletSwapsTool: AgentTool = {
   id: "watch_wallet_swaps",
   name: "Detect Jupiter swaps for a wallet",
   description:
-    "Scan a Solana wallet's recent transactions on mainnet and return ONLY Jupiter swaps, valued in USD. Use minUsdThreshold to filter for big trades. Built for jobs like 'alert me when this wallet swaps >$500 on Jupiter'.",
+    "Scan a Solana wallet's recent transactions on mainnet and return ONLY Jupiter swaps, valued in USD. Pre-filters by minUsdThreshold (default $100) so dust swaps never reach the worker. To loosen the floor for a particular job, pass minUsdThreshold explicitly (e.g. 25 for low-cap watching, 0 to see everything).",
   category: "read",
   costsMoney: false,
   schema: {
@@ -334,7 +334,8 @@ export const watchWalletSwapsTool: AgentTool = {
       },
       minUsdThreshold: {
         type: "number",
-        description: "Minimum swap value in USD to return. Default 0.",
+        description:
+          "Minimum swap value in USD to return. DEFAULT 100 — anything smaller is treated as dust and never returned. Pass 0 to disable the filter, or a different positive number to tighten/loosen.",
       },
     },
     required: ["address"],
@@ -346,7 +347,15 @@ export const watchWalletSwapsTool: AgentTool = {
     if (invalid) return invalid;
 
     const limit = Math.min(Math.max(Number(input.lookbackCount ?? 25), 1), 50);
-    const minUsd = Math.max(0, Number(input.minUsdThreshold ?? 0));
+    // Default $100 floor — keeps dust swaps from polluting the
+    // worker's context. The chip jobs that want lower thresholds
+    // pass them explicitly; the LLM never lands on $0.0008 swaps
+    // by accident.
+    const rawThreshold = input.minUsdThreshold;
+    const minUsd =
+      rawThreshold === undefined || rawThreshold === null
+        ? 100
+        : Math.max(0, Number(rawThreshold));
 
     const sigs = await rpcCall<RpcSig[]>("getSignaturesForAddress", [address, { limit }]);
     if (!sigs) return { ok: false, message: "Mainnet RPC unavailable; try again." };
