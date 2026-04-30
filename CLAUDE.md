@@ -2,7 +2,7 @@
 
 **This is the active hackathon codebase.** If you're reading this cold, orient yourself here before anything else.
 
-**Stellar/Pulse has been retired (2026-04-28).** The old `~/kyvernlabs` directory and the stopped `kyvernlabs` pm2 process on the VM are dead weight — leave them alone, don't pull, don't restart. Both `kyvernlabs.com` AND `app.kyvernlabs.com` now serve **this** repo via the `kyvern-commerce` pm2 process on port 3001.
+Both `kyvernlabs.com` AND `app.kyvernlabs.com` serve **this** repo via the `kyvern-commerce` pm2 process on port 3001. The old Stellar/Pulse codebase was deleted from the VM on 2026-05-01 — the `~/kyvernlabs` directory and the stopped `kyvernlabs` pm2 process are gone, not just dormant.
 
 ---
 
@@ -45,12 +45,11 @@ ssh -i ~/Documents/ssh-key3.key ubuntu@80.225.209.190
 
 **What lives where on the VM:**
 
-| Path | Role | Don't touch? |
-|---|---|---|
-| `/home/ubuntu/kyvernlabs-commerce/` | **Kyvern (this repo)** — serves both `kyvernlabs.com` AND `app.kyvernlabs.com` | No — this is where you deploy |
-| `/home/ubuntu/kyvernlabs/` | Abandoned Stellar repo (retired 2026-04-28) | **Don't pull, don't build, don't deploy** |
+| Path | Role |
+|---|---|
+| `/home/ubuntu/kyvernlabs-commerce/` | **Kyvern (this repo)** — serves both `kyvernlabs.com` AND `app.kyvernlabs.com`. This is where you deploy. |
 
-**pm2 processes:**
+**pm2 processes (all 4 must stay online):**
 
 | id | name | cwd | port | purpose |
 |---|---|---|---|---|
@@ -58,7 +57,6 @@ ssh -i ~/Documents/ssh-key3.key ubuntu@80.225.209.190
 | 2 | `atlas` | `~/kyvernlabs-commerce` | — | `scripts/atlas-runner.ts` — autonomous agent loop (3 min cycles) |
 | 3 | `atlas-attacker` | `~/kyvernlabs-commerce` | — | `scripts/atlas-attacker.ts` — adversarial probes every ~8 min |
 | 5 | `agent-pool` | `~/kyvernlabs-commerce` | — | user-spawned agent ticker |
-| 4 | `kyvernlabs` | `~/kyvernlabs` | 3000 | **Stopped — retired Stellar process. Do not restart.** |
 
 **Required env vars on kyvern-commerce + atlas + atlas-attacker:**
 ```
