@@ -1,5 +1,6 @@
 import Database from "better-sqlite3";
 import path from "path";
+import { hashSubject } from "./agents/signal-hash";
 
 const DB_PATH = process.env.PULSE_DB_PATH || path.join(process.cwd(), "pulse.db");
 
@@ -646,11 +647,6 @@ function migrate(db: Database.Database) {
   // and the v2 hash needs $-amount + bare-number normalization.
   // Wrapped in a try so a fresh-DB boot (no signals yet) is fine.
   try {
-    // Avoid a circular import at the module level — pull the hash
-    // function lazily, only when migrate() runs.
-    const { hashSubject } = require("./agents/signal-hash") as {
-      hashSubject: (s: string) => string;
-    };
     const rows = db
       .prepare("SELECT id, subject FROM signals")
       .all() as Array<{ id: string; subject: string }>;
