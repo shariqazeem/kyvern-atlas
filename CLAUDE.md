@@ -97,7 +97,7 @@ ssh -i ~/Documents/ssh-key3.key ubuntu@80.225.209.190 '
 
 # 3. Poll /tmp/kyvern-build-done (or -fail). When done:
 ssh -i ~/Documents/ssh-key3.key ubuntu@80.225.209.190 '
-  pm2 restart kyvern-commerce atlas atlas-attacker &&
+  pm2 restart kyvern-commerce atlas atlas-attacker agent-pool &&
   curl -sS http://127.0.0.1:3001/api/atlas/status | head -c 200
 '
 ```
@@ -127,7 +127,7 @@ curl -sS -o /dev/null -w "kyvernlabs.com: %{http_code}\napp.kyvernlabs.com: %{ht
 4. **`patch-package` aborts the WHOLE patch if any hunk fails context.** If you extend the patch and a subsequent install fails, `rm -rf node_modules/@sqds/multisig && npm install` on the VM to get clean source.
 5. **Server fee-payer `GZCnHuFtswvsJftSDmtoHEve8amqNLzAAPvYy8NU3ZNZ` drains over time.** If every vault.pay() fails simulation with "Attempt to debit an account but found no record of a prior credit" even though the vault USDC ATA has balance → fee payer has 0 SOL. Top up at https://faucet.solana.com (devnet; public RPC airdrop is rate-limited, VM has no `solana` CLI).
 6. **`atlas.db` migrations silently skip under WAL lock.** If other processes (atlas, atlas-attacker) are writing while the web app boots, `ALTER TABLE` can be swallowed. Apply manually with a short `node -e` snippet if a column is missing.
-7. **Atlas + atlas-attacker runners need `pm2 restart` after every kyvern-commerce restart.** Otherwise their fetch state stays stuck logging "fetch failed" even after the server is back.
+7. **Atlas + atlas-attacker AND agent-pool runners need `pm2 restart` after every kyvern-commerce restart.** Atlas/attacker fetch state stays stuck logging "fetch failed" otherwise. **The agent-pool process is the one that ticks user-spawned agents — its JS code is loaded ONCE at process start, so any code change (runner.ts, store.ts, tools/*) is invisible to user agents until pm2 restart agent-pool.** This is a silent failure mode: deploys appear to succeed (web app is updated, DB migrations run), but workers behave as if nothing changed because they're still on the old runtime. **Always include `agent-pool` in the restart list.**
 8. **Build ENOSPC on 45 GB disk at 92% full.** If build fails with `ENOSPC`:
    ```bash
    rm -rf ~/kyvernlabs-commerce.backup-* ~/kyvernlabs-commerce/.next
