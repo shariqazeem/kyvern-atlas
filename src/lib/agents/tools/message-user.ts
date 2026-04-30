@@ -27,6 +27,7 @@ const VALID_SIGNAL_KINDS: SignalKind[] = [
   "price_trigger",
   "github_release",
   "observation",
+  "condition_update",
 ];
 
 function isStructuredSignal(input: Record<string, unknown>): boolean {
@@ -63,7 +64,7 @@ export const messageUserTool: AgentTool = {
         type: "string",
         enum: [...VALID_SIGNAL_KINDS],
         description:
-          "Signal kind for Finding mode. bounty=Superteam/hackathon listing · ecosystem_announcement=protocol launch/grant · wallet_move=on-chain whale activity · price_trigger=token price/volume threshold hit · github_release=new release/commit · observation=anything else worth surfacing.",
+          "Signal kind for Finding mode. bounty=Superteam/hackathon listing · ecosystem_announcement=protocol launch/grant · wallet_move=on-chain whale activity · price_trigger=FIRST time the price crossed your band (or breach in opposite direction) · github_release=new release/commit · observation=genuinely unusual non-event (only fire if anomalous against your recent observations) · condition_update=meaningful milestone within an already-surfaced persistent condition (duration milestone, trend change, volume spike on top of existing breach).",
       },
       subject: {
         type: "string",
@@ -84,6 +85,16 @@ export const messageUserTool: AgentTool = {
         type: "string",
         description:
           "Finding mode (optional): URL the owner can click to verify the finding directly.",
+      },
+      persistenceContext: {
+        type: "string",
+        description:
+          "Finding mode (optional, ≤200 chars): how long has this been going on, what changed since you first observed it. E.g. 'below band for 6h — longest stretch since Apr 15' or 'wallet quiet for 4h — unusual, normally 3+ swaps/hr'. Frontends render this as the persistence stripe on the signal card.",
+      },
+      nextTrigger: {
+        type: "string",
+        description:
+          "Finding mode (optional, ≤200 chars): the SPECIFIC trigger you're watching for next. REPLACES vague 'I'll continue monitoring' language with a concrete commitment. E.g. 'break above $85 on volume as bounce confirmation' or 'submission count crossing 50' or 'next Anchor release tag'.",
       },
       // CHAT MODE field
       message: {
@@ -117,6 +128,16 @@ export const messageUserTool: AgentTool = {
         typeof input.sourceUrl === "string" && input.sourceUrl.trim().length > 0
           ? String(input.sourceUrl).trim()
           : null;
+      const persistenceContext =
+        typeof input.persistenceContext === "string" &&
+        input.persistenceContext.trim().length > 0
+          ? String(input.persistenceContext).slice(0, 200).trim()
+          : null;
+      const nextTrigger =
+        typeof input.nextTrigger === "string" &&
+        input.nextTrigger.trim().length > 0
+          ? String(input.nextTrigger).slice(0, 200).trim()
+          : null;
 
       const result = writeSignal({
         agentId: ctx.agent.id,
@@ -126,6 +147,8 @@ export const messageUserTool: AgentTool = {
         evidence,
         suggestion,
         sourceUrl,
+        persistenceContext,
+        nextTrigger,
       });
 
       // Dedup hit — the same (kind + subject) was already surfaced

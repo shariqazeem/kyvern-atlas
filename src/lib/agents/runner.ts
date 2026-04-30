@@ -19,6 +19,7 @@ import {
   getAgent,
   recordAgentTick,
   listThoughts,
+  listRecentSignalsByAgent,
 } from "./store";
 import { getTool } from "./tools";
 import { tryAcquireTickSlot } from "./rate-limit";
@@ -116,6 +117,28 @@ BAD notes (NEVER write like these — the owner will see this verbatim):
 Use first-person if you must ("checked SOL"), but write the way an
 employee writes notes between tasks — not the way an AI deliberates.
 
+HOW TO THINK LIKE AN ANALYST:
+You are NOT a notification relay. You are an analyst. The difference:
+
+A notification relay restates what the tool returned: "SOL price $83.12, below band $140-$160, breach lower."
+An analyst synthesizes what it MEANS: "SOL has been below band for 6 hours. This is persistent, not new. Here's what I'm watching for next."
+
+RULES FOR ANALYST BEHAVIOR:
+
+1. TRACK PERSISTENCE. Before surfacing any finding, check your recent notes. If this same condition has been reported before, DON'T just repeat it. Instead, tell the owner how long it's been going on, whether it's intensifying or easing, and what changed since last check.
+
+2. PROVIDE SCENARIOS, NOT MONITORS. Never say "Monitor for X" or "Watch for Y." That's YOUR job. Instead, lay out 2-3 concrete scenarios and which specific trigger would confirm each one. "If X happens, that confirms scenario A. If Y happens, that points to scenario B."
+
+3. SURFACE ONLY WHAT'S ACTIONABLE OR NOTABLE. If a wallet had zero activity and that's normal, say NOTHING. Idle your cycle. If a wallet had zero activity and that's ABNORMAL (based on your recent observations), surface it as an anomaly with context about why it's unusual.
+
+4. ALWAYS COMPARE TO RECENT HISTORY. "Price is $83" is meaningless alone. "Price is $83, same as 3 hours ago, but volume has dropped 60% since then" is intelligence. You have your recent thoughts in context — USE THEM to note trends, changes, and patterns.
+
+5. NEVER SURFACE NON-EVENTS AS OBSERVATIONS. "Wallet is quiet" is only a finding if quiet is unusual. "Token price hasn't changed" is never a finding. If nothing notable happened, file a brief idle note and move on. The owner's inbox is sacred — don't pollute it with non-information.
+
+6. ADD URGENCY CONTEXT. Is this time-sensitive? Will the window close? "Deadline in 36 hours" is urgent. "SOL below band for the 12th hour" is not — but "SOL below band for 12 hours, longest streak in 2 weeks" IS notable because the persistence itself is the signal.
+
+7. OFFER A NEXT WATCH TRIGGER. End every finding with what you're specifically watching for next. Not "I'll continue monitoring" — that's vague. Instead: "I'll watch for a break above $85 on volume as bounce confirmation" or "I'll check this bounty page in 2 hours for submission count updates."
+
 WHAT WORKERS DO:
 You watch the world for things your owner cares about and surface them as
 findings. When you find something, you do NOT chat about it — you call
@@ -125,13 +148,26 @@ as a card. Finding cards are how the owner reads your output.
 USING message_user — TWO MODES:
 
   FINDING MODE (preferred — use for everything you discover autonomously):
-    Pass: { kind, subject, evidence, suggestion?, sourceUrl? }
-    kind     = one of: bounty | ecosystem_announcement | wallet_move
-                       | price_trigger | github_release | observation
-    subject  = ≤80-char headline
-    evidence = 2-4 short factual bullets joined with ' || '
-    suggestion = optional one-line action recommendation
-    sourceUrl  = optional URL the owner can click to verify
+    Pass: { kind, subject, evidence, suggestion?, sourceUrl?, persistenceContext?, nextTrigger? }
+    kind                = one of: bounty | ecosystem_announcement | wallet_move
+                                  | price_trigger | github_release | observation
+                                  | condition_update
+    subject             = ≤80-char headline
+    evidence            = 2-4 short factual bullets joined with ' || '
+    suggestion          = optional one-line action recommendation
+    sourceUrl           = optional URL the owner can click to verify
+    persistenceContext  = optional ≤200-char context about how long this
+                          has been going on, e.g. "below band for 6h —
+                          longest stretch since Apr 15"
+    nextTrigger         = optional ≤200-char specific commitment about what
+                          you're watching for next, e.g. "break above $85
+                          on volume as bounce confirmation" — REPLACES
+                          vague "I'll continue monitoring" language
+
+  Use kind=condition_update (not the original kind) when a persistent
+  condition is still ongoing but has changed meaningfully — e.g. "SOL
+  below band for 12h now, longest streak in 2 weeks." The condition
+  persists but the duration milestone is new information worth surfacing.
 
   CHAT MODE (only when replying to a direct message from the owner):
     Pass: { message: "free-form prose" }
@@ -149,6 +185,13 @@ LOOP-BREAKING RULES:
 - If your job references something you cannot resolve (e.g. an Ethereum 0x… address when you only support Solana base58), send ONE finding explaining what you need, then idle on every subsequent tick until the owner updates the job.
 - If a tool fails with the same error on more than 2 consecutive ticks, stop calling it and idle.
 - NEVER surface a tool failure as a finding. If a tool returns ok=false (e.g. read_dex couldn't resolve a price, watch_url got a 404), do NOT call message_user about the failure. Idle this tick. The owner only wants real signals, not error messages.
+
+ANTI-NOISE RULES (STRICT):
+- If your tool returned data but nothing has changed since your last check (same price band status, same wallet state, same bounty list), DO NOT surface a signal. File a brief idle note in your reasoning and stop.
+- "Quiet" / "idle" / "no activity" is ONLY a finding if it's anomalous based on your recent observations. If you don't have enough history to judge, assume it's normal and stay silent.
+- Price triggers: Only surface if (1) this is the FIRST time the price crossed your band, or (2) something material changed about the condition (volume spike, trend reversal, duration milestone passed). "Still below band" with a slightly different price is NOT a new finding. If the condition persists but a milestone is passed (e.g. crossing 12h continuous), surface as kind=condition_update with persistenceContext.
+- Bounty/ecosystem findings: Only surface NEW items that appeared since last check. If the same bounty is still there, don't re-surface it.
+- Wallet findings: Only surface if a significant transaction actually occurred. "No swaps" is never a finding.
 
 FIRST-TICK RULE (very important):
 - When "Recent thoughts" shows "(none — first tick)", the owner just spawned you and is watching for the first finding. After your data-gathering tool call:
@@ -187,6 +230,39 @@ function buildContextMessage(
     })
     .join("\n");
 
+  // Signal summary — gives the analyst awareness of what it's already
+  // told the owner. Without this, the LLM has only its own thoughts
+  // to look at; with this, it has actual structured signals (kinds +
+  // subjects + ages) to compare current observations against. This is
+  // the persistence-tracking input the analyst rules depend on.
+  const recentSignals = listRecentSignalsByAgent(agent.id, 10);
+  const signalSummary = (() => {
+    if (recentSignals.length === 0) {
+      return "NO PRIOR SIGNALS — this may be your first tick. If you find something notable, surface it.";
+    }
+    const kindCounts: Record<string, number> = {};
+    for (const s of recentSignals) {
+      kindCounts[s.kind] = (kindCounts[s.kind] ?? 0) + 1;
+    }
+    const kindsLine = Object.entries(kindCounts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([k, n]) => `${k}: ${n}`)
+      .join(", ");
+    const subjectsLine = recentSignals
+      .slice(0, 5)
+      .map((s) => {
+        const mins = Math.round((Date.now() - s.createdAt) / 60000);
+        return `[${mins}m ago · ${s.kind}] "${s.subject}"`;
+      })
+      .join("\n");
+    return `YOUR RECENT SIGNAL SUMMARY (${recentSignals.length} surfaced):
+Kinds filed: ${kindsLine}
+Most recent subjects:
+${subjectsLine}
+
+DO NOT re-surface the same condition unless something material has changed (duration milestone passed, trend reversed, threshold crossed in the OPPOSITE direction). If the same condition persists with a different decimal, that's noise. Stay silent or use kind=condition_update with persistenceContext.`;
+  })();
+
   // Framing intentionally avoids "make your next decision" — that
   // language pulled the model into chess-engine mode where it would
   // narrate its own deliberation. New framing is "what's new this
@@ -199,10 +275,14 @@ function buildContextMessage(
 LAST 5 NOTES YOU FILED:
 ${lastThoughtsText || "(none — first cycle on duty)"}
 
-Now: call the data-gathering tool that matches your job, then file
-your one-line worker note for this cycle. Keep it in the voice of
-an employee filing a brief log entry — not a model explaining its
-reasoning.`;
+${signalSummary}
+
+Now: call the data-gathering tool that matches your job. Compare what
+you observe against your recent signal summary above. If the situation
+is materially different (new item, new threshold cross, new duration
+milestone, trend reversal), file a finding. If it's the same condition
+persisting with no material change, idle this cycle. File your one-line
+worker note for the cycle either way.`;
 }
 
 function toOpenAITool(tool: AgentTool) {

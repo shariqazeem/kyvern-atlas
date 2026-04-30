@@ -95,7 +95,8 @@ export type SignalKind =
   | "wallet_move"
   | "price_trigger"
   | "github_release"
-  | "observation";
+  | "observation"
+  | "condition_update";
 
 export type SignalStatus = "unread" | "read" | "archived";
 
@@ -113,6 +114,14 @@ export interface Signal {
   signature: string | null;
   /** Where the owner can verify the finding (e.g. a Superteam bounty URL). */
   sourceUrl: string | null;
+  /** Context describing how long the condition has persisted and what
+   *  changed since first observation. Rendered as a stripe on the
+   *  signal card. Null for findings that aren't tracking persistence. */
+  persistenceContext: string | null;
+  /** Specific trigger the worker is watching for next, e.g. "break
+   *  above $85 on volume as bounce confirmation". Replaces vague
+   *  "I'll continue monitoring" suggestions with concrete commitments. */
+  nextTrigger: string | null;
   status: SignalStatus;
   createdAt: number;
 }

@@ -40,6 +40,7 @@ const KIND_ICON: Record<SignalKind, LucideIcon> = {
   price_trigger: TrendingUp,
   github_release: GitBranch,
   observation: Sparkles,
+  condition_update: TrendingUp,
 };
 
 const KIND_COLOR: Record<SignalKind, string> = {
@@ -49,6 +50,7 @@ const KIND_COLOR: Record<SignalKind, string> = {
   price_trigger: "#9333EA",
   github_release: "#0F766E",
   observation: "#6B7280",
+  condition_update: "#9333EA",
 };
 
 const KIND_LABEL: Record<SignalKind, string> = {
@@ -58,6 +60,7 @@ const KIND_LABEL: Record<SignalKind, string> = {
   price_trigger: "PRICE TRIGGER",
   github_release: "RELEASE",
   observation: "OBSERVATION",
+  condition_update: "CONDITION UPDATE",
 };
 
 function fmtAgo(ms: number): string {

@@ -13,13 +13,14 @@
  */
 
 import { getTool } from "./tools";
-import { listOpenTasks } from "./store";
+import { listOpenTasks, listRecentSignalsByAgent, writeSignal } from "./store";
 import type {
   Agent,
   AgentDecision,
   AgentTemplate,
   AgentToolContext,
   AgentToolResult,
+  SignalKind,
 } from "./types";
 
 /* ─────────────────────────────────────────────────────────────────── */
@@ -33,8 +34,21 @@ interface VoiceProfile {
     actionStart: string[]; // about to use a tool
     actionAfter: string[]; // after tool succeeded
   };
-  /** Action picker — returns { toolId, input, reasoning } */
+  /** Sync action picker — returns { toolId, input, reasoning }.
+   *  Used by legacy templates (scout/analyst/hunter/greeter/earner/
+   *  custom/atlas). Cycle is single-tool: pick → execute → done. */
   pickAction: (agent: Agent, ctx: ScriptedContext) => ScriptedDecision;
+  /** Optional async picker — runs INSTEAD of pickAction when defined.
+   *  Path C templates use this so they can do "watch → if qualifying,
+   *  surface" in one cycle: data-gathering tool first, then optional
+   *  message_user write via writeSignal directly (storage-layer dedup
+   *  handles idempotency). Returns the final thought + decision the
+   *  scripted runner records. Idle → toolId: null. */
+  pickActionAsync?: (
+    agent: Agent,
+    toolCtx: AgentToolContext,
+    ctx: ScriptedContext,
+  ) => Promise<ScriptedTickResult>;
 }
 
 interface ScriptedContext {
@@ -393,6 +407,484 @@ const ATLAS_VOICE: VoiceProfile = {
 };
 
 /* ─────────────────────────────────────────────────────────────────── */
+/*                  Path C Templates — Async Pickers                    */
+/* ─────────────────────────────────────────────────────────────────── */
+/*  Each Path C template runs a deterministic "data-gather → surface
+ *  if qualifying" flow as the LLM-fallback. The script parses the
+ *  job_prompt to extract the URL/wallet/symbol/repo, calls the
+ *  matching tool, inspects the result, and ONLY surfaces a signal if
+ *  the tool returned something the owner would actually want to
+ *  read. The storage-layer dedup gate (per-kind windows in
+ *  writeSignal) handles idempotency, so we don't have to track
+ *  "already surfaced" state here.
+ *
+ *  Strict rule: if nothing notable happened, call no tools after
+ *  the gather and return an idle thought. Silence is correct.
+ */
+
+/** First http(s):// URL anywhere in the prompt. */
+function firstUrlIn(s: string): string | null {
+  const m = s.match(/https?:\/\/[^\s)\]"']+/i);
+  return m ? m[0] : null;
+}
+
+/** First Solana base58 pubkey-shaped substring. */
+function firstSolanaAddrIn(s: string): string | null {
+  const m = s.match(/\b[1-9A-HJ-NP-Za-km-z]{32,44}\b/);
+  return m ? m[0] : null;
+}
+
+/** Min-USD threshold from prose like "minUsdThreshold 5000" or "> $1000". */
+function parseMinUsd(s: string, fallback = 100): number {
+  const m =
+    s.match(/minUsdThreshold\s*=?\s*(\d+(?:[\.,]\d+)?)/i) ??
+    s.match(/>\s*\$?\s*(\d+(?:[\.,]\d+)?)/);
+  if (m) {
+    const n = Number(m[1].replace(",", ""));
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return fallback;
+}
+
+/** "minPrize=500" / "minPrize 500" / "≥$500" type extraction. */
+function parseMinPrize(s: string): number | null {
+  const m =
+    s.match(/minPrize\s*=?\s*(\d+)/i) ??
+    s.match(/[≥>]\s*\$?\s*(\d{2,})/);
+  if (m) {
+    const n = Number(m[1]);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return null;
+}
+
+/** Token symbol (SOL, BONK, JUP …) from prose or a read_dex example. */
+function parseTokenSymbol(s: string): string | null {
+  const dexMatch = s.match(/read_dex\s*(?:with)?\s*['"]?([A-Z]{2,8})['"]?/);
+  if (dexMatch) return dexMatch[1];
+  const inlineMatch = s.match(
+    /\b([A-Z]{2,6})\b\s+(?:price|outside|band|moves|crosses)/,
+  );
+  if (inlineMatch) return inlineMatch[1];
+  return null;
+}
+
+/** $A–$B band parsed from "$140–$160" or "$140 to $160". */
+function parsePriceBand(
+  s: string,
+): { lower: number; upper: number } | null {
+  const dashMatch = s.match(/\$([\d.]+)\s*[–\-—]\s*\$?([\d.]+)/);
+  const wordMatch = s.match(/\$([\d.]+)\s*to\s*\$?([\d.]+)/i);
+  const m = dashMatch ?? wordMatch;
+  if (!m) return null;
+  const lower = Number(m[1]);
+  const upper = Number(m[2]);
+  if (!Number.isFinite(lower) || !Number.isFinite(upper) || upper <= lower) {
+    return null;
+  }
+  return { lower, upper };
+}
+
+/** Reusable shape: data-gather tool then optional signal write. */
+async function runDataGatherThenMaybeSignal(
+  agent: Agent,
+  toolCtx: AgentToolContext,
+  spec: {
+    dataToolId: string;
+    dataInput: Record<string, unknown>;
+    /** Decide what (if anything) to surface from the tool result.
+     *  Return null to idle silently. */
+    deriveSignal: (
+      toolResult: AgentToolResult,
+    ) =>
+      | {
+          kind: SignalKind;
+          subject: string;
+          evidence: string[];
+          suggestion?: string;
+          sourceUrl?: string;
+          persistenceContext?: string;
+          nextTrigger?: string;
+        }
+      | null;
+    idleThought: (toolResult: AgentToolResult) => string;
+    surfacedThought: (
+      toolResult: AgentToolResult,
+      surfaced: { subject: string },
+    ) => string;
+    parseFailedThought: () => string;
+  },
+): Promise<ScriptedTickResult> {
+  const tool = getTool(spec.dataToolId);
+  if (!tool) {
+    return {
+      thought: `${spec.dataToolId} unavailable, can't gather data.`,
+      decision: { action: "observe" },
+    };
+  }
+
+  let toolResult: AgentToolResult;
+  try {
+    toolResult = await tool.execute(toolCtx, spec.dataInput);
+  } catch (e) {
+    return {
+      thought: `gather call failed: ${e instanceof Error ? e.message : String(e)}`,
+      decision: { action: "observe" },
+    };
+  }
+
+  if (!toolResult.ok) {
+    return {
+      thought: `gather returned not-ok · idle.`,
+      decision: {
+        action: "tool_call",
+        toolId: tool.id,
+        toolInput: spec.dataInput,
+        toolResult,
+      },
+      toolResult,
+    };
+  }
+
+  const signalSpec = spec.deriveSignal(toolResult);
+  if (!signalSpec) {
+    return {
+      thought: spec.idleThought(toolResult),
+      decision: {
+        action: "tool_call",
+        toolId: tool.id,
+        toolInput: spec.dataInput,
+        toolResult,
+      },
+      toolResult,
+    };
+  }
+
+  // Surface — write directly via writeSignal so the storage-layer
+  // dedup gate decides if it actually persists. We don't go through
+  // message_user because that's a tool the LLM uses; in scripted we
+  // already have the structured payload and just need to write it.
+  const writeResult = writeSignal({
+    agentId: agent.id,
+    deviceId: agent.deviceId,
+    kind: signalSpec.kind,
+    subject: signalSpec.subject,
+    evidence: signalSpec.evidence,
+    suggestion: signalSpec.suggestion ?? null,
+    sourceUrl: signalSpec.sourceUrl ?? null,
+    persistenceContext: signalSpec.persistenceContext ?? null,
+    nextTrigger: signalSpec.nextTrigger ?? null,
+  });
+
+  if (!writeResult.created) {
+    // Dedup gate fired. Treat as idle so we don't double-log.
+    return {
+      thought: `same finding already surfaced ${Math.round((writeResult.duplicateAgeMs ?? 0) / 60000)}m ago · idle`,
+      decision: {
+        action: "tool_call",
+        toolId: tool.id,
+        toolInput: spec.dataInput,
+        toolResult,
+      },
+      toolResult,
+    };
+  }
+
+  toolCtx.log({
+    description: `Surfaced signal: ${signalSpec.subject.slice(0, 60)}${signalSpec.subject.length > 60 ? "…" : ""}`,
+  });
+
+  return {
+    thought: spec.surfacedThought(toolResult, { subject: signalSpec.subject }),
+    decision: {
+      action: "tool_call",
+      toolId: tool.id,
+      toolInput: spec.dataInput,
+      toolResult,
+    },
+    toolResult,
+  };
+}
+
+const BOUNTY_HUNTER_VOICE: VoiceProfile = {
+  thoughts: {
+    observe: ["No new bounties this pass · idle."],
+    actionStart: ["Pulled bounty board."],
+    actionAfter: ["{result}"],
+  },
+  pickAction: (agent, ctx) => ({
+    thought: pick(SCOUT_VOICE.thoughts.observe),
+    toolId: null,
+    input: {},
+  }),
+  pickActionAsync: async (agent, toolCtx) => {
+    const url = firstUrlIn(agent.jobPrompt);
+    if (!url) {
+      return {
+        thought: "no bounty URL parsed from job · idle",
+        decision: { action: "observe" },
+      };
+    }
+    const minPrize = parseMinPrize(agent.jobPrompt);
+    return runDataGatherThenMaybeSignal(agent, toolCtx, {
+      dataToolId: "watch_url",
+      dataInput: {
+        url,
+        format: "json",
+        sinceLastCheck: true,
+        ...(minPrize ? { minPrize } : {}),
+      },
+      deriveSignal: (r) => {
+        const items = ((r.data as { items?: unknown[] })?.items ?? []) as Array<{
+          title?: string;
+          url?: string;
+          summary?: string;
+        }>;
+        if (!Array.isArray(items) || items.length === 0) return null;
+        const top = items[0];
+        const title = String(top.title ?? "(unknown)").slice(0, 80);
+        return {
+          kind: "bounty",
+          subject: title,
+          evidence: [
+            top.summary ? String(top.summary).slice(0, 200) : `New listing on ${url}`,
+            minPrize ? `Filtered ≥ $${minPrize}` : "No minimum filter",
+          ],
+          sourceUrl: top.url ?? url,
+        };
+      },
+      idleThought: () => "scanned bounty board · no qualifying listings · idle",
+      surfacedThought: (_r, s) => `surfaced bounty · ${s.subject.slice(0, 50)}`,
+      parseFailedThought: () => "failed to parse job · idle",
+    });
+  },
+};
+
+const ECOSYSTEM_WATCHER_VOICE: VoiceProfile = {
+  thoughts: {
+    observe: ["No new ecosystem items · idle."],
+    actionStart: ["Pulled feed."],
+    actionAfter: ["{result}"],
+  },
+  pickAction: () => ({
+    thought: "scanning ecosystem feed",
+    toolId: null,
+    input: {},
+  }),
+  pickActionAsync: async (agent, toolCtx) => {
+    const url = firstUrlIn(agent.jobPrompt);
+    if (!url) {
+      return {
+        thought: "no feed URL parsed from job · idle",
+        decision: { action: "observe" },
+      };
+    }
+    const isRss = /\.(?:xml|rss)\b|rss\.\w+|\/rss\b/.test(url);
+    return runDataGatherThenMaybeSignal(agent, toolCtx, {
+      dataToolId: "watch_url",
+      dataInput: {
+        url,
+        format: isRss ? "rss" : "json",
+        sinceLastCheck: true,
+      },
+      deriveSignal: (r) => {
+        const items = ((r.data as { items?: unknown[] })?.items ?? []) as Array<{
+          title?: string;
+          url?: string;
+          summary?: string;
+        }>;
+        if (!Array.isArray(items) || items.length === 0) return null;
+        const top = items[0];
+        return {
+          kind: "ecosystem_announcement",
+          subject: String(top.title ?? "(unknown)").slice(0, 80),
+          evidence: [
+            top.summary ? String(top.summary).slice(0, 200) : "New ecosystem item",
+            `Source: ${new URL(url).host}`,
+          ],
+          sourceUrl: top.url ?? url,
+        };
+      },
+      idleThought: () => "scanned ecosystem feed · no new items · idle",
+      surfacedThought: (_r, s) => `surfaced ecosystem update · ${s.subject.slice(0, 50)}`,
+      parseFailedThought: () => "feed unavailable · idle",
+    });
+  },
+};
+
+const WHALE_TRACKER_VOICE: VoiceProfile = {
+  thoughts: {
+    observe: ["wallet quiet · idle."],
+    actionStart: ["Scanning wallet."],
+    actionAfter: ["{result}"],
+  },
+  pickAction: () => ({
+    thought: "scanning whale wallet",
+    toolId: null,
+    input: {},
+  }),
+  pickActionAsync: async (agent, toolCtx) => {
+    const wallet = firstSolanaAddrIn(agent.jobPrompt);
+    if (!wallet) {
+      return {
+        thought: "no wallet address parsed from job · idle",
+        decision: { action: "observe" },
+      };
+    }
+    const minUsd = parseMinUsd(agent.jobPrompt, 100);
+    return runDataGatherThenMaybeSignal(agent, toolCtx, {
+      dataToolId: "watch_wallet_swaps",
+      dataInput: {
+        address: wallet,
+        lookbackCount: 25,
+        minUsdThreshold: minUsd,
+      },
+      deriveSignal: (r) => {
+        const swaps = ((r.data as { swaps?: unknown[] })?.swaps ?? []) as Array<{
+          signature: string;
+          valueUsd?: number | null;
+          tokenInMint?: string;
+          tokenOutMint?: string;
+        }>;
+        if (!Array.isArray(swaps) || swaps.length === 0) return null;
+        const top = swaps[0];
+        const usd = typeof top.valueUsd === "number" ? top.valueUsd : null;
+        if (usd !== null && usd < minUsd) return null;
+        return {
+          kind: "wallet_move",
+          subject: `Whale moved ${usd ? `$${usd.toFixed(0)} ` : ""}on ${wallet.slice(0, 6)}…`,
+          evidence: [
+            `Signature: ${top.signature}`,
+            usd ? `Value: $${usd.toFixed(2)}` : "Value: unpriced",
+            top.tokenInMint && top.tokenOutMint
+              ? `Pair: ${top.tokenInMint.slice(0, 6)} → ${top.tokenOutMint.slice(0, 6)}`
+              : "",
+          ].filter(Boolean),
+          sourceUrl: `https://explorer.solana.com/tx/${top.signature}`,
+        };
+      },
+      idleThought: () => `wallet quiet · no qualifying swaps ≥ $${minUsd} · idle`,
+      surfacedThought: (_r, s) => `surfaced whale move · ${s.subject.slice(0, 50)}`,
+      parseFailedThought: () => "wallet RPC unavailable · idle",
+    });
+  },
+};
+
+const TOKEN_PULSE_VOICE: VoiceProfile = {
+  thoughts: {
+    observe: ["price inside band · idle."],
+    actionStart: ["Pulling price."],
+    actionAfter: ["{result}"],
+  },
+  pickAction: () => ({
+    thought: "pulling token price",
+    toolId: null,
+    input: {},
+  }),
+  pickActionAsync: async (agent, toolCtx) => {
+    const symbol = parseTokenSymbol(agent.jobPrompt);
+    const band = parsePriceBand(agent.jobPrompt);
+    if (!symbol) {
+      return {
+        thought: "no token symbol parsed from job · idle",
+        decision: { action: "observe" },
+      };
+    }
+    return runDataGatherThenMaybeSignal(agent, toolCtx, {
+      dataToolId: "read_dex",
+      dataInput: {
+        tokenIdOrSymbol: symbol,
+        ...(band ? { lowerBand: band.lower, upperBand: band.upper } : {}),
+      },
+      deriveSignal: (r) => {
+        const data = r.data as
+          | { symbol?: string; priceUsd?: number; breach?: string | null; lowerBand?: number; upperBand?: number }
+          | undefined;
+        if (!data || typeof data.priceUsd !== "number") return null;
+        // Without a band, we can't deterministically decide if this
+        // is notable. Idle silently.
+        if (!band) return null;
+        if (!data.breach) return null;
+        const direction = data.breach;
+        return {
+          kind: "price_trigger",
+          subject: `${symbol} outside band: $${data.priceUsd.toFixed(data.priceUsd < 1 ? 6 : 4)}`,
+          evidence: [
+            `Price: $${data.priceUsd}`,
+            `Band: $${band.lower}–$${band.upper}`,
+            `Breach: ${direction}`,
+          ],
+          nextTrigger:
+            direction === "lower"
+              ? `Re-entry above $${band.lower} on volume`
+              : `Pullback below $${band.upper}`,
+        };
+      },
+      idleThought: (r) => {
+        const data = r.data as { priceUsd?: number; breach?: string | null } | undefined;
+        const price = data?.priceUsd
+          ? `$${data.priceUsd.toFixed(data.priceUsd < 1 ? 6 : 4)}`
+          : "?";
+        return `${symbol} price ${price} · inside band · idle`;
+      },
+      surfacedThought: (_r, s) => `surfaced price breach · ${s.subject.slice(0, 50)}`,
+      parseFailedThought: () => "price source unavailable · idle",
+    });
+  },
+};
+
+const GITHUB_WATCHER_VOICE: VoiceProfile = {
+  thoughts: {
+    observe: ["no new releases · idle."],
+    actionStart: ["Pulled release feed."],
+    actionAfter: ["{result}"],
+  },
+  pickAction: () => ({
+    thought: "scanning github releases",
+    toolId: null,
+    input: {},
+  }),
+  pickActionAsync: async (agent, toolCtx) => {
+    const url = firstUrlIn(agent.jobPrompt);
+    if (!url) {
+      return {
+        thought: "no github URL parsed from job · idle",
+        decision: { action: "observe" },
+      };
+    }
+    return runDataGatherThenMaybeSignal(agent, toolCtx, {
+      dataToolId: "watch_url",
+      dataInput: {
+        url,
+        format: "json",
+        sinceLastCheck: true,
+      },
+      deriveSignal: (r) => {
+        const items = ((r.data as { items?: unknown[] })?.items ?? []) as Array<{
+          title?: string;
+          url?: string;
+          summary?: string;
+        }>;
+        if (!Array.isArray(items) || items.length === 0) return null;
+        const top = items[0];
+        return {
+          kind: "github_release",
+          subject: String(top.title ?? "(release)").slice(0, 80),
+          evidence: [
+            top.summary ? String(top.summary).slice(0, 200) : "New release",
+            `Repo: ${url.replace(/.*\/repos\//, "").replace(/\/releases.*/, "")}`,
+          ],
+          sourceUrl: top.url ?? url,
+        };
+      },
+      idleThought: () => "scanned releases · no new tag · idle",
+      surfacedThought: (_r, s) => `surfaced release · ${s.subject.slice(0, 50)}`,
+      parseFailedThought: () => "github API unavailable · idle",
+    });
+  },
+};
+
+/* ─────────────────────────────────────────────────────────────────── */
 /*                            Voice Map                                 */
 /* ─────────────────────────────────────────────────────────────────── */
 
@@ -404,14 +896,15 @@ const VOICES: Record<AgentTemplate, VoiceProfile> = {
   earner: GREETER_VOICE, // Earner inherits Greeter's voice — same personality shape
   custom: CUSTOM_VOICE,
   atlas: ATLAS_VOICE,
-  // Path C templates — share scout's curious-observer voice for the
-  // scripted fallback. The LLM path is doing the real work in Path C;
-  // scripted only fires on rate-limit or LLM failure.
-  bounty_hunter: SCOUT_VOICE,
-  ecosystem_watcher: SCOUT_VOICE,
-  whale_tracker: SCOUT_VOICE,
-  token_pulse: SCOUT_VOICE,
-  github_watcher: SCOUT_VOICE,
+  // Path C templates — own deterministic data-gather → maybe-surface
+  // flows via pickActionAsync. The storage-layer dedup gate prevents
+  // re-emission, so silence-on-non-events is enforced two ways:
+  // here at decision time, and again in writeSignal at write time.
+  bounty_hunter: BOUNTY_HUNTER_VOICE,
+  ecosystem_watcher: ECOSYSTEM_WATCHER_VOICE,
+  whale_tracker: WHALE_TRACKER_VOICE,
+  token_pulse: TOKEN_PULSE_VOICE,
+  github_watcher: GITHUB_WATCHER_VOICE,
 };
 
 /* ─────────────────────────────────────────────────────────────────── */
@@ -435,6 +928,14 @@ export async function scriptedTick(
 ): Promise<ScriptedTickResult> {
   const voice = VOICES[agent.template] ?? CUSTOM_VOICE;
   const ctx = buildContext(agent);
+
+  // Path C templates own the entire decision + signal-surfacing flow
+  // via pickActionAsync. Legacy templates fall through to the sync
+  // pickAction below.
+  if (voice.pickActionAsync) {
+    return voice.pickActionAsync(agent, toolCtx, ctx);
+  }
+
   const decision = voice.pickAction(agent, ctx);
 
   // Idle path — just record the thought

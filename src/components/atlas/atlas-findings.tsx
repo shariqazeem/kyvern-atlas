@@ -34,6 +34,7 @@ const KIND_ICON: Record<SignalKind, React.ComponentType<{ className?: string; st
   price_trigger: TrendingUp,
   github_release: GitBranch,
   observation: Sparkles,
+  condition_update: TrendingUp,
 };
 
 const KIND_LABEL: Record<SignalKind, string> = {
@@ -43,6 +44,7 @@ const KIND_LABEL: Record<SignalKind, string> = {
   price_trigger: "PRICE TRIGGER",
   github_release: "RELEASE",
   observation: "OBSERVATION",
+  condition_update: "CONDITION UPDATE",
 };
 
 function fmtAgo(ms: number): string {

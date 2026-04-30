@@ -42,6 +42,22 @@ export function hashSubject(subject: string): string {
     subject
       .toLowerCase()
       .trim()
+      // Time durations: "for 3 hours", "for 6 hours", "for 12 hours" → "for N hours"
+      // (must run BEFORE the bare-number normalizer below so the duration
+      // word is preserved; otherwise "3 hours" → "N hours" via the next
+      // pass which is fine, but the explicit pattern keeps intent clear.)
+      .replace(
+        /\bfor\s+\d+\s*(?:hour|hr|h|day|d|minute|min|m)s?\b/g,
+        "for N TIMEUNIT",
+      )
+      // "since April 15", "since March", "since Apr 15", "since 2026-04-15"
+      // → "since DATE" so milestone comparisons collapse across ref dates.
+      .replace(
+        /\bsince\s+(?:[a-z]+\.?\s*\d*|\d{4}-\d{2}-\d{2}|\d+\s+\w+\s+ago)\b/g,
+        "since DATE",
+      )
+      // "4 consecutive checks", "6 consecutive checks" → "N consecutive checks"
+      .replace(/\b\d+\s+consecutive\b/g, "N consecutive")
       // $-amounts: $83.14, $1,500, $0.0008 → $X
       .replace(/\$\s*[\d,]+(?:\.\d+)?/g, "$X")
       // Standalone decimals or comma'd numbers: 0.0008, 1,500, 1.5 → N

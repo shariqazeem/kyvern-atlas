@@ -374,6 +374,8 @@ interface SignalRow {
   suggestion: string | null;
   signature: string | null;
   source_url: string | null;
+  persistence_context: string | null;
+  next_trigger: string | null;
   status: string;
   created_at: number;
 }
@@ -385,6 +387,7 @@ const VALID_KINDS: SignalKind[] = [
   "price_trigger",
   "github_release",
   "observation",
+  "condition_update",
 ];
 
 function rowToSignal(r: SignalRow): Signal {
@@ -405,6 +408,8 @@ function rowToSignal(r: SignalRow): Signal {
     suggestion: r.suggestion,
     signature: r.signature,
     sourceUrl: r.source_url,
+    persistenceContext: r.persistence_context,
+    nextTrigger: r.next_trigger,
     status: (["unread", "read", "archived"].includes(r.status) ? r.status : "unread") as SignalStatus,
     createdAt: r.created_at,
   };
@@ -416,18 +421,20 @@ function rowToSignal(r: SignalRow): Signal {
  *  hash to the same value and the dedup gate actually fires. */
 import { hashSubject } from "./signal-hash";
 
-/** Per-kind dedup windows. Tuned for the noise patterns we saw in
- *  production: token_pulse re-emits the same band-break every tick
- *  while a price stays out-of-band, so a 30-min window collapses
- *  ~55 of those 72 dupes; bounty/release/announcement are slower-
- *  moving and warrant a 24-hour window so reposts don't re-surface. */
+/** Per-kind dedup windows. Tuned (May 1) so that persistent conditions
+ *  don't re-surface — Token Pulse "SOL below band" persists for hours
+ *  in real markets, so 30 min was too short; same logic for "wallet
+ *  quiet" anomaly observations. The condition_update kind exists for
+ *  meaningful milestone updates within a long-running condition (e.g.
+ *  "12h continuous now, longest streak in 2 weeks"). */
 const DEDUPE_WINDOW_MS_BY_KIND: Record<SignalKind, number> = {
-  bounty: 24 * 60 * 60 * 1000,                  // 24h
-  ecosystem_announcement: 24 * 60 * 60 * 1000,  // 24h
-  github_release: 24 * 60 * 60 * 1000,          // 24h
-  wallet_move: 60 * 60 * 1000,                  // 1h
-  price_trigger: 30 * 60 * 1000,                // 30m
-  observation: 60 * 60 * 1000,                  // 1h
+  bounty: 24 * 60 * 60 * 1000,                  // 24h — bounty repostings shouldn't re-surface daily
+  ecosystem_announcement: 24 * 60 * 60 * 1000,  // 24h — same announcement shouldn't loop
+  github_release: 24 * 60 * 60 * 1000,          // 24h — same tag shouldn't re-fire
+  wallet_move: 60 * 60 * 1000,                  // 1h — wallet activity is fast
+  price_trigger: 4 * 60 * 60 * 1000,            // 4h (was 30m) — persistent breaches re-fired every cycle
+  observation: 6 * 60 * 60 * 1000,              // 6h (was 1h) — "wallet quiet" anomalies shouldn't repeat hourly
+  condition_update: 4 * 60 * 60 * 1000,         // 4h — milestone updates inside a persistent condition
 };
 
 interface WriteSignalResult {
@@ -452,11 +459,19 @@ export function writeSignal(input: {
   suggestion?: string | null;
   signature?: string | null;
   sourceUrl?: string | null;
+  persistenceContext?: string | null;
+  nextTrigger?: string | null;
 }): WriteSignalResult {
   const now = Date.now();
   const subject = input.subject.slice(0, 200);
   const evidence = input.evidence.map((e) => String(e).slice(0, 400)).slice(0, 8);
   const subjectHash = hashSubject(subject);
+  const persistenceContext = input.persistenceContext
+    ? String(input.persistenceContext).slice(0, 200).trim() || null
+    : null;
+  const nextTrigger = input.nextTrigger
+    ? String(input.nextTrigger).slice(0, 200).trim() || null
+    : null;
   const db = getDb();
 
   // Dedup gate — same (agent, kind, subject_hash) inside window → drop.
@@ -485,8 +500,9 @@ export function writeSignal(input: {
   db.prepare(
     `INSERT INTO signals (
       id, agent_id, device_id, kind, subject, subject_hash, evidence_json,
-      suggestion, signature, source_url, status, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'unread', ?)`,
+      suggestion, signature, source_url, persistence_context, next_trigger,
+      status, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'unread', ?)`,
   ).run(
     id,
     input.agentId,
@@ -498,6 +514,8 @@ export function writeSignal(input: {
     input.suggestion ?? null,
     input.signature ?? null,
     input.sourceUrl ?? null,
+    persistenceContext,
+    nextTrigger,
     now,
   );
 
@@ -513,10 +531,27 @@ export function writeSignal(input: {
       suggestion: input.suggestion ?? null,
       signature: input.signature ?? null,
       sourceUrl: input.sourceUrl ?? null,
+      persistenceContext,
+      nextTrigger,
       status: "unread",
       createdAt: now,
     },
   };
+}
+
+/** Recent signals filed by ONE agent — used by the runner to build
+ *  a "what have I already told the owner" summary the LLM can read.
+ *  Persistence-aware analysis depends on this. */
+export function listRecentSignalsByAgent(
+  agentId: string,
+  limit = 10,
+): Signal[] {
+  const rows = getDb()
+    .prepare(
+      `SELECT * FROM signals WHERE agent_id = ? ORDER BY created_at DESC LIMIT ?`,
+    )
+    .all(agentId, Math.max(1, Math.min(limit, 50))) as SignalRow[];
+  return rows.map(rowToSignal);
 }
 
 export function listInbox(

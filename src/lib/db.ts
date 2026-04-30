@@ -637,6 +637,13 @@ function migrate(db: Database.Database) {
   tryAlter(
     `CREATE INDEX IF NOT EXISTS idx_signals_dedup ON signals(agent_id, kind, subject_hash, created_at)`,
   );
+  // persistenceContext + nextTrigger — analyst metadata fields. Both
+  // optional; older signals predating these fields render with no
+  // stripe / no next-trigger commitment, which is the correct historical
+  // behavior. (Added alongside the analyst-mode prompt + condition_update
+  // signal kind on May 1.)
+  tryAlter(`ALTER TABLE signals ADD COLUMN persistence_context TEXT`);
+  tryAlter(`ALTER TABLE signals ADD COLUMN next_trigger TEXT`);
   // Re-backfill EVERY row (not just NULL ones) — v2 of hashSubject
   // normalizes numeric volatility so "$83.14" and "$83.27" share a
   // hash. The first migration backfilled with v1 (literal) so we
