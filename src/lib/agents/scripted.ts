@@ -13,7 +13,7 @@
  */
 
 import { getTool } from "./tools";
-import { listOpenTasks, listRecentSignalsByAgent, writeSignal } from "./store";
+import { listOpenTasks, writeSignal } from "./store";
 import type {
   Agent,
   AgentDecision,
@@ -612,7 +612,7 @@ const BOUNTY_HUNTER_VOICE: VoiceProfile = {
     actionStart: ["Pulled bounty board."],
     actionAfter: ["{result}"],
   },
-  pickAction: (agent, ctx) => ({
+  pickAction: () => ({
     thought: pick(SCOUT_VOICE.thoughts.observe),
     toolId: null,
     input: {},
