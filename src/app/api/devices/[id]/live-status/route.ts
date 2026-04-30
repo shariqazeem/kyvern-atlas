@@ -271,6 +271,24 @@ export async function GET(
     }
   }
 
+  // Path C — On-chain action count for today across vault_payments
+  // (the policy-program-evaluated rows). Surfaces the "X on-chain today"
+  // cell on the TodayStrip and answers "is the policy program getting
+  // exercised today?" without a second round-trip.
+  const todayPayments = db
+    .prepare(
+      `SELECT created_at FROM vault_payments WHERE vault_id = ?`,
+    )
+    .all(params.id) as Array<{ created_at: string }>;
+  let onChainToday = 0;
+  for (const r of todayPayments) {
+    const ms = Date.parse(
+      r.created_at.replace(" ", "T") +
+        (r.created_at.includes("Z") ? "" : "Z"),
+    );
+    if (!isNaN(ms) && ms >= todayMs) onChainToday++;
+  }
+
   // Money flow (last 24h + last hour) — pull from device_log
   const allLogs = db
     .prepare(
@@ -341,5 +359,6 @@ export async function GET(
     workers,
     // Path C — today's signal stats for the home card's third stat row
     signalsToday,
+    onChainToday,
   });
 }

@@ -808,9 +808,14 @@ function ThoughtRow({
             </span>
           )}
           {thought.signature && (
-            <SignaturePill signature={thought.signature} />
+            <OnChainBadge
+              signature={thought.signature}
+              amountUsd={thought.amountUsd}
+              kind={moneyKind}
+            />
           )}
-          {thought.amountUsd != null &&
+          {!thought.signature &&
+            thought.amountUsd != null &&
             thought.amountUsd > 0 &&
             moneyKind && (
               <MoneyDelta amount={thought.amountUsd} kind={moneyKind} />
@@ -884,4 +889,44 @@ function moneyDirection(tool: string | null): "earned" | "spent" | null {
   if (tool === "claim_task") return "earned";
   if (tool === "subscribe_to_agent" || tool === "post_task") return "spent";
   return null;
+}
+
+/** OnChainBadge — replaces the bare SignaturePill when a thought
+ *  produced a real Solana tx. The pill collapses signature + amount +
+ *  direction into one chunky green pill so the thought feed reads as
+ *  on-chain proof, not just a debug trace. Falls back to SignaturePill
+ *  when amount is missing. */
+function OnChainBadge({
+  signature,
+  amountUsd,
+  kind,
+}: {
+  signature: string;
+  amountUsd: number | null;
+  kind: "earned" | "spent" | null;
+}) {
+  const hasAmount = amountUsd != null && amountUsd > 0;
+  if (!hasAmount) return <SignaturePill signature={signature} />;
+  const earned = kind === "earned";
+  return (
+    <a
+      href={`https://explorer.solana.com/tx/${signature}?cluster=devnet`}
+      target="_blank"
+      rel="noreferrer"
+      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-mono"
+      style={{
+        background: earned ? "rgba(34,197,94,0.10)" : "rgba(217,119,6,0.10)",
+        color: earned ? "#15803D" : "#B45309",
+        fontSize: 10.5,
+        fontWeight: 600,
+        letterSpacing: "0.02em",
+      }}
+    >
+      <span aria-hidden>✓</span>
+      On-chain · {earned ? "+" : "−"}${amountUsd!.toFixed(3)}
+      <span aria-hidden style={{ opacity: 0.6, marginLeft: 2 }}>
+        ↗
+      </span>
+    </a>
+  );
 }

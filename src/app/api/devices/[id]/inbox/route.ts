@@ -1,18 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
-import { listInbox, countSignals } from "@/lib/agents/store";
+import { listInbox, countSignals, dailyDigest } from "@/lib/agents/store";
 import { getDb } from "@/lib/db";
 import type { SignalStatus } from "@/lib/agents/types";
 
 /**
- * GET /api/devices/[id]/inbox?status=unread|read|all&limit=50&since=0
+ * GET /api/devices/[id]/inbox?status=unread|read|all&limit=50&since=0&includeSnoozed=0
  *
  * Returns signals for a device, joined with the worker's name + emoji
- * for inline rendering on the Inbox page. Also returns the unreadCount
- * so the tab bar's badge dot can update without a second request.
+ * for inline rendering on the Inbox page. Also returns the unreadCount,
+ * a daily digest summary line for the inbox banner, and the list of
+ * workers on this device so the filter dropdown can render names.
  *
- *   ?status     — unread | read | archived | all (default: all)
- *   ?limit      — 1..200 (default 50)
- *   ?since      — only return signals created at >= this ms timestamp
+ *   ?status          — unread | read | archived | all (default: all)
+ *   ?limit           — 1..200 (default 50)
+ *   ?since           — only return signals created at >= this ms timestamp
+ *   ?includeSnoozed  — set to 1 to include snoozed signals (default off)
  */
 
 interface AgentLookupRow {
@@ -31,23 +33,31 @@ export async function GET(
   const statusParam = url.searchParams.get("status") ?? "all";
   const limit = Math.max(1, Math.min(parseInt(url.searchParams.get("limit") ?? "50", 10) || 50, 200));
   const since = parseInt(url.searchParams.get("since") ?? "0", 10) || 0;
+  const includeSnoozed = url.searchParams.get("includeSnoozed") === "1";
   const status: SignalStatus | undefined =
     statusParam === "unread" || statusParam === "read" || statusParam === "archived"
       ? (statusParam as SignalStatus)
       : undefined;
 
   try {
-    const signals = listInbox(params.id, { status, limit, since });
+    const signals = listInbox(params.id, {
+      status,
+      limit,
+      since,
+      excludeSnoozed: !includeSnoozed,
+    });
 
-    // Join agent names + emojis in one query
+    // Join agent names + emojis in one query — also pull the device's
+    // workers (for the filter dropdown) in case the inbox is empty.
+    const deviceWorkers = getDb()
+      .prepare(
+        `SELECT id, name, emoji FROM agents WHERE device_id = ? AND status != 'retired' ORDER BY created_at ASC`,
+      )
+      .all(params.id) as AgentLookupRow[];
+
     const agents: Record<string, { name: string; emoji: string }> = {};
-    if (signals.length > 0) {
-      const ids = Array.from(new Set(signals.map((s) => s.agentId)));
-      const placeholders = ids.map(() => "?").join(",");
-      const rows = getDb()
-        .prepare(`SELECT id, name, emoji FROM agents WHERE id IN (${placeholders})`)
-        .all(...ids) as AgentLookupRow[];
-      for (const a of rows) agents[a.id] = { name: a.name, emoji: a.emoji };
+    for (const a of deviceWorkers) {
+      agents[a.id] = { name: a.name, emoji: a.emoji };
     }
 
     const enriched = signals.map((s) => ({
@@ -57,11 +67,18 @@ export async function GET(
 
     const unreadCount = countSignals(params.id, "unread");
     const totalCount = countSignals(params.id);
+    const digest = dailyDigest(params.id);
 
     return NextResponse.json({
       signals: enriched,
       unreadCount,
       totalCount,
+      digest,
+      workers: deviceWorkers.map((w) => ({
+        id: w.id,
+        name: w.name,
+        emoji: w.emoji,
+      })),
     });
   } catch (e) {
     console.error("[inbox GET]", e);

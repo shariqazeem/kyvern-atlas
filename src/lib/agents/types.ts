@@ -122,6 +122,9 @@ export interface Signal {
    *  above $85 on volume as bounce confirmation". Replaces vague
    *  "I'll continue monitoring" suggestions with concrete commitments. */
   nextTrigger: string | null;
+  /** Millisecond timestamp the inbox should hide this signal until.
+   *  Set by the "Snooze 4h" inline action. null = never snoozed. */
+  snoozedUntil: number | null;
   status: SignalStatus;
   createdAt: number;
 }

@@ -18,8 +18,12 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowRight, Sparkles } from "lucide-react";
+import { ArrowRight, Sparkles, Link2 } from "lucide-react";
 import type { Signal } from "@/lib/agents/types";
+import {
+  severityForSignal,
+  severityVisuals,
+} from "@/lib/agents/signal-severity";
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
@@ -154,6 +158,9 @@ export function WorkersFoundStrip({ deviceId }: WorkersFoundStripProps) {
    ──────────────────────────────────────────────────────────────────── */
 
 function FoundCard({ signal }: { signal: SignalWithWorker }) {
+  const sev = severityForSignal(signal);
+  const vis = severityVisuals(sev, !!signal.signature);
+  const showAccent = vis.accent !== "transparent";
   return (
     <motion.div
       layout
@@ -165,12 +172,14 @@ function FoundCard({ signal }: { signal: SignalWithWorker }) {
     >
       <Link
         href="/app/inbox"
-        className="block rounded-[14px] active:scale-[0.985] transition"
+        className="block rounded-[14px] active:scale-[0.985] transition relative overflow-hidden"
         style={{
-          width: 168,
-          minHeight: 86,
+          width: 184,
+          minHeight: 96,
           background: "#FFFFFF",
-          border: "1px solid rgba(15,23,42,0.06)",
+          border: showAccent
+            ? `1px solid ${vis.accent}33`
+            : "1px solid rgba(15,23,42,0.06)",
           boxShadow: [
             "inset 0 1px 0 rgba(255,255,255,1)",
             "0 1px 2px rgba(15,23,42,0.04)",
@@ -178,9 +187,32 @@ function FoundCard({ signal }: { signal: SignalWithWorker }) {
           ].join(", "),
         }}
       >
-        <div className="px-3 pt-2.5 pb-2 h-full flex flex-col">
-          {/* Worker line */}
+        {showAccent && (
+          <div
+            aria-hidden
+            style={{
+              position: "absolute",
+              left: 0,
+              top: 0,
+              bottom: 0,
+              width: 3,
+              background: vis.accent,
+              opacity: signal.status === "unread" ? 1 : 0.55,
+            }}
+          />
+        )}
+        <div className="px-3 pt-2.5 pb-2 h-full flex flex-col" style={{ paddingLeft: showAccent ? 12 : 12 }}>
+          {/* Worker line + severity dot */}
           <div className="flex items-center gap-1.5 mb-1">
+            <span
+              className="rounded-full flex-none"
+              style={{
+                width: 5,
+                height: 5,
+                background: vis.dot,
+              }}
+              aria-hidden
+            />
             <span
               className="w-5 h-5 rounded-full flex items-center justify-center text-[12px] flex-none"
               style={{
@@ -201,11 +233,19 @@ function FoundCard({ signal }: { signal: SignalWithWorker }) {
             >
               {signal.worker.name}
             </span>
+            {signal.signature && (
+              <Link2
+                className="w-2.5 h-2.5 ml-auto flex-none"
+                strokeWidth={2.4}
+                style={{ color: "#15803D" }}
+                aria-label="on-chain"
+              />
+            )}
           </div>
 
           {/* Subject summary — 1-2 lines max */}
           <div
-            className="text-[#0A0A0A] mb-1.5"
+            className="text-[#0A0A0A] mb-0.5"
             style={{
               fontSize: 12.5,
               lineHeight: 1.35,
@@ -218,6 +258,24 @@ function FoundCard({ signal }: { signal: SignalWithWorker }) {
           >
             {summarize(signal.subject)}
           </div>
+
+          {/* Next trigger if present — small italic green line */}
+          {signal.nextTrigger && (
+            <div
+              className="italic mb-1"
+              style={{
+                fontSize: 10.5,
+                lineHeight: 1.3,
+                color: "#15803D",
+                display: "-webkit-box",
+                WebkitLineClamp: 1,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+              }}
+            >
+              {signal.nextTrigger}
+            </div>
+          )}
 
           {/* Footer — timestamp + unread dot */}
           <div className="mt-auto flex items-center justify-between gap-2">
@@ -233,9 +291,10 @@ function FoundCard({ signal }: { signal: SignalWithWorker }) {
                 style={{
                   width: 6,
                   height: 6,
-                  background: "#22C55E",
-                  boxShadow:
-                    "0 0 0 2.5px rgba(34,197,94,0.14), 0 0 6px rgba(34,197,94,0.5)",
+                  background: showAccent ? vis.accent : "#22C55E",
+                  boxShadow: showAccent
+                    ? `0 0 0 2.5px ${vis.accent}24, 0 0 6px ${vis.accent}80`
+                    : "0 0 0 2.5px rgba(34,197,94,0.14), 0 0 6px rgba(34,197,94,0.5)",
                 }}
                 aria-label="unread"
               />

@@ -644,6 +644,15 @@ function migrate(db: Database.Database) {
   // signal kind on May 1.)
   tryAlter(`ALTER TABLE signals ADD COLUMN persistence_context TEXT`);
   tryAlter(`ALTER TABLE signals ADD COLUMN next_trigger TEXT`);
+  // signals.snoozed_until — millisecond timestamp the inbox should
+  // hide this signal until. Set by the "Snooze 4h" inline action so
+  // that recurring conditions (e.g. "SOL still outside band") don't
+  // re-yell at the user once they've acknowledged the situation.
+  // null = never snoozed.
+  tryAlter(`ALTER TABLE signals ADD COLUMN snoozed_until INTEGER`);
+  tryAlter(
+    `CREATE INDEX IF NOT EXISTS idx_signals_snooze ON signals(device_id, snoozed_until)`,
+  );
   // Re-backfill EVERY row (not just NULL ones) — v2 of hashSubject
   // normalizes numeric volatility so "$83.14" and "$83.27" share a
   // hash. The first migration backfilled with v1 (literal) so we

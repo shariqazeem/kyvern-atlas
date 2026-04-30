@@ -376,6 +376,7 @@ interface SignalRow {
   source_url: string | null;
   persistence_context: string | null;
   next_trigger: string | null;
+  snoozed_until: number | null;
   status: string;
   created_at: number;
 }
@@ -410,6 +411,7 @@ function rowToSignal(r: SignalRow): Signal {
     sourceUrl: r.source_url,
     persistenceContext: r.persistence_context,
     nextTrigger: r.next_trigger,
+    snoozedUntil: r.snoozed_until,
     status: (["unread", "read", "archived"].includes(r.status) ? r.status : "unread") as SignalStatus,
     createdAt: r.created_at,
   };
@@ -533,6 +535,7 @@ export function writeSignal(input: {
       sourceUrl: input.sourceUrl ?? null,
       persistenceContext,
       nextTrigger,
+      snoozedUntil: null,
       status: "unread",
       createdAt: now,
     },
@@ -556,16 +559,29 @@ export function listRecentSignalsByAgent(
 
 export function listInbox(
   deviceId: string,
-  opts: { status?: SignalStatus; limit?: number; since?: number } = {},
+  opts: {
+    status?: SignalStatus;
+    limit?: number;
+    since?: number;
+    /** When true (default), suppress signals whose snoozed_until is in
+     *  the future. Set false to include snoozed rows for admin views. */
+    excludeSnoozed?: boolean;
+  } = {},
 ): Signal[] {
   const limit = Math.max(1, Math.min(opts.limit ?? 50, 200));
   const since = opts.since ?? 0;
+  const now = Date.now();
+  const excludeSnoozed = opts.excludeSnoozed !== false;
   const db = getDb();
+  const snoozeClause = excludeSnoozed
+    ? `AND (snoozed_until IS NULL OR snoozed_until <= ${now})`
+    : "";
   const rows = opts.status
     ? (db
         .prepare(
           `SELECT * FROM signals
            WHERE device_id = ? AND status = ? AND created_at >= ?
+             ${snoozeClause}
            ORDER BY created_at DESC LIMIT ?`,
         )
         .all(deviceId, opts.status, since, limit) as SignalRow[])
@@ -573,6 +589,7 @@ export function listInbox(
         .prepare(
           `SELECT * FROM signals
            WHERE device_id = ? AND created_at >= ?
+             ${snoozeClause}
            ORDER BY created_at DESC LIMIT ?`,
         )
         .all(deviceId, since, limit) as SignalRow[]);
@@ -599,6 +616,53 @@ export function markSignalStatus(signalId: string, status: SignalStatus): boolea
     .prepare(`UPDATE signals SET status = ? WHERE id = ?`)
     .run(status, signalId);
   return r.changes > 0;
+}
+
+/** Mark a signal as read AND snooze it until `until` (ms). The inbox
+ *  filter hides snoozed signals by default — recurring conditions stop
+ *  re-yelling at the user once they've acknowledged. */
+export function snoozeSignal(signalId: string, untilMs: number): boolean {
+  const r = getDb()
+    .prepare(
+      `UPDATE signals SET status = 'read', snoozed_until = ? WHERE id = ?`,
+    )
+    .run(untilMs, signalId);
+  return r.changes > 0;
+}
+
+/** Daily digest counts for the inbox banner. Resets at UTC midnight to
+ *  match the rest of the "today" stats on /app live-status. */
+export function dailyDigest(deviceId: string): {
+  signalsToday: number;
+  criticalToday: number;
+  onChainToday: number;
+  thoughtsToday: number;
+} {
+  const day = new Date();
+  day.setUTCHours(0, 0, 0, 0);
+  const since = day.getTime();
+  const db = getDb();
+  const sigRow = db
+    .prepare(
+      `SELECT
+         COUNT(*) AS total,
+         SUM(CASE WHEN signature IS NOT NULL THEN 1 ELSE 0 END) AS onchain
+       FROM signals WHERE device_id = ? AND created_at >= ?`,
+    )
+    .get(deviceId, since) as { total: number; onchain: number };
+  const thoughtsRow = db
+    .prepare(
+      `SELECT COUNT(*) AS n FROM agent_thoughts t
+       JOIN agents a ON a.id = t.agent_id
+       WHERE a.device_id = ? AND t.timestamp >= ?`,
+    )
+    .get(deviceId, since) as { n: number };
+  return {
+    signalsToday: sigRow?.total ?? 0,
+    criticalToday: 0,
+    onChainToday: sigRow?.onchain ?? 0,
+    thoughtsToday: thoughtsRow?.n ?? 0,
+  };
 }
 
 export function getSignal(signalId: string): Signal | null {

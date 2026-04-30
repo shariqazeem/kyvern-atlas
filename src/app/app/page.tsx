@@ -27,6 +27,7 @@ import { DeviceChassis } from "@/components/device/home/chassis";
 import { BalanceOrbit } from "@/components/device/home/balance-orbit";
 import { TodayStrip } from "@/components/device/home/today-strip";
 import { WorkersFoundStrip } from "@/components/device/home/workers-found-strip";
+import { PolicyShield } from "@/components/device/home/policy-shield";
 import { DeviceFAB } from "@/components/device/home/device-fab";
 import { TopUpDrawer } from "@/components/device/top-up-drawer";
 
@@ -58,6 +59,7 @@ interface LiveStatus {
     totalEarnedUsd: number;
   }>;
   signalsToday?: { total: number; unread: number; read: number; actionable: number };
+  onChainToday?: number;
 }
 
 function devWallet(): string {
@@ -153,6 +155,11 @@ export default function DeviceHome() {
                 Balance is the proof, not the headline. */}
             {deviceId && <WorkersFoundStrip deviceId={deviceId} />}
 
+            {/* PolicyShield — the moat made visible. Sits above the
+                balance orbit so the user always sees that the
+                policy program is alive and enforcing. */}
+            {deviceId && <PolicyShield deviceId={deviceId} />}
+
             <BalanceOrbit
               usdcBalance={status?.usdcBalance ?? 0}
               pnlNet={status?.pnlToday.net ?? 0}
@@ -167,6 +174,8 @@ export default function DeviceHome() {
               spentToday={status?.pnlToday.spent ?? 0}
               signalsToday={status?.signalsToday?.total ?? 0}
               workersActive={status?.workersActive ?? 0}
+              workersTotal={(status?.workers ?? []).length}
+              onChainToday={status?.onChainToday ?? 0}
             />
 
             <div className="flex items-center justify-center pt-1">
