@@ -632,22 +632,41 @@ function migrate(db: Database.Database) {
   // finding many times even though the system prompt forbids it. We
   // gate at the storage layer: same (agent_id, kind, subject_hash)
   // within the per-kind dedup window → drop, return existing signal.
-  // Hash matches the JS hashSubject(): lower(trim(subject)) trimmed
-  // to 80 chars. Using SQL lower(trim()) on the substring would clip
-  // BEFORE casing, producing a different hash, so do it in this order.
   tryAlter(`ALTER TABLE signals ADD COLUMN subject_hash TEXT`);
   tryAlter(
     `CREATE INDEX IF NOT EXISTS idx_signals_dedup ON signals(agent_id, kind, subject_hash, created_at)`,
   );
-  // Backfill — one-time, idempotent (only updates rows where the
-  // column is still NULL). Cheap on the production signals table
-  // (~hundreds of rows). Matches the JS implementation exactly.
+  // Re-backfill EVERY row (not just NULL ones) — v2 of hashSubject
+  // normalizes numeric volatility so "$83.14" and "$83.27" share a
+  // hash. The first migration backfilled with v1 (literal) so we
+  // need to recompute everything. Idempotent — running again with
+  // the same subject produces the same hash, no churn.
+  //
+  // Done in JS rather than SQL because SQLite has no regex builtin
+  // and the v2 hash needs $-amount + bare-number normalization.
+  // Wrapped in a try so a fresh-DB boot (no signals yet) is fine.
   try {
-    db.exec(
-      `UPDATE signals SET subject_hash = substr(lower(trim(subject)), 1, 80) WHERE subject_hash IS NULL`,
-    );
+    // Avoid a circular import at the module level — pull the hash
+    // function lazily, only when migrate() runs.
+    const { hashSubject } = require("./agents/signal-hash") as {
+      hashSubject: (s: string) => string;
+    };
+    const rows = db
+      .prepare("SELECT id, subject FROM signals")
+      .all() as Array<{ id: string; subject: string }>;
+    if (rows.length > 0) {
+      const update = db.prepare(
+        "UPDATE signals SET subject_hash = ? WHERE id = ?",
+      );
+      const tx = db.transaction(
+        (batch: Array<{ id: string; subject: string }>) => {
+          for (const r of batch) update.run(hashSubject(r.subject), r.id);
+        },
+      );
+      tx(rows);
+    }
   } catch {
-    /* if the column doesn't exist yet on a stale connection, retry next boot */
+    /* fresh DB, signals table empty, or column not yet present — fine */
   }
 }
 

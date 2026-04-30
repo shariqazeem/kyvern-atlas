@@ -410,12 +410,11 @@ function rowToSignal(r: SignalRow): Signal {
   };
 }
 
-/** Subject hash for dedup. Matches the SQL backfill exactly:
- *  lower → trim → first 80 chars. Two signals from the same worker
- *  with the same kind hash to the same value → dedup hit. */
-function hashSubject(subject: string): string {
-  return subject.toLowerCase().trim().slice(0, 80);
-}
+/** Subject hash for dedup — moved to ./signal-hash so the migration
+ *  re-backfill in db.ts can use the exact same function. v2 normalizes
+ *  $-amounts and bare numbers so volatile prices ("$83.14" vs "$83.27")
+ *  hash to the same value and the dedup gate actually fires. */
+import { hashSubject } from "./signal-hash";
 
 /** Per-kind dedup windows. Tuned for the noise patterns we saw in
  *  production: token_pulse re-emits the same band-break every tick
