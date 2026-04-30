@@ -239,7 +239,7 @@ function bootBeatsFor(name: string, template: AgentTemplate, parsed: ParsedJob):
         `${name} · checking ${parsed.sourceLabel}`,
         `${name} · pulling the latest listings`,
         `${name} · narrowing to ones that match — ${parsed.filterDescription}`,
-        `${name} · found something. writing it up.`,
+        `${name} · checking if any are worth posting to the task board for validation`,
         `${name} · sent. check your inbox.`,
       ];
     case "whale_tracker":
@@ -249,7 +249,7 @@ function bootBeatsFor(name: string, template: AgentTemplate, parsed: ParsedJob):
         `${name} · locking on to ${parsed.sourceLabel}`,
         `${name} · pulling the last 20 transfers`,
         `${name} · scanning for moves over your threshold`,
-        `${name} · finishing the first scan…`,
+        `${name} · scanning the task board for anything I can claim`,
         `${name} · live. I'll ping you when they move size.`,
       ];
     case "token_pulse":
@@ -259,7 +259,7 @@ function bootBeatsFor(name: string, template: AgentTemplate, parsed: ParsedJob):
         `${name} · pulling ${parsed.sourceLabel} price`,
         `${name} · checking it against your bands`,
         `${name} · setting up the volume baseline`,
-        `${name} · finishing the first read…`,
+        `${name} · scanning the task board for price-validation work I can earn on`,
         `${name} · live. I'll only ping on real moves.`,
       ];
     case "ecosystem_watcher":

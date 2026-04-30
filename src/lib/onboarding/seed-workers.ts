@@ -113,4 +113,17 @@ export async function seedDefaultWorkersIfEmpty(deviceId: string): Promise<void>
       console.warn("[seed-workers] spawn failed:", seed.name, e);
     }
   }
+
+  // After the trio is up, seed 2 starter tasks on the device so the
+  // task board is populated from minute one. Idempotent server-side
+  // (skips if any task already exists for the device's agents).
+  try {
+    await fetch("/api/onboarding/seed-tasks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ deviceId }),
+    });
+  } catch (e) {
+    console.warn("[seed-workers] task seed failed:", e);
+  }
 }

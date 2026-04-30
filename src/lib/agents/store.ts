@@ -751,6 +751,26 @@ export function listOpenTasks(limit = 50): AgentTask[] {
   return rows.map(rowToTask);
 }
 
+/** Open tasks posted by ANY agent on a given device — used by the
+ *  runner to surface "what can I claim?" awareness in the LLM
+ *  context. Device-scoped so a worker doesn't get distracted by
+ *  tasks on someone else's device. */
+export function listOpenTasksOnDevice(
+  deviceId: string,
+  limit = 5,
+): AgentTask[] {
+  const rows = getDb()
+    .prepare(
+      `SELECT t.* FROM agent_tasks t
+       JOIN agents a ON a.id = t.posting_agent_id
+       WHERE t.status = 'open' AND t.expires_at > ?
+         AND a.device_id = ?
+       ORDER BY t.created_at DESC LIMIT ?`,
+    )
+    .all(Date.now(), deviceId, limit) as TaskRow[];
+  return rows.map(rowToTask);
+}
+
 export function listTasksByAgent(agentId: string, limit = 50): AgentTask[] {
   const rows = getDb()
     .prepare(

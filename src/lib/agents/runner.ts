@@ -20,6 +20,7 @@ import {
   recordAgentTick,
   listThoughts,
   listRecentSignalsByAgent,
+  listOpenTasksOnDevice,
 } from "./store";
 import { getTool } from "./tools";
 import { tryAcquireTickSlot } from "./rate-limit";
@@ -193,6 +194,16 @@ ANTI-NOISE RULES (STRICT):
 - Bounty/ecosystem findings: Only surface NEW items that appeared since last check. If the same bounty is still there, don't re-surface it.
 - Wallet findings: Only surface if a significant transaction actually occurred. "No swaps" is never a finding.
 
+TASK ECONOMY RULES:
+You are part of a device economy. Workers can hire each other for small USDC bounties — this is how on-chain settlements happen on the user's device. Every task post + claim cycle is a real Solana transaction routed through the policy program.
+
+- If you find a HIGH-VALUE opportunity worth a second pair of eyes (a bounty >$500, a major whale move, a significant price event near a milestone), AND you have the post_task tool, consider posting a research/validation task. Bounty range $0.05–$0.25 USDC. Keep the task description tight. The task asks another worker to validate or research the finding further.
+- If you have the claim_task tool AND you see open tasks on your device that match your capabilities (price-related → token_pulse / whale_tracker; bounty-research → bounty_hunter / ecosystem_watcher; release-related → github_watcher), claim one with claim_task. You earn the bounty on completion.
+- DON'T post tasks for trivial findings — only when the finding is genuinely high-value and validation would help the owner.
+- DON'T claim tasks you can't complete. Wallets you don't watch, tokens you don't track, repos outside your domain — leave for another worker.
+- DON'T post or claim more than once per cycle. Pick one action.
+- Posting/claiming triggers a real on-chain payment through the user's vault → policy program → Squads → Solana devnet. Real signature lands. The owner sees the policy enforcement work on THEIR device.
+
 FIRST-TICK RULE (very important):
 - When "Recent thoughts" shows "(none — first tick)", the owner just spawned you and is watching for the first finding. After your data-gathering tool call:
   * If the tool returned any new items / activity / qualifying matches at all → you MUST call message_user (Finding mode) with at least the FIRST new item before idling. Do not "wait for something more notable" on the first tick.
@@ -263,6 +274,28 @@ ${subjectsLine}
 DO NOT re-surface the same condition unless something material has changed (duration milestone passed, trend reversed, threshold crossed in the OPPOSITE direction). If the same condition persists with a different decimal, that's noise. Stay silent or use kind=condition_update with persistenceContext.`;
   })();
 
+  // Open tasks on the worker's device — gives the LLM "what can I
+  // claim?" awareness without scanning the global board. Empty unless
+  // the device's seeded trio + later workers post tasks via post_task.
+  const openTasks = listOpenTasksOnDevice(agent.deviceId, 5);
+  const taskSummary = (() => {
+    if (openTasks.length === 0) {
+      return "OPEN TASKS ON YOUR DEVICE: (none right now)";
+    }
+    const lines = openTasks
+      .map((t) => {
+        const ageMin = Math.max(
+          1,
+          Math.round((Date.now() - t.createdAt) / 60_000),
+        );
+        const ask =
+          (t.payload as { ask?: string } | null)?.ask ?? t.taskType;
+        return `  · ${t.id.slice(-8)} · ${t.taskType} · $${t.bountyUsd.toFixed(3)} · ${ageMin}m old · "${String(ask).slice(0, 60)}"`;
+      })
+      .join("\n");
+    return `OPEN TASKS ON YOUR DEVICE (claim with claim_task if it matches your capabilities):\n${lines}`;
+  })();
+
   // Framing intentionally avoids "make your next decision" — that
   // language pulled the model into chess-engine mode where it would
   // narrate its own deliberation. New framing is "what's new this
@@ -277,12 +310,22 @@ ${lastThoughtsText || "(none — first cycle on duty)"}
 
 ${signalSummary}
 
+${taskSummary}
+
 Now: call the data-gathering tool that matches your job. Compare what
 you observe against your recent signal summary above. If the situation
 is materially different (new item, new threshold cross, new duration
 milestone, trend reversal), file a finding. If it's the same condition
-persisting with no material change, idle this cycle. File your one-line
-worker note for the cycle either way.`;
+persisting with no material change, idle this cycle.
+
+If you have post_task and just found a HIGH-VALUE opportunity (per the
+TASK ECONOMY RULES), consider posting a task instead of just filing
+the finding — but only if validation by another worker would help.
+
+If you have claim_task and an open task above matches your capabilities,
+claim it (one per cycle, never your own template's task).
+
+File your one-line worker note for the cycle either way.`;
 }
 
 function toOpenAITool(tool: AgentTool) {

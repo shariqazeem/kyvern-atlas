@@ -171,7 +171,7 @@ export const TEMPLATES: AgentTemplateDef[] = [
     jobPromptPlaceholder: "What kind of bounties are you watching for?",
     jobPromptExample:
       "Watch https://superteam.fun/api/listings?category=Development&order=desc&take=15 every cycle using watch_url. Surface any new bounty with reward >$500 as a finding. Use kind='bounty', include the reward and deadline as evidence, and link the listing as sourceUrl.",
-    recommendedTools: ["watch_url", "read_dex", "message_user"],
+    recommendedTools: ["watch_url", "read_dex", "message_user", "post_task"],
     defaultFrequencySeconds: 600,
     description: "Watches bounty boards. Pings you when a fit drops.",
     earningStyle: "Steady",
@@ -207,7 +207,7 @@ export const TEMPLATES: AgentTemplateDef[] = [
     jobPromptPlaceholder: "Which ecosystem feeds should I watch?",
     jobPromptExample:
       "Every cycle, watch_url https://solana.com/news/rss.xml with format='rss' and sinceLastCheck=true. Surface every new post as an ecosystem_announcement. Subject = title, evidence = excerpt + author + date, sourceUrl = post URL.",
-    recommendedTools: ["watch_url", "message_user"],
+    recommendedTools: ["watch_url", "message_user", "post_task", "claim_task"],
     defaultFrequencySeconds: 600,
     description: "Watches Solana accounts and feeds. Pings on hackathons, grants, and launches.",
     earningStyle: "Steady",
@@ -243,7 +243,7 @@ export const TEMPLATES: AgentTemplateDef[] = [
     jobPromptPlaceholder: "Which wallets should I track, and at what size threshold?",
     jobPromptExample:
       "Every cycle, watch_wallet on Kraken's Solana hot wallet FWznbcNXWQuHTawe9RxvQ2LdCENssh12dsznf4RiouN5 with lookbackCount=20. For each new transfer or swap, surface a wallet_move finding with subject summarising the action, evidence: signature + amount + token + time, sourceUrl = https://explorer.solana.com/tx/<signature>.",
-    recommendedTools: ["watch_wallet_swaps", "watch_wallet", "read_dex", "message_user"],
+    recommendedTools: ["watch_wallet_swaps", "watch_wallet", "read_dex", "message_user", "claim_task"],
     defaultFrequencySeconds: 240,
     description: "Tracks wallets. Pings you when they move size.",
     earningStyle: "Opportunistic",
@@ -269,7 +269,7 @@ export const TEMPLATES: AgentTemplateDef[] = [
     jobPromptPlaceholder: "Which token, what threshold, what window?",
     jobPromptExample:
       "Every cycle, read_dex with 'SOL'. Track price across cycles in your recent thoughts. If SOL moves >5% in either direction over 30 minutes, surface a price_trigger finding with the percent change and current price as subject, evidence with start price, end price, and time window.",
-    recommendedTools: ["read_dex", "watch_wallet_swaps", "message_user"],
+    recommendedTools: ["read_dex", "watch_wallet_swaps", "message_user", "claim_task"],
     defaultFrequencySeconds: 180,
     description: "Watches a token's price + volume. Pings you on configured moves.",
     earningStyle: "Opportunistic",
@@ -305,7 +305,7 @@ export const TEMPLATES: AgentTemplateDef[] = [
     jobPromptPlaceholder: "Which repo or org should I watch?",
     jobPromptExample:
       "Every cycle, watch_url on https://api.github.com/repos/coral-xyz/anchor/releases with format='json' and sinceLastCheck=true. For each new release, surface a github_release finding with the tag as subject, body excerpt as evidence, and the release URL as sourceUrl.",
-    recommendedTools: ["watch_url", "message_user"],
+    recommendedTools: ["watch_url", "message_user", "claim_task"],
     defaultFrequencySeconds: 900,
     description: "Watches a GitHub repo or org. Pings on releases and fresh commits.",
     earningStyle: "Steady",

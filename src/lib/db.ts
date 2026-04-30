@@ -671,6 +671,59 @@ function migrate(db: Database.Database) {
   } catch {
     /* fresh DB, signals table empty, or column not yet present — fine */
   }
+
+  // Path C task-economy tool backfill — adds post_task / claim_task to
+  // agents that were spawned BEFORE the May 1 templates.ts change. Mirrors
+  // the canonical tool lists in src/lib/agents/templates.ts (kept hardcoded
+  // here to avoid circular deps; if templates.ts changes, change both).
+  // Idempotent — running with the same agents produces the same merged
+  // tool array, no churn. Skips agents whose tool list already contains
+  // every desired tool.
+  try {
+    const PATH_C_TOOLS: Record<string, string[]> = {
+      bounty_hunter: ["watch_url", "read_dex", "message_user", "post_task"],
+      ecosystem_watcher: ["watch_url", "message_user", "post_task", "claim_task"],
+      whale_tracker: ["watch_wallet_swaps", "watch_wallet", "read_dex", "message_user", "claim_task"],
+      token_pulse: ["read_dex", "watch_wallet_swaps", "message_user", "claim_task"],
+      github_watcher: ["watch_url", "message_user", "claim_task"],
+    };
+    const agents = db
+      .prepare(
+        `SELECT id, template, allowed_tools FROM agents WHERE template IN (?, ?, ?, ?, ?)`,
+      )
+      .all(
+        "bounty_hunter",
+        "ecosystem_watcher",
+        "whale_tracker",
+        "token_pulse",
+        "github_watcher",
+      ) as Array<{ id: string; template: string; allowed_tools: string }>;
+    if (agents.length > 0) {
+      const updateTools = db.prepare(
+        `UPDATE agents SET allowed_tools = ? WHERE id = ?`,
+      );
+      const tx = db.transaction(
+        (batch: typeof agents) => {
+          for (const a of batch) {
+            let current: string[] = [];
+            try {
+              current = JSON.parse(a.allowed_tools);
+            } catch {
+              current = [];
+            }
+            const desired = PATH_C_TOOLS[a.template] ?? [];
+            const merged = Array.from(new Set([...current, ...desired]));
+            if (merged.length !== current.length) {
+              updateTools.run(JSON.stringify(merged), a.id);
+            }
+          }
+        },
+      );
+      tx(agents);
+    }
+  } catch {
+    /* agents table empty or schema not yet present — fine */
+  }
 }
 
 // --- Benchmark Queries (cross-user market intelligence) ---
