@@ -2,12 +2,16 @@
 
 /**
  * TabBar — iOS-style bottom navigation. Fixed at viewport bottom.
- * Four tabs: Home · Inbox · Tasks · Settings.
+ * Four tabs: Home · Jobs · Findings · Settings.
  *
- * The Inbox tab carries an unread badge dot. The badge polls the
+ * Phase 7 — Jobs (was Tasks) is now the primary economic surface
+ * and sits second after Home. Findings (was Inbox) is demoted to
+ * third — it stays accessible but isn't the headline anymore.
+ *
+ * The Findings tab carries an unread badge dot. The badge polls the
  * primary device's /api/devices/[id]/inbox endpoint every 8s while
  * the user is NOT already on /app/inbox (no need to ping when the
- * Inbox page itself is already polling on screen).
+ * page itself is already polling on screen).
  */
 
 import { useEffect, useState } from "react";
@@ -19,8 +23,11 @@ import { useAuth } from "@/hooks/use-auth";
 
 const TABS = [
   { href: "/app", label: "Home", icon: Home, exact: true, key: "home" as const },
-  { href: "/app/inbox", label: "Inbox", icon: Inbox, exact: false, key: "inbox" as const },
-  { href: "/app/tasks", label: "Tasks", icon: Briefcase, exact: false, key: "tasks" as const },
+  // Phase 7 reorder — Jobs comes immediately after Home; Findings
+  // (legacy "Inbox") is demoted to third position. The icons stay
+  // the same so muscle memory survives.
+  { href: "/app/tasks", label: "Jobs", icon: Briefcase, exact: false, key: "tasks" as const },
+  { href: "/app/inbox", label: "Findings", icon: Inbox, exact: false, key: "inbox" as const },
   { href: "/app/settings", label: "Settings", icon: Settings, exact: false, key: "settings" as const },
 ] as const;
 

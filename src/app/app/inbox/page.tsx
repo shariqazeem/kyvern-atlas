@@ -270,7 +270,7 @@ export default function InboxPage() {
                 letterSpacing: "0.14em",
               }}
             >
-              Intelligence Inbox
+              Findings · secondary view
             </span>
           </div>
           <span
@@ -288,10 +288,18 @@ export default function InboxPage() {
         <div className="relative px-5 pt-3 pb-3.5 flex items-end justify-between">
           <div>
             <h1 className="text-[24px] font-semibold tracking-tight text-[#0A0A0A] leading-none">
-              Inbox
+              Findings
             </h1>
             <p className="text-[12.5px] text-[#6B6B6B] mt-1.5">
-              What your workers found while you were away.
+              Read-only feed of what your workers surfaced.{" "}
+              <Link
+                href="/app/tasks"
+                className="underline underline-offset-2"
+                style={{ color: "#15803D" }}
+              >
+                Jobs
+              </Link>{" "}
+              is where the economy lives.
             </p>
           </div>
           <div

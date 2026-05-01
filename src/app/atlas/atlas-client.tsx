@@ -32,8 +32,11 @@ import type { Signal } from "@/lib/agents/types";
 import { ManifestoBlock } from "@/components/atlas/manifesto-block";
 import { AtlasDevicePlinth } from "@/components/atlas/atlas-device-plinth";
 import { AtlasHeroStats } from "@/components/atlas/atlas-hero-stats";
-import { AtlasMicroStats } from "@/components/atlas/atlas-micro-stats";
-import { AtlasPnlSparkline } from "@/components/atlas/atlas-pnl-sparkline";
+import {
+  AtlasEarningsHero,
+  AtlasEconomyStats,
+  type AtlasEconomy,
+} from "@/components/atlas/atlas-economy";
 import { AtlasFindings } from "@/components/atlas/atlas-findings";
 import { AttackWall } from "@/components/atlas/attack-wall";
 import { DrainAtlasCallout } from "@/components/atlas/drain-atlas-callout";
@@ -51,6 +54,10 @@ interface AtlasClientProps {
   initialState: AtlasState | null;
   initialFeed: FeedItem[];
   initialAttacks: AtlasAttack[];
+  /** Legacy 24h PnL series; retained in the prop shape because page.tsx
+   *  still passes it from the SSR snapshot. Phase 7 replaced the
+   *  visualisation with a 14-day daily-earnings sparkline pulled live
+   *  from /api/atlas/economy, so the value is no longer rendered. */
   initialPnl24h: number[];
   initialFindings: Signal[];
   initialFindingsThisWeek: number;
@@ -59,26 +66,30 @@ interface AtlasClientProps {
 export default function AtlasClient({
   initialState,
   initialAttacks,
-  initialPnl24h,
   initialFindings,
   initialFindingsThisWeek,
 }: AtlasClientProps) {
   const [state, setState] = useState<AtlasState | null>(initialState);
   const [attacks, setAttacks] = useState<AtlasAttack[]>(initialAttacks);
+  const [economy, setEconomy] = useState<AtlasEconomy | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const [s, a] = await Promise.all([
+      const [s, a, e] = await Promise.all([
         fetch("/api/atlas/status").then((r) => (r.ok ? r.json() : null)),
         fetch("/api/atlas/decisions?kind=attacks&limit=60").then((r) =>
           r.ok ? r.json() : null,
         ),
+        fetch("/api/atlas/economy").then((r) => (r.ok ? r.json() : null)),
       ]);
       if (s && typeof s === "object" && !("error" in s)) {
         setState(s as AtlasState);
       }
       if (a && Array.isArray(a.attacks)) {
         setAttacks(a.attacks as AtlasAttack[]);
+      }
+      if (e && typeof e === "object" && !("error" in e)) {
+        setEconomy(e as AtlasEconomy);
       }
     } catch {
       /* silent — observatory must keep showing the last good state */
@@ -152,33 +163,36 @@ export default function AtlasClient({
             </div>
           )}
 
-          {/* 3. Micro stats + sparkline (side-by-side on desktop, stacked on mobile) */}
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.55, delay: 0.25, ease: EASE }}
-            className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-12 pb-6"
-            style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}
-          >
-            <AtlasMicroStats
-              totalSettled={state?.totalSettled ?? 0}
-              totalEarnedUsd={state?.totalEarnedUsd ?? 0}
-              totalSpentUsd={state?.totalSpentUsd ?? 0}
-            />
-            <div className="flex items-center gap-3">
-              <span
-                className="font-mono uppercase whitespace-nowrap"
-                style={{
-                  color: "rgba(255,255,255,0.4)",
-                  fontSize: "11px",
-                  letterSpacing: "0.12em",
-                }}
-              >
-                24h
-              </span>
-              <AtlasPnlSparkline values={initialPnl24h} />
-            </div>
-          </motion.div>
+          {/* 3. Atlas economy hero — Phase 7. "Atlas earned $X.XX in N
+                days" + 14-day sparkline. Uses Atlas's task-economy
+                rollups from /api/atlas/economy (claimed completions,
+                payouts, success rate, on-chain totals).
+
+                The legacy AtlasMicroStats + 24h sparkline pair was
+                removed; its three values (settled / earned / spent)
+                are now subsumed into AtlasEconomyStats with extra
+                context (avg payout, success %). state.totalEarnedUsd
+                still drives the hero number — economy.totalEarnedUsd
+                aggregates the same value from the task pool. */}
+          <AtlasEarningsHero
+            economy={
+              economy
+                ? {
+                    ...economy,
+                    // Use the canonical Atlas state's earnings as the
+                    // hero number — it's the same total but already
+                    // computed in the runner so the SSR snapshot
+                    // shows a real value before /api/atlas/economy
+                    // resolves.
+                    totalEarnedUsd:
+                      state?.totalEarnedUsd ?? economy.totalEarnedUsd,
+                  }
+                : null
+            }
+            firstIgnitionAt={state?.firstIgnitionAt ?? null}
+          />
+
+          <AtlasEconomyStats economy={economy} />
 
           {/* 4. Atlas Findings (Path C — above the Attack Wall) */}
           <AtlasFindings
