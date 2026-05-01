@@ -9,7 +9,7 @@ import type {
 } from "@/lib/agents/types";
 
 /**
- * POST /api/_verify/phase-1?secret=...&posterAgent=...&claimerAgent=...
+ * POST /api/verify/phase-1?secret=...&posterAgent=...&claimerAgent=...
  *
  * One-shot verification harness for Phase 1 economy engine. Drives each
  * tool against real vaults + real Solana devnet and reports back the
