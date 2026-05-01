@@ -913,3 +913,14 @@ export function getTask(id: string): AgentTask | null {
     .get(id) as TaskRow | undefined;
   return row ? rowToTask(row) : null;
 }
+
+/** True if this agent has ever posted a task. Used by the Phase 2
+ *  first-post guarantee in the runner — a fresh Sentinel that hasn't
+ *  posted anything yet gets an URGENT injection forcing a post on its
+ *  first qualifying tick. */
+export function hasAgentPostedTask(agentId: string): boolean {
+  const row = getDb()
+    .prepare(`SELECT 1 FROM agent_tasks WHERE posting_agent_id = ? LIMIT 1`)
+    .get(agentId);
+  return !!row;
+}

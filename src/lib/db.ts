@@ -711,7 +711,11 @@ function migrate(db: Database.Database) {
   // every desired tool.
   try {
     const PATH_C_TOOLS: Record<string, string[]> = {
-      bounty_hunter: ["watch_url", "read_dex", "message_user", "post_task"],
+      // Phase 2 — Sentinel toolset locked. read_dex dropped, read_onchain
+      // added so the worker can sanity-check on-chain identity of bounty
+      // issuers. message_user kept for surfacing findings; post_task is
+      // the economic primary action.
+      bounty_hunter: ["watch_url", "post_task", "message_user", "read_onchain"],
       ecosystem_watcher: ["watch_url", "message_user", "post_task", "claim_task"],
       whale_tracker: ["watch_wallet_swaps", "watch_wallet", "read_dex", "message_user", "claim_task"],
       token_pulse: ["read_dex", "watch_wallet_swaps", "message_user", "claim_task"],
@@ -753,6 +757,31 @@ function migrate(db: Database.Database) {
     }
   } catch {
     /* agents table empty or schema not yet present — fine */
+  }
+
+  // ── Phase 2 — bounty_hunter toolset REPLACEMENT (not merge) ─────
+  //
+  // Path C's backfill above is additive (Set union) so it never drops
+  // legacy tools. Phase 2 needs Sentinel's tool list to be EXACTLY the
+  // four economic-loop tools — read_dex must go. This block runs after
+  // the merge migration and overrides bounty_hunter agents' tools to
+  // the canonical Phase 2 list. Idempotent — re-running with the same
+  // canonical list is a no-op.
+  try {
+    const phase2BountyHunterTools = [
+      "watch_url",
+      "post_task",
+      "message_user",
+      "read_onchain",
+    ];
+    const desired = JSON.stringify(phase2BountyHunterTools);
+    db.prepare(
+      `UPDATE agents SET allowed_tools = ?
+         WHERE template = 'bounty_hunter' AND status != 'retired'
+           AND allowed_tools != ?`,
+    ).run(desired, desired);
+  } catch {
+    /* fresh DB or no bounty_hunter rows yet — fine */
   }
 }
 

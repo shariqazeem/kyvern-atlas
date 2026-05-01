@@ -617,6 +617,14 @@ const BOUNTY_HUNTER_VOICE: VoiceProfile = {
     toolId: null,
     input: {},
   }),
+  // Phase 2 — Sentinel becomes the first economic worker. The scripted
+  // fallback now does the FULL economic loop: watch_url → post_task
+  // (escrow $0.15 research bounty) → writeSignal (surface to inbox).
+  // Idle silently when there's nothing new — anti-noise rules apply.
+  //
+  // The scripted path is a safety net: the LLM owns this flow most of
+  // the time, but if Commonstack is down or the LLM declines to call a
+  // tool, scripted guarantees Sentinel still posts within 3 ticks.
   pickActionAsync: async (agent, toolCtx) => {
     const url = firstUrlIn(agent.jobPrompt);
     if (!url) {
@@ -626,37 +634,154 @@ const BOUNTY_HUNTER_VOICE: VoiceProfile = {
       };
     }
     const minPrize = parseMinPrize(agent.jobPrompt);
-    return runDataGatherThenMaybeSignal(agent, toolCtx, {
-      dataToolId: "watch_url",
-      dataInput: {
-        url,
-        format: "json",
-        sinceLastCheck: true,
-        ...(minPrize ? { minPrize } : {}),
-      },
-      deriveSignal: (r) => {
-        const items = ((r.data as { items?: unknown[] })?.items ?? []) as Array<{
-          title?: string;
-          url?: string;
-          summary?: string;
-        }>;
-        if (!Array.isArray(items) || items.length === 0) return null;
-        const top = items[0];
-        const title = String(top.title ?? "(unknown)").slice(0, 80);
-        return {
-          kind: "bounty",
-          subject: title,
-          evidence: [
-            top.summary ? String(top.summary).slice(0, 200) : `New listing on ${url}`,
-            minPrize ? `Filtered ≥ $${minPrize}` : "No minimum filter",
-          ],
-          sourceUrl: top.url ?? url,
+
+    // Step 1 — fetch the bounty board.
+    const watchTool = getTool("watch_url");
+    if (!watchTool) {
+      return {
+        thought: "watch_url tool unavailable · idle",
+        decision: { action: "observe" },
+      };
+    }
+    const watchInput = {
+      url,
+      format: "json" as const,
+      sinceLastCheck: true,
+      ...(minPrize ? { minPrize } : {}),
+    };
+    let watchResult: AgentToolResult;
+    try {
+      watchResult = await watchTool.execute(toolCtx, watchInput);
+    } catch (e) {
+      return {
+        thought: `watch_url failed: ${e instanceof Error ? e.message : "error"} · idle`,
+        decision: { action: "observe" },
+      };
+    }
+    if (!watchResult.ok) {
+      return {
+        thought: `watch_url returned not-ok · idle`,
+        decision: {
+          action: "tool_call",
+          toolId: "watch_url",
+          toolInput: watchInput,
+          toolResult: watchResult,
+        },
+        toolResult: watchResult,
+      };
+    }
+    const items = ((watchResult.data as { items?: unknown[] })?.items ??
+      []) as Array<{
+      title?: string;
+      url?: string;
+      summary?: string;
+      reward?: string | number;
+      deadline?: string;
+      skills?: string[] | string;
+    }>;
+    if (!Array.isArray(items) || items.length === 0) {
+      // Anti-noise: no new qualifying listings → idle silently.
+      return {
+        thought: "scanned bounty board · no new qualifying listings · idle",
+        decision: {
+          action: "tool_call",
+          toolId: "watch_url",
+          toolInput: watchInput,
+          toolResult: watchResult,
+        },
+        toolResult: watchResult,
+      };
+    }
+
+    const top = items[0];
+    const title = String(top.title ?? "(unknown)").slice(0, 80);
+    const sourceUrl = top.url ?? url;
+    const skills = Array.isArray(top.skills)
+      ? top.skills.join(", ")
+      : typeof top.skills === "string"
+        ? top.skills
+        : "";
+
+    // Step 2 — escrow + post the research task. Goes first because
+    // ECONOMY PRIORITY puts post_task ahead of message_user.
+    const postTool = getTool("post_task");
+    let postResult: AgentToolResult | null = null;
+    if (postTool) {
+      const ask = `Validate Superteam bounty: ${title}`;
+      const context =
+        `URL: ${sourceUrl}` +
+        (top.summary ? ` · ${String(top.summary).slice(0, 200)}` : "") +
+        (top.reward ? ` · reward ${top.reward}` : "") +
+        (top.deadline ? ` · deadline ${top.deadline}` : "") +
+        (skills ? ` · skills ${skills}` : "");
+      try {
+        postResult = await postTool.execute(toolCtx, {
+          taskType: "research",
+          payload: JSON.stringify({ ask, context, sourceUrl }),
+          bountyUsd: 0.15,
+          ttlSeconds: 3600,
+        });
+      } catch (e) {
+        postResult = {
+          ok: false,
+          message: `post_task failed: ${e instanceof Error ? e.message : "error"}`,
         };
-      },
-      idleThought: () => "scanned bounty board · no qualifying listings · idle",
-      surfacedThought: (_r, s) => `surfaced bounty · ${s.subject.slice(0, 50)}`,
-      parseFailedThought: () => "failed to parse job · idle",
+      }
+    }
+
+    // Step 3 — write the signal regardless of post outcome. The owner
+    // still wants to see the bounty in their inbox even if the policy
+    // program rejected the escrow.
+    const writeResult = writeSignal({
+      agentId: agent.id,
+      deviceId: agent.deviceId,
+      kind: "bounty",
+      subject: title,
+      evidence: [
+        top.reward ? `Reward: ${top.reward}` : "Reward: see listing",
+        top.deadline ? `Deadline: ${top.deadline}` : "Deadline: see listing",
+        skills ? `Skills: ${skills}` : "Skills: see listing",
+        minPrize ? `Filtered ≥ $${minPrize}` : "No minimum filter",
+      ].slice(0, 4),
+      sourceUrl,
     });
+
+    if (writeResult.created) {
+      toolCtx.log({
+        description: `Surfaced bounty · ${title.slice(0, 60)}${title.length > 60 ? "…" : ""}`,
+      });
+    }
+
+    // Final decision recorded references whichever action moved money:
+    // post_task on success, otherwise watch_url so the thought feed
+    // still has context.
+    if (postResult?.ok && postResult.signature) {
+      return {
+        thought: `posted research task · escrowed $0.15 · ${title.slice(0, 50)}`,
+        decision: {
+          action: "tool_call",
+          toolId: "post_task",
+          toolInput: { taskType: "research", bountyUsd: 0.15 },
+          toolResult: postResult,
+        },
+        toolResult: postResult,
+      };
+    }
+
+    // Post failed (policy reject / treasury issue). Still emitted the
+    // signal — note both outcomes in the thought.
+    return {
+      thought: postResult
+        ? `surfaced bounty · ${title.slice(0, 40)} · post_task blocked: ${postResult.failedReason ?? postResult.message ?? "unknown"}`
+        : `surfaced bounty · ${title.slice(0, 50)} · post_task tool unavailable`,
+      decision: {
+        action: "tool_call",
+        toolId: "watch_url",
+        toolInput: watchInput,
+        toolResult: watchResult,
+      },
+      toolResult: watchResult,
+    };
   },
 };
 

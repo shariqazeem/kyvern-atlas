@@ -171,7 +171,13 @@ export const TEMPLATES: AgentTemplateDef[] = [
     jobPromptPlaceholder: "What kind of bounties are you watching for?",
     jobPromptExample:
       "Watch https://superteam.fun/api/listings?category=Development&order=desc&take=15 every cycle using watch_url. Surface any new bounty with reward >$500 as a finding. Use kind='bounty', include the reward and deadline as evidence, and link the listing as sourceUrl.",
-    recommendedTools: ["watch_url", "read_dex", "message_user", "post_task"],
+    // Phase 2 — Sentinel is now the FIRST economic worker. Toolset
+    // locked to the four tools its lifecycle actually uses: watch_url
+    // (find bounties), post_task (escrow $0.15 research jobs),
+    // message_user (surface findings to the inbox), read_onchain
+    // (sanity-check the bounty issuer's on-chain rep). read_dex was
+    // dropped — Sentinel doesn't track tokens.
+    recommendedTools: ["watch_url", "post_task", "message_user", "read_onchain"],
     defaultFrequencySeconds: 600,
     description: "Watches bounty boards. Pings you when a fit drops.",
     earningStyle: "Steady",

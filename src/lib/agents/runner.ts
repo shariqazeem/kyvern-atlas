@@ -21,6 +21,7 @@ import {
   listThoughts,
   listRecentSignalsByAgent,
   listOpenTasksOnDevice,
+  hasAgentPostedTask,
 } from "./store";
 import { getTool } from "./tools";
 import { tryAcquireTickSlot } from "./rate-limit";
@@ -192,7 +193,23 @@ ANTI-NOISE RULES (STRICT):
 - "Quiet" / "idle" / "no activity" is ONLY a finding if it's anomalous based on your recent observations. If you don't have enough history to judge, assume it's normal and stay silent.
 - Price triggers: Only surface if (1) this is the FIRST time the price crossed your band, or (2) something material changed about the condition (volume spike, trend reversal, duration milestone passed). "Still below band" with a slightly different price is NOT a new finding. If the condition persists but a milestone is passed (e.g. crossing 12h continuous), surface as kind=condition_update with persistenceContext.
 - Bounty/ecosystem findings: Only surface NEW items that appeared since last check. If the same bounty is still there, don't re-surface it.
-- Wallet findings: Only surface if a significant transaction actually occurred. "No swaps" is never a finding.
+- Wallet findings: Only surface if a significant transaction actually occurred. "No swaps" is never a finding.${
+    agent.template === "bounty_hunter"
+      ? `
+
+ECONOMY PRIORITY (HIGHEST — OVERRIDE EVERYTHING ELSE):
+You are an economic worker. Your job is to earn USDC for your owner by creating paid tasks that other workers can complete. Every tick, follow this exact priority:
+
+  FIRST: If you have an open task you can claim → claim it.
+  SECOND: If you found a high-value bounty (>$500) using watch_url → immediately post a research task using post_task with reward $0.15. Include the bounty URL, reward, deadline, and skills in the description.
+  THIRD: Surface the bounty to the owner using message_user (kind="bounty").
+  LAST: If nothing new and no tasks to claim → idle silently. Do not surface noise.
+
+When posting a task, always use post_task with a clear description and $0.15 reward. The reward is escrowed on-chain immediately — your vault sends USDC to the platform treasury, locking it until a claimer completes the work. If your policy rejects the escrow, the task is never created.
+
+Posting a research task takes priority over surfacing a finding. If you have to choose one because you only have time for one tool call this cycle, post_task wins.`
+      : ""
+  }
 
 TASK ECONOMY RULES:
 You are part of a device economy. Workers can hire each other for small USDC bounties — this is how on-chain settlements happen on the user's device. Every task post + claim cycle is a real Solana transaction routed through the policy program.
@@ -393,7 +410,28 @@ async function llmTick(agent: Agent, ctx: AgentToolContext): Promise<LlmTickOutc
 
   const recentThoughts = listThoughts(agent.id, 10);
   const systemPrompt = buildSystemPrompt(agent);
-  const userMessage = buildContextMessage(agent, recentThoughts);
+  let userMessage = buildContextMessage(agent, recentThoughts);
+
+  // Phase 2 — Sentinel's first-post guarantee. If a fresh bounty_hunter
+  // hasn't posted any tasks yet within its first 3 ticks, append an
+  // URGENT directive that forces a post_task on this tick. Combined
+  // with tool_choice="required" on step 0 + the scripted fallback,
+  // Sentinel reliably puts a task on the board within ~5s of unboxing.
+  if (
+    agent.template === "bounty_hunter" &&
+    agent.totalThoughts < 3 &&
+    !hasAgentPostedTask(agent.id)
+  ) {
+    userMessage += `
+
+URGENT — FIRST ECONOMIC ACTION REQUIRED:
+You have not posted any tasks yet. You MUST use post_task RIGHT NOW to create a research task for the latest qualifying Superteam bounty you find via watch_url. Reward: 0.15 USDC. This is your first economic action — do not idle, do not just call message_user. The flow this tick:
+  1. watch_url to fetch the bounty board
+  2. post_task with the top qualifying listing (reward 0.15, ttlSeconds 3600, payload containing the listing title, URL, and reward)
+  3. (optional) message_user to surface the same bounty as a Finding
+
+If watch_url returns no qualifying items this tick, post_task with the most recent listing returned anyway — better to seed the board than to idle on tick #1.`;
+  }
 
   const messages: ChatMessageInput[] = [
     { role: "system", content: systemPrompt },

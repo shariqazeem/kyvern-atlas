@@ -92,7 +92,7 @@ export async function seedDefaultWorkersIfEmpty(deviceId: string): Promise<void>
 
   for (const seed of getDefaultWorkerSeeds()) {
     try {
-      await fetch("/api/agents/spawn", {
+      const res = await fetch("/api/agents/spawn", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -106,6 +106,26 @@ export async function seedDefaultWorkersIfEmpty(deviceId: string): Promise<void>
           frequencySeconds: seed.frequencySeconds,
         }),
       });
+
+      // Phase 2 — fire one immediate tick on Sentinel so the first
+      // post_task lands within ~5s of unbox completion. The other two
+      // workers in the trio are passive (no LLM-side urgency to
+      // reduce their first-tick latency); they ride the agent-pool
+      // cadence as before. Best-effort — if the tick fails, the
+      // agent-pool will pick up the agent on its next cycle.
+      if (seed.template === "bounty_hunter" && res.ok) {
+        try {
+          const spawned = (await res.json()) as { agent?: { id?: string } };
+          const agentId = spawned?.agent?.id;
+          if (agentId) {
+            void fetch(`/api/agents/${agentId}/tick`, { method: "POST" }).catch(
+              () => {},
+            );
+          }
+        } catch {
+          /* ignore — spawn already happened, agent-pool will tick it */
+        }
+      }
     } catch (e) {
       // Partial seeding is acceptable — log and keep going. Don't
       // throw because we don't want to block the user's /unbox →
