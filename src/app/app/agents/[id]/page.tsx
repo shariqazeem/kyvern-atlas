@@ -18,21 +18,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
-import {
-  ArrowLeft,
-  Pause,
-  Play,
-  Activity,
-  X,
-} from "lucide-react";
-import { SignaturePill } from "@/components/primitives/signature-pill";
+import { motion } from "framer-motion";
+import { ArrowLeft, Pause, Play, X } from "lucide-react";
 import { ChatDrawer, type ChatMessage } from "@/components/agent/chat-drawer";
 import { WelcomeNote } from "@/components/agent/welcome-note";
 import { FirstMessage } from "@/components/agent/first-message";
 import { BootSequence } from "@/components/agent/boot-sequence";
 import { LiveWorkerCard } from "@/components/agent/live-worker-card";
 import { FirstSignalToast } from "@/components/agent/first-signal-toast";
+import { EconomicTimeline } from "@/components/agent/economic-timeline";
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
@@ -55,17 +49,6 @@ interface Agent {
   metadata?: { firstMessage?: string; watchingTarget?: string } | Record<string, unknown>;
 }
 
-interface Thought {
-  id: string;
-  timestamp: number;
-  thought: string;
-  toolUsed: string | null;
-  signature: string | null;
-  amountUsd: number | null;
-  counterparty: string | null;
-  mode: "llm" | "scripted";
-}
-
 const QUICK_REPLIES = [
   "How are you doing?",
   "Show me what you found",
@@ -83,7 +66,6 @@ function moduleId(template: string): string {
 export default function AgentDetailPage({ params }: { params: { id: string } }) {
   const searchParams = useSearchParams();
   const [agent, setAgent] = useState<Agent | null>(null);
-  const [thoughts, setThoughts] = useState<Thought[]>([]);
   const [chat, setChat] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -120,12 +102,13 @@ export default function AgentDetailPage({ params }: { params: { id: string } }) 
     prevThoughtsRef.current = agent.totalThoughts;
   }, [agent, isFreshParam]);
 
-  // Initial load
+  // Initial load — agent + chat. Thought feed is owned by the
+  // EconomicTimeline component (Phase 6) which polls its own
+  // dedicated endpoint, so we don't fetch thoughts here anymore.
   const load = useCallback(async () => {
     try {
-      const [agentRes, thoughtsRes, chatRes] = await Promise.all([
+      const [agentRes, chatRes] = await Promise.all([
         fetch(`/api/agents/${params.id}`),
-        fetch(`/api/agents/${params.id}/thoughts?limit=30`),
         fetch(`/api/agents/${params.id}/chat?limit=30`),
       ]);
       if (agentRes.status === 404) {
@@ -134,10 +117,8 @@ export default function AgentDetailPage({ params }: { params: { id: string } }) 
         return;
       }
       const agentJson = await agentRes.json();
-      const thoughtsJson = await thoughtsRes.json();
       const chatJson = await chatRes.json();
       setAgent(agentJson.agent);
-      setThoughts(thoughtsJson.thoughts ?? []);
       setChat(chatJson.messages ?? []);
       setLoading(false);
     } catch {
@@ -150,17 +131,15 @@ export default function AgentDetailPage({ params }: { params: { id: string } }) 
     void load();
   }, [load]);
 
-  // Poll
+  // Poll agent + chat. Faster cadence during the first-60s activation
+  // window so totalThoughts 0→1 transition flips the boot sequence
+  // promptly.
   useEffect(() => {
     const intervalMs = showActivation ? 2000 : 5000;
     const iv = setInterval(() => {
       fetch(`/api/agents/${params.id}`)
         .then((r) => (r.ok ? r.json() : null))
         .then((d) => d?.agent && setAgent(d.agent as Agent))
-        .catch(() => {});
-      fetch(`/api/agents/${params.id}/thoughts?limit=30`)
-        .then((r) => (r.ok ? r.json() : null))
-        .then((d) => d?.thoughts && setThoughts(d.thoughts as Thought[]))
         .catch(() => {});
       fetch(`/api/agents/${params.id}/chat?limit=30`)
         .then((r) => (r.ok ? r.json() : null))
@@ -581,64 +560,13 @@ export default function AgentDetailPage({ params }: { params: { id: string } }) 
         </div>
       )}
 
-      {/* Internal log screen */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.1, duration: 0.4 }}
-        className="rounded-[16px] overflow-hidden"
-        style={{
-          background: "#FFFFFF",
-          border: "1px solid rgba(15,23,42,0.06)",
-          boxShadow: "0 1px 2px rgba(15,23,42,0.03)",
-        }}
-      >
-        <div
-          className="flex items-center justify-between px-4 pt-3 pb-2.5"
-          style={{ borderBottom: "1px solid rgba(15,23,42,0.05)" }}
-        >
-          <div className="flex items-center gap-1.5">
-            <Activity className="w-3 h-3 text-[#9CA3AF]" strokeWidth={2} />
-            <span
-              className="font-mono uppercase"
-              style={{
-                color: "#9CA3AF",
-                fontSize: 9.5,
-                letterSpacing: "0.16em",
-              }}
-            >
-              Internal log
-            </span>
-          </div>
-          <span
-            className="font-mono"
-            style={{ color: "#9CA3AF", fontSize: 10 }}
-          >
-            {agent.totalThoughts} cycles
-          </span>
-        </div>
-
-        {thoughts.length === 0 ? (
-          <div
-            className="py-10 text-center text-[13px] font-mono"
-            style={{ color: "#9CA3AF" }}
-          >
-            {isAlive ? "Waiting for first thought…" : "Worker is paused."}
-          </div>
-        ) : (
-          <div className="divide-y" style={{ borderColor: "rgba(15,23,42,0.04)" }}>
-            <AnimatePresence initial={false}>
-              {thoughts.map((t, i) => (
-                <ThoughtRow
-                  key={t.id}
-                  thought={t}
-                  cycleNumber={agent.totalThoughts - i}
-                />
-              ))}
-            </AnimatePresence>
-          </div>
-        )}
-      </motion.div>
+      {/* Phase 6 — Economic Activity Timeline replaces the raw
+          internal-log thought feed. The previous feed surfaced every
+          tick (anti-noise included), which made the page feel like
+          debug output. The timeline shows only money-moving actions
+          + their on-chain signatures, which is what owners actually
+          care about. */}
+      <EconomicTimeline agentId={agent.id} isAlive={isAlive} />
 
       {/* Sticky chat drawer */}
       <ChatDrawer
@@ -731,202 +659,3 @@ function SpecBlock({
   );
 }
 
-/* ── ThoughtRow ───────────────────────────────────────────────────── */
-
-function ThoughtRow({
-  thought,
-  cycleNumber,
-}: {
-  thought: Thought;
-  cycleNumber: number;
-}) {
-  const ts = new Date(thought.timestamp);
-  const hh = String(ts.getHours()).padStart(2, "0");
-  const mm = String(ts.getMinutes()).padStart(2, "0");
-  const ss = String(ts.getSeconds()).padStart(2, "0");
-  const time = `${hh}:${mm}:${ss}`;
-
-  const moneyKind = moneyDirection(thought.toolUsed);
-  const hasFooter =
-    !!thought.toolUsed ||
-    !!thought.signature ||
-    (thought.amountUsd != null && thought.amountUsd > 0);
-
-  return (
-    <motion.article
-      layout
-      initial={{ opacity: 0, y: -6 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.98 }}
-      transition={{ duration: 0.25, ease: EASE }}
-      className="px-4 py-3.5"
-    >
-      {/* Top row — cycle # gutter, time, mode */}
-      <div className="flex items-center gap-2 mb-1.5">
-        <span
-          className="font-mono"
-          style={{
-            color: "#0A0A0A",
-            fontSize: 10.5,
-            fontWeight: 500,
-            letterSpacing: "0.04em",
-          }}
-        >
-          #{String(cycleNumber).padStart(4, "0")}
-        </span>
-        <span
-          className="font-mono"
-          style={{ color: "#9CA3AF", fontSize: 10.5 }}
-        >
-          {time}
-        </span>
-        <ModePill mode={thought.mode} />
-      </div>
-
-      {/* Reasoning text */}
-      <p
-        className="text-[#0A0A0A]"
-        style={{ fontSize: 14.5, lineHeight: 1.55 }}
-      >
-        {thought.thought}
-      </p>
-
-      {/* Footer */}
-      {hasFooter && (
-        <div className="flex items-center gap-2 mt-2 flex-wrap">
-          {thought.toolUsed && (
-            <span
-              className="font-mono px-2 py-0.5 rounded"
-              style={{
-                background: "rgba(15,23,42,0.04)",
-                color: "#374151",
-                fontSize: 10,
-                border: "1px solid rgba(15,23,42,0.05)",
-              }}
-            >
-              {thought.toolUsed.replace(/_/g, " ")}
-            </span>
-          )}
-          {thought.signature && (
-            <OnChainBadge
-              signature={thought.signature}
-              amountUsd={thought.amountUsd}
-              kind={moneyKind}
-            />
-          )}
-          {!thought.signature &&
-            thought.amountUsd != null &&
-            thought.amountUsd > 0 &&
-            moneyKind && (
-              <MoneyDelta amount={thought.amountUsd} kind={moneyKind} />
-            )}
-        </div>
-      )}
-    </motion.article>
-  );
-}
-
-function ModePill({ mode }: { mode: "llm" | "scripted" }) {
-  if (mode === "llm") {
-    return (
-      <span
-        className="inline-flex items-center gap-1 px-1.5 py-[1px] rounded font-mono uppercase"
-        style={{
-          background: "rgba(34,197,94,0.10)",
-          color: "#15803D",
-          fontSize: 9,
-          letterSpacing: "0.06em",
-        }}
-      >
-        <span
-          className="w-1.5 h-1.5 rounded-full"
-          style={{ background: "#22C55E" }}
-        />
-        llm
-      </span>
-    );
-  }
-  return (
-    <span
-      className="inline-flex items-center gap-1 px-1.5 py-[1px] rounded font-mono uppercase"
-      style={{
-        background: "rgba(15,23,42,0.04)",
-        color: "#6B7280",
-        fontSize: 9,
-        letterSpacing: "0.06em",
-      }}
-    >
-      scripted
-    </span>
-  );
-}
-
-function MoneyDelta({
-  amount,
-  kind,
-}: {
-  amount: number;
-  kind: "earned" | "spent";
-}) {
-  const earned = kind === "earned";
-  return (
-    <span
-      className="font-mono"
-      style={{
-        color: earned ? "#15803D" : "#B45309",
-        fontSize: 11.5,
-        fontVariantNumeric: "tabular-nums",
-        fontWeight: 500,
-      }}
-    >
-      {earned ? "+" : "−"}${amount.toFixed(3)} {earned ? "earned" : "spent"}
-    </span>
-  );
-}
-
-function moneyDirection(tool: string | null): "earned" | "spent" | null {
-  if (!tool) return null;
-  if (tool === "claim_task") return "earned";
-  if (tool === "subscribe_to_agent" || tool === "post_task") return "spent";
-  return null;
-}
-
-/** OnChainBadge — replaces the bare SignaturePill when a thought
- *  produced a real Solana tx. The pill collapses signature + amount +
- *  direction into one chunky green pill so the thought feed reads as
- *  on-chain proof, not just a debug trace. Falls back to SignaturePill
- *  when amount is missing. */
-function OnChainBadge({
-  signature,
-  amountUsd,
-  kind,
-}: {
-  signature: string;
-  amountUsd: number | null;
-  kind: "earned" | "spent" | null;
-}) {
-  const hasAmount = amountUsd != null && amountUsd > 0;
-  if (!hasAmount) return <SignaturePill signature={signature} />;
-  const earned = kind === "earned";
-  return (
-    <a
-      href={`https://explorer.solana.com/tx/${signature}?cluster=devnet`}
-      target="_blank"
-      rel="noreferrer"
-      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-mono"
-      style={{
-        background: earned ? "rgba(34,197,94,0.10)" : "rgba(217,119,6,0.10)",
-        color: earned ? "#15803D" : "#B45309",
-        fontSize: 10.5,
-        fontWeight: 600,
-        letterSpacing: "0.02em",
-      }}
-    >
-      <span aria-hidden>✓</span>
-      On-chain · {earned ? "+" : "−"}${amountUsd!.toFixed(3)}
-      <span aria-hidden style={{ opacity: 0.6, marginLeft: 2 }}>
-        ↗
-      </span>
-    </a>
-  );
-}

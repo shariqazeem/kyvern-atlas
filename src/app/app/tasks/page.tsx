@@ -1,17 +1,16 @@
 "use client";
 
 /**
- * /app/tasks — agent task board.
+ * /app/tasks — Jobs feed (Phase 6 redesign).
  *
- * Transformation #4 polish: summary header, real descriptions on cards
- * (the payload's `ask`), manual "Post a task" form so the owner can
- * drive the board directly, completed cards link to the on-chain
- * payment via SignaturePill.
+ * The primary surface for the device's economic loop. Three tabs:
  *
- * Polls /api/tasks?status=open and ?status=completed every 8s. When the
- * owner has a device, both endpoints are filtered to that device's
- * agents so the board stays scoped — public-board mode is reserved for
- * the unauth view.
+ *   Open         — escrowed bounties waiting for a claimer
+ *   In progress  — claimed but not yet completed (escrow held)
+ *   Completed    — settled tasks with payment_signature → Explorer
+ *
+ * Polls /api/tasks?status={open,in_progress,completed} every 8s. The
+ * owner can also drive the board manually via the "Post a task" form.
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -25,6 +24,9 @@ import {
   Microscope,
   ShieldCheck,
   TrendingUp,
+  ExternalLink,
+  Link2,
+  Loader2,
 } from "lucide-react";
 import { SignaturePill } from "@/components/primitives/signature-pill";
 import { useAuth } from "@/hooks/use-auth";
@@ -48,11 +50,25 @@ interface OpenTask {
   postingAgent: AgentBrief | null;
 }
 
+interface InProgressTask {
+  id: string;
+  taskType: string;
+  bountyUsd: number;
+  escrowSignature: string | null;
+  createdAt: number;
+  expiresAt: number;
+  ask: string | null;
+  context: string | null;
+  postingAgent: AgentBrief | null;
+  claimingAgent: AgentBrief | null;
+}
+
 interface CompletedTask {
   id: string;
   taskType: string;
   bountyUsd: number;
   paymentSignature: string | null;
+  escrowSignature: string | null;
   completedAt: number | null;
   ask: string | null;
   context: string | null;
@@ -105,8 +121,11 @@ function visualFor(t: string): {
 
 export default function TasksPage() {
   const { wallet, isLoading: authLoading } = useAuth();
-  const [view, setView] = useState<"open" | "completed">("open");
+  const [view, setView] = useState<"open" | "in_progress" | "completed">(
+    "open",
+  );
   const [open, setOpen] = useState<OpenTask[]>([]);
+  const [inProgressList, setInProgressList] = useState<InProgressTask[]>([]);
   const [completed, setCompleted] = useState<CompletedTask[]>([]);
   const [deviceId, setDeviceId] = useState<string | null>(null);
   const [postOpen, setPostOpen] = useState(false);
@@ -131,6 +150,10 @@ export default function TasksPage() {
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => d?.tasks && setOpen(d.tasks as OpenTask[]))
       .catch(() => {});
+    fetch(`/api/tasks?status=in_progress&limit=20${dq}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d?.tasks && setInProgressList(d.tasks as InProgressTask[]))
+      .catch(() => {});
     fetch(`/api/tasks?status=completed&limit=20${dq}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => d?.tasks && setCompleted(d.tasks as CompletedTask[]))
@@ -147,7 +170,6 @@ export default function TasksPage() {
     () => completed.reduce((s, t) => s + t.bountyUsd, 0),
     [completed],
   );
-  const inProgress = 0; // claimed-but-not-completed isn't returned today; reserved.
 
   return (
     <div className="py-2 pb-24">
@@ -159,10 +181,10 @@ export default function TasksPage() {
         <div className="flex items-end justify-between gap-3 mb-3 flex-wrap">
           <div>
             <h1 className="text-[28px] font-semibold tracking-[-0.025em] text-[#0A0A0A] mb-1">
-              Task board
+              Jobs on your device
             </h1>
             <p className="text-[13px] text-[#6B6B6B]">
-              Workers post jobs. Other workers claim, complete, and earn USDC. All on-chain.
+              Workers post, claim, and complete paid jobs in real USDC. Every step is enforced on-chain by your policy program.
             </p>
           </div>
           {deviceId && (
@@ -186,17 +208,23 @@ export default function TasksPage() {
 
         <SummaryBar
           openCount={open.length}
-          inProgress={inProgress}
+          inProgress={inProgressList.length}
           completedCount={completed.length}
           totalPaidOut={totalPaidOut}
         />
 
-        <div className="flex gap-2 mt-4">
+        <div className="flex gap-2 mt-4 flex-wrap">
           <Tab
             active={view === "open"}
             onClick={() => setView("open")}
             icon={<Clock className="w-3 h-3" />}
             label={`Open (${open.length})`}
+          />
+          <Tab
+            active={view === "in_progress"}
+            onClick={() => setView("in_progress")}
+            icon={<Loader2 className="w-3 h-3" />}
+            label={`In progress (${inProgressList.length})`}
           />
           <Tab
             active={view === "completed"}
@@ -207,8 +235,8 @@ export default function TasksPage() {
         </div>
       </motion.div>
 
-      {view === "open" ? (
-        open.length === 0 ? (
+      {view === "open" &&
+        (open.length === 0 ? (
           <EmptyBoard view="open" />
         ) : (
           <div className="space-y-2">
@@ -216,16 +244,27 @@ export default function TasksPage() {
               <OpenTaskCard key={t.id} task={t} index={i} />
             ))}
           </div>
-        )
-      ) : completed.length === 0 ? (
-        <EmptyBoard view="completed" />
-      ) : (
-        <div className="space-y-2">
-          {completed.map((t, i) => (
-            <CompletedTaskCard key={t.id} task={t} index={i} />
-          ))}
-        </div>
-      )}
+        ))}
+      {view === "in_progress" &&
+        (inProgressList.length === 0 ? (
+          <EmptyBoard view="in_progress" />
+        ) : (
+          <div className="space-y-2">
+            {inProgressList.map((t, i) => (
+              <InProgressTaskCard key={t.id} task={t} index={i} />
+            ))}
+          </div>
+        ))}
+      {view === "completed" &&
+        (completed.length === 0 ? (
+          <EmptyBoard view="completed" />
+        ) : (
+          <div className="space-y-2">
+            {completed.map((t, i) => (
+              <CompletedTaskCard key={t.id} task={t} index={i} />
+            ))}
+          </div>
+        ))}
 
       {postOpen && deviceId && (
         <PostTaskModal
@@ -336,6 +375,124 @@ function Tab({
 }
 
 /* ── Cards ──────────────────────────────────────────────────────────── */
+
+function InProgressTaskCard({
+  task,
+  index,
+}: {
+  task: InProgressTask;
+  index: number;
+}) {
+  const v = visualFor(task.taskType);
+  const Icon = v.Icon;
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: Math.min(index * 0.04, 0.2) }}
+      className="rounded-[14px] p-3.5"
+      style={{
+        background: "#fff",
+        boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+        border: "1px solid rgba(245,158,11,0.20)",
+      }}
+    >
+      <div className="flex items-start justify-between gap-3 mb-2">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+            <span
+              className="inline-flex items-center gap-1 px-1.5 py-[2px] rounded font-mono uppercase"
+              style={{
+                background: v.bg,
+                color: v.fg,
+                fontSize: "9.5px",
+                letterSpacing: "0.10em",
+                fontWeight: 600,
+              }}
+            >
+              <Icon className="w-2.5 h-2.5" strokeWidth={2.4} />
+              {v.label}
+            </span>
+            <span
+              className="inline-flex items-center gap-1 px-1.5 py-[2px] rounded font-mono uppercase"
+              style={{
+                background: "rgba(245,158,11,0.10)",
+                color: "#B45309",
+                fontSize: "9.5px",
+                letterSpacing: "0.10em",
+                fontWeight: 600,
+              }}
+            >
+              <Loader2 className="w-2.5 h-2.5 animate-spin" strokeWidth={2.4} />
+              IN PROGRESS
+            </span>
+          </div>
+          <p
+            className="text-[14px] text-[#0A0A0A] mb-1"
+            style={{
+              lineHeight: 1.42,
+              fontWeight: 500,
+              display: "-webkit-box",
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: "vertical",
+              overflow: "hidden",
+            }}
+          >
+            {task.ask ?? task.taskType.replace(/_/g, " ")}
+          </p>
+          <div className="flex items-center gap-1 text-[11px] text-[#6B6B6B] flex-wrap">
+            {task.postingAgent && (
+              <span>
+                {task.postingAgent.emoji} {task.postingAgent.name}
+              </span>
+            )}
+            <span>→</span>
+            {task.claimingAgent ? (
+              <span>
+                {task.claimingAgent.emoji} {task.claimingAgent.name}
+              </span>
+            ) : (
+              <span style={{ color: "#9CA3AF" }}>(unassigned)</span>
+            )}
+          </div>
+        </div>
+        <span
+          className="text-[16px] font-mono font-semibold shrink-0"
+          style={{ color: "#B45309" }}
+        >
+          ${task.bountyUsd.toFixed(3)}
+        </span>
+      </div>
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <span
+          className="text-[10px] font-mono"
+          style={{ color: "#9B9B9B" }}
+        >
+          claimed {fmtAgo(new Date(task.createdAt).toISOString())}
+        </span>
+        {task.escrowSignature && (
+          <a
+            href={`https://explorer.solana.com/tx/${task.escrowSignature}?cluster=devnet`}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded font-mono"
+            style={{
+              background: "rgba(245,158,11,0.10)",
+              color: "#B45309",
+              fontSize: 10.5,
+              fontWeight: 600,
+            }}
+            title="View escrow on Solana Explorer"
+          >
+            <Link2 className="w-2.5 h-2.5" strokeWidth={2.4} />
+            escrow {task.escrowSignature.slice(0, 4)}…{task.escrowSignature.slice(-4)}
+            <ExternalLink className="w-2.5 h-2.5" />
+          </a>
+        )}
+      </div>
+    </motion.div>
+  );
+}
 
 function OpenTaskCard({ task, index }: { task: OpenTask; index: number }) {
   const v = visualFor(task.taskType);
@@ -521,7 +678,17 @@ function CompletedTaskCard({
 
 /* ── Empty state ────────────────────────────────────────────────────── */
 
-function EmptyBoard({ view }: { view: "open" | "completed" }) {
+function EmptyBoard({
+  view,
+}: {
+  view: "open" | "in_progress" | "completed";
+}) {
+  const copy =
+    view === "open"
+      ? "Your workers will post tasks here when they find opportunities worth validating. The first task usually appears within 10 minutes of unboxing."
+      : view === "in_progress"
+        ? "No claimed tasks right now. When a worker claims an open task, the escrow + claimer chain shows up here."
+        : "No tasks have been completed yet. Once a worker claims and finishes a task, the on-chain payment shows up here with an Explorer link.";
   return (
     <div
       className="rounded-[16px] py-10 px-4 text-center"
@@ -535,9 +702,7 @@ function EmptyBoard({ view }: { view: "open" | "completed" }) {
         className="text-[13px] mx-auto max-w-[420px] leading-[1.55]"
         style={{ color: "#6B7280" }}
       >
-        {view === "open"
-          ? "Your workers will post tasks here when they find opportunities worth validating. The first task usually appears within 10 minutes of unboxing."
-          : "No tasks have been completed yet. Once a worker claims and finishes a task, the on-chain payment shows up here with an Explorer link."}
+        {copy}
       </p>
     </div>
   );

@@ -106,6 +106,65 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ tasks: filtered.slice(0, limit) });
     }
 
+    if (status === "in_progress" || status === "claimed") {
+      // Phase 6 — surface tasks that have been claimed but not yet
+      // completed. Includes the legacy "claimed" status that was used
+      // before the Phase 1 split renamed it to "in_progress".
+      const rows = getDb()
+        .prepare(
+          `SELECT * FROM agent_tasks
+            WHERE status IN ('in_progress','claimed')
+              AND expires_at > ?
+            ORDER BY created_at DESC
+            LIMIT ?`,
+        )
+        .all(Date.now(), Math.min(limit * 4, 200)) as TaskRowMin[];
+
+      const tasks = rows.map((r) => {
+        const poster = getAgent(r.posting_agent_id);
+        const claimer = r.claiming_agent_id
+          ? getAgent(r.claiming_agent_id)
+          : null;
+        const { ask, context } = parsePayload(r.payload_json);
+        return {
+          id: r.id,
+          taskType: r.task_type,
+          bountyUsd: r.bounty_usd,
+          escrowSignature:
+            (r as TaskRowMin & { escrow_signature?: string | null })
+              .escrow_signature ?? null,
+          createdAt: r.created_at,
+          expiresAt: r.expires_at,
+          ask,
+          context,
+          postingAgent: poster
+            ? {
+                id: poster.id,
+                deviceId: poster.deviceId,
+                name: poster.name,
+                emoji: poster.emoji,
+              }
+            : null,
+          claimingAgent: claimer
+            ? {
+                id: claimer.id,
+                deviceId: claimer.deviceId,
+                name: claimer.name,
+                emoji: claimer.emoji,
+              }
+            : null,
+        };
+      });
+      const filtered = deviceId
+        ? tasks.filter(
+            (t) =>
+              t.postingAgent?.deviceId === deviceId ||
+              t.claimingAgent?.deviceId === deviceId,
+          )
+        : tasks;
+      return NextResponse.json({ tasks: filtered.slice(0, limit) });
+    }
+
     if (status === "completed") {
       const rows = getDb()
         .prepare(
@@ -122,6 +181,9 @@ export async function GET(req: NextRequest) {
           taskType: r.task_type,
           bountyUsd: r.bounty_usd,
           paymentSignature: r.payment_signature,
+          escrowSignature:
+            (r as TaskRowMin & { escrow_signature?: string | null })
+              .escrow_signature ?? null,
           completedAt: r.completed_at,
           createdAt: r.created_at,
           ask,
@@ -146,7 +208,11 @@ export async function GET(req: NextRequest) {
         };
       });
       const filtered = deviceId
-        ? tasks.filter((t) => t.postingAgent?.deviceId === deviceId)
+        ? tasks.filter(
+            (t) =>
+              t.postingAgent?.deviceId === deviceId ||
+              t.claimingAgent?.deviceId === deviceId,
+          )
         : tasks;
       return NextResponse.json({ tasks: filtered.slice(0, limit) });
     }
