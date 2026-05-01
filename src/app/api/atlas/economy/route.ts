@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
+import { getAtlasDb } from "@/lib/atlas/db";
 
 /**
  * GET /api/atlas/economy
@@ -124,25 +125,68 @@ export async function GET() {
       .get(ATLAS_VAULT_ID, "kyvern.payout") as { n: number };
     const tasksPaidOutByAtlas = paidOutRow.n;
 
-    // ── dailyEarnings — last 14 days of bountyUsd from claimer ───
-    // Bucket by completed_at date (UTC day).
+    // ── dailyEarnings — last 14 UTC days ──────────────────────────
+    // Atlas's earnings have two sources:
+    //   (a) Task-economy completions where Atlas was the claimer.
+    //       Pulled from agent_tasks (above).
+    //   (b) Reader payments simulated by addEarning($0.10) every time
+    //       Atlas's `publish` action settles. These don't materialise
+    //       as their own row anywhere — they tick up state.totalEarnedUsd
+    //       directly. We use atlas_decisions (action='publish',
+    //       outcome='settled') as a proxy: each settled publish is
+    //       worth $0.10 of incoming reader revenue.
     const dayMs = 24 * 60 * 60 * 1000;
     const todayMid = new Date();
     todayMid.setUTCHours(0, 0, 0, 0);
     const days: { date: string; earned: number }[] = [];
+    const dayIndex = new Map<string, number>();
     for (let i = 13; i >= 0; i--) {
       const t = todayMid.getTime() - i * dayMs;
       const d = new Date(t);
       const iso = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
       days.push({ date: iso, earned: 0 });
+      dayIndex.set(iso, days.length - 1);
     }
+    const bucketIso = (ms: number): string => {
+      const d = new Date(ms);
+      d.setUTCHours(0, 0, 0, 0);
+      return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+    };
+
     for (const r of completedAsClaimer) {
       if (r.completed_at == null) continue;
-      const d = new Date(r.completed_at);
-      d.setUTCHours(0, 0, 0, 0);
-      const iso = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
-      const bucket = days.find((b) => b.date === iso);
-      if (bucket) bucket.earned += r.bounty_usd ?? 0;
+      const idx = dayIndex.get(bucketIso(r.completed_at));
+      if (idx != null) days[idx].earned += r.bounty_usd ?? 0;
+    }
+
+    // (b) Reader-payment proxy from atlas.db. Best-effort — atlas.db
+    // lives in a separate file; if it's unreadable we silently skip
+    // and just show task earnings.
+    try {
+      const atlasDb = getAtlasDb();
+      interface PublishRow {
+        decided_at: string;
+      }
+      const sinceIso = new Date(
+        todayMid.getTime() - 13 * dayMs,
+      ).toISOString();
+      const publishedRows = atlasDb
+        .prepare(
+          `SELECT decided_at FROM atlas_decisions
+             WHERE action = 'publish' AND outcome = 'settled'
+               AND decided_at >= ?`,
+        )
+        .all(sinceIso) as PublishRow[];
+      for (const r of publishedRows) {
+        const ms = Date.parse(
+          r.decided_at.endsWith("Z") ? r.decided_at : r.decided_at + "Z",
+        );
+        if (isNaN(ms)) continue;
+        const idx = dayIndex.get(bucketIso(ms));
+        if (idx != null) days[idx].earned += 0.1;
+      }
+    } catch {
+      /* atlas.db unavailable — fall back to task earnings only */
     }
 
     // ── lastEarning — most recent completion Atlas claimed ────────
