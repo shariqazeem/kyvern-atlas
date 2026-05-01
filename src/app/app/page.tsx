@@ -1,23 +1,26 @@
 "use client";
 
 /**
- * /app — Device Home.
+ * /app — Device Home (Phase 5: earnings-first redesign).
  *
  * The whole page IS the device. A premium light chassis with:
  *   • LED status strip (online dot · KVN-XXXX serial · live uptime)
- *   • Hero scrambling balance with PnL today, surrounded by an orbital
- *     ring of worker "modules" — active workers glow + occasionally
- *     surface a thought bubble
- *   • Today's hunt summary strip (earned · spent · signals · workers)
- *   • Inbox preview — last 3 signals as mini notification cards
- *   • A floating physical-looking FAB above the TabBar that expands
- *     to Top up device / Hire worker
+ *   • EARNINGS HERO — "Your device earned $X.XX today" — the headline
+ *   • LIVE ACTION FEED — chronological log of every economic event
+ *     with Explorer links (post / claim / complete / stake)
+ *   • POLICY SHIELD — compact bar showing the on-chain enforcement
+ *     limits and last decision
+ *   • WORKER STRIP — per-worker chip row (last action + earnings)
+ *   • BALANCE ORBIT — secondary, smaller; orbital ring of workers
+ *   • TODAY STRIP — earned · spent · signals · workers · on-chain
+ *   • DeviceFAB — top-up / hire-worker (above tab bar)
  *
- * Live data: `/api/devices/[id]/live-status` polled every 5s for the
- * hero, plus `/api/devices/[id]/inbox` polled every 5s for the preview.
+ * Live data: `/api/devices/[id]/live-status` polled every 5s, returning
+ * actionFeed + policyLastAction + balances + worker rollups in one
+ * round trip (added in Phase 5).
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
@@ -26,7 +29,10 @@ import { useDeviceStore } from "@/hooks/use-device-store";
 import { DeviceChassis } from "@/components/device/home/chassis";
 import { BalanceOrbit } from "@/components/device/home/balance-orbit";
 import { TodayStrip } from "@/components/device/home/today-strip";
-import { WorkersFoundStrip } from "@/components/device/home/workers-found-strip";
+import { EarningsHero } from "@/components/device/home/earnings-hero";
+import { ActionFeed } from "@/components/device/home/action-feed";
+import type { ActionFeedItem } from "@/components/device/home/action-feed";
+import { WorkerStrip } from "@/components/device/home/worker-strip";
 import { PolicyShield } from "@/components/device/home/policy-shield";
 import { DeviceFAB } from "@/components/device/home/device-fab";
 import { TopUpDrawer } from "@/components/device/top-up-drawer";
@@ -35,6 +41,17 @@ const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
 interface VaultBrief {
   vault: { id: string; name: string; emoji: string; pausedAt: string | null; network: string };
+}
+
+interface LiveWorker {
+  id: string;
+  name: string;
+  emoji: string;
+  template: string;
+  isThinking: boolean;
+  lastThoughtAt: number | null;
+  totalThoughts: number;
+  totalEarnedUsd: number;
 }
 
 interface LiveStatus {
@@ -50,16 +67,19 @@ interface LiveStatus {
   pnlSparkline: number[];
   workersActive: number;
   earningPerMinUsd: number;
-  workers: Array<{
-    id: string;
-    name: string;
-    emoji: string;
-    isThinking: boolean;
-    totalThoughts: number;
-    totalEarnedUsd: number;
-  }>;
+  workers: LiveWorker[];
   signalsToday?: { total: number; unread: number; read: number; actionable: number };
   onChainToday?: number;
+  actionFeed?: ActionFeedItem[];
+  policyLastAction?: {
+    id: string;
+    merchant: string;
+    amountUsd: number;
+    approved: boolean;
+    reason: string | null;
+    txSignature: string | null;
+    createdAt: number;
+  } | null;
 }
 
 function devWallet(): string {
@@ -73,6 +93,14 @@ function devWallet(): string {
   window.localStorage.setItem(K, s);
   return s;
 }
+
+const VERB_BY_TOOL: Record<string, string> = {
+  post_task: "posted a task",
+  claim_task: "claimed a task",
+  complete_task: "completed a task",
+  stake_on_finding: "staked on a finding",
+  subscribe_to_agent: "subscribed to feed",
+};
 
 export default function DeviceHome() {
   const { wallet, isLoading } = useAuth();
@@ -127,6 +155,20 @@ export default function DeviceHome() {
 
   const onTopUp = useCallback(() => setTopUpOpen(true), []);
 
+  // Derive last-verb-by-agent from the action feed so the WorkerStrip
+  // shows a real recent action ("staked", "completed", etc.) instead
+  // of the template's default verb. Falls back inside WorkerStrip.
+  const lastVerbByAgent = useMemo(() => {
+    const feed = status?.actionFeed ?? [];
+    const map: Record<string, string> = {};
+    for (const item of feed) {
+      if (map[item.worker.id]) continue;
+      const v = VERB_BY_TOOL[item.tool];
+      if (v) map[item.worker.id] = v;
+    }
+    return map;
+  }, [status?.actionFeed]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -149,17 +191,41 @@ export default function DeviceHome() {
           paused={status?.paused ?? false}
           network={status?.network ?? "devnet"}
         >
-          <div className="flex flex-col gap-5">
-            {/* Findings first — what your workers found while you were
-                away is the daily reason the owner opens this page.
-                Balance is the proof, not the headline. */}
-            {deviceId && <WorkersFoundStrip deviceId={deviceId} />}
+          <div className="flex flex-col gap-4 sm:gap-5">
+            {/* EARNINGS HERO — the screenshot. "Your device earned
+                $X.XX today" sits above everything else. */}
+            <EarningsHero
+              earnedToday={status?.pnlToday.earned ?? 0}
+              spentToday={status?.pnlToday.spent ?? 0}
+              netToday={status?.pnlToday.net ?? 0}
+              earningPerMinUsd={status?.earningPerMinUsd ?? 0}
+              workersActive={status?.workersActive ?? 0}
+              onChainToday={status?.onChainToday ?? 0}
+            />
 
-            {/* PolicyShield — the moat made visible. Sits above the
-                balance orbit so the user always sees that the
-                policy program is alive and enforcing. */}
+            {/* LIVE ACTION FEED — every post / claim / complete /
+                stake, with Explorer links. The proof of life. */}
+            <ActionFeed
+              items={status?.actionFeed ?? []}
+              network={status?.network ?? "devnet"}
+            />
+
+            {/* POLICY SHIELD — compact "what the chain enforced last"
+                bar. Owns its own polling at a slower cadence (15s)
+                so we don't load it from this page's status feed. */}
             {deviceId && <PolicyShield deviceId={deviceId} />}
 
+            {/* WORKERS — compact chip row showing each worker's last
+                tool verb + total earnings. Demoted from the old
+                scrollable findings strip per Phase 5. */}
+            <WorkerStrip
+              workers={status?.workers ?? []}
+              lastVerbByAgent={lastVerbByAgent}
+            />
+
+            {/* BALANCE ORBIT — secondary now. Still the device's
+                visual signature for screenshots, but no longer the
+                headline. */}
             <BalanceOrbit
               usdcBalance={status?.usdcBalance ?? 0}
               pnlNet={status?.pnlToday.net ?? 0}
@@ -169,6 +235,7 @@ export default function DeviceHome() {
               hireHref="/app/agents/spawn"
             />
 
+            {/* TODAY STRIP — full grid of today's stats. */}
             <TodayStrip
               earnedToday={status?.pnlToday.earned ?? 0}
               spentToday={status?.pnlToday.spent ?? 0}
@@ -224,10 +291,10 @@ function NoDeviceState() {
         <span className="text-[32px]">🧭</span>
       </div>
       <h2 className="text-[22px] font-semibold text-[#0A0A0A] tracking-tight">
-        A device that finds you opportunities.
+        A device that earns for you.
       </h2>
       <p className="mt-2 text-[14px] text-[#6B6B6B] max-w-[340px] leading-[1.6]">
-        Workers watch the world. Send you findings. Spend within budget.
+        Workers post, claim, and complete paid tasks on-chain. You set the budget; the policy program enforces it.
       </p>
       <Link
         href="/app/agents/spawn"

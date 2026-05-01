@@ -335,6 +335,104 @@ export async function GET(
   let cum = 0;
   const sparkline = buckets.map((b) => (cum += b));
 
+  // ── Phase 5 — Action feed for the device home headline ────────
+  // Pulls the last 10 economic events on this device's agents:
+  // every post_task / claim_task / complete_task / stake_on_finding /
+  // subscribe_to_agent thought, with worker identity, signature, and
+  // signatureStatus joined in. The home page's ActionFeed renders
+  // each row as a one-liner with an Explorer link when a signature
+  // is present.
+  interface FeedRow {
+    id: string;
+    timestamp: number;
+    tool_used: string;
+    signature: string | null;
+    signature_status: string | null;
+    amount_usd: number | null;
+    counterparty: string | null;
+    decision_json: string | null;
+    agent_id: string;
+    agent_name: string;
+    agent_emoji: string;
+  }
+  const feedRows = db
+    .prepare(
+      `SELECT t.id, t.timestamp, t.tool_used, t.signature, t.signature_status,
+              t.amount_usd, t.counterparty, t.decision_json,
+              a.id AS agent_id, a.name AS agent_name, a.emoji AS agent_emoji
+         FROM agent_thoughts t
+         JOIN agents a ON a.id = t.agent_id
+        WHERE a.device_id = ?
+          AND t.tool_used IN ('post_task','claim_task','complete_task','stake_on_finding','subscribe_to_agent')
+        ORDER BY t.timestamp DESC
+        LIMIT 12`,
+    )
+    .all(params.id) as FeedRow[];
+
+  const actionFeed = feedRows.map((r) => {
+    // Pull the result message off decision_json for an idle-tick
+    // fallback — when a tool was called but returned ok:false without
+    // a signature (e.g. claim_task race), the message is informative.
+    let toolMessage: string | null = null;
+    try {
+      if (r.decision_json) {
+        const d = JSON.parse(r.decision_json) as {
+          toolResult?: { message?: string };
+        };
+        if (typeof d.toolResult?.message === "string")
+          toolMessage = d.toolResult.message.slice(0, 140);
+      }
+    } catch {
+      /* ignore */
+    }
+    return {
+      id: r.id,
+      timestamp: r.timestamp,
+      tool: r.tool_used,
+      worker: { id: r.agent_id, name: r.agent_name, emoji: r.agent_emoji },
+      amountUsd: r.amount_usd,
+      signature: r.signature,
+      signatureStatus: r.signature_status as "success" | "failed" | null,
+      counterparty: r.counterparty,
+      message: toolMessage,
+    };
+  });
+
+  // policyLastAction — most recent vault_payments row for this vault.
+  // Already exposed by /api/devices/[id]/policy-shield, but Phase 5
+  // wants it on live-status so the home page hero can show it without
+  // a second round-trip.
+  interface PaymentRowLite {
+    id: string;
+    merchant: string;
+    amount_usd: number;
+    status: string;
+    reason: string | null;
+    tx_signature: string | null;
+    created_at: string;
+  }
+  const lastPayment = db
+    .prepare(
+      `SELECT id, merchant, amount_usd, status, reason, tx_signature, created_at
+         FROM vault_payments
+        WHERE vault_id = ?
+        ORDER BY created_at DESC
+        LIMIT 1`,
+    )
+    .get(params.id) as PaymentRowLite | undefined;
+  const policyLastAction = lastPayment
+    ? {
+        id: lastPayment.id,
+        merchant: lastPayment.merchant,
+        amountUsd: lastPayment.amount_usd,
+        approved:
+          lastPayment.status === "allowed" || lastPayment.status === "settled",
+        reason: lastPayment.reason,
+        txSignature: lastPayment.tx_signature,
+        createdAt: tsToMs(lastPayment.created_at),
+      }
+    : null;
+
   // On-chain balances (legacy vaults without a PDA report zero)
   const balances = vault.vaultPda
     ? await fetchVaultBalances(vault.vaultPda, vault.network)
@@ -360,5 +458,8 @@ export async function GET(
     // Path C — today's signal stats for the home card's third stat row
     signalsToday,
     onChainToday,
+    // Phase 5 — earnings-first home page payload
+    actionFeed,
+    policyLastAction,
   });
 }
