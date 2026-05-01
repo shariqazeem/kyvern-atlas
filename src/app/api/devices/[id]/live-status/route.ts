@@ -55,9 +55,18 @@ interface LogRow {
 }
 
 function tsToMs(s: string): number {
-  // SQLite returns "YYYY-MM-DD HH:MM:SS" which JS Date can parse if we
-  // hint the timezone. Stored values are UTC.
-  const ms = Date.parse(s.replace(" ", "T") + "Z");
+  // Mixed-format timestamps in this DB:
+  //   · SQLite default datetime: "YYYY-MM-DD HH:MM:SS" (no T, no Z)
+  //   · ISO already: "2026-05-01T18:48:31.430Z" (writeDeviceLog uses this)
+  // Detect which one we got and normalise to ISO before Date.parse.
+  if (!s) return 0;
+  const hasT = s.includes("T");
+  const normalised = hasT
+    ? s.endsWith("Z") || /[+-]\d{2}:?\d{2}$/.test(s)
+      ? s
+      : s + "Z"
+    : s.replace(" ", "T") + "Z";
+  const ms = Date.parse(normalised);
   return isNaN(ms) ? 0 : ms;
 }
 
