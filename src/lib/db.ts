@@ -654,6 +654,26 @@ function migrate(db: Database.Database) {
     `CREATE INDEX IF NOT EXISTS idx_signals_snooze ON signals(device_id, snoozed_until)`,
   );
 
+  // ── Phase 8 — agent_stakes dedup table ────────────────────────────
+  //
+  // Tracks successful stake_on_finding settlements per (agent, subject)
+  // so the dedup gate in stake_on_finding can short-circuit re-stakes
+  // on the same finding within a 24h window. Phase 4 verification
+  // showed 4 stakes on the same SOL band breach in one tick — this
+  // gate keeps it to one.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS agent_stakes (
+      id            TEXT PRIMARY KEY,
+      agent_id      TEXT NOT NULL,
+      subject_hash  TEXT NOT NULL,
+      signature     TEXT NOT NULL,
+      amount_usd    REAL NOT NULL,
+      created_at    INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_agent_stakes_dedup
+      ON agent_stakes(agent_id, subject_hash, created_at);
+  `);
+
   // ── Phase 1: Economy Engine migrations ────────────────────────────
   //
   // The Phase 1 split (post → escrow, claim → in_progress, complete →

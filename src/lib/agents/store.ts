@@ -573,6 +573,47 @@ export function setSignalOnChain(
   return r.changes > 0;
 }
 
+/** Phase 8 stake dedup. Returns true if this agent has already staked
+ *  on the same finding subject (normalised via hashSubject) inside the
+ *  given window. The Phase 4 verification surfaced 4 stakes on a single
+ *  SOL-band breach in one tick — this lets stake_on_finding short-
+ *  circuit without burning USDC.
+ *
+ *  Window default: 24h. Pass 0 to allow re-stake per cycle (testing). */
+export function hasRecentStakeOnSubject(
+  agentId: string,
+  subjectHash: string,
+  windowMs: number = 24 * 60 * 60 * 1000,
+): boolean {
+  if (windowMs <= 0) return false;
+  const cutoff = Date.now() - windowMs;
+  const row = getDb()
+    .prepare(
+      `SELECT 1 FROM agent_stakes
+        WHERE agent_id = ? AND subject_hash = ? AND created_at >= ?
+        LIMIT 1`,
+    )
+    .get(agentId, subjectHash, cutoff);
+  return !!row;
+}
+
+/** Record a successful stake for the dedup gate above. Called by
+ *  stake_on_finding AFTER serverVaultPay settles. */
+export function recordStake(input: {
+  agentId: string;
+  subjectHash: string;
+  signature: string;
+  amountUsd: number;
+}): void {
+  const id = `stk_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+  getDb()
+    .prepare(
+      `INSERT INTO agent_stakes (id, agent_id, subject_hash, signature, amount_usd, created_at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+    )
+    .run(id, input.agentId, input.subjectHash, input.signature, input.amountUsd, Date.now());
+}
+
 /** Find the most recent signal subject by an agent — used by
  *  stake_on_finding to attach the stake to the latest finding when the
  *  caller doesn't pass an explicit signal id. */

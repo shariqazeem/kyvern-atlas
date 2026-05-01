@@ -75,7 +75,10 @@ export function KyvernOS({ children }: { children: React.ReactNode }) {
       </AnimatePresence>
 
       {/* The OS */}
-      <div className="min-h-screen" style={{ background: "#FAFAFA" }}>
+      <div
+        className="min-h-screen overflow-x-hidden"
+        style={{ background: "#FAFAFA" }}
+      >
         <StatusBar />
         <main className="px-5 sm:px-8 pb-24 max-w-[680px] mx-auto w-full">
           {children}

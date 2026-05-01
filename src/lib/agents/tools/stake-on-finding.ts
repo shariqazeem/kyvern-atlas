@@ -2,8 +2,10 @@ import type { AgentTool } from "../types";
 import {
   bumpAgentSpent,
   findRecentSignalBySubject,
+  hasRecentStakeOnSubject,
   setSignalOnChain,
 } from "../store";
+import { hashSubject } from "../signal-hash";
 import { serverVaultPay } from "@/lib/server-pay";
 import { TREASURY_VAULT_ID, treasuryRecipientPubkey } from "../treasury";
 
@@ -72,6 +74,19 @@ export const stakeOnFindingTool: AgentTool = {
       };
     }
 
+    // Phase 8 — dedup. The LLM was firing 4 stakes on the same SOL
+    // band breach inside a single tick (~$0.07 wasted per cycle).
+    // Mirrors the signals dedup gate: same (agent, hashSubject) inside
+    // a 24h window → drop. Returns success-shaped ok=false so the
+    // LLM gets a clean "already staked" message instead of an error.
+    const subjectHash = hashSubject(findingSubject);
+    if (hasRecentStakeOnSubject(ctx.agent.id, subjectHash, 24 * 60 * 60 * 1000)) {
+      return {
+        ok: false,
+        message: `already staked on "${findingSubject.slice(0, 50)}" within the last 24h — skip and look for a different finding`,
+      };
+    }
+
     let recipientPubkey: string;
     try {
       recipientPubkey = treasuryRecipientPubkey();
@@ -112,6 +127,21 @@ export const stakeOnFindingTool: AgentTool = {
     // Anchor the stake to the originating signal if we can find one.
     const signal = findRecentSignalBySubject(ctx.agent.id, findingSubject);
     if (signal) setSignalOnChain(signal.id, stake.signature);
+
+    // Record the stake row so the dedup check on the next tick sees
+    // it. Done AFTER on-chain success — a blocked stake doesn't
+    // burn the dedup window.
+    try {
+      const { recordStake } = await import("../store");
+      recordStake({
+        agentId: ctx.agent.id,
+        subjectHash,
+        signature: stake.signature,
+        amountUsd: stakeAmount,
+      });
+    } catch {
+      /* table not present in legacy schema — caller already paid */
+    }
 
     ctx.log({
       description: `Staked $${stakeAmount.toFixed(3)} on "${findingSubject.slice(0, 50)}"`,
