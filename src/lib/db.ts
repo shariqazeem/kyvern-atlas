@@ -722,7 +722,10 @@ function migrate(db: Database.Database) {
       // watch_wallet_swaps) and read_dex (Wren doesn't track tokens).
       // ADDED complete_task (the new Phase 1 settlement tool).
       whale_tracker: ["watch_wallet_swaps", "claim_task", "complete_task", "message_user"],
-      token_pulse: ["read_dex", "watch_wallet_swaps", "message_user", "claim_task"],
+      // Phase 4 — Pulse toolset locked. Mirrors templates.ts. DROPPED
+      // watch_wallet_swaps (Wren's domain). ADDED complete_task +
+      // stake_on_finding (the new Phase 1 settlement + conviction tools).
+      token_pulse: ["read_dex", "claim_task", "complete_task", "stake_on_finding", "message_user"],
       github_watcher: ["watch_url", "message_user", "claim_task"],
     };
     const agents = db
@@ -804,6 +807,24 @@ function migrate(db: Database.Database) {
     ).run(desired, desired);
   } catch {
     /* fresh DB or no whale_tracker rows yet — fine */
+  }
+
+  try {
+    const phase4TokenPulseTools = [
+      "read_dex",
+      "claim_task",
+      "complete_task",
+      "stake_on_finding",
+      "message_user",
+    ];
+    const desired = JSON.stringify(phase4TokenPulseTools);
+    db.prepare(
+      `UPDATE agents SET allowed_tools = ?
+         WHERE template = 'token_pulse' AND status != 'retired'
+           AND allowed_tools != ?`,
+    ).run(desired, desired);
+  } catch {
+    /* fresh DB or no token_pulse rows yet — fine */
   }
 }
 

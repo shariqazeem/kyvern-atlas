@@ -230,6 +230,23 @@ When completing a task, use complete_task with a short factual result string. Ex
 
 The bounty for a task you complete is paid out from the platform treasury directly to your vault — real on-chain settlement. claim_task takes priority over post_task or message_user when an open task exists. If you have to choose one tool call this cycle, claim or complete wins.`
       : ""
+  }${
+    agent.template === "token_pulse"
+      ? `
+
+ECONOMY PRIORITY (HIGHEST — OVERRIDE EVERYTHING ELSE):
+You are an economic worker specialised in price validation and conviction staking. Every tick, follow this exact priority:
+
+  FIRST: If there are open tasks on your device (research or validation) → claim_task the highest-reward one. Even tasks with task_type='research' that ask you to validate a bounty/listing are fair game — read the ask and decide if you can deliver a price-based confirmation.
+  SECOND: If you have an in_progress task assigned to you → complete_task with a factual price-based confirmation. Examples:
+            · "Reward $X confirmed via DexScreener; listing source corroborates."
+            · "SOL price $145.21 cross-checked against CoinGecko (within 0.4%)."
+  THIRD: If read_dex shows a HIGH-CONVICTION price move (band breach, big sudden move, persistence milestone) → call stake_on_finding with $0.01–$0.05 to put USDC behind your conviction. Stake size scales with confidence — don't max-stake every tick. Reasoning is required and must be specific (cite the price, band, and what makes this conviction-grade).
+  FOURTH: Surface the price finding to the owner via message_user (kind="price_trigger") with the current price and breach direction.
+  LAST: If nothing to claim, complete, or stake — and no breach to surface — idle silently. Do not surface noise.
+
+stake_on_finding moves real USDC from your vault to the platform treasury, anchored to your most recent signal. It's a one-way bet — there's no payout path yet, the act of staking IS the on-chain proof of conviction. Use sparingly (no more than once per band breach, only on the FIRST tick the breach is observed). Don't stake on the same price condition every cycle.`
+      : ""
   }
 
 TASK ECONOMY RULES:
@@ -440,17 +457,21 @@ async function llmTick(agent: Agent, ctx: AgentToolContext): Promise<LlmTickOutc
   // below) + the scripted fallback, Sentinel reliably puts a task on
   // the board within ~5s of unboxing.
   //
-  // Phase 3 — Wren's first-claim guarantee. A fresh whale_tracker
-  // (totalThoughts < 5, no completed tasks yet) gets an URGENT
-  // directive whose contents depend on what's available:
-  //   · in_progress task assigned to Wren → push complete_task
-  //   · open tasks on the device          → push claim_task → complete_task
-  //   · neither                           → no URGENT (regular flow)
+  // Phase 3/4 — Wren and Pulse's first-claim guarantee. A fresh
+  // whale_tracker / token_pulse (totalThoughts < 5, no completed
+  // tasks yet) gets an URGENT directive whose contents depend on
+  // what's available:
+  //   · in_progress task assigned to it → push complete_task
+  //   · open tasks on the device        → push claim_task → complete_task
+  //   · neither                         → no URGENT (regular flow)
+  // Pulse additionally gets a stake hint when read_dex reveals a
+  // band breach this tick (handled inside the prompt block below).
   const urgentMode =
     (agent.template === "bounty_hunter" &&
       agent.totalThoughts < 3 &&
       !hasAgentPostedTask(agent.id)) ||
-    (agent.template === "whale_tracker" &&
+    ((agent.template === "whale_tracker" ||
+      agent.template === "token_pulse") &&
       agent.totalThoughts < 5 &&
       !hasAgentCompletedTask(agent.id) &&
       (!!getInProgressTaskForAgent(agent.id) ||
@@ -511,6 +532,44 @@ There is at least one open task on your device that you can complete. You MUST c
           "Bounty validated: active listing, deadline correct, reward confirmed."
 
 If claim_task returns ok:false because another worker beat you to it, fall through to watch_wallet_swaps and surface a wallet_move finding instead. Idling on a fresh tick when an open task exists is forbidden — claim earns USDC for your owner.`;
+    }
+  }
+
+  if (urgentMode && agent.template === "token_pulse") {
+    const inProgress = getInProgressTaskForAgent(agent.id);
+    const openOnDevice = listOpenTasksOnDevice(agent.deviceId, 3);
+    if (inProgress) {
+      userMessage += `
+
+URGENT — COMPLETE THE TASK YOU CLAIMED:
+You have an in_progress task assigned to you. complete_task it RIGHT NOW.
+
+  taskId:    ${inProgress.id}
+  taskType:  ${inProgress.taskType}
+  bounty:    $${inProgress.bountyUsd.toFixed(3)}
+  ask:       ${(inProgress.payload as { ask?: string } | null)?.ask ?? "(see payload)"}
+
+Call complete_task with the taskId and a short factual price-based result. Examples:
+  · "Reward $X confirmed via DexScreener; listing source corroborates."
+  · "SOL price $145.21 cross-checked against alt source (within 0.4%)."
+  · "Token volume confirms — last 24h matches the listing's claim."
+
+The treasury will pay your vault $${inProgress.bountyUsd.toFixed(3)} on success. Do not idle, do not call any other tool first. complete_task is THE action this tick.`;
+    } else if (openOnDevice.length > 0) {
+      const top = openOnDevice
+        .slice()
+        .sort((a, b) => b.bountyUsd - a.bountyUsd)[0];
+      userMessage += `
+
+URGENT — FIRST CLAIM REQUIRED:
+There is at least one open task on your device that you can complete with a price-based validation. Even tasks tagged "research" can usually be answered with a quick DEX cross-check. You MUST chain TWO tool calls this tick — do not stop after one. The flow:
+
+  STEP 0: claim_task with taskId="${top.id}" (highest-reward open task on your device, $${top.bountyUsd.toFixed(3)}).
+
+  STEP 1: complete_task with the same taskId and a short factual result. Example:
+          "Reward confirmed via DexScreener; cross-checked listing — looks consistent."
+
+If claim_task returns ok:false (another worker beat you to it), fall through to read_dex on your tracked token and consider stake_on_finding ($0.02) if the price is outside its band. Idling on a fresh tick when an open task exists is forbidden.`;
     }
   }
 

@@ -282,7 +282,20 @@ export const TEMPLATES: AgentTemplateDef[] = [
     jobPromptPlaceholder: "Which token, what threshold, what window?",
     jobPromptExample:
       "Every cycle, read_dex with 'SOL'. Track price across cycles in your recent thoughts. If SOL moves >5% in either direction over 30 minutes, surface a price_trigger finding with the percent change and current price as subject, evidence with start price, end price, and time window.",
-    recommendedTools: ["read_dex", "watch_wallet_swaps", "message_user", "claim_task"],
+    // Phase 4 — Pulse is the FIRST validator + staker. Toolset locked
+    // to the five economic-loop tools: read_dex (price detection),
+    // claim_task + complete_task (validation work — Pulse claims
+    // research/validation tasks Sentinel posts), stake_on_finding
+    // (puts USDC behind high-conviction price moves), message_user
+    // (surface price triggers to the inbox). watch_wallet_swaps was
+    // dropped — Wren owns wallet tracking now, Pulse focuses on price.
+    recommendedTools: [
+      "read_dex",
+      "claim_task",
+      "complete_task",
+      "stake_on_finding",
+      "message_user",
+    ],
     defaultFrequencySeconds: 180,
     description: "Watches a token's price + volume. Pings you on configured moves.",
     earningStyle: "Opportunistic",

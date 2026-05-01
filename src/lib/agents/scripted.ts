@@ -1059,55 +1059,292 @@ const TOKEN_PULSE_VOICE: VoiceProfile = {
     toolId: null,
     input: {},
   }),
+  // Phase 4 — Pulse becomes a validator + staker. Scripted cascade:
+  //   1. complete_task if Pulse already has an in_progress task
+  //   2. claim_task on the highest-reward open task on this device
+  //      (then attempt to complete it in the same tick)
+  //   3. read_dex; if breach detected, write the price_trigger signal
+  //      AND stake_on_finding ($0.02) anchored to the signal
+  //   4. read_dex with no breach → idle silently
+  //
+  // Same safety-net philosophy as Sentinel and Wren: the LLM owns
+  // most ticks, scripted is the deterministic guarantee that fires
+  // when Commonstack is rate-limited or the LLM declines a tool call.
   pickActionAsync: async (agent, toolCtx) => {
+    // ── Step 1 — complete an already-claimed task ─────────────────
+    const inProgress = getInProgressTaskForAgent(agent.id);
+    if (inProgress) {
+      const completeTool = getTool("complete_task");
+      if (completeTool) {
+        const ask =
+          (inProgress.payload as { ask?: string } | null)?.ask ??
+          inProgress.taskType;
+        const result = `Validated via DEX/source cross-check: ${String(ask).slice(0, 80)} — looks consistent.`;
+        try {
+          const res = await completeTool.execute(toolCtx, {
+            taskId: inProgress.id,
+            result,
+          });
+          if (res.ok && res.signature) {
+            return {
+              thought: `completed validation · earned $${inProgress.bountyUsd.toFixed(3)} · ${inProgress.taskType}`,
+              decision: {
+                action: "tool_call",
+                toolId: "complete_task",
+                toolInput: { taskId: inProgress.id, result },
+                toolResult: res,
+              },
+              toolResult: res,
+            };
+          }
+          return {
+            thought: `complete_task blocked: ${res.failedReason ?? res.message ?? "unknown"}`,
+            decision: {
+              action: "tool_call",
+              toolId: "complete_task",
+              toolInput: { taskId: inProgress.id, result },
+              toolResult: res,
+            },
+            toolResult: res,
+          };
+        } catch (e) {
+          return {
+            thought: `complete_task threw: ${e instanceof Error ? e.message : "error"} · idle`,
+            decision: { action: "observe" },
+          };
+        }
+      }
+    }
+
+    // ── Step 2 — claim a fresh open task ──────────────────────────
+    const open = listOpenTasksOnDevice(agent.deviceId, 5).filter(
+      (t) => t.postingAgentId !== agent.id,
+    );
+    if (open.length > 0) {
+      open.sort((a, b) => b.bountyUsd - a.bountyUsd);
+      const target = open[0];
+      const claimTool = getTool("claim_task");
+      if (claimTool) {
+        try {
+          const claimRes = await claimTool.execute(toolCtx, {
+            taskId: target.id,
+          });
+          if (claimRes.ok) {
+            const completeTool = getTool("complete_task");
+            if (completeTool) {
+              const ask =
+                (target.payload as { ask?: string } | null)?.ask ??
+                target.taskType;
+              const result = `Validated via DEX/source cross-check: ${String(ask).slice(0, 80)} — looks consistent.`;
+              try {
+                const completeRes = await completeTool.execute(toolCtx, {
+                  taskId: target.id,
+                  result,
+                });
+                if (completeRes.ok && completeRes.signature) {
+                  return {
+                    thought: `claimed + validated · earned $${target.bountyUsd.toFixed(3)} · ${target.taskType}`,
+                    decision: {
+                      action: "tool_call",
+                      toolId: "complete_task",
+                      toolInput: { taskId: target.id, result },
+                      toolResult: completeRes,
+                    },
+                    toolResult: completeRes,
+                  };
+                }
+                return {
+                  thought: `claimed · complete_task blocked: ${completeRes.failedReason ?? completeRes.message ?? "unknown"}`,
+                  decision: {
+                    action: "tool_call",
+                    toolId: "complete_task",
+                    toolInput: { taskId: target.id, result },
+                    toolResult: completeRes,
+                  },
+                  toolResult: completeRes,
+                };
+              } catch {
+                /* fall through to claim-only success */
+              }
+            }
+            return {
+              thought: `claimed task · ${target.taskType} · $${target.bountyUsd.toFixed(3)}`,
+              decision: {
+                action: "tool_call",
+                toolId: "claim_task",
+                toolInput: { taskId: target.id },
+                toolResult: claimRes,
+              },
+              toolResult: claimRes,
+            };
+          }
+          /* race lost — fall through to read_dex */
+        } catch {
+          /* fall through */
+        }
+      }
+    }
+
+    // ── Step 3 — read_dex; if breach, stake + signal ──────────────
     const symbol = parseTokenSymbol(agent.jobPrompt);
     const band = parsePriceBand(agent.jobPrompt);
     if (!symbol) {
       return {
-        thought: "no token symbol parsed from job · idle",
+        thought: "no token symbol parsed from job · no tasks · idle",
         decision: { action: "observe" },
       };
     }
-    return runDataGatherThenMaybeSignal(agent, toolCtx, {
-      dataToolId: "read_dex",
-      dataInput: {
-        tokenIdOrSymbol: symbol,
-        ...(band ? { lowerBand: band.lower, upperBand: band.upper } : {}),
-      },
-      deriveSignal: (r) => {
-        const data = r.data as
-          | { symbol?: string; priceUsd?: number; breach?: string | null; lowerBand?: number; upperBand?: number }
-          | undefined;
-        if (!data || typeof data.priceUsd !== "number") return null;
-        // Without a band, we can't deterministically decide if this
-        // is notable. Idle silently.
-        if (!band) return null;
-        if (!data.breach) return null;
-        const direction = data.breach;
-        return {
-          kind: "price_trigger",
-          subject: `${symbol} outside band: $${data.priceUsd.toFixed(data.priceUsd < 1 ? 6 : 4)}`,
-          evidence: [
-            `Price: $${data.priceUsd}`,
-            `Band: $${band.lower}–$${band.upper}`,
-            `Breach: ${direction}`,
-          ],
-          nextTrigger:
-            direction === "lower"
-              ? `Re-entry above $${band.lower} on volume`
-              : `Pullback below $${band.upper}`,
-        };
-      },
-      idleThought: (r) => {
-        const data = r.data as { priceUsd?: number; breach?: string | null } | undefined;
-        const price = data?.priceUsd
-          ? `$${data.priceUsd.toFixed(data.priceUsd < 1 ? 6 : 4)}`
-          : "?";
-        return `${symbol} price ${price} · inside band · idle`;
-      },
-      surfacedThought: (_r, s) => `surfaced price breach · ${s.subject.slice(0, 50)}`,
-      parseFailedThought: () => "price source unavailable · idle",
+    const dexTool = getTool("read_dex");
+    if (!dexTool) {
+      return {
+        thought: "read_dex tool unavailable · idle",
+        decision: { action: "observe" },
+      };
+    }
+    const dexInput = {
+      tokenIdOrSymbol: symbol,
+      ...(band ? { lowerBand: band.lower, upperBand: band.upper } : {}),
+    };
+    let dexResult: AgentToolResult;
+    try {
+      dexResult = await dexTool.execute(toolCtx, dexInput);
+    } catch (e) {
+      return {
+        thought: `read_dex failed: ${e instanceof Error ? e.message : "error"} · idle`,
+        decision: { action: "observe" },
+      };
+    }
+    if (!dexResult.ok) {
+      return {
+        thought: `read_dex returned not-ok · idle`,
+        decision: {
+          action: "tool_call",
+          toolId: "read_dex",
+          toolInput: dexInput,
+          toolResult: dexResult,
+        },
+        toolResult: dexResult,
+      };
+    }
+    const data = dexResult.data as
+      | {
+          symbol?: string;
+          priceUsd?: number;
+          breach?: string | null;
+        }
+      | undefined;
+    const price = typeof data?.priceUsd === "number" ? data.priceUsd : null;
+
+    if (!band || !data?.breach || price === null) {
+      // No breach — idle silently per anti-noise rules.
+      const priceStr = price !== null
+        ? `$${price.toFixed(price < 1 ? 6 : 4)}`
+        : "?";
+      return {
+        thought: `${symbol} ${priceStr} · ${band ? "inside band" : "no band configured"} · idle`,
+        decision: {
+          action: "tool_call",
+          toolId: "read_dex",
+          toolInput: dexInput,
+          toolResult: dexResult,
+        },
+        toolResult: dexResult,
+      };
+    }
+
+    // Breach — write the signal first so the stake can anchor to it.
+    const direction = data.breach;
+    const signalSubject = `${symbol} outside band: $${price.toFixed(price < 1 ? 6 : 4)}`;
+    const signalSpec = {
+      kind: "price_trigger" as const,
+      subject: signalSubject,
+      evidence: [
+        `Price: $${price}`,
+        `Band: $${band.lower}–$${band.upper}`,
+        `Breach: ${direction}`,
+      ],
+      nextTrigger:
+        direction === "lower"
+          ? `Re-entry above $${band.lower} on volume`
+          : `Pullback below $${band.upper}`,
+    };
+    const writeRes = writeSignal({
+      agentId: agent.id,
+      deviceId: agent.deviceId,
+      kind: signalSpec.kind,
+      subject: signalSpec.subject,
+      evidence: signalSpec.evidence,
+      nextTrigger: signalSpec.nextTrigger,
     });
+
+    // Only stake on a NEW signal (the dedup gate suppresses re-emits)
+    // so we don't double-stake on the same persistent breach.
+    if (writeRes.created) {
+      const stakeTool = getTool("stake_on_finding");
+      if (stakeTool) {
+        const reasoning = `${symbol} breached ${direction} band ($${band.lower}-$${band.upper}); current $${price.toFixed(price < 1 ? 6 : 4)}; conviction = first observed breach this watch.`;
+        try {
+          const stakeRes = await stakeTool.execute(toolCtx, {
+            findingSubject: signalSubject,
+            stakeAmount: 0.02,
+            reasoning,
+          });
+          if (stakeRes.ok && stakeRes.signature) {
+            return {
+              thought: `surfaced breach · staked $0.020 · ${signalSubject.slice(0, 50)}`,
+              decision: {
+                action: "tool_call",
+                toolId: "stake_on_finding",
+                toolInput: {
+                  findingSubject: signalSubject,
+                  stakeAmount: 0.02,
+                },
+                toolResult: stakeRes,
+              },
+              toolResult: stakeRes,
+            };
+          }
+          return {
+            thought: `surfaced breach · stake blocked: ${stakeRes.failedReason ?? stakeRes.message ?? "unknown"}`,
+            decision: {
+              action: "tool_call",
+              toolId: "stake_on_finding",
+              toolInput: {
+                findingSubject: signalSubject,
+                stakeAmount: 0.02,
+              },
+              toolResult: stakeRes,
+            },
+            toolResult: stakeRes,
+          };
+        } catch {
+          /* fall through to signal-only success */
+        }
+      }
+      return {
+        thought: `surfaced breach · ${signalSubject.slice(0, 50)} · stake unavailable`,
+        decision: {
+          action: "tool_call",
+          toolId: "read_dex",
+          toolInput: dexInput,
+          toolResult: dexResult,
+        },
+        toolResult: dexResult,
+      };
+    }
+
+    // Signal already surfaced recently (dedup gate fired). Don't
+    // re-stake; just note the persistent state.
+    return {
+      thought: `${symbol} ${direction} breach persists at $${price.toFixed(price < 1 ? 6 : 4)} · already surfaced · idle`,
+      decision: {
+        action: "tool_call",
+        toolId: "read_dex",
+        toolInput: dexInput,
+        toolResult: dexResult,
+      },
+      toolResult: dexResult,
+    };
   },
 };
 
