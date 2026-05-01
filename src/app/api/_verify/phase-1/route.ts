@@ -1,10 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  getAgent,
-  getTask,
-  listAgentsByDevice,
-  recordAgentTick,
-} from "@/lib/agents/store";
+import { getAgent, getTask, recordAgentTick } from "@/lib/agents/store";
 import { getDb } from "@/lib/db";
 import { TOOLS } from "@/lib/agents/tools";
 import { TREASURY_VAULT_ID } from "@/lib/agents/treasury";
