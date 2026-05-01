@@ -13,7 +13,11 @@
  */
 
 import { getTool } from "./tools";
-import { listOpenTasks, writeSignal } from "./store";
+import {
+  hasAgentPostedTask,
+  listOpenTasks,
+  writeSignal,
+} from "./store";
 import type {
   Agent,
   AgentDecision,
@@ -643,10 +647,15 @@ const BOUNTY_HUNTER_VOICE: VoiceProfile = {
         decision: { action: "observe" },
       };
     }
+    // Phase 2 — fresh BH that hasn't posted a task yet bypasses the
+    // sinceLastCheck cache so we always have a listing to escrow.
+    // Otherwise the agent could lock its first three ticks into
+    // "no new items" when the cache is warm but nothing has changed.
+    const isFreshBH = !hasAgentPostedTask(agent.id);
     const watchInput = {
       url,
       format: "json" as const,
-      sinceLastCheck: true,
+      sinceLastCheck: !isFreshBH,
       ...(minPrize ? { minPrize } : {}),
     };
     let watchResult: AgentToolResult;

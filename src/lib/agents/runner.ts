@@ -415,22 +415,32 @@ async function llmTick(agent: Agent, ctx: AgentToolContext): Promise<LlmTickOutc
   // Phase 2 — Sentinel's first-post guarantee. If a fresh bounty_hunter
   // hasn't posted any tasks yet within its first 3 ticks, append an
   // URGENT directive that forces a post_task on this tick. Combined
-  // with tool_choice="required" on step 0 + the scripted fallback,
-  // Sentinel reliably puts a task on the board within ~5s of unboxing.
-  if (
+  // with tool_choice="required" on step 0 AND step 1 (see urgentMode
+  // below) + the scripted fallback, Sentinel reliably puts a task on
+  // the board within ~5s of unboxing.
+  const urgentMode =
     agent.template === "bounty_hunter" &&
     agent.totalThoughts < 3 &&
-    !hasAgentPostedTask(agent.id)
-  ) {
+    !hasAgentPostedTask(agent.id);
+  if (urgentMode) {
     userMessage += `
 
 URGENT — FIRST ECONOMIC ACTION REQUIRED:
-You have not posted any tasks yet. You MUST use post_task RIGHT NOW to create a research task for the latest qualifying Superteam bounty you find via watch_url. Reward: 0.15 USDC. This is your first economic action — do not idle, do not just call message_user. The flow this tick:
-  1. watch_url to fetch the bounty board
-  2. post_task with the top qualifying listing (reward 0.15, ttlSeconds 3600, payload containing the listing title, URL, and reward)
-  3. (optional) message_user to surface the same bounty as a Finding
+You have not posted any tasks yet. You MUST chain TWO tool calls this tick — do not stop after one. The flow:
 
-If watch_url returns no qualifying items this tick, post_task with the most recent listing returned anyway — better to seed the board than to idle on tick #1.`;
+  STEP 0: watch_url with the Superteam URL from your job.
+    Pass sinceLastCheck=false on this first tick (you want the freshest listing, not just changes since last check).
+
+  STEP 1: post_task with reward 0.15, ttlSeconds 3600.
+    payload should be a JSON string containing { ask, context, sourceUrl }
+    where sourceUrl is the bounty's URL and context summarizes the
+    title/reward/deadline/skills.
+
+You MAY also call message_user (Finding mode, kind='bounty') in a
+follow-up step to surface the bounty in the Inbox, but that is
+secondary — post_task is the priority. If watch_url returns zero
+items because of a sinceLastCheck cache, retry once with
+sinceLastCheck=false. Idling on tick #1 is forbidden.`;
   }
 
   const messages: ChatMessageInput[] = [
@@ -444,12 +454,18 @@ If watch_url returns no qualifying items this tick, post_task with the most rece
   let lastSignature: string | null = null;
 
   for (let step = 0; step < MAX_STEPS_PER_TICK; step++) {
-    // STEP 1 must call a tool. Reasoning-only ticks were wasting workers
+    // STEP 0 must call a tool. Reasoning-only ticks were wasting workers
     // (Sentinel: 189 ticks in 17h, 0 watch_url calls). tool_choice="required"
-    // forces the model to emit a tool_call on the first step. Subsequent
-    // steps can choose to stop ("auto") so the loop exits cleanly after
-    // the model has finished its work.
-    const toolChoice = step === 0 ? "required" : "auto";
+    // forces the model to emit a tool_call on the first step.
+    //
+    // Phase 2 — when urgentMode is on (fresh bounty_hunter that hasn't
+    // posted yet), ALSO force a tool call on step 1. That's how we
+    // guarantee the watch_url → post_task chain inside a single tick;
+    // without it the LLM tends to stop after one call when tool_choice
+    // is "auto". Steps 2+ stay "auto" so the loop can exit cleanly
+    // after message_user (the optional follow-up).
+    const toolChoice =
+      step === 0 || (urgentMode && step === 1) ? "required" : "auto";
     let response;
     try {
       response = await c.chat.completions.create({
