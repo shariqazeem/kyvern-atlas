@@ -924,3 +924,33 @@ export function hasAgentPostedTask(agentId: string): boolean {
     .get(agentId);
   return !!row;
 }
+
+/** Most recent in_progress task assigned to this agent (null if none).
+ *  Phase 3 — Wren's URGENT directive checks this to decide whether to
+ *  push the LLM toward claim_task (no in-progress task yet) or
+ *  complete_task (already has one waiting). */
+export function getInProgressTaskForAgent(agentId: string): AgentTask | null {
+  const row = getDb()
+    .prepare(
+      `SELECT * FROM agent_tasks
+        WHERE claiming_agent_id = ?
+          AND status IN ('in_progress','claimed')
+        ORDER BY created_at DESC
+        LIMIT 1`,
+    )
+    .get(agentId) as TaskRow | undefined;
+  return row ? rowToTask(row) : null;
+}
+
+/** True if this agent has ever completed any task. Used as the
+ *  "fresh worker" signal for Wren's URGENT first-claim guarantee. */
+export function hasAgentCompletedTask(agentId: string): boolean {
+  const row = getDb()
+    .prepare(
+      `SELECT 1 FROM agent_tasks
+        WHERE claiming_agent_id = ? AND status = 'completed'
+        LIMIT 1`,
+    )
+    .get(agentId);
+  return !!row;
+}

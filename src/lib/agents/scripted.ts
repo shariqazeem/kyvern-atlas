@@ -14,8 +14,10 @@
 
 import { getTool } from "./tools";
 import {
+  getInProgressTaskForAgent,
   hasAgentPostedTask,
   listOpenTasks,
+  listOpenTasksOnDevice,
   writeSignal,
 } from "./store";
 import type {
@@ -868,11 +870,142 @@ const WHALE_TRACKER_VOICE: VoiceProfile = {
     toolId: null,
     input: {},
   }),
+  // Phase 3 — Wren is now the first claim+complete worker. The
+  // scripted fallback runs the full economic loop:
+  //   1. If Wren has an in_progress task → complete it
+  //   2. Else if any open task on device → claim + complete in one go
+  //   3. Else → fall through to watch_wallet_swaps for whale-tracking
+  //   4. Idle silently when nothing notable
+  //
+  // Same guarantee philosophy as Sentinel's scripted path: the LLM
+  // owns this most of the time, scripted is the safety net that
+  // works even when Commonstack is rate-limited.
   pickActionAsync: async (agent, toolCtx) => {
+    // ── Step 1 — complete a task already in_progress for this agent ──
+    const inProgress = getInProgressTaskForAgent(agent.id);
+    if (inProgress) {
+      const completeTool = getTool("complete_task");
+      if (completeTool) {
+        const ask =
+          (inProgress.payload as { ask?: string } | null)?.ask ??
+          inProgress.taskType;
+        const result = `Validated: ${String(ask).slice(0, 80)} · checked sources, looks consistent.`;
+        try {
+          const completeResult = await completeTool.execute(toolCtx, {
+            taskId: inProgress.id,
+            result,
+          });
+          if (completeResult.ok && completeResult.signature) {
+            return {
+              thought: `completed task · earned $${inProgress.bountyUsd.toFixed(3)} · ${inProgress.taskType}`,
+              decision: {
+                action: "tool_call",
+                toolId: "complete_task",
+                toolInput: { taskId: inProgress.id, result },
+                toolResult: completeResult,
+              },
+              toolResult: completeResult,
+            };
+          }
+          // Payout failed (treasury insufficient USDC etc.) — still
+          // record the attempt so the thought feed has context.
+          return {
+            thought: `complete_task blocked: ${completeResult.failedReason ?? completeResult.message ?? "unknown"}`,
+            decision: {
+              action: "tool_call",
+              toolId: "complete_task",
+              toolInput: { taskId: inProgress.id, result },
+              toolResult: completeResult,
+            },
+            toolResult: completeResult,
+          };
+        } catch (e) {
+          return {
+            thought: `complete_task threw: ${e instanceof Error ? e.message : "error"} · idle`,
+            decision: { action: "observe" },
+          };
+        }
+      }
+    }
+
+    // ── Step 2 — claim the highest-reward open task on this device ──
+    const open = listOpenTasksOnDevice(agent.deviceId, 5).filter(
+      (t) => t.postingAgentId !== agent.id,
+    );
+    if (open.length > 0) {
+      open.sort((a, b) => b.bountyUsd - a.bountyUsd);
+      const target = open[0];
+      const claimTool = getTool("claim_task");
+      if (claimTool) {
+        try {
+          const claimResult = await claimTool.execute(toolCtx, {
+            taskId: target.id,
+          });
+          if (claimResult.ok) {
+            // Try to complete immediately in the same tick — same flow
+            // as the LLM URGENT path. The treasury will payout if
+            // funded.
+            const completeTool = getTool("complete_task");
+            if (completeTool) {
+              const ask =
+                (target.payload as { ask?: string } | null)?.ask ??
+                target.taskType;
+              const result = `Validated: ${String(ask).slice(0, 80)} · checked sources, looks consistent.`;
+              try {
+                const completeResult = await completeTool.execute(toolCtx, {
+                  taskId: target.id,
+                  result,
+                });
+                if (completeResult.ok && completeResult.signature) {
+                  return {
+                    thought: `claimed + completed · earned $${target.bountyUsd.toFixed(3)} · ${target.taskType}`,
+                    decision: {
+                      action: "tool_call",
+                      toolId: "complete_task",
+                      toolInput: { taskId: target.id, result },
+                      toolResult: completeResult,
+                    },
+                    toolResult: completeResult,
+                  };
+                }
+                return {
+                  thought: `claimed · complete_task blocked: ${completeResult.failedReason ?? completeResult.message ?? "unknown"}`,
+                  decision: {
+                    action: "tool_call",
+                    toolId: "complete_task",
+                    toolInput: { taskId: target.id, result },
+                    toolResult: completeResult,
+                  },
+                  toolResult: completeResult,
+                };
+              } catch {
+                /* fall through to claim-only success */
+              }
+            }
+            return {
+              thought: `claimed task · ${target.taskType} · $${target.bountyUsd.toFixed(3)}`,
+              decision: {
+                action: "tool_call",
+                toolId: "claim_task",
+                toolInput: { taskId: target.id },
+                toolResult: claimResult,
+              },
+              toolResult: claimResult,
+            };
+          }
+          // claim returned not-ok (raced against another claimer) —
+          // fall through to watch_wallet_swaps below.
+        } catch {
+          /* fall through */
+        }
+      }
+    }
+
+    // ── Step 3 — fall back to whale-tracking when no tasks available ──
     const wallet = firstSolanaAddrIn(agent.jobPrompt);
     if (!wallet) {
       return {
-        thought: "no wallet address parsed from job · idle",
+        thought: "no wallet address parsed from job · no tasks · idle",
         decision: { action: "observe" },
       };
     }

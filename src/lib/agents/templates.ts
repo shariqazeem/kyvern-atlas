@@ -249,7 +249,14 @@ export const TEMPLATES: AgentTemplateDef[] = [
     jobPromptPlaceholder: "Which wallets should I track, and at what size threshold?",
     jobPromptExample:
       "Every cycle, watch_wallet on Kraken's Solana hot wallet FWznbcNXWQuHTawe9RxvQ2LdCENssh12dsznf4RiouN5 with lookbackCount=20. For each new transfer or swap, surface a wallet_move finding with subject summarising the action, evidence: signature + amount + token + time, sourceUrl = https://explorer.solana.com/tx/<signature>.",
-    recommendedTools: ["watch_wallet_swaps", "watch_wallet", "read_dex", "message_user", "claim_task"],
+    // Phase 3 — Wren is the FIRST claim+complete worker. Toolset
+    // locked to the four economic-loop tools: watch_wallet_swaps for
+    // the original whale watching, claim_task + complete_task for the
+    // task economy (this is where Wren earns), message_user for
+    // surfacing wallet moves to the inbox. watch_wallet (no-op when
+    // swaps tool exists) and read_dex (Wren doesn't track tokens)
+    // were dropped.
+    recommendedTools: ["watch_wallet_swaps", "claim_task", "complete_task", "message_user"],
     defaultFrequencySeconds: 240,
     description: "Tracks wallets. Pings you when they move size.",
     earningStyle: "Opportunistic",

@@ -108,19 +108,30 @@ export async function seedDefaultWorkersIfEmpty(deviceId: string): Promise<void>
       });
 
       // Phase 2 — fire one immediate tick on Sentinel so the first
-      // post_task lands within ~5s of unbox completion. The other two
-      // workers in the trio are passive (no LLM-side urgency to
-      // reduce their first-tick latency); they ride the agent-pool
-      // cadence as before. Best-effort — if the tick fails, the
-      // agent-pool will pick up the agent on its next cycle.
-      if (seed.template === "bounty_hunter" && res.ok) {
+      // post_task lands within ~5s of unbox completion.
+      // Phase 3 — also fire on Wren so the claim+complete loop closes
+      // immediately on a fresh device (Sentinel posts → Wren claims
+      // and completes within seconds of /unbox).
+      // Pulse remains passive — the agent-pool cadence is fine.
+      if (
+        (seed.template === "bounty_hunter" ||
+          seed.template === "whale_tracker") &&
+        res.ok
+      ) {
         try {
           const spawned = (await res.json()) as { agent?: { id?: string } };
           const agentId = spawned?.agent?.id;
           if (agentId) {
-            void fetch(`/api/agents/${agentId}/tick`, { method: "POST" }).catch(
-              () => {},
-            );
+            // Wren ticks ~2s after Sentinel so Sentinel's escrow
+            // (when funded) has time to land before Wren scans the
+            // board. Best-effort — if the tick fails, the agent-pool
+            // will pick up the agent on its next cycle.
+            const delayMs = seed.template === "whale_tracker" ? 2_000 : 0;
+            setTimeout(() => {
+              void fetch(`/api/agents/${agentId}/tick`, {
+                method: "POST",
+              }).catch(() => {});
+            }, delayMs);
           }
         } catch {
           /* ignore — spawn already happened, agent-pool will tick it */

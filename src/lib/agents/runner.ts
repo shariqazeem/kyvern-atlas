@@ -22,6 +22,8 @@ import {
   listRecentSignalsByAgent,
   listOpenTasksOnDevice,
   hasAgentPostedTask,
+  hasAgentCompletedTask,
+  getInProgressTaskForAgent,
 } from "./store";
 import { getTool } from "./tools";
 import { tryAcquireTickSlot } from "./rate-limit";
@@ -208,6 +210,25 @@ You are an economic worker. Your job is to earn USDC for your owner by creating 
 When posting a task, always use post_task with a clear description and $0.15 reward. The reward is escrowed on-chain immediately — your vault sends USDC to the platform treasury, locking it until a claimer completes the work. If your policy rejects the escrow, the task is never created.
 
 Posting a research task takes priority over surfacing a finding. If you have to choose one because you only have time for one tool call this cycle, post_task wins.`
+      : ""
+  }${
+    agent.template === "whale_tracker"
+      ? `
+
+ECONOMY PRIORITY (HIGHEST — OVERRIDE EVERYTHING ELSE):
+You are an economic worker. Your job is to earn USDC for your owner by claiming and completing tasks other workers post. Every tick, follow this exact priority:
+
+  FIRST: If there are open tasks on your device that you can complete → claim_task the highest-reward open task.
+  SECOND: If you have an in_progress task assigned to you (claiming_agent_id = your id) → complete_task it immediately with a clear, factual validation result.
+  THIRD: If you found a notable whale move using watch_wallet_swaps → message_user (kind="wallet_move") to surface it.
+  LAST: If nothing to claim or complete and no notable move → idle silently. Do not surface noise.
+
+When completing a task, use complete_task with a short factual result string. Examples:
+  · For bounty research: "Bounty validated: active listing, deadline correct, reward $X confirmed."
+  · For wallet/token validation: "Transfer confirmed on-chain · sig <…> · $X moved."
+  · For forecast/analysis: "Cross-checked against alt source · matches within 1.5%."
+
+The bounty for a task you complete is paid out from the platform treasury directly to your vault — real on-chain settlement. claim_task takes priority over post_task or message_user when an open task exists. If you have to choose one tool call this cycle, claim or complete wins.`
       : ""
   }
 
@@ -418,11 +439,23 @@ async function llmTick(agent: Agent, ctx: AgentToolContext): Promise<LlmTickOutc
   // with tool_choice="required" on step 0 AND step 1 (see urgentMode
   // below) + the scripted fallback, Sentinel reliably puts a task on
   // the board within ~5s of unboxing.
+  //
+  // Phase 3 — Wren's first-claim guarantee. A fresh whale_tracker
+  // (totalThoughts < 5, no completed tasks yet) gets an URGENT
+  // directive whose contents depend on what's available:
+  //   · in_progress task assigned to Wren → push complete_task
+  //   · open tasks on the device          → push claim_task → complete_task
+  //   · neither                           → no URGENT (regular flow)
   const urgentMode =
-    agent.template === "bounty_hunter" &&
-    agent.totalThoughts < 3 &&
-    !hasAgentPostedTask(agent.id);
-  if (urgentMode) {
+    (agent.template === "bounty_hunter" &&
+      agent.totalThoughts < 3 &&
+      !hasAgentPostedTask(agent.id)) ||
+    (agent.template === "whale_tracker" &&
+      agent.totalThoughts < 5 &&
+      !hasAgentCompletedTask(agent.id) &&
+      (!!getInProgressTaskForAgent(agent.id) ||
+        listOpenTasksOnDevice(agent.deviceId, 3).length > 0));
+  if (urgentMode && agent.template === "bounty_hunter") {
     userMessage += `
 
 URGENT — FIRST ECONOMIC ACTION REQUIRED:
@@ -441,6 +474,44 @@ follow-up step to surface the bounty in the Inbox, but that is
 secondary — post_task is the priority. If watch_url returns zero
 items because of a sinceLastCheck cache, retry once with
 sinceLastCheck=false. Idling on tick #1 is forbidden.`;
+  }
+
+  if (urgentMode && agent.template === "whale_tracker") {
+    const inProgress = getInProgressTaskForAgent(agent.id);
+    const openOnDevice = listOpenTasksOnDevice(agent.deviceId, 3);
+    if (inProgress) {
+      userMessage += `
+
+URGENT — COMPLETE THE TASK YOU CLAIMED:
+You have an in_progress task assigned to you. complete_task it RIGHT NOW.
+
+  taskId:    ${inProgress.id}
+  taskType:  ${inProgress.taskType}
+  bounty:    $${inProgress.bountyUsd.toFixed(3)}
+  ask:       ${(inProgress.payload as { ask?: string } | null)?.ask ?? "(see payload)"}
+
+Call complete_task with the taskId and a short factual result string. Examples of good results:
+  · "Bounty validated: listing active, deadline correct, reward $X confirmed."
+  · "Transfer confirmed on-chain · sig <…> · $X moved."
+  · "Cross-checked against alt source · matches within 1.5%."
+
+The treasury will pay your vault $${inProgress.bountyUsd.toFixed(3)} on success. Do not idle, do not call any other tool first. complete_task is THE action this tick.`;
+    } else if (openOnDevice.length > 0) {
+      const top = openOnDevice
+        .slice()
+        .sort((a, b) => b.bountyUsd - a.bountyUsd)[0];
+      userMessage += `
+
+URGENT — FIRST CLAIM REQUIRED:
+There is at least one open task on your device that you can complete. You MUST chain TWO tool calls this tick — do not stop after one. The flow:
+
+  STEP 0: claim_task with taskId="${top.id}" (the highest-reward open task on your device, $${top.bountyUsd.toFixed(3)}).
+
+  STEP 1: complete_task with the same taskId and a short factual result describing what you validated. Example:
+          "Bounty validated: active listing, deadline correct, reward confirmed."
+
+If claim_task returns ok:false because another worker beat you to it, fall through to watch_wallet_swaps and surface a wallet_move finding instead. Idling on a fresh tick when an open task exists is forbidden — claim earns USDC for your owner.`;
+    }
   }
 
   const messages: ChatMessageInput[] = [

@@ -717,7 +717,11 @@ function migrate(db: Database.Database) {
       // the economic primary action.
       bounty_hunter: ["watch_url", "post_task", "message_user", "read_onchain"],
       ecosystem_watcher: ["watch_url", "message_user", "post_task", "claim_task"],
-      whale_tracker: ["watch_wallet_swaps", "watch_wallet", "read_dex", "message_user", "claim_task"],
+      // Phase 3 — Wren toolset locked to the claim+complete economic loop.
+      // Mirrors templates.ts. DROPPED watch_wallet (no-op duplicate of
+      // watch_wallet_swaps) and read_dex (Wren doesn't track tokens).
+      // ADDED complete_task (the new Phase 1 settlement tool).
+      whale_tracker: ["watch_wallet_swaps", "claim_task", "complete_task", "message_user"],
       token_pulse: ["read_dex", "watch_wallet_swaps", "message_user", "claim_task"],
       github_watcher: ["watch_url", "message_user", "claim_task"],
     };
@@ -759,14 +763,15 @@ function migrate(db: Database.Database) {
     /* agents table empty or schema not yet present — fine */
   }
 
-  // ── Phase 2 — bounty_hunter toolset REPLACEMENT (not merge) ─────
+  // ── Phase 2/3 — economic-loop toolset REPLACEMENT (not merge) ───
   //
   // Path C's backfill above is additive (Set union) so it never drops
-  // legacy tools. Phase 2 needs Sentinel's tool list to be EXACTLY the
-  // four economic-loop tools — read_dex must go. This block runs after
-  // the merge migration and overrides bounty_hunter agents' tools to
-  // the canonical Phase 2 list. Idempotent — re-running with the same
-  // canonical list is a no-op.
+  // legacy tools. Phase 2 (Sentinel) and Phase 3 (Wren) need their
+  // tool lists to be EXACTLY the four economic-loop tools — read_dex
+  // and watch_wallet must go on Wren, read_dex on Sentinel. These
+  // REPLACE blocks run after the merge migration and override agents'
+  // tools to the canonical lists. Idempotent — re-running with the
+  // same canonical list is a no-op.
   try {
     const phase2BountyHunterTools = [
       "watch_url",
@@ -782,6 +787,23 @@ function migrate(db: Database.Database) {
     ).run(desired, desired);
   } catch {
     /* fresh DB or no bounty_hunter rows yet — fine */
+  }
+
+  try {
+    const phase3WhaleTrackerTools = [
+      "watch_wallet_swaps",
+      "claim_task",
+      "complete_task",
+      "message_user",
+    ];
+    const desired = JSON.stringify(phase3WhaleTrackerTools);
+    db.prepare(
+      `UPDATE agents SET allowed_tools = ?
+         WHERE template = 'whale_tracker' AND status != 'retired'
+           AND allowed_tools != ?`,
+    ).run(desired, desired);
+  } catch {
+    /* fresh DB or no whale_tracker rows yet — fine */
   }
 }
 
