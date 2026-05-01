@@ -679,13 +679,20 @@ const BOUNTY_HUNTER_VOICE: VoiceProfile = {
         toolResult: watchResult,
       };
     }
-    const items = ((watchResult.data as { items?: unknown[] })?.items ??
-      []) as Array<{
+    // watch_url returns `newItems` (the post-dedup list), not `items` —
+    // the legacy scripted code read the wrong key and silently idled
+    // forever. Pre-Phase-2 this only manifested as "no new listings"
+    // strings; once we wired post_task on top, the bug stopped the
+    // economy loop cold.
+    const itemsRaw =
+      (watchResult.data as { newItems?: unknown[] } | undefined)?.newItems ??
+      [];
+    const items = itemsRaw as Array<{
       title?: string;
       url?: string;
       summary?: string;
-      reward?: string | number;
-      deadline?: string;
+      rewardUsd?: number | null;
+      deadline?: string | null;
       skills?: string[] | string;
     }>;
     if (!Array.isArray(items) || items.length === 0) {
@@ -705,6 +712,10 @@ const BOUNTY_HUNTER_VOICE: VoiceProfile = {
     const top = items[0];
     const title = String(top.title ?? "(unknown)").slice(0, 80);
     const sourceUrl = top.url ?? url;
+    const rewardUsd =
+      typeof top.rewardUsd === "number" && Number.isFinite(top.rewardUsd)
+        ? top.rewardUsd
+        : null;
     const skills = Array.isArray(top.skills)
       ? top.skills.join(", ")
       : typeof top.skills === "string"
@@ -720,7 +731,7 @@ const BOUNTY_HUNTER_VOICE: VoiceProfile = {
       const context =
         `URL: ${sourceUrl}` +
         (top.summary ? ` · ${String(top.summary).slice(0, 200)}` : "") +
-        (top.reward ? ` · reward ${top.reward}` : "") +
+        (rewardUsd != null ? ` · reward $${rewardUsd}` : "") +
         (top.deadline ? ` · deadline ${top.deadline}` : "") +
         (skills ? ` · skills ${skills}` : "");
       try {
@@ -747,7 +758,7 @@ const BOUNTY_HUNTER_VOICE: VoiceProfile = {
       kind: "bounty",
       subject: title,
       evidence: [
-        top.reward ? `Reward: ${top.reward}` : "Reward: see listing",
+        rewardUsd != null ? `Reward: $${rewardUsd}` : "Reward: see listing",
         top.deadline ? `Deadline: ${top.deadline}` : "Deadline: see listing",
         skills ? `Skills: ${skills}` : "Skills: see listing",
         minPrize ? `Filtered ≥ $${minPrize}` : "No minimum filter",
