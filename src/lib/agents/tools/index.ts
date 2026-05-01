@@ -11,6 +11,8 @@ import { exposePaywallTool } from "./expose-paywall";
 import { subscribeToAgentTool } from "./subscribe-to-agent";
 import { postTaskTool } from "./post-task";
 import { claimTaskTool } from "./claim-task";
+import { completeTaskTool } from "./complete-task";
+import { stakeOnFindingTool } from "./stake-on-finding";
 import { readOnchainTool } from "./read-onchain";
 import { readDexTool } from "./read-dex";
 import { watchWalletTool, watchWalletSwapsTool } from "./watch-wallet";
@@ -22,6 +24,8 @@ export const TOOLS: Record<string, AgentTool> = {
   [subscribeToAgentTool.id]: subscribeToAgentTool,
   [postTaskTool.id]: postTaskTool,
   [claimTaskTool.id]: claimTaskTool,
+  [completeTaskTool.id]: completeTaskTool,
+  [stakeOnFindingTool.id]: stakeOnFindingTool,
   [readOnchainTool.id]: readOnchainTool,
   [readDexTool.id]: readDexTool,
   [watchWalletTool.id]: watchWalletTool,

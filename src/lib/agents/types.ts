@@ -68,6 +68,11 @@ export interface AgentThought {
   decision: AgentDecision | null;
   toolUsed: string | null;
   signature: string | null; // Solana tx sig if action produced one
+  /** 'success' when a tool produced a settled signature, 'failed' when
+   *  the policy program rejected it (so the inbox + thought feed can
+   *  render a red on-chain badge instead of a green one). Null on
+   *  thoughts that didn't touch the chain. */
+  signatureStatus: "success" | "failed" | null;
   amountUsd: number | null;
   counterparty: string | null;
   /** Which path produced this thought — drives the green "mode: llm"
@@ -125,13 +130,35 @@ export interface Signal {
   /** Millisecond timestamp the inbox should hide this signal until.
    *  Set by the "Snooze 4h" inline action. null = never snoozed. */
   snoozedUntil: number | null;
+  /** Phase 1 — when a worker stakes USDC on this finding (or another
+   *  on-chain action is anchored to it), the canonical Solana sig
+   *  lives here. Distinct from the broader `signature` field which
+   *  was used for any related tx. */
+  onChainSignature: string | null;
   status: SignalStatus;
   createdAt: number;
 }
 
 /* ── Tasks (agent-to-agent task economy) ── */
 
-export type TaskStatus = "open" | "claimed" | "completed" | "expired" | "failed";
+/**
+ * Lifecycle (Phase 1):
+ *   open        — escrow signature stored, waiting for a claimer
+ *   in_progress — claimed by an agent, working on the result
+ *   completed   — claimer delivered, treasury → claimer settlement done
+ *   expired     — TTL passed before anyone claimed it
+ *   failed      — settlement attempt failed (rare; refund happens off-chain)
+ *
+ * "claimed" was the old name for in_progress before Phase 1; some tools
+ * may still see legacy rows in that state.
+ */
+export type TaskStatus =
+  | "open"
+  | "claimed"
+  | "in_progress"
+  | "completed"
+  | "expired"
+  | "failed";
 
 export interface AgentTask {
   id: string;
@@ -143,6 +170,9 @@ export interface AgentTask {
   claimingAgentId: string | null;
   result: Record<string, unknown> | null;
   paymentSignature: string | null;
+  /** Sig of the escrow payment — poster vault → treasury at post time.
+   *  Null only on legacy rows that predate Phase 1. */
+  escrowSignature: string | null;
   createdAt: number;
   expiresAt: number;
   completedAt: number | null;
@@ -185,7 +215,19 @@ export interface AgentToolContext {
 export interface AgentToolResult {
   ok: boolean;
   message: string;
+  /** Solana sig of a settled, policy-allowed transaction. */
   signature?: string;
+  /** Sig (or off-chain decision id when no real sig exists) of a
+   *  transaction the policy program REJECTED. The runner stores this
+   *  on the thought row with signature_status='failed' so the UI can
+   *  render "✗ blocked $X" with the right link. The CLAUDE.md note on
+   *  the open narrative gap applies — for now this is null on policy
+   *  rejects (no real failed-tx sig is produced today); the field
+   *  exists so option B is a one-line change. */
+  failedSignature?: string | null;
+  /** Reason the policy program rejected the action, surfaced in the
+   *  thought feed beside the failed badge. */
+  failedReason?: string | null;
   amountUsd?: number;
   counterparty?: string;
   data?: Record<string, unknown>;

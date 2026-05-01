@@ -1,5 +1,10 @@
 import type { AgentTool } from "../types";
-import { getAgent, bumpAgentSpent, bumpAgentEarned } from "../store";
+import {
+  getAgent,
+  bumpAgentSpent,
+  bumpAgentEarned,
+  listRecentSignalsByAgent,
+} from "../store";
 import { getVault } from "@/lib/vault-store";
 import { serverVaultPay } from "@/lib/server-pay";
 
@@ -73,18 +78,46 @@ export const subscribeToAgentTool: AgentTool = {
         counterparty: `${targetAgent.emoji} ${targetAgent.name}`,
         eventType: "spending_sent",
       });
+
+      // Phase 1 — return the latest 3 signals from the target so this
+      // is a real intelligence exchange, not just a payment receipt.
+      // The LLM can quote / cross-check these on the next reasoning
+      // round.
+      const recent = listRecentSignalsByAgent(targetAgent.id, 3);
+      const feed = recent.map((s) => ({
+        kind: s.kind,
+        subject: s.subject,
+        evidence: s.evidence.slice(0, 4),
+        nextTrigger: s.nextTrigger,
+        ageSeconds: Math.floor((Date.now() - s.createdAt) / 1000),
+        sourceUrl: s.sourceUrl,
+      }));
+
+      const summary = feed.length
+        ? feed
+            .map(
+              (f, i) =>
+                `${i + 1}. [${f.kind}] ${f.subject} (${Math.floor(f.ageSeconds / 60)}m ago)`,
+            )
+            .join(" · ")
+        : "no recent signals yet";
+
       return {
         ok: true,
-        message: `Paid ${targetAgent.name} $${amount.toFixed(3)}. Signature: ${result.signature.slice(0, 12)}...`,
+        message: `Paid ${targetAgent.name} $${amount.toFixed(3)} — received ${feed.length} signals: ${summary}`,
         signature: result.signature,
         amountUsd: amount,
         counterparty: targetAgent.name,
+        data: { feed, signature: result.signature },
       };
     }
 
     return {
       ok: false,
       message: `Payment failed: ${result.reason ?? "unknown"}`,
+      failedSignature: null,
+      failedReason: result.reason ?? "policy_blocked",
+      amountUsd: amount,
     };
   },
 };

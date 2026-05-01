@@ -181,6 +181,10 @@ export function recordAgentTick(input: {
   thought: string;
   decision: AgentDecision | null;
   signature?: string | null;
+  /** 'success' for settled txs, 'failed' for policy-blocked. Defaults
+   *  to 'success' if a signature is supplied without an explicit
+   *  status; null otherwise. Persisted as signature_status. */
+  signatureStatus?: "success" | "failed" | null;
   amountUsd?: number | null;
   counterparty?: string | null;
   /** "llm" (default) or "scripted" — drives the mode pill on the
@@ -191,12 +195,14 @@ export function recordAgentTick(input: {
   const ts = Date.now();
   const db = getDb();
   const mode: "llm" | "scripted" = input.mode ?? "llm";
+  const sigStatus: "success" | "failed" | null =
+    input.signatureStatus ?? (input.signature ? "success" : null);
 
   db.prepare(
     `INSERT INTO agent_thoughts (
       id, agent_id, timestamp, thought, decision_json, tool_used,
-      signature, amount_usd, counterparty, mode
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      signature, amount_usd, counterparty, mode, signature_status
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     id,
     input.agentId,
@@ -208,6 +214,7 @@ export function recordAgentTick(input: {
     input.amountUsd ?? null,
     input.counterparty ?? null,
     mode,
+    sigStatus,
   );
 
   // Update agent rollups (callers use bumpAgentEarned/bumpAgentSpent
@@ -227,6 +234,7 @@ export function recordAgentTick(input: {
     decision: input.decision,
     toolUsed: input.decision?.toolId ?? null,
     signature: input.signature ?? null,
+    signatureStatus: sigStatus,
     amountUsd: input.amountUsd ?? null,
     counterparty: input.counterparty ?? null,
     mode,
@@ -257,6 +265,7 @@ interface ThoughtRow {
   decision_json: string | null;
   tool_used: string | null;
   signature: string | null;
+  signature_status: string | null;
   amount_usd: number | null;
   counterparty: string | null;
   mode: string | null;
@@ -276,6 +285,10 @@ export function listThoughts(agentId: string, limit = 50): AgentThought[] {
     decision: r.decision_json ? (JSON.parse(r.decision_json) as AgentDecision) : null,
     toolUsed: r.tool_used,
     signature: r.signature,
+    signatureStatus:
+      r.signature_status === "success" || r.signature_status === "failed"
+        ? (r.signature_status as "success" | "failed")
+        : null,
     amountUsd: r.amount_usd,
     counterparty: r.counterparty,
     mode: (r.mode === "scripted" ? "scripted" : "llm") as "llm" | "scripted",
@@ -338,6 +351,7 @@ interface TaskRow {
   claiming_agent_id: string | null;
   result_json: string | null;
   payment_signature: string | null;
+  escrow_signature: string | null;
   created_at: number;
   expires_at: number;
   completed_at: number | null;
@@ -354,6 +368,7 @@ function rowToTask(r: TaskRow): AgentTask {
     claimingAgentId: r.claiming_agent_id,
     result: r.result_json ? (JSON.parse(r.result_json) as Record<string, unknown>) : null,
     paymentSignature: r.payment_signature,
+    escrowSignature: r.escrow_signature,
     createdAt: r.created_at,
     expiresAt: r.expires_at,
     completedAt: r.completed_at,
@@ -377,6 +392,7 @@ interface SignalRow {
   persistence_context: string | null;
   next_trigger: string | null;
   snoozed_until: number | null;
+  on_chain_signature: string | null;
   status: string;
   created_at: number;
 }
@@ -412,6 +428,7 @@ function rowToSignal(r: SignalRow): Signal {
     persistenceContext: r.persistence_context,
     nextTrigger: r.next_trigger,
     snoozedUntil: r.snoozed_until,
+    onChainSignature: r.on_chain_signature,
     status: (["unread", "read", "archived"].includes(r.status) ? r.status : "unread") as SignalStatus,
     createdAt: r.created_at,
   };
@@ -536,10 +553,40 @@ export function writeSignal(input: {
       persistenceContext,
       nextTrigger,
       snoozedUntil: null,
+      onChainSignature: null,
       status: "unread",
       createdAt: now,
     },
   };
+}
+
+/** Anchor a signal to an on-chain transaction. Used by stake_on_finding
+ *  so the inbox can render the green "On-chain ✓ $X staked" badge with
+ *  an Explorer link directly on the finding card. */
+export function setSignalOnChain(
+  signalId: string,
+  signature: string,
+): boolean {
+  const r = getDb()
+    .prepare(`UPDATE signals SET on_chain_signature = ? WHERE id = ?`)
+    .run(signature, signalId);
+  return r.changes > 0;
+}
+
+/** Find the most recent signal subject by an agent — used by
+ *  stake_on_finding to attach the stake to the latest finding when the
+ *  caller doesn't pass an explicit signal id. */
+export function findRecentSignalBySubject(
+  agentId: string,
+  subject: string,
+): Signal | null {
+  const row = getDb()
+    .prepare(
+      `SELECT * FROM signals WHERE agent_id = ? AND subject = ?
+         ORDER BY created_at DESC LIMIT 1`,
+    )
+    .get(agentId, subject) as SignalRow | undefined;
+  return row ? rowToSignal(row) : null;
 }
 
 /** Recent signals filed by ONE agent — used by the runner to build
@@ -737,16 +784,25 @@ export function postTask(input: {
   bountyUsd: number;
   /** TTL in seconds, default 1 hour */
   ttlSeconds?: number;
+  /** Solana sig of the escrow payment (poster vault → treasury). The
+   *  Phase 1 economy engine requires this — a task with no
+   *  escrow_signature is a contract that was never signed and shouldn't
+   *  exist. */
+  escrowSignature?: string | null;
+  /** Optional pre-generated id (so the escrow payment's memo can
+   *  reference the same id that lands in the row). When omitted a new
+   *  id is generated. */
+  id?: string;
 }): AgentTask {
-  const id = `tsk_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+  const id = input.id ?? `tsk_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
   const now = Date.now();
   const ttl = (input.ttlSeconds ?? 3600) * 1000;
   getDb()
     .prepare(
       `INSERT INTO agent_tasks (
         id, posting_agent_id, task_type, payload_json, bounty_usd,
-        status, created_at, expires_at
-      ) VALUES (?, ?, ?, ?, ?, 'open', ?, ?)`,
+        status, escrow_signature, created_at, expires_at
+      ) VALUES (?, ?, ?, ?, ?, 'open', ?, ?, ?)`,
     )
     .run(
       id,
@@ -754,6 +810,7 @@ export function postTask(input: {
       input.taskType,
       JSON.stringify(input.payload),
       input.bountyUsd,
+      input.escrowSignature ?? null,
       now,
       now + ttl,
     );
@@ -767,17 +824,21 @@ export function postTask(input: {
     claimingAgentId: null,
     result: null,
     paymentSignature: null,
+    escrowSignature: input.escrowSignature ?? null,
     createdAt: now,
     expiresAt: now + ttl,
     completedAt: null,
   };
 }
 
-/** Atomic claim — only succeeds if task is still 'open'. */
+/** Atomic claim — only succeeds if task is still 'open'. Sets
+ *  status='in_progress'. The Phase 1 economy split moves the actual
+ *  settlement out to complete_task; claim is now a pure ownership
+ *  acquisition step that doesn't touch USDC. */
 export function claimTask(taskId: string, claimingAgentId: string): boolean {
   const result = getDb()
     .prepare(
-      `UPDATE agent_tasks SET status = 'claimed', claiming_agent_id = ?
+      `UPDATE agent_tasks SET status = 'in_progress', claiming_agent_id = ?
        WHERE id = ? AND status = 'open' AND expires_at > ?`,
     )
     .run(claimingAgentId, taskId, Date.now());

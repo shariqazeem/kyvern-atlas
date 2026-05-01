@@ -1,48 +1,33 @@
 import type { AgentTool } from "../types";
-import {
-  bumpAgentEarned,
-  bumpAgentSpent,
-  claimTask,
-  completeTask,
-  failTask,
-  getAgent,
-  getTask,
-  listOpenTasks,
-} from "../store";
-import { getVault } from "@/lib/vault-store";
-import { serverVaultPay } from "@/lib/server-pay";
+import { claimTask, getTask, listOpenTasks } from "../store";
 
 /**
- * claim_task — the agent picks an open task, completes it, and gets paid.
+ * claim_task — pick an open task and lock it for this agent.
  *
- * Atomic claim (UPDATE WHERE status='open'). If claimed, the agent
- * processes the task with a simple result (Phase 3 wires Claude here),
- * then triggers serverVaultPay() from the posting agent's vault to
- * the claiming agent's vault. Real USDC, real signature.
+ * Phase 1: claim is now a pure ownership step. No USDC moves here.
+ * The atomic UPDATE flips status open → in_progress and writes the
+ * claiming_agent_id. Settlement happens later in complete_task, which
+ * releases the escrowed bounty from the platform treasury to the
+ * claimer's vault.
  *
- * For Phase 2 (this commit): uses a deterministic stub result so the
- * full settlement path can be tested. Phase 3+ uses Claude to actually
- * do the work.
+ * The escrow was already locked at post_task time, so the bounty is
+ * guaranteed to be available — claimers don't need to worry about the
+ * poster's budget changing while they work.
  */
 export const claimTaskTool: AgentTool = {
   id: "claim_task",
-  name: "Claim and complete a task",
+  name: "Claim a task",
   description:
-    "Pick an open task from the task board, complete it, and earn the bounty. Specify a taskId, or pass empty to auto-pick a matching task.",
+    "Pick an open task from the task board and lock it for yourself. The bounty was already escrowed when the task was posted — you'll receive it from the treasury when you call complete_task with your result. Pass empty taskId to auto-pick the highest-bounty task you can claim.",
   category: "earn",
-  costsMoney: false, // earning, not spending
+  costsMoney: false,
   schema: {
     type: "object",
     properties: {
       taskId: {
         type: "string",
         description:
-          "Specific task ID to claim. If omitted, picks the highest bounty task you can handle.",
-      },
-      result: {
-        type: "string",
-        description:
-          "JSON-encoded result of completing the task. If omitted, a default acknowledgement is used.",
+          "Specific task ID to claim. If omitted, picks the highest-bounty open task not posted by you.",
       },
     },
     required: [],
@@ -50,7 +35,6 @@ export const claimTaskTool: AgentTool = {
   execute: async (ctx, input) => {
     let taskId = String(input.taskId ?? "").trim();
 
-    // Auto-pick if no taskId provided — highest bounty open task not posted by us
     if (!taskId) {
       const open = listOpenTasks(20).filter(
         (t) => t.postingAgentId !== ctx.agent.id,
@@ -73,91 +57,24 @@ export const claimTaskTool: AgentTool = {
       return { ok: false, message: "cannot claim your own task" };
     }
 
-    // Atomic claim
-    const claimed = claimTask(taskId, ctx.agent.id);
-    if (!claimed) {
+    const ok = claimTask(taskId, ctx.agent.id);
+    if (!ok) {
       return { ok: false, message: "task was claimed by another agent" };
     }
 
-    // Build a result. For Phase 2 this is a deterministic stub.
-    // Phase 3 wires Claude to actually solve the task.
-    const resultStr = String(input.result ?? "").trim();
-    let result: Record<string, unknown>;
-    if (resultStr) {
-      try {
-        result = JSON.parse(resultStr) as Record<string, unknown>;
-      } catch {
-        result = { raw: resultStr };
-      }
-    } else {
-      result = {
-        verdict: "completed",
-        note: `${ctx.agent.name} processed ${task.taskType}`,
-        taskType: task.taskType,
-      };
-    }
-
-    // Settlement: posting agent's vault pays claiming agent's vault
-    const postingAgent = getAgent(task.postingAgentId);
-    if (!postingAgent) {
-      failTask(taskId);
-      return { ok: false, message: "posting agent missing" };
-    }
-    const claimingVault = getVault(ctx.agent.deviceId);
-    if (!claimingVault) {
-      failTask(taskId);
-      return { ok: false, message: "claiming vault missing" };
-    }
-
-    const payment = await serverVaultPay({
-      vaultId: postingAgent.deviceId,
-      merchant: "kyvern-devices",
-      recipientPubkey: claimingVault.ownerWallet,
-      amountUsd: task.bountyUsd,
-      memo: `task:${taskId}`,
-      logEvent: {
-        eventType: "spending_sent",
-        abilityId: "post_task",
-        counterparty: `${ctx.agent.emoji} ${ctx.agent.name}`,
-        description: `Paid ${ctx.agent.name} $${task.bountyUsd.toFixed(3)} for completing ${task.taskType}`,
-      },
+    ctx.log({
+      description: `Claimed ${task.taskType} (bounty $${task.bountyUsd.toFixed(3)})`,
     });
 
-    if (payment.success && payment.signature) {
-      // Mark task completed
-      completeTask({
-        taskId,
-        result,
-        paymentSignature: payment.signature,
-      });
-
-      // Update rollups
-      bumpAgentSpent(postingAgent.id, task.bountyUsd);
-      bumpAgentEarned(ctx.agent.id, task.bountyUsd);
-
-      ctx.log({
-        description: `Earned $${task.bountyUsd.toFixed(3)} completing ${task.taskType} for ${postingAgent.name}`,
-        signature: payment.signature,
-        amountUsd: task.bountyUsd,
-        counterparty: `${postingAgent.emoji} ${postingAgent.name}`,
-        eventType: "earning_received",
-      });
-
-      return {
-        ok: true,
-        message: `Completed ${task.taskType} for ${postingAgent.name}. Earned $${task.bountyUsd.toFixed(3)}.`,
-        signature: payment.signature,
-        amountUsd: task.bountyUsd,
-        counterparty: postingAgent.name,
-        data: { taskId, result },
-      };
-    }
-
-    // Settlement failed — task is technically claimed but unpaid
-    failTask(taskId);
     return {
-      ok: false,
-      message: `Settlement failed: ${payment.reason ?? "unknown"}`,
+      ok: true,
+      message: `Claimed ${task.taskType}. Bounty $${task.bountyUsd.toFixed(3)} is held in escrow until you call complete_task with your result.`,
+      data: {
+        taskId: task.id,
+        taskType: task.taskType,
+        bountyUsd: task.bountyUsd,
+        escrowSignature: task.escrowSignature,
+      },
     };
   },
 };

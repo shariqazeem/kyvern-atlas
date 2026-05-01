@@ -653,6 +653,27 @@ function migrate(db: Database.Database) {
   tryAlter(
     `CREATE INDEX IF NOT EXISTS idx_signals_snooze ON signals(device_id, snoozed_until)`,
   );
+
+  // ── Phase 1: Economy Engine migrations ────────────────────────────
+  //
+  // The Phase 1 split (post → escrow, claim → in_progress, complete →
+  // settlement) needs three additive columns so the lifecycle can be
+  // reconstructed end-to-end:
+  //
+  //   agent_tasks.escrow_signature   — Solana sig of the post-time
+  //                                     poster→treasury transfer that
+  //                                     locks the bounty
+  //   agent_thoughts.signature_status — 'success' | 'failed'; lets the
+  //                                     UI render policy rejections as
+  //                                     red on-chain badges
+  //   signals.on_chain_signature      — distinct from the older
+  //                                     `signature` column: when a
+  //                                     finding is staked or otherwise
+  //                                     anchored to a real tx, this is
+  //                                     the canonical link
+  tryAlter(`ALTER TABLE agent_tasks ADD COLUMN escrow_signature TEXT`);
+  tryAlter(`ALTER TABLE agent_thoughts ADD COLUMN signature_status TEXT`);
+  tryAlter(`ALTER TABLE signals ADD COLUMN on_chain_signature TEXT`);
   // Re-backfill EVERY row (not just NULL ones) — v2 of hashSubject
   // normalizes numeric volatility so "$83.14" and "$83.27" share a
   // hash. The first migration backfilled with v1 (literal) so we

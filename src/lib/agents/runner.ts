@@ -515,11 +515,23 @@ async function llmTick(agent: Agent, ctx: AgentToolContext): Promise<LlmTickOutc
       toolResult,
     };
 
+    // Phase 1 — surface failed (policy-rejected) txs as red on-chain
+    // badges. If the tool returned a real signature it's success; if
+    // it returned a failedSignature/failedReason the policy program
+    // blocked the action.
+    const sig = toolResult.signature ?? toolResult.failedSignature ?? null;
+    const sigStatus: "success" | "failed" | null = toolResult.signature
+      ? "success"
+      : toolResult.failedSignature || toolResult.failedReason
+        ? "failed"
+        : null;
+
     recordAgentTick({
       agentId: agent.id,
       thought: reasoning,
       decision,
-      signature: toolResult.signature ?? null,
+      signature: sig,
+      signatureStatus: sigStatus,
       amountUsd: toolResult.amountUsd ?? null,
       counterparty: toolResult.counterparty ?? null,
       mode: "llm",
@@ -567,11 +579,20 @@ async function llmTick(agent: Agent, ctx: AgentToolContext): Promise<LlmTickOutc
 async function scriptedTickWrapper(agent: Agent, ctx: AgentToolContext) {
   const result = await scriptedTick(agent, ctx);
 
+  const sSig =
+    result.toolResult?.signature ?? result.toolResult?.failedSignature ?? null;
+  const sStatus: "success" | "failed" | null = result.toolResult?.signature
+    ? "success"
+    : result.toolResult?.failedSignature || result.toolResult?.failedReason
+      ? "failed"
+      : null;
+
   recordAgentTick({
     agentId: agent.id,
     thought: result.thought,
     decision: result.decision,
-    signature: result.toolResult?.signature ?? null,
+    signature: sSig,
+    signatureStatus: sStatus,
     amountUsd: result.toolResult?.amountUsd ?? null,
     counterparty: result.toolResult?.counterparty ?? null,
     mode: "scripted",
