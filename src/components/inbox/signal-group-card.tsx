@@ -35,6 +35,7 @@ import {
   TrendingUp,
   GitBranch,
   Sparkles,
+  Target,
   ExternalLink,
   Check,
   Clock,
@@ -60,6 +61,7 @@ const KIND_ICON: Record<SignalKind, LucideIcon> = {
   github_release: GitBranch,
   observation: Sparkles,
   condition_update: TrendingUp,
+  opportunity: Target,
 };
 
 const KIND_LABEL: Record<SignalKind, string> = {
@@ -70,6 +72,7 @@ const KIND_LABEL: Record<SignalKind, string> = {
   github_release: "RELEASE",
   observation: "OBSERVATION",
   condition_update: "UPDATE",
+  opportunity: "OPPORTUNITY",
 };
 
 function fmtAgo(ms: number): string {
@@ -400,7 +403,7 @@ export function SignalGroupCard({
               href={head.sourceUrl}
               icon={<ExternalLink className="w-3 h-3" />}
             >
-              {head.kind === "bounty"
+              {head.kind === "bounty" || head.kind === "opportunity"
                 ? "Apply"
                 : head.kind === "github_release"
                   ? "View release"
@@ -410,7 +413,7 @@ export function SignalGroupCard({
             </ActionButton>
           )}
 
-          {head.kind === "bounty" && (
+          {(head.kind === "bounty" || head.kind === "opportunity") && (
             <ActionButton
               onClick={onPostAsTask}
               busy={busy === "post-as-task"}

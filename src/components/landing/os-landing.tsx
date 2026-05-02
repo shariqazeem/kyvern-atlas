@@ -415,7 +415,7 @@ function SectionDevice() {
               tag: "Layer 3",
               title: "The Workers",
               body:
-                "Autonomous agents you spawn on your device. Each has personality, job, allowed tools, frequency. They find opportunities. They operate within the budget. They cannot exceed it.",
+                "Autonomous AI workers you hire onto your device. Three ship with every Kyvern: Sentinel posts paid jobs, Wren claims and completes them, Pulse stakes USDC on conviction. They earn — they cannot exceed your budget.",
             },
           ].map((l, i) => (
             <motion.div
@@ -508,46 +508,36 @@ function SectionDevice() {
    ════════════════════════════════════════════════════════════════════ */
 
 function SectionWorkers() {
+  // Phase 0 — picker locked to the trio. The landing showcase mirrors
+  // it so the "this is what's in the box" promise matches what the
+  // user actually gets at /unbox.
   const workers = [
     {
       emoji: "🎯",
-      name: "Bounty Hunter",
+      name: "Sentinel",
+      role: "Opportunity Scout",
       watches: "Bounty boards & hackathons",
-      pings: "When a fit drops",
+      pings: "Posts paid research jobs when a fit drops",
       example:
-        "High-value match: $10K Superteam bounty, Development category, deadline in 36 hours. Only 4 submissions so far.",
-    },
-    {
-      emoji: "📡",
-      name: "Ecosystem Watcher",
-      watches: "Solana accounts & RSS feeds",
-      pings: "Hackathons, grants, launches",
-      example:
-        "Solana Foundation just announced a new grant round for infrastructure projects. Applications open May 5.",
+        "High-value match: $10K Superteam bounty, Development category, deadline in 36 hours. Posting a $0.15 research task to verify scope.",
     },
     {
       emoji: "🐋",
-      name: "Whale Tracker",
-      watches: "Specific wallets",
-      pings: "Big swaps & rotations",
+      name: "Wren",
+      role: "Market Intelligence",
+      watches: "Specific wallets · open jobs",
+      pings: "Claims tasks · earns USDC on completion",
       example:
-        "Kraken moved $2.3M SOL to a Binance deposit wallet. This pattern historically precedes a 2-5% price move within 2 hours.",
+        "Claimed Sentinel's research task. Kraken moved $2.3M SOL to a Binance deposit. Completed → +$0.15 from treasury.",
     },
     {
       emoji: "📈",
-      name: "Token Pulse",
+      name: "Pulse",
+      role: "Validation & Staking",
       watches: "Token price + volume",
-      pings: "Configured threshold breaks",
+      pings: "Stakes USDC on high-conviction price moves",
       example:
-        "SOL has been below your $140 band for 6 hours — longest streak since April 15. Watching for bounce above $85 on volume.",
-    },
-    {
-      emoji: "🛠️",
-      name: "GitHub Watcher",
-      watches: "Repos & orgs",
-      pings: "Releases & fresh commits",
-      example:
-        "solana-labs/solana v2.1.0 released 12 minutes ago. Includes breaking changes to the stake program interface.",
+        "SOL outside $140–$160 band. Staking $0.02 on the breach as on-chain proof of conviction.",
     },
   ];
 
@@ -555,7 +545,7 @@ function SectionWorkers() {
     <section className="relative" style={{ background: "#F4F4F6" }}>
       <div className="max-w-[1200px] mx-auto px-5 sm:px-8 py-24 sm:py-32">
         <div className="text-center mb-12">
-          <SectionLabel>Your workers</SectionLabel>
+          <SectionLabel>Three workers ship in every device</SectionLabel>
           <h2
             className="mt-3 mx-auto max-w-[820px] tracking-tight"
             style={{
@@ -566,7 +556,8 @@ function SectionWorkers() {
               letterSpacing: "-0.02em",
             }}
           >
-            Spawn a worker. Give it a job. Watch it find opportunities.
+            Your device hires workers. They earn real money.{" "}
+            <span style={{ color: "#15803D" }}>You control every dollar.</span>
           </h2>
         </div>
 
@@ -602,9 +593,9 @@ function SectionWorkers() {
                 >
                   {w.emoji}
                 </div>
-                <div>
+                <div className="min-w-0">
                   <div
-                    className="text-[14px] font-semibold tracking-tight"
+                    className="text-[14px] font-semibold tracking-tight truncate"
                     style={{ color: "#0A0A0A" }}
                   >
                     {w.name}
@@ -613,7 +604,7 @@ function SectionWorkers() {
                     className="font-mono uppercase tracking-[0.10em]"
                     style={{ color: "#9CA3AF", fontSize: 9.5 }}
                   >
-                    Worker template
+                    {w.role}
                   </div>
                 </div>
               </div>
@@ -956,8 +947,8 @@ function SectionFinalCta() {
           className="mt-5 mx-auto max-w-[560px] text-[15px] leading-[1.6]"
           style={{ color: "rgba(255,255,255,0.65)" }}
         >
-          A device that finds you opportunities. On-chain budgets that
-          can&apos;t be bypassed. Workers that earn while you sleep.
+          Your device hires workers. They earn real money. You control
+          every dollar — enforced on-chain by a Solana policy program.
         </p>
         <div className="mt-9 flex flex-col sm:flex-row items-center justify-center gap-3">
           <Link

@@ -434,6 +434,34 @@ function firstUrlIn(s: string): string | null {
   return m ? m[0] : null;
 }
 
+/** All http(s):// URLs in the prompt, in order, deduped, capped at 6.
+ *  Used by the multi-source Opportunity Scout (Phase 1 — Sentinel)
+ *  to fan out across bounty boards, RSS feeds, GitHub releases, etc.
+ *  in priority order until one source returns new items. */
+function allUrlsIn(s: string): string[] {
+  const matches = s.match(/https?:\/\/[^\s)\]"',]+/gi) ?? [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of matches) {
+    // Trim trailing punctuation that often clings to URLs in prose.
+    const url = raw.replace(/[.,;:!?]+$/g, "");
+    if (!seen.has(url)) {
+      seen.add(url);
+      out.push(url);
+      if (out.length >= 6) break;
+    }
+  }
+  return out;
+}
+
+/** Detect feed format from URL — RSS by extension/path, JSON by /api/
+ *  or .json, falls back to JSON. Mirrors watch_url's auto detection. */
+function detectFeedFormat(url: string): "json" | "rss" | "html" {
+  if (/\.(?:rss|xml)\b/i.test(url) || /\/rss\b/i.test(url)) return "rss";
+  if (/\.json\b/i.test(url) || /\/api\//i.test(url)) return "json";
+  return "html";
+}
+
 /** First Solana base58 pubkey-shaped substring. */
 function firstSolanaAddrIn(s: string): string | null {
   const m = s.match(/\b[1-9A-HJ-NP-Za-km-z]{32,44}\b/);
@@ -614,8 +642,8 @@ async function runDataGatherThenMaybeSignal(
 
 const BOUNTY_HUNTER_VOICE: VoiceProfile = {
   thoughts: {
-    observe: ["No new bounties this pass · idle."],
-    actionStart: ["Pulled bounty board."],
+    observe: ["No new opportunities this pass · idle."],
+    actionStart: ["Scanning sources."],
     actionAfter: ["{result}"],
   },
   pickAction: () => ({
@@ -623,25 +651,24 @@ const BOUNTY_HUNTER_VOICE: VoiceProfile = {
     toolId: null,
     input: {},
   }),
-  // Phase 2 — Sentinel becomes the first economic worker. The scripted
-  // fallback now does the FULL economic loop: watch_url → post_task
-  // (escrow $0.15 research bounty) → writeSignal (surface to inbox).
-  // Idle silently when there's nothing new — anti-noise rules apply.
+  // Phase 1 (billion-dollar edition) — Sentinel becomes a true
+  // multi-source Opportunity Scout. Scripted fallback fans out across
+  // ALL URLs in the job prompt (Superteam + Colosseum + Solana RSS +
+  // GitHub releases) in priority order, stopping at the first source
+  // that returned a new high-value item. Posts a $0.15 research task
+  // and surfaces a kind='opportunity' signal for that find.
   //
-  // The scripted path is a safety net: the LLM owns this flow most of
-  // the time, but if Commonstack is down or the LLM declines to call a
-  // tool, scripted guarantees Sentinel still posts within 3 ticks.
+  // The LLM owns this flow most of the time; scripted is the
+  // deterministic safety net that fires when Commonstack rate-limits
+  // or the LLM declines a tool call.
   pickActionAsync: async (agent, toolCtx) => {
-    const url = firstUrlIn(agent.jobPrompt);
-    if (!url) {
+    const urls = allUrlsIn(agent.jobPrompt);
+    if (urls.length === 0) {
       return {
-        thought: "no bounty URL parsed from job · idle",
+        thought: "no source URLs parsed from job · idle",
         decision: { action: "observe" },
       };
     }
-    const minPrize = parseMinPrize(agent.jobPrompt);
-
-    // Step 1 — fetch the bounty board.
     const watchTool = getTool("watch_url");
     if (!watchTool) {
       return {
@@ -649,71 +676,96 @@ const BOUNTY_HUNTER_VOICE: VoiceProfile = {
         decision: { action: "observe" },
       };
     }
-    // Phase 2 — fresh BH that hasn't posted a task yet bypasses the
-    // sinceLastCheck cache so we always have a listing to escrow.
-    // Otherwise the agent could lock its first three ticks into
-    // "no new items" when the cache is warm but nothing has changed.
+    const minPrize = parseMinPrize(agent.jobPrompt);
+    // Fresh Sentinel that hasn't posted a task yet bypasses the
+    // sinceLastCheck cache so we always have an item to escrow on the
+    // first tick. Subsequent ticks honor the cache so we don't re-post
+    // the same bounty over and over.
     const isFreshBH = !hasAgentPostedTask(agent.id);
-    const watchInput = {
-      url,
-      format: "json" as const,
-      sinceLastCheck: !isFreshBH,
-      ...(minPrize ? { minPrize } : {}),
-    };
-    let watchResult: AgentToolResult;
-    try {
-      watchResult = await watchTool.execute(toolCtx, watchInput);
-    } catch (e) {
-      return {
-        thought: `watch_url failed: ${e instanceof Error ? e.message : "error"} · idle`,
-        decision: { action: "observe" },
-      };
-    }
-    if (!watchResult.ok) {
-      return {
-        thought: `watch_url returned not-ok · idle`,
-        decision: {
-          action: "tool_call",
-          toolId: "watch_url",
-          toolInput: watchInput,
-          toolResult: watchResult,
-        },
-        toolResult: watchResult,
-      };
-    }
-    // watch_url returns `newItems` (the post-dedup list), not `items` —
-    // the legacy scripted code read the wrong key and silently idled
-    // forever. Pre-Phase-2 this only manifested as "no new listings"
-    // strings; once we wired post_task on top, the bug stopped the
-    // economy loop cold.
-    const itemsRaw =
-      (watchResult.data as { newItems?: unknown[] } | undefined)?.newItems ??
-      [];
-    const items = itemsRaw as Array<{
+
+    // Loop through URLs in order. Stop at the first source that
+    // returned new items. Each watch_url call is bounded to ~5s.
+    let scannedSummary = "";
+    let chosenUrl: string | null = null;
+    let chosenItems: Array<{
       title?: string;
       url?: string;
       summary?: string;
       rewardUsd?: number | null;
       deadline?: string | null;
       skills?: string[] | string;
-    }>;
-    if (!Array.isArray(items) || items.length === 0) {
-      // Anti-noise: no new qualifying listings → idle silently.
+    }> = [];
+    let chosenWatchInput: Record<string, unknown> | null = null;
+    let chosenWatchResult: AgentToolResult | null = null;
+    let chosenKindHint: string = "opportunity";
+
+    for (const url of urls) {
+      const format = detectFeedFormat(url);
+      const watchInput: Record<string, unknown> = {
+        url,
+        format,
+        sinceLastCheck: !isFreshBH,
+        ...(minPrize ? { minPrize } : {}),
+      };
+      let watchResult: AgentToolResult;
+      try {
+        watchResult = await watchTool.execute(toolCtx, watchInput);
+      } catch {
+        scannedSummary += `${new URL(url).host}: error · `;
+        continue;
+      }
+      if (!watchResult.ok) {
+        scannedSummary += `${new URL(url).host}: not-ok · `;
+        continue;
+      }
+      const itemsRaw =
+        (watchResult.data as { newItems?: unknown[] } | undefined)?.newItems ??
+        [];
+      const items = itemsRaw as Array<{
+        title?: string;
+        url?: string;
+        summary?: string;
+        rewardUsd?: number | null;
+        deadline?: string | null;
+        skills?: string[] | string;
+      }>;
+      const kindHint = String(
+        (watchResult.data as { kindHint?: string } | undefined)?.kindHint ??
+          "opportunity",
+      );
+      if (Array.isArray(items) && items.length > 0) {
+        // Found new items at this source — stop here and act.
+        chosenUrl = url;
+        chosenItems = items;
+        chosenWatchInput = watchInput;
+        chosenWatchResult = watchResult;
+        chosenKindHint = kindHint;
+        scannedSummary += `${new URL(url).host}: ${items.length} new`;
+        break;
+      }
+      scannedSummary += `${new URL(url).host}: 0 new · `;
+    }
+
+    if (!chosenUrl || !chosenWatchResult || !chosenWatchInput) {
+      // No source had new items — silent idle per anti-noise rules.
       return {
-        thought: "scanned bounty board · no new qualifying listings · idle",
-        decision: {
-          action: "tool_call",
-          toolId: "watch_url",
-          toolInput: watchInput,
-          toolResult: watchResult,
-        },
-        toolResult: watchResult,
+        thought: `scanned ${urls.length} sources · ${scannedSummary || "all quiet"} · idle`,
+        decision: { action: "observe" },
       };
     }
 
-    const top = items[0];
+    // Pick the highest-reward item if rewardUsd is populated, else
+    // first. This biases toward the most valuable Superteam bounty
+    // when scanning a list, while still surfacing RSS items
+    // deterministically.
+    const sortedItems = chosenItems.slice().sort((a, b) => {
+      const aR = typeof a.rewardUsd === "number" ? a.rewardUsd : 0;
+      const bR = typeof b.rewardUsd === "number" ? b.rewardUsd : 0;
+      return bR - aR;
+    });
+    const top = sortedItems[0];
     const title = String(top.title ?? "(unknown)").slice(0, 80);
-    const sourceUrl = top.url ?? url;
+    const sourceUrl = top.url ?? chosenUrl;
     const rewardUsd =
       typeof top.rewardUsd === "number" && Number.isFinite(top.rewardUsd)
         ? top.rewardUsd
@@ -724,18 +776,26 @@ const BOUNTY_HUNTER_VOICE: VoiceProfile = {
         ? top.skills
         : "";
 
+    // Always use kind='opportunity' for Sentinel's findings. The
+    // chosenKindHint from watch_url is informational only — the
+    // unified Opportunity Scout taxonomy collapses bounties + grants +
+    // releases + announcements under one kind so the inbox reads as a
+    // single intelligence stream.
+    void chosenKindHint;
+
     // Step 2 — escrow + post the research task. Goes first because
     // ECONOMY PRIORITY puts post_task ahead of message_user.
     const postTool = getTool("post_task");
     let postResult: AgentToolResult | null = null;
     if (postTool) {
-      const ask = `Validate Superteam bounty: ${title}`;
+      const ask = `Validate opportunity: ${title}`;
       const context =
         `URL: ${sourceUrl}` +
         (top.summary ? ` · ${String(top.summary).slice(0, 200)}` : "") +
         (rewardUsd != null ? ` · reward $${rewardUsd}` : "") +
         (top.deadline ? ` · deadline ${top.deadline}` : "") +
-        (skills ? ` · skills ${skills}` : "");
+        (skills ? ` · skills ${skills}` : "") +
+        ` · source ${new URL(chosenUrl).host}`;
       try {
         postResult = await postTool.execute(toolCtx, {
           taskType: "research",
@@ -751,18 +811,18 @@ const BOUNTY_HUNTER_VOICE: VoiceProfile = {
       }
     }
 
-    // Step 3 — write the signal regardless of post outcome. The owner
-    // still wants to see the bounty in their inbox even if the policy
-    // program rejected the escrow.
+    // Step 3 — write the opportunity signal regardless of post
+    // outcome. The owner still wants to see the find in their inbox
+    // even if the policy program rejected the escrow.
     const writeResult = writeSignal({
       agentId: agent.id,
       deviceId: agent.deviceId,
-      kind: "bounty",
+      kind: "opportunity",
       subject: title,
       evidence: [
         rewardUsd != null ? `Reward: $${rewardUsd}` : "Reward: see listing",
         top.deadline ? `Deadline: ${top.deadline}` : "Deadline: see listing",
-        skills ? `Skills: ${skills}` : "Skills: see listing",
+        skills ? `Skills: ${skills}` : `Source: ${new URL(chosenUrl).host}`,
         minPrize ? `Filtered ≥ $${minPrize}` : "No minimum filter",
       ].slice(0, 4),
       sourceUrl,
@@ -770,7 +830,7 @@ const BOUNTY_HUNTER_VOICE: VoiceProfile = {
 
     if (writeResult.created) {
       toolCtx.log({
-        description: `Surfaced bounty · ${title.slice(0, 60)}${title.length > 60 ? "…" : ""}`,
+        description: `Surfaced opportunity · ${title.slice(0, 60)}${title.length > 60 ? "…" : ""}`,
       });
     }
 
@@ -794,15 +854,15 @@ const BOUNTY_HUNTER_VOICE: VoiceProfile = {
     // signal — note both outcomes in the thought.
     return {
       thought: postResult
-        ? `surfaced bounty · ${title.slice(0, 40)} · post_task blocked: ${postResult.failedReason ?? postResult.message ?? "unknown"}`
-        : `surfaced bounty · ${title.slice(0, 50)} · post_task tool unavailable`,
+        ? `surfaced opportunity · ${title.slice(0, 40)} · post_task blocked: ${postResult.failedReason ?? postResult.message ?? "unknown"}`
+        : `surfaced opportunity · ${title.slice(0, 50)} · post_task tool unavailable`,
       decision: {
         action: "tool_call",
         toolId: "watch_url",
-        toolInput: watchInput,
-        toolResult: watchResult,
+        toolInput: chosenWatchInput,
+        toolResult: chosenWatchResult,
       },
-      toolResult: watchResult,
+      toolResult: chosenWatchResult,
     };
   },
 };

@@ -21,11 +21,11 @@ const SITE_URL = "https://kyvernlabs.com";
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "Kyvern — Let your AI agents run free.",
+    default: "Kyvern — Your device hires AI workers that earn real USDC.",
     template: "%s · Kyvern",
   },
   description:
-    "Kyvern is the Solana program that replaces private keys with budgets enforced by consensus. Deploy an AI agent, set the rules on-chain, let it run. Atlas — our reference agent — is live on devnet now.",
+    "Kyvern is the device where AI workers earn real USDC for you under an on-chain Solana policy program. Your device hires workers. They earn real money. You control every dollar. Live on Solana devnet.",
   keywords: [
     "autonomous AI agent", "agent autonomy", "AI agent wallet",
     "on-chain authorization", "agent authorization layer",
@@ -44,15 +44,15 @@ export const metadata: Metadata = {
     locale: "en_US",
     url: SITE_URL,
     siteName: "Kyvern",
-    title: "Kyvern — Let your AI agents run free.",
+    title: "Kyvern — Your device hires AI workers that earn real USDC.",
     description:
-      "The Solana program that lets AI agents operate real money autonomously. Budgets enforced by consensus. Watch Atlas run live on devnet.",
+      "Your device hires workers. They earn real money. You control every dollar. AI workers under an on-chain Solana policy program. Live on devnet.",
     images: [
       {
         url: "/og-image.jpg",
         width: 1200,
         height: 630,
-        alt: "Kyvern — Let your AI agents run free.",
+        alt: "Kyvern — Your device hires AI workers that earn real USDC.",
       },
       {
         url: "/kyvernlabs_logo.jpg",
@@ -64,9 +64,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Kyvern — Let your AI agents run free.",
+    title: "Kyvern — Your device hires AI workers that earn real USDC.",
     description:
-      "Solana-native authorization for autonomous AI agents. Atlas — our reference agent — is operating real money on devnet right now.",
+      "Your device hires workers. They earn real money. You control every dollar. Atlas, our reference agent, is operating live on Solana devnet right now.",
     images: ["/og-image.jpg"],
     creator: "@shariqshkt",
   },
@@ -106,7 +106,7 @@ export default function RootLayout({
               url: SITE_URL,
               logo: `${SITE_URL}/kyvernlabs_logo.jpg`,
               description:
-                "Kyvern is the Solana program that gives AI agents real economic autonomy. Replaces private keys with budgets, allowlists, and velocity caps enforced by consensus. Atlas — our reference agent — operates autonomously on devnet.",
+                "Kyvern is the device where AI workers earn real USDC for you under an on-chain Solana policy program. Your device hires workers. They earn real money. You control every dollar. Atlas, our reference agent, has been operating autonomously on Solana devnet since April 2026.",
               founder: { "@type": "Person", name: "Shariq Azeem" },
               sameAs: [
                 "https://x.com/shariqshkt",

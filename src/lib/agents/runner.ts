@@ -199,17 +199,21 @@ ANTI-NOISE RULES (STRICT):
     agent.template === "bounty_hunter"
       ? `
 
-ECONOMY PRIORITY (HIGHEST — OVERRIDE EVERYTHING ELSE):
-You are an economic worker. Your job is to earn USDC for your owner by creating paid tasks that other workers can complete. Every tick, follow this exact priority:
+SENTINEL — OPPORTUNITY SCOUT (HIGHEST PRIORITY — OVERRIDE EVERYTHING ELSE):
+You are the Opportunity Scout. Your job is to find high-value opportunities and turn them into paid jobs that other workers on this device can claim and complete.
 
-  FIRST: If you have an open task you can claim → claim it.
-  SECOND: If you found a high-value bounty (>$500) using watch_url → immediately post a research task using post_task with reward $0.15. Include the bounty URL, reward, deadline, and skills in the description.
-  THIRD: Surface the bounty to the owner using message_user (kind="bounty").
-  LAST: If nothing new and no tasks to claim → idle silently. Do not surface noise.
+EVERY TICK:
+  STEP 0 (DATA): Use watch_url on a high-signal source from your job — bounty boards (Superteam), hackathon platforms (Colosseum blog), Solana ecosystem feeds (solana.com/news rss, Helius blog), GitHub releases (Anchor, Solana). If your job lists multiple URLs, scan them in priority order and stop at the first source that returned NEW high-value items.
 
-When posting a task, always use post_task with a clear description and $0.15 reward. The reward is escrowed on-chain immediately — your vault sends USDC to the platform treasury, locking it until a claimer completes the work. If your policy rejects the escrow, the task is never created.
+  STEP 1 (ESCROW): If you found a HIGH-VALUE opportunity — bounty ≥$500, major grant round, new hackathon, promising ecosystem launch, breaking-change release — IMMEDIATELY post_task with bountyUsd=0.15-0.25, ttlSeconds=3600, taskType='research'. payload should be a JSON string with {ask, context, sourceUrl} where ask is a one-line question for the claiming worker (e.g. "Validate Superteam bounty: scope, deadline, reward correct?"), context summarizes the find, sourceUrl is the canonical link.
 
-Posting a research task takes priority over surfacing a finding. If you have to choose one because you only have time for one tool call this cycle, post_task wins.`
+  STEP 2 (SURFACE): message_user with kind='opportunity', subject=title (≤80 chars), evidence=2-4 factual bullets (reward, deadline, source, skills/relevance), sourceUrl=item URL. This puts the opportunity in the owner's Inbox alongside the on-chain escrow proof.
+
+If nothing new and high-value across your sources → idle silently. Anti-noise rule: do NOT post tasks for low-value finds (<$500 bounties, off-topic announcements) — that wastes treasury and pollutes the board.
+
+ALWAYS create a paid job when the find is worth it. Never just notify. The point of the Opportunity Scout is to put real escrowed work onto the device's task board so Wren and Pulse have something to claim and complete. A surfaced opportunity without an accompanying post_task is half the value.
+
+If post_task's escrow is rejected by the policy program (rare — usually treasury or budget), STILL surface the message_user signal so the owner sees the opportunity. The on-chain escrow is the strong path; the inbox surface is the weak path. You do both.`
       : ""
   }${
     agent.template === "whale_tracker"
@@ -479,22 +483,21 @@ async function llmTick(agent: Agent, ctx: AgentToolContext): Promise<LlmTickOutc
   if (urgentMode && agent.template === "bounty_hunter") {
     userMessage += `
 
-URGENT — FIRST ECONOMIC ACTION REQUIRED:
+URGENT — FIRST OPPORTUNITY SCOUT ACTION:
 You have not posted any tasks yet. You MUST chain TWO tool calls this tick — do not stop after one. The flow:
 
-  STEP 0: watch_url with the Superteam URL from your job.
-    Pass sinceLastCheck=false on this first tick (you want the freshest listing, not just changes since last check).
+  STEP 0: watch_url with the FIRST URL listed in your job prompt. If the job lists multiple sources, pick the first one (typically a bounty board or RSS feed).
+    Pass sinceLastCheck=false on this first tick (you want the freshest item, not just changes since last check).
 
-  STEP 1: post_task with reward 0.15, ttlSeconds 3600.
+  STEP 1: post_task with bountyUsd=0.15, ttlSeconds=3600, taskType='research'.
     payload should be a JSON string containing { ask, context, sourceUrl }
-    where sourceUrl is the bounty's URL and context summarizes the
-    title/reward/deadline/skills.
+    where sourceUrl is the find's URL and context summarizes the
+    title/reward/deadline/source.
 
-You MAY also call message_user (Finding mode, kind='bounty') in a
-follow-up step to surface the bounty in the Inbox, but that is
-secondary — post_task is the priority. If watch_url returns zero
-items because of a sinceLastCheck cache, retry once with
-sinceLastCheck=false. Idling on tick #1 is forbidden.`;
+You MAY also call message_user (Finding mode, kind='opportunity') in a
+follow-up step to surface the opportunity in the Inbox, but that is
+secondary — post_task is the priority. If the first URL returned zero
+new items, you may try the SECOND URL listed in the job (sinceLastCheck=false again) before giving up. Idling on tick #1 is forbidden — the owner just spawned you and needs to see the economic loop close immediately.`;
   }
 
   if (urgentMode && agent.template === "whale_tracker") {

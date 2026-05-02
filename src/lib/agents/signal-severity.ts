@@ -72,7 +72,7 @@ export function severityForSignal(s: SignalLike): Severity {
   const maxDollars = parseLargestDollar(text);
 
   // Critical conditions — short-circuit first.
-  if (s.kind === "bounty") {
+  if (s.kind === "bounty" || s.kind === "opportunity") {
     if (maxDollars >= 500 && isNearDeadline(text)) return "critical";
     if (maxDollars >= 500) return "important";
   }
@@ -84,7 +84,8 @@ export function severityForSignal(s: SignalLike): Severity {
   // Kind-default mapping.
   switch (s.kind) {
     case "bounty":
-      return "important"; // a bounty is always worth a glance even if small
+    case "opportunity":
+      return "important"; // an opportunity is always worth a glance even if small
     case "wallet_move":
       return "important";
     case "ecosystem_announcement":

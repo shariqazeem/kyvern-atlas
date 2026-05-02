@@ -731,11 +731,12 @@ function migrate(db: Database.Database) {
   // every desired tool.
   try {
     const PATH_C_TOOLS: Record<string, string[]> = {
-      // Phase 2 — Sentinel toolset locked. read_dex dropped, read_onchain
-      // added so the worker can sanity-check on-chain identity of bounty
-      // issuers. message_user kept for surfacing findings; post_task is
-      // the economic primary action.
-      bounty_hunter: ["watch_url", "post_task", "message_user", "read_onchain"],
+      // Phase 1 (billion-dollar edition) — Sentinel as Opportunity
+      // Scout. Toolset locked to 3 tools: watch_url (multi-source
+      // scan), post_task (escrow $0.15 research bounty), message_user
+      // (surface as kind='opportunity'). read_onchain dropped — that's
+      // a downstream worker's job, not Sentinel's.
+      bounty_hunter: ["watch_url", "post_task", "message_user"],
       ecosystem_watcher: ["watch_url", "message_user", "post_task", "claim_task"],
       // Phase 3 — Wren toolset locked to the claim+complete economic loop.
       // Mirrors templates.ts. DROPPED watch_wallet (no-op duplicate of
@@ -796,13 +797,16 @@ function migrate(db: Database.Database) {
   // tools to the canonical lists. Idempotent — re-running with the
   // same canonical list is a no-op.
   try {
-    const phase2BountyHunterTools = [
+    // Phase 1 (billion-dollar edition) REPLACE — Sentinel as
+    // Opportunity Scout drops read_onchain. Multi-source scanning
+    // doesn't need on-chain issuer checks; that's a downstream
+    // claimer's job.
+    const phase1SentinelTools = [
       "watch_url",
       "post_task",
       "message_user",
-      "read_onchain",
     ];
-    const desired = JSON.stringify(phase2BountyHunterTools);
+    const desired = JSON.stringify(phase1SentinelTools);
     db.prepare(
       `UPDATE agents SET allowed_tools = ?
          WHERE template = 'bounty_hunter' AND status != 'retired'

@@ -163,43 +163,58 @@ export const TEMPLATES: AgentTemplateDef[] = [
   /* ── Path C picker templates ──────────────────────────────────── */
   {
     id: "bounty_hunter",
-    name: "Bounty Hunter",
+    name: "Sentinel — Opportunity Scout",
     emoji: "🎯",
     suggestedName: "Sentinel",
     personalityPrompt:
-      "You hunt opportunities. You watch bounty boards and hackathon platforms with patience, then surface a clean finding the moment a fit drops. You don't speculate; you cite. You write tight subject lines and 2-4 factual evidence bullets per finding.",
-    jobPromptPlaceholder: "What kind of bounties are you watching for?",
+      "You are the Opportunity Scout. You scan high-signal sources every cycle — bounty boards, ecosystem feeds, hackathon platforms, GitHub releases — and turn high-value finds into paid jobs other workers can claim. You never just notify; you escrow first, then surface. You write tight subject lines and 2-4 factual evidence bullets per finding. Silence is a feature: if nothing new is worth flagging, you idle quietly.",
+    jobPromptPlaceholder:
+      "Which sources should I watch? (paste 1-4 URLs — bounty boards, RSS feeds, hackathons, releases)",
     jobPromptExample:
-      "Watch https://superteam.fun/api/listings?category=Development&order=desc&take=15 every cycle using watch_url. Surface any new bounty with reward >$500 as a finding. Use kind='bounty', include the reward and deadline as evidence, and link the listing as sourceUrl.",
-    // Phase 2 — Sentinel is now the FIRST economic worker. Toolset
-    // locked to the four tools its lifecycle actually uses: watch_url
-    // (find bounties), post_task (escrow $0.15 research jobs),
-    // message_user (surface findings to the inbox), read_onchain
-    // (sanity-check the bounty issuer's on-chain rep). read_dex was
-    // dropped — Sentinel doesn't track tokens.
-    recommendedTools: ["watch_url", "post_task", "message_user", "read_onchain"],
+      "Every cycle, scan these sources with watch_url:\n• https://superteam.fun/api/listings?take=25 (bounties)\n• https://blog.colosseum.com/rss (hackathon news)\n• https://solana.com/news/rss.xml (Solana ecosystem)\n• https://api.github.com/repos/coral-xyz/anchor/releases (Anchor releases)\nFor any new high-value find — bounty ≥$500, major grant, new hackathon, promising launch — post_task with a $0.15 research bounty AND message_user (kind='opportunity'). Idle silently when nothing new.",
+    // Phase 1 (billion-dollar edition) — Sentinel becomes a true
+    // multi-source Opportunity Scout. Toolset locked to the three
+    // tools its lifecycle uses: watch_url (scan multiple sources),
+    // post_task (escrow $0.15-0.25 research jobs), message_user
+    // (surface as kind='opportunity'). read_onchain dropped — Sentinel
+    // shouldn't be sanity-checking issuers; that's a downstream
+    // worker's job.
+    recommendedTools: ["watch_url", "post_task", "message_user"],
     defaultFrequencySeconds: 600,
-    description: "Watches bounty boards. Pings you when a fit drops.",
+    description:
+      "Finds high-value opportunities (bounties, grants, gigs, launches) and turns them into paid jobs other workers can complete.",
     earningStyle: "Steady",
-    activityLevel: "Chill",
-    watches: "Bounty boards & hackathons",
-    pings: "When a fit drops",
+    activityLevel: "Balanced",
+    watches: "Bounties · grants · launches · releases",
+    pings: "Posts paid jobs from high-value finds",
     inPicker: true,
     jobSuggestions: [
       {
-        label: "Superteam Dev >$500",
+        label: "Multi-source scout (recommended)",
         job:
-          "Every cycle, call watch_url on https://superteam.fun/api/listings?category=Development&order=desc&take=15 with minPrize=500 and sinceLastCheck=true. For each new listing returned, call message_user in Finding mode with kind='bounty', subject= the listing title (≤80 chars), evidence including the reward in USD, the deadline, and any required skills, and sourceUrl set to the listing URL. If no new listings, idle.",
+          "Every cycle, fan out across four high-signal sources using watch_url with sinceLastCheck=true:\n" +
+          "• https://superteam.fun/api/listings?take=25 — Superteam bounties (all categories)\n" +
+          "• https://blog.colosseum.com/rss — Colosseum hackathon blog\n" +
+          "• https://solana.com/news/rss.xml — Solana Foundation news\n" +
+          "• https://api.github.com/repos/coral-xyz/anchor/releases — Anchor releases (breaking-change opportunities)\n\n" +
+          "For each NEW high-value item (Superteam bounty ≥$500, hackathon announcement, grant round, new ecosystem launch, major Anchor release), do BOTH:\n" +
+          "  1. post_task with taskType='research', bountyUsd=0.15, ttlSeconds=3600. payload JSON should include {ask, context, sourceUrl} where ask asks another worker to validate the opportunity.\n" +
+          "  2. message_user (Finding mode) with kind='opportunity', subject=title (≤80 chars), evidence including reward/USD where applicable + deadline + source. sourceUrl = item URL.\n\n" +
+          "If nothing new and high-value across all four sources → idle silently. Never just notify — always create a paid job when the find is worth it.",
       },
       {
-        label: "Superteam high-bar ≥$2k",
+        label: "Bounty boards (Superteam ≥$2k)",
         job:
-          "Every cycle, call watch_url on https://superteam.fun/api/listings?take=25 with minPrize=2000 and sinceLastCheck=true. NO category filter — the high-bar set spans design, content, development, and grants. Only surface bounties with reward ≥$2000. For each new listing, call message_user in Finding mode with kind='bounty', subject= the listing title (≤80 chars), evidence: reward in USD, deadline, sponsor name, type, and any required skills. sourceUrl = the listing URL. Idle when nothing new.",
+          "Every cycle, watch_url on https://superteam.fun/api/listings?take=25 with minPrize=2000 and sinceLastCheck=true. NO category filter — the high-bar set spans design, content, development, and grants. For each NEW listing, do BOTH: (1) post_task with taskType='research', bountyUsd=0.15 to ask another worker to validate the opportunity (eligibility, deadline, fit); (2) message_user kind='opportunity' subject=title evidence=reward+deadline+sponsor+skills sourceUrl=listing URL. Idle when nothing new.",
       },
       {
-        label: "All Superteam bounties ≥$300",
+        label: "Ecosystem announcements (Solana + Helius)",
         job:
-          "Every cycle, call watch_url on https://superteam.fun/api/listings?take=15 with minPrize=300 and sinceLastCheck=true. This is the WHOLE Superteam board (design, content, development, research, etc.) — broader than the Development-only chip. For each new listing, call message_user in Finding mode with kind='bounty', subject= the listing title (≤80 chars), evidence: reward in USD, deadline, sponsor, type. sourceUrl = the listing URL. Idle when nothing new.",
+          "Every cycle, fan out across Solana ecosystem feeds with watch_url + sinceLastCheck=true:\n" +
+          "• https://solana.com/news/rss.xml format=rss — Solana Foundation\n" +
+          "• https://www.helius.dev/blog/rss.xml format=rss — Helius blog\n" +
+          "• https://blog.colosseum.com/rss format=rss — Colosseum hackathons\n\n" +
+          "For each NEW item that announces a grant round, hackathon, or major launch, do BOTH: (1) post_task with taskType='research', bountyUsd=0.15 asking another worker to assess relevance; (2) message_user kind='opportunity' subject=title evidence=excerpt+source+date sourceUrl=item URL. Idle when nothing new.",
       },
     ],
   },
@@ -220,7 +235,11 @@ export const TEMPLATES: AgentTemplateDef[] = [
     activityLevel: "Balanced",
     watches: "Ecosystem accounts & feeds",
     pings: "Hackathons, grants, launches",
-    inPicker: true,
+    // Phase 0 (billion-dollar edition): picker locked to the trio
+    // Sentinel · Wren · Pulse. Ecosystem Watcher kept in the registry
+    // for backwards-compat with any DB rows that already chose it,
+    // but no longer offered on the spawn picker.
+    inPicker: false,
     jobSuggestions: [
       {
         label: "Multi-feed: Solana + Helius + Superteam",
@@ -338,7 +357,11 @@ export const TEMPLATES: AgentTemplateDef[] = [
     activityLevel: "Chill",
     watches: "GitHub repos & orgs",
     pings: "Releases & fresh commits",
-    inPicker: true,
+    // Phase 0 (billion-dollar edition): picker locked to the trio
+    // Sentinel · Wren · Pulse. GitHub Watcher kept in the registry
+    // for backwards-compat with any DB rows that already chose it,
+    // but no longer offered on the spawn picker.
+    inPicker: false,
     jobSuggestions: [
       {
         label: "solana-labs/solana releases",

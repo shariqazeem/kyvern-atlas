@@ -454,6 +454,7 @@ const DEDUPE_WINDOW_MS_BY_KIND: Record<SignalKind, number> = {
   price_trigger: 4 * 60 * 60 * 1000,            // 4h (was 30m) — persistent breaches re-fired every cycle
   observation: 6 * 60 * 60 * 1000,              // 6h (was 1h) — "wallet quiet" anomalies shouldn't repeat hourly
   condition_update: 4 * 60 * 60 * 1000,         // 4h — milestone updates inside a persistent condition
+  opportunity: 24 * 60 * 60 * 1000,             // 24h — same opportunity shouldn't re-fire (Phase 1 — Sentinel)
 };
 
 interface WriteSignalResult {

@@ -21,6 +21,7 @@ import {
   TrendingUp,
   GitBranch,
   Sparkles,
+  Target,
   ExternalLink,
 } from "lucide-react";
 import type { Signal, SignalKind } from "@/lib/agents/types";
@@ -35,6 +36,7 @@ const KIND_ICON: Record<SignalKind, React.ComponentType<{ className?: string; st
   github_release: GitBranch,
   observation: Sparkles,
   condition_update: TrendingUp,
+  opportunity: Target,
 };
 
 const KIND_LABEL: Record<SignalKind, string> = {
@@ -45,6 +47,7 @@ const KIND_LABEL: Record<SignalKind, string> = {
   github_release: "RELEASE",
   observation: "OBSERVATION",
   condition_update: "CONDITION UPDATE",
+  opportunity: "OPPORTUNITY",
 };
 
 function fmtAgo(ms: number): string {

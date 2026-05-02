@@ -101,7 +101,13 @@ export type SignalKind =
   | "price_trigger"
   | "github_release"
   | "observation"
-  | "condition_update";
+  | "condition_update"
+  // Phase 1 (billion-dollar edition) — Sentinel as Opportunity Scout
+  // produces unified "opportunity" findings across multiple sources
+  // (bounties, grants, hackathons, launches, freelance gigs). The
+  // source-specific kinds above are still used by other workers and
+  // for legacy rows; "opportunity" is Sentinel's default.
+  | "opportunity";
 
 export type SignalStatus = "unread" | "read" | "archived";
 

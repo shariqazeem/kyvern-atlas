@@ -27,6 +27,7 @@ import {
   TrendingUp,
   GitBranch,
   Sparkles,
+  Target,
   ExternalLink,
   Check,
 } from "lucide-react";
@@ -41,6 +42,7 @@ const KIND_ICON: Record<SignalKind, LucideIcon> = {
   github_release: GitBranch,
   observation: Sparkles,
   condition_update: TrendingUp,
+  opportunity: Target,
 };
 
 const KIND_COLOR: Record<SignalKind, string> = {
@@ -51,6 +53,7 @@ const KIND_COLOR: Record<SignalKind, string> = {
   github_release: "#0F766E",
   observation: "#6B7280",
   condition_update: "#9333EA",
+  opportunity: "#15803D",
 };
 
 const KIND_LABEL: Record<SignalKind, string> = {
@@ -61,6 +64,7 @@ const KIND_LABEL: Record<SignalKind, string> = {
   github_release: "RELEASE",
   observation: "OBSERVATION",
   condition_update: "CONDITION UPDATE",
+  opportunity: "OPPORTUNITY",
 };
 
 function fmtAgo(ms: number): string {

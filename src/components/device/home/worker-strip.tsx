@@ -117,7 +117,7 @@ export function WorkerStrip({ workers, lastVerbByAgent }: WorkerStripProps) {
             <li key={w.id}>
               <Link
                 href={`/app/agents/${w.id}`}
-                className="flex items-center gap-2 px-4 py-2 hover:bg-[rgba(15,23,42,0.02)] transition"
+                className="flex items-center gap-2 px-4 py-2 hover:bg-[rgba(15,23,42,0.02)] transition min-w-0"
               >
                 <span
                   className="w-6 h-6 rounded-full flex items-center justify-center text-[13px] flex-none relative"
@@ -133,20 +133,19 @@ export function WorkerStrip({ workers, lastVerbByAgent }: WorkerStripProps) {
                   {w.emoji}
                 </span>
                 <span
-                  className="text-[12.5px] font-medium"
+                  className="text-[12.5px] font-medium truncate flex-none max-w-[100px]"
                   style={{ color: "#0A0A0A" }}
                 >
                   {w.name}
                 </span>
                 <span
-                  className="text-[11.5px] truncate min-w-0"
+                  className="text-[11.5px] truncate min-w-0 flex-1"
                   style={{ color: "#6B7280" }}
                 >
                   · {verb}
                 </span>
-                <span className="ml-auto" />
                 <span
-                  className="font-mono"
+                  className="font-mono flex-none"
                   style={{
                     color:
                       w.totalEarnedUsd > 0 ? "#15803D" : "#9CA3AF",

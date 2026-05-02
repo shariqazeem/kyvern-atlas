@@ -4,7 +4,7 @@
  * /app/inbox — the device's intelligence briefing.
  *
  * Transformation #4 rebuild:
- *   - Daily digest banner: "3 new findings · 1 critical · 1 on-chain · 47 ticks"
+ *   - Daily digest banner: "3 new findings · 1 critical · 1 on-chain · 47 checks"
  *   - Severity-coloured cards (critical/important/info/routine)
  *   - Signal grouping by (agent, kind, subject_hash) — repeats collapse
  *   - Inline action buttons per kind (Apply / Post-as-task / Snooze / Dismiss)
@@ -426,7 +426,7 @@ function DigestBanner({
       tone: "#D97706",
     });
   items.push({
-    label: digest.thoughtsToday === 1 ? "tick" : "ticks",
+    label: digest.thoughtsToday === 1 ? "check" : "checks",
     value: String(digest.thoughtsToday),
   });
 

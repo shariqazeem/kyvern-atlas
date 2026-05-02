@@ -216,7 +216,7 @@ function FeedRow({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, height: 0 }}
       transition={{ duration: 0.28, ease: EASE }}
-      className="px-4 py-2.5 flex items-center gap-2 flex-wrap"
+      className="px-4 py-2.5 flex items-center gap-2 flex-nowrap min-w-0"
     >
       {/* worker chip */}
       <span
@@ -236,10 +236,17 @@ function FeedRow({
         {item.worker.name}
       </span>
 
-      {/* verb + highlight */}
+      {/* verb + highlight — truncates on narrow viewports so the
+          Explorer pill + timestamp stay on one line. The full text
+          is preserved in the title attribute for hover. */}
       <span
-        className="text-[12.5px] min-w-0"
+        className="text-[12.5px] min-w-0 flex-1 truncate"
         style={{ color: "#374151", lineHeight: 1.4 }}
+        title={
+          txt.highlight
+            ? `${txt.verb} ${txt.highlight.text}`
+            : txt.verb
+        }
       >
         {txt.verb}
         {txt.highlight && (
@@ -261,7 +268,7 @@ function FeedRow({
       {/* status badge */}
       {success && (
         <span
-          className="inline-flex items-center"
+          className="inline-flex items-center flex-none"
           style={{ color: "#15803D" }}
           aria-label="settled"
         >
@@ -270,7 +277,7 @@ function FeedRow({
       )}
       {failed && (
         <span
-          className="inline-flex items-center"
+          className="inline-flex items-center flex-none"
           style={{ color: "#B91C1C" }}
           aria-label="blocked"
         >
@@ -278,15 +285,13 @@ function FeedRow({
         </span>
       )}
 
-      <span className="ml-auto" />
-
       {/* explorer link */}
       {item.signature && (
         <a
           href={explorerUrl(item.signature, network)}
           target="_blank"
           rel="noreferrer"
-          className="inline-flex items-center gap-1 px-2 py-0.5 rounded font-mono"
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded font-mono flex-none"
           style={{
             background: success
               ? "rgba(34,197,94,0.10)"
@@ -297,14 +302,16 @@ function FeedRow({
           title="Open on Solana Explorer"
         >
           <Link2 className="w-2.5 h-2.5" strokeWidth={2.4} />
-          {item.signature.slice(0, 4)}…{item.signature.slice(-4)}
+          <span className="hidden sm:inline">
+            {item.signature.slice(0, 4)}…{item.signature.slice(-4)}
+          </span>
           <ExternalLink className="w-2.5 h-2.5" />
         </a>
       )}
 
       {/* time */}
       <span
-        className="font-mono"
+        className="font-mono flex-none"
         style={{ color: "#9CA3AF", fontSize: 10.5 }}
       >
         {fmtAgo(item.timestamp)}

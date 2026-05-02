@@ -440,38 +440,60 @@ export default function AgentDetailPage({ params }: { params: { id: string } }) 
             </div>
           </div>
 
-          {/* Stat row */}
+          {/* Compact economics line — replaces the old 4-stat grid.
+              The Economic Timeline below shows the per-action detail;
+              this is the at-a-glance summary. */}
           <div
-            className="grid grid-cols-4 rounded-[12px] overflow-hidden"
+            className="rounded-[12px] px-3.5 py-2.5 flex items-center justify-between gap-2 flex-wrap"
             style={{
               background: "rgba(15,23,42,0.025)",
               border: "1px solid rgba(15,23,42,0.05)",
             }}
           >
-            <Stat label="Thoughts" value={String(agent.totalThoughts)} />
-            <Stat
-              label="Earned"
-              value={`+$${agent.totalEarnedUsd.toFixed(2)}`}
-              tone="#15803D"
-              divider
-            />
-            <Stat
-              label="Spent"
-              value={`$${agent.totalSpentUsd.toFixed(2)}`}
-              divider
-            />
-            <Stat
-              label="Net"
-              value={`${net >= 0 ? "+" : ""}$${net.toFixed(2)}`}
-              tone={net >= 0 ? "#15803D" : "#B91C1C"}
-              divider
-            />
+            <div
+              className="font-mono inline-flex items-baseline gap-1.5"
+              style={{
+                color: "#374151",
+                fontSize: 13,
+                fontVariantNumeric: "tabular-nums",
+              }}
+            >
+              <span style={{ color: "#15803D", fontWeight: 600 }}>
+                +${agent.totalEarnedUsd.toFixed(2)}
+              </span>
+              <span style={{ color: "#9CA3AF", fontSize: 10.5 }}>earned</span>
+              <span style={{ color: "#D1D5DB", margin: "0 2px" }}>·</span>
+              <span style={{ color: "#374151", fontWeight: 500 }}>
+                ${agent.totalSpentUsd.toFixed(2)}
+              </span>
+              <span style={{ color: "#9CA3AF", fontSize: 10.5 }}>spent</span>
+              <span style={{ color: "#D1D5DB", margin: "0 2px" }}>·</span>
+              <span
+                style={{
+                  color: net >= 0 ? "#15803D" : "#B91C1C",
+                  fontWeight: 600,
+                }}
+              >
+                {net >= 0 ? "+" : ""}${net.toFixed(2)}
+              </span>
+              <span style={{ color: "#9CA3AF", fontSize: 10.5 }}>net</span>
+            </div>
+            <span
+              className="font-mono"
+              style={{
+                color: "#9CA3AF",
+                fontSize: 10.5,
+                fontVariantNumeric: "tabular-nums",
+              }}
+            >
+              {agent.totalThoughts} {agent.totalThoughts === 1 ? "check" : "checks"}
+            </span>
           </div>
 
-          {/* Last-thought line */}
+          {/* Last-check line */}
           {lastThoughtMins !== null && (
             <p className="mt-3 font-mono text-[10.5px]" style={{ color: "#9CA3AF" }}>
-              Last thought {lastThoughtMins}m ago · ticks every{" "}
+              Last check {lastThoughtMins}m ago · runs every{" "}
               {agent.frequencySeconds}s
             </p>
           )}
@@ -587,48 +609,6 @@ export default function AgentDetailPage({ params }: { params: { id: string } }) 
         agentName={agent.name}
         onDismiss={() => setShowToast(false)}
       />
-    </div>
-  );
-}
-
-/* ── Stat ─────────────────────────────────────────────────────────── */
-
-function Stat({
-  label,
-  value,
-  tone,
-  divider,
-}: {
-  label: string;
-  value: string;
-  tone?: string;
-  divider?: boolean;
-}) {
-  return (
-    <div
-      className="px-2 py-2.5 flex flex-col items-center text-center"
-      style={
-        divider
-          ? { borderLeft: "1px solid rgba(15,23,42,0.05)" }
-          : undefined
-      }
-    >
-      <span
-        className="font-mono text-[14px]"
-        style={{
-          color: tone ?? "#0A0A0A",
-          fontVariantNumeric: "tabular-nums",
-          fontWeight: 500,
-        }}
-      >
-        {value}
-      </span>
-      <span
-        className="font-mono text-[9px] uppercase tracking-[0.14em] mt-0.5"
-        style={{ color: "#9CA3AF" }}
-      >
-        {label}
-      </span>
     </div>
   );
 }
