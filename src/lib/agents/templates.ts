@@ -319,21 +319,22 @@ export const TEMPLATES: AgentTemplateDef[] = [
   },
   {
     id: "token_pulse",
-    name: "Token Pulse",
+    name: "Pulse — Validation & Staking Worker",
     emoji: "📈",
     suggestedName: "Pulse",
     personalityPrompt:
-      "You watch a token's heartbeat — price + volume. You ping the owner only on configured threshold breaks. You write tight, factual price summaries.",
-    jobPromptPlaceholder: "Which token, what threshold, what window?",
+      "You are the Validation & Staking Worker. You validate market signals and stake real USDC on high-conviction findings. Every tick, you scan the device for open validation tasks, claim them, and complete them with factual price data from read_dex. When the price moves outside a configured band, you put real USDC behind your conviction via stake_on_finding. You write tight, factual price summaries — current price, source, breach direction. Silence is correct when the price is inside band and there's no validation work to do.",
+    jobPromptPlaceholder:
+      "Which token + price band? (e.g. 'SOL outside $140–$160')",
     jobPromptExample:
-      "Every cycle, read_dex with 'SOL'. Track price across cycles in your recent thoughts. If SOL moves >5% in either direction over 30 minutes, surface a price_trigger finding with the percent change and current price as subject, evidence with start price, end price, and time window.",
-    // Phase 4 — Pulse is the FIRST validator + staker. Toolset locked
-    // to the five economic-loop tools: read_dex (price detection),
-    // claim_task + complete_task (validation work — Pulse claims
-    // research/validation tasks Sentinel posts), stake_on_finding
-    // (puts USDC behind high-conviction price moves), message_user
-    // (surface price triggers to the inbox). watch_wallet_swaps was
-    // dropped — Wren owns wallet tracking now, Pulse focuses on price.
+      "Every cycle, FIRST check open validation/research tasks on the device — claim_task + complete_task with real read_dex data. THEN call read_dex on SOL with band $140–$160; if breach, stake_on_finding ($0.02–$0.05) and surface kind='price_trigger'. Idle silently when inside band and no tasks to claim.",
+    // Phase 3 (billion-dollar edition) — Pulse as Validation &
+    // Staking Worker. Five-tool lock unchanged from Phase 4: read_dex
+    // (price detection + validation evidence), claim_task +
+    // complete_task (validation work — Pulse claims research/
+    // validation tasks Sentinel and Wren post), stake_on_finding
+    // (puts USDC behind high-conviction breaches), message_user
+    // (surface price triggers + completed validations to the inbox).
     recommendedTools: [
       "read_dex",
       "claim_task",
@@ -342,27 +343,33 @@ export const TEMPLATES: AgentTemplateDef[] = [
       "message_user",
     ],
     defaultFrequencySeconds: 180,
-    description: "Watches a token's price + volume. Pings you on configured moves.",
+    description:
+      "Validates price moves, market signals, and research tasks. Stakes real USDC on high-conviction findings and completes paid validation work.",
     earningStyle: "Opportunistic",
     activityLevel: "Aggressive",
-    watches: "Token price & volume",
-    pings: "Price spikes & volume jumps",
+    watches: "Token bands · validation tasks",
+    pings: "Stakes on conviction · earns from validations",
     inPicker: true,
     jobSuggestions: [
       {
-        label: "SOL outside $140–$160 band",
+        label: "Validate-and-stake on SOL band (recommended)",
         job:
-          "Every cycle, call read_dex with 'SOL'. If the returned price is below $140 OR above $160, surface a price_trigger finding. Subject = 'SOL outside band: $<price>'. Evidence: current price, band ($140–$160), source (CoinGecko or DexScreener), and whether it's the upper or lower break. sourceUrl = https://www.coingecko.com/en/coins/solana. If price is inside the band, idle.",
+          "Every cycle, follow this exact priority:\n" +
+          "  1. Check for open validation/research tasks on the device. claim_task the highest-reward match, then complete_task with a factual result that includes the live SOL price from read_dex (e.g. \"Validated · SOL @ $145.21 via CoinGecko · cross-checked against listing — consistent.\").\n" +
+          "  2. After tasks, call read_dex with tokenIdOrSymbol='SOL', lowerBand=140, upperBand=160. The tool returns {priceUsd, breach, inBand}.\n" +
+          "  3. If breach is 'lower' or 'upper' AND you haven't already staked on this band today, stake_on_finding with stakeAmount=0.02 (or 0.05 for very high-conviction breaches >5% past the band). reasoning must cite the price + breach direction.\n" +
+          "  4. message_user (Finding mode) with kind='price_trigger', subject='SOL outside band: $<price>', evidence: current price + band + source + breach direction, sourceUrl=https://www.coingecko.com/en/coins/solana.\n" +
+          "  5. If price is inside band AND no tasks → idle silently.",
       },
       {
-        label: "BONK outside $0.0000180–$0.0000300 band",
+        label: "BONK band $0.0000180–$0.0000300",
         job:
-          "Every cycle, call read_dex with 'BONK'. If the returned price is below $0.0000180 OR above $0.0000300, surface a price_trigger finding. Subject = 'BONK outside band: $<price>'. Evidence: current price, band, source, and whether it's the upper or lower break. sourceUrl = https://www.coingecko.com/en/coins/bonk. Idle when inside band.",
+          "Every cycle, FIRST check open validation/research tasks → claim_task + complete_task using live read_dex data on the relevant token. THEN call read_dex with 'BONK', lowerBand=0.0000180, upperBand=0.0000300. On breach, stake_on_finding ($0.02) and surface kind='price_trigger' (subject + price + band + breach direction + sourceUrl=https://www.coingecko.com/en/coins/bonk). Idle when inside band and no tasks.",
       },
       {
-        label: "JUP outside $0.30–$0.80 band",
+        label: "JUP band $0.30–$0.80 (validator-first)",
         job:
-          "Every cycle, call read_dex with 'JUP' (Jupiter token). The tool returns the current USD price. Compare it to the band: lower bound $0.30, upper bound $0.80. If the price is strictly less than $0.30 OR strictly greater than $0.80, you MUST surface a price_trigger finding with subject='JUP outside band: $<price>', evidence covering current price + band + source, sourceUrl=https://www.coingecko.com/en/coins/jupiter-exchange-solana. If the price is within [$0.30, $0.80] inclusive, idle.",
+          "Every cycle, follow validator-first priority: (1) claim_task + complete_task on any open validation tasks using read_dex for evidence; (2) call read_dex with 'JUP', lowerBand=0.30, upperBand=0.80; (3) on breach, stake_on_finding $0.02–$0.05 (size scales with how far past band) + message_user kind='price_trigger' with subject + price + band + breach + sourceUrl=https://www.coingecko.com/en/coins/jupiter-exchange-solana; (4) idle when in-band + no tasks.",
       },
     ],
   },

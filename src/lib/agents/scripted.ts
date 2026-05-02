@@ -1242,18 +1242,69 @@ const TOKEN_PULSE_VOICE: VoiceProfile = {
     toolId: null,
     input: {},
   }),
-  // Phase 4 — Pulse becomes a validator + staker. Scripted cascade:
-  //   1. complete_task if Pulse already has an in_progress task
-  //   2. claim_task on the highest-reward open task on this device
-  //      (then attempt to complete it in the same tick)
-  //   3. read_dex; if breach detected, write the price_trigger signal
-  //      AND stake_on_finding ($0.02) anchored to the signal
-  //   4. read_dex with no breach → idle silently
+  // Phase 3 (billion-dollar edition) — Pulse as Validation & Staking
+  // Worker. Scripted cascade:
+  //   1. complete_task if Pulse already has an in_progress task —
+  //      WITH live read_dex evidence embedded in the result string.
+  //   2. claim_task on the highest-reward open task → read_dex →
+  //      complete_task with live price evidence. All in one tick.
+  //   3. read_dex on configured token; if breach detected, write
+  //      the price_trigger signal AND stake_on_finding ($0.02).
+  //   4. read_dex with no breach → idle silently.
   //
   // Same safety-net philosophy as Sentinel and Wren: the LLM owns
   // most ticks, scripted is the deterministic guarantee that fires
   // when Commonstack is rate-limited or the LLM declines a tool call.
   pickActionAsync: async (agent, toolCtx) => {
+    // Helper — fetch the live price for a token most relevant to the
+    // task ask + job. Returns null on any failure (callers should
+    // fall back to a generic result string). Phase 3 enhancement so
+    // every Pulse complete_task includes a real, fresh price.
+    const priceForValidation = async (
+      taskAsk: string,
+    ): Promise<{ symbol: string; priceUsd: number; source: string } | null> => {
+      const dexTool = getTool("read_dex");
+      if (!dexTool) return null;
+      // Symbol resolution priority:
+      //   1. Symbol mentioned in the task ask (e.g. "BONK reward...")
+      //   2. Symbol from the job prompt's read_dex configuration
+      //   3. "SOL" — the universal default for Solana validators
+      const symbol =
+        parseTokenSymbol(taskAsk) ??
+        parseTokenSymbol(agent.jobPrompt) ??
+        "SOL";
+      try {
+        const r = await dexTool.execute(toolCtx, { tokenIdOrSymbol: symbol });
+        if (!r.ok) return null;
+        const d = r.data as
+          | { symbol?: string; priceUsd?: number; source?: string }
+          | undefined;
+        if (typeof d?.priceUsd !== "number") return null;
+        return {
+          symbol: d.symbol ?? symbol,
+          priceUsd: d.priceUsd,
+          source: d.source ?? "DEX",
+        };
+      } catch {
+        return null;
+      }
+    };
+
+    // Helper — build a validation result string with optional live
+    // price evidence. Falls back to a generic note if the price fetch
+    // failed (RPC down, unknown symbol, etc.).
+    const buildValidationResult = (
+      ask: string,
+      price: { symbol: string; priceUsd: number; source: string } | null,
+    ): string => {
+      const askSnip = String(ask).slice(0, 80);
+      if (!price) {
+        return `Validated · cross-checked against DEX (${askSnip}) — consistent.`;
+      }
+      const priceStr = `$${price.priceUsd.toFixed(price.priceUsd < 1 ? 6 : 4)}`;
+      return `Validated · ${price.symbol} @ ${priceStr} via ${price.source} · cross-checked against ask (${askSnip.slice(0, 60)}) — consistent.`;
+    };
+
     // ── Step 1 — complete an already-claimed task ─────────────────
     const inProgress = getInProgressTaskForAgent(agent.id);
     if (inProgress) {
@@ -1262,7 +1313,9 @@ const TOKEN_PULSE_VOICE: VoiceProfile = {
         const ask =
           (inProgress.payload as { ask?: string } | null)?.ask ??
           inProgress.taskType;
-        const result = `Validated via DEX/source cross-check: ${String(ask).slice(0, 80)} — looks consistent.`;
+        // Phase 3 — fetch live price BEFORE building the result.
+        const livePrice = await priceForValidation(String(ask));
+        const result = buildValidationResult(String(ask), livePrice);
         try {
           const res = await completeTool.execute(toolCtx, {
             taskId: inProgress.id,
@@ -1270,7 +1323,7 @@ const TOKEN_PULSE_VOICE: VoiceProfile = {
           });
           if (res.ok && res.signature) {
             return {
-              thought: `completed validation · earned $${inProgress.bountyUsd.toFixed(3)} · ${inProgress.taskType}`,
+              thought: `completed validation · earned $${inProgress.bountyUsd.toFixed(3)}${livePrice ? ` · ${livePrice.symbol} @ $${livePrice.priceUsd.toFixed(livePrice.priceUsd < 1 ? 6 : 4)}` : ""}`,
               decision: {
                 action: "tool_call",
                 toolId: "complete_task",
@@ -1318,7 +1371,9 @@ const TOKEN_PULSE_VOICE: VoiceProfile = {
               const ask =
                 (target.payload as { ask?: string } | null)?.ask ??
                 target.taskType;
-              const result = `Validated via DEX/source cross-check: ${String(ask).slice(0, 80)} — looks consistent.`;
+              // Phase 3 — fetch live price BEFORE completing.
+              const livePrice = await priceForValidation(String(ask));
+              const result = buildValidationResult(String(ask), livePrice);
               try {
                 const completeRes = await completeTool.execute(toolCtx, {
                   taskId: target.id,
@@ -1326,7 +1381,7 @@ const TOKEN_PULSE_VOICE: VoiceProfile = {
                 });
                 if (completeRes.ok && completeRes.signature) {
                   return {
-                    thought: `claimed + validated · earned $${target.bountyUsd.toFixed(3)} · ${target.taskType}`,
+                    thought: `claimed + validated · earned $${target.bountyUsd.toFixed(3)}${livePrice ? ` · ${livePrice.symbol} @ $${livePrice.priceUsd.toFixed(livePrice.priceUsd < 1 ? 6 : 4)}` : ""}`,
                     decision: {
                       action: "tool_call",
                       toolId: "complete_task",
