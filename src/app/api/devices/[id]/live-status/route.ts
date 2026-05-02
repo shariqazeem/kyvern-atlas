@@ -81,6 +81,27 @@ async function fetchVaultBalances(
   vaultPda: string,
   network: string,
 ): Promise<{ usdc: number; sol: number; usdcAta: string | null }> {
+  // Always derive the deterministic ATA address — even when the
+  // account doesn't exist on-chain yet OR getParsedTokenAccountsByOwner
+  // misses it. The drawer uses this address as the "paste in faucet"
+  // target since Circle's devnet faucet handles regular ATAs reliably
+  // but not off-curve (PDA) destinations.
+  let derivedAta: string | null = null;
+  try {
+    const { getAssociatedTokenAddressSync } = await import("@solana/spl-token");
+    const mintPk = new PublicKey(
+      network === "mainnet" ? USDC_MINT_MAINNET : USDC_MINT_DEVNET,
+    );
+    const ownerPk = new PublicKey(vaultPda);
+    derivedAta = getAssociatedTokenAddressSync(
+      mintPk,
+      ownerPk,
+      true, // vault PDA is off-curve
+    ).toBase58();
+  } catch {
+    /* invalid pubkey shape — leave derivedAta null and fall through */
+  }
+
   try {
     const conn = new Connection(rpcUrlFor(network), "confirmed");
     const owner = new PublicKey(vaultPda);
@@ -90,16 +111,21 @@ async function fetchVaultBalances(
       conn.getBalance(owner),
     ]);
     let usdc = 0;
-    let usdcAta: string | null = null;
+    let usdcAta = derivedAta;
     if (accounts.value.length > 0) {
       const acc = accounts.value[0];
       const ui = acc.account.data.parsed.info.tokenAmount.uiAmount;
       usdc = typeof ui === "number" ? ui : 0;
+      // Prefer the on-chain pubkey when present so we never disagree
+      // with what Solana itself reports (almost always identical to
+      // the derived address).
       usdcAta = acc.pubkey.toBase58();
     }
     return { usdc, sol: lamports / 1e9, usdcAta };
   } catch {
-    return { usdc: 0, sol: 0, usdcAta: null };
+    // RPC error — return the derived ATA anyway so the user can still
+    // copy the correct address into the faucet.
+    return { usdc: 0, sol: 0, usdcAta: derivedAta };
   }
 }
 

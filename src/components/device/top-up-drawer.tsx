@@ -270,23 +270,25 @@ export function TopUpDrawer({
                   </div>
                 </div>
 
-                {/* Addresses */}
+                {/* Addresses — USDC token account first because Circle's
+                    faucet reliably sends to standard ATAs but often
+                    silently fails on off-curve (PDA) destinations. */}
                 <div className="space-y-2 mb-4">
                   <CopyAddressRow
-                    label="Vault address (paste in faucet)"
-                    value={vaultPda}
-                    explorerHref={
-                      vaultPda
-                        ? `https://explorer.solana.com/address/${vaultPda}${cluster}`
-                        : undefined
-                    }
-                  />
-                  <CopyAddressRow
-                    label="USDC token account"
+                    label="USDC address (paste in faucet) ✓"
                     value={usdcAta}
                     explorerHref={
                       usdcAta
                         ? `https://explorer.solana.com/address/${usdcAta}${cluster}`
+                        : undefined
+                    }
+                  />
+                  <CopyAddressRow
+                    label="Vault PDA (info — for SOL faucet)"
+                    value={vaultPda}
+                    explorerHref={
+                      vaultPda
+                        ? `https://explorer.solana.com/address/${vaultPda}${cluster}`
                         : undefined
                     }
                   />
@@ -326,12 +328,35 @@ export function TopUpDrawer({
                 {/* Helper text */}
                 <p
                   className="mt-3 text-[11px] leading-relaxed"
-                  style={{ color: "rgba(255,255,255,0.5)" }}
+                  style={{ color: "rgba(255,255,255,0.55)" }}
                 >
-                  On the Circle faucet, choose <strong>Solana Devnet</strong> +{" "}
-                  <strong>USDC</strong>, paste the vault address above, and send. Your
-                  balance updates within ~30 seconds. Devnet only — mainnet USDC will
-                  not work.
+                  On the{" "}
+                  <strong style={{ color: "rgba(255,255,255,0.85)" }}>
+                    Circle USDC faucet
+                  </strong>
+                  , choose{" "}
+                  <strong style={{ color: "rgba(255,255,255,0.85)" }}>
+                    Solana Devnet
+                  </strong>{" "}
+                  +{" "}
+                  <strong style={{ color: "rgba(255,255,255,0.85)" }}>
+                    USDC
+                  </strong>
+                  , paste the{" "}
+                  <strong style={{ color: "#86EFAC" }}>top address</strong>{" "}
+                  (USDC), and send. Use the SOL faucet with the{" "}
+                  <strong style={{ color: "rgba(255,255,255,0.85)" }}>
+                    Vault PDA
+                  </strong>{" "}
+                  for fees. Balance updates within ~30 seconds.
+                </p>
+                <p
+                  className="mt-2 text-[10.5px] leading-relaxed"
+                  style={{ color: "rgba(255,255,255,0.42)" }}
+                >
+                  Why two addresses? Solana token accounts are derived per-token.
+                  Circle&apos;s faucet sends best to the explicit USDC token
+                  account; PDA-owned wallets sometimes confuse it.
                 </p>
               </div>
             </div>
