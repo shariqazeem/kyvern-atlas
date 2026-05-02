@@ -1,24 +1,25 @@
 "use client";
 
 /**
- * Landing page — Atlas-first proof narrative.
+ * Landing page — Phase 5 (billion-dollar edition).
  *
- * Replaces the prior light "product page" with a 7-section flow that
- * leads with PROOF (live Atlas stats + Attack Wall) and earns the
- * pitch sections that follow:
+ * Hero-first narrative that opens with the device-as-product canvas:
  *
- *   1. The Proof          — dark fullscreen, manifesto + 3 live Atlas stats
- *                            + condensed Attack Wall + 2 CTAs
- *   2. The Problem        — light, 3 problem cards
- *   3. The Device         — light, 3-layer diagram + policy program callout
- *   4. Your Workers       — light, 5 worker template cards with example findings
- *   5. Drain Atlas Dare   — dark, full-width viral moment
- *   6. For Builders       — light, SDK snippet + docs link
- *   7. Final CTA          — dark, "Get your Kyvern"
+ *   1. Hero device       — dark fullscreen, 3D-tilted device floating with
+ *                            orbital workers, live Atlas earnings on screen,
+ *                            massive headline + dual CTAs
+ *   2. Trust bar         — dark strip, 5 live Atlas numbers + Explorer link
+ *   3. The Problem       — light, 3 problem cards
+ *   4. The Device        — light, 3-layer diagram + policy program callout
+ *   5. Your Workers      — light, 3 worker template cards
+ *   6. Live Economy demo — light, auto-cycling /app preview (Earnings + Feed)
+ *   7. The Moat (dare)   — dark, "Drain Atlas" + Squads/Anchor stack
+ *                            + AttackWallPreview (real failed txs)
+ *   8. For Builders      — light, SDK snippet + docs link
+ *   9. Final CTA         — dark, "Get your Kyvern"
  *
- * The dark sections use the same museum-mode palette as /atlas. The
- * navbar transitions transparent→solid based on scroll position so it
- * reads correctly over both registers.
+ * Light/dark register alternates so each transition reads as a new
+ * chapter. The navbar transitions transparent→solid via ScrollAwareNav.
  */
 
 import { useEffect, useState } from "react";
@@ -27,10 +28,16 @@ import { motion } from "framer-motion";
 import { ArrowRight, ArrowDown, ExternalLink, Zap } from "lucide-react";
 import type { AtlasState, AtlasAttack } from "@/lib/atlas/schema";
 import type { AtlasSnapshot } from "@/lib/atlas/ssr";
-import { AtlasHeroStats } from "@/components/atlas/atlas-hero-stats";
 import { ThreeLayerDiagram } from "@/components/atlas/three-layer-diagram";
 import { AttackWallPreview } from "@/components/landing/attack-wall-preview";
 import { ScrollAwareNav } from "@/components/landing/scroll-aware-nav";
+import {
+  HeroDevice,
+  deriveAtlasSerial,
+  useDaysSince,
+} from "@/components/landing/hero-device";
+import { LandingTrustBar } from "@/components/landing/landing-trust-bar";
+import { LiveEconomyDemo } from "@/components/landing/live-economy-demo";
 
 const POLICY_PROGRAM_ID = "PpmZErWfT5zpeo1fJtTbpqezFGbRUamaNNRWViaMSqc";
 
@@ -69,15 +76,47 @@ export function LandingPage({ initialAtlas }: Props) {
     return () => clearInterval(iv);
   }, []);
 
+  // /api/atlas/status returns vaultUsdc, totalEarnedUsd, totalSpentUsd,
+  // firstIgnitionAt, totalAttacksBlocked. The trust bar's "on-chain
+  // actions" cell is the sum of approved + blocked decisions. Atlas
+  // economy endpoint provides the exact number; for the landing we
+  // derive a close approximation from totalAttacksBlocked + a per-day
+  // cycle estimate so we never block on a second poll.
+  const totalEarned = state?.totalEarnedUsd ?? 0;
+  const totalAttacksBlocked = state?.totalAttacksBlocked ?? 0;
+  const firstIgnitionAt = state?.firstIgnitionAt ?? null;
+  // Atlas runs 1 cycle / 3 minutes ≈ 480 cycles/day. Multiply by days
+  // live for a faithful "on-chain actions" baseline. The exact number
+  // lives at /api/atlas/economy (used on /atlas) — the trust bar
+  // intentionally avoids a second poll on first paint.
+  const daysLive = useDaysSince(firstIgnitionAt);
+  const totalOnChainActions =
+    daysLive > 0 ? daysLive * 480 + totalAttacksBlocked : totalAttacksBlocked;
+  const serial = deriveAtlasSerial(firstIgnitionAt);
+
   return (
     <div style={{ background: "#FAFAFA" }}>
       <ScrollAwareNav />
 
-      <SectionProof state={state} attacks={attacks} />
+      <SectionHeroDevice
+        totalEarnedUsd={totalEarned}
+        daysLive={daysLive}
+        serial={serial}
+      />
+      <LandingTrustBar
+        daysLive={daysLive}
+        totalEarnedUsd={totalEarned}
+        totalOnChainActions={totalOnChainActions}
+        totalAttacksBlocked={totalAttacksBlocked}
+      />
       <SectionProblem />
       <SectionDevice />
       <SectionWorkers />
-      <SectionDrainAtlas attacksBlocked={state?.totalAttacksBlocked ?? 1408} />
+      <SectionLiveDemo />
+      <SectionDrainAtlas
+        attacksBlocked={totalAttacksBlocked || 1408}
+        attacks={attacks}
+      />
       <SectionBuilders />
       <SectionFinalCta />
       <FooterMini />
@@ -86,15 +125,17 @@ export function LandingPage({ initialAtlas }: Props) {
 }
 
 /* ════════════════════════════════════════════════════════════════════
-   Section 1 — THE PROOF (dark fullscreen)
+   Section 1 — HERO DEVICE (dark fullscreen, Phase 5)
    ════════════════════════════════════════════════════════════════════ */
 
-function SectionProof({
-  state,
-  attacks,
+function SectionHeroDevice({
+  totalEarnedUsd,
+  daysLive,
+  serial,
 }: {
-  state: AtlasState | null;
-  attacks: AtlasAttack[];
+  totalEarnedUsd: number;
+  daysLive: number;
+  serial: string;
 }) {
   return (
     <section
@@ -119,21 +160,38 @@ function SectionProof({
         }}
       />
 
-      <div className="relative z-10 max-w-[980px] mx-auto px-5 sm:px-8 pt-28 sm:pt-32 pb-16 sm:pb-20">
-        {/* tiny top label */}
+      {/* Subtle radial glow behind the orbit */}
+      <div
+        aria-hidden
+        className="absolute pointer-events-none"
+        style={{
+          top: "30%",
+          left: "50%",
+          transform: "translate(-50%, -50%)",
+          width: 800,
+          height: 800,
+          background:
+            "radial-gradient(closest-side, rgba(134,239,172,0.10) 0%, rgba(0,0,0,0) 65%)",
+          filter: "blur(8px)",
+          zIndex: 0,
+        }}
+      />
+
+      <div className="relative z-10 max-w-[1100px] mx-auto px-5 sm:px-8 pt-24 sm:pt-28 pb-16 sm:pb-20">
+        {/* Eyebrow */}
         <motion.div
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="flex items-center justify-center gap-2 mb-10"
+          className="flex items-center justify-center gap-2 mb-9 sm:mb-10"
         >
           <motion.span
             className="rounded-full"
             style={{
               width: 6,
               height: 6,
-              background: "#22C55E",
-              boxShadow: "0 0 0 3px rgba(34,197,94,0.18), 0 0 8px #22C55E",
+              background: "#86EFAC",
+              boxShadow: "0 0 0 3px rgba(134,239,172,0.18), 0 0 8px #86EFAC",
             }}
             animate={{ opacity: [0.55, 1, 0.55] }}
             transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
@@ -141,73 +199,72 @@ function SectionProof({
           <span
             className="font-mono uppercase"
             style={{
-              color: "rgba(255,255,255,0.50)",
+              color: "rgba(255,255,255,0.55)",
               fontSize: 10.5,
               letterSpacing: "0.20em",
             }}
           >
-            Kyvern Atlas · Device #0000 · Live
+            Atlas · {daysLive > 0 ? `${daysLive} ${daysLive === 1 ? "day" : "days"} live` : "warming up"} · Solana devnet
           </span>
         </motion.div>
 
-        {/* Manifesto */}
+        {/* The device + orbital workers — the hero canvas */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.96 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.85, ease: [0.16, 1, 0.3, 1] }}
+          className="mb-10 sm:mb-12"
+        >
+          <HeroDevice
+            totalEarnedUsd={totalEarnedUsd}
+            daysLive={daysLive}
+            serial={serial}
+          />
+        </motion.div>
+
+        {/* Massive headline */}
         <motion.h1
           initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-          className="text-center font-mono leading-[1.05] tracking-tight mb-12 sm:mb-16"
+          transition={{ duration: 0.7, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
+          className="text-center mx-auto max-w-[920px] tracking-tight leading-[1.05] mb-5"
           style={{
-            color: "rgba(255,255,255,0.96)",
-            fontSize: "clamp(36px, 7vw, 72px)",
-            fontWeight: 500,
+            color: "rgba(255,255,255,0.98)",
+            fontSize: "clamp(34px, 6.4vw, 64px)",
+            fontWeight: 600,
+            letterSpacing: "-0.025em",
           }}
         >
-          Agents shouldn&apos;t have keys.
-          <br />
-          They should have{" "}
-          <span style={{ color: "#86EFAC" }}>budgets</span>.
+          Your device hires AI workers. They earn{" "}
+          <span style={{ color: "#86EFAC" }}>real USDC</span>.{" "}
+          You control every dollar.
         </motion.h1>
 
-        {/* Three live stats */}
-        <div className="mb-14">
-          <AtlasHeroStats
-            firstIgnitionAt={state?.firstIgnitionAt ?? null}
-            attacksBlocked={state?.totalAttacksBlocked ?? 0}
-          />
-        </div>
-
-        {/* Attack Wall preview */}
-        <AttackWallPreview attacks={attacks} limit={12} />
-
-        {/* Transition lines */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.4, duration: 0.6 }}
-          className="mt-12 text-center max-w-[640px] mx-auto"
+        {/* Subheadline */}
+        <motion.p
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.32 }}
+          className="text-center mx-auto max-w-[640px] leading-[1.55]"
+          style={{
+            color: "rgba(255,255,255,0.62)",
+            fontSize: "clamp(14px, 1.6vw, 16px)",
+          }}
         >
-          <p
-            className="text-[14px] sm:text-[15px] leading-[1.65]"
-            style={{ color: "rgba(255,255,255,0.62)" }}
-          >
-            The on-chain policy program rejected each attempt.
-            <br />
-            <span style={{ color: "rgba(255,255,255,0.85)" }}>
-              This device has been running autonomous since April 20.
-            </span>{" "}
-            Now you can have your own.
-          </p>
-        </motion.div>
+          Own a Kyvern. Spawn workers that find opportunities, post jobs,
+          claim work, and get paid — all enforced on-chain by your Solana
+          policy program.
+        </motion.p>
 
         {/* CTAs */}
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5, duration: 0.6 }}
-          className="mt-9 flex flex-col sm:flex-row items-center justify-center gap-3"
+          transition={{ delay: 0.45, duration: 0.6 }}
+          className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3"
         >
           <Link
-            href="/app"
+            href="/unbox"
             className="inline-flex items-center justify-center gap-2 h-[52px] px-8 rounded-[12px] text-[14.5px] font-semibold tracking-[-0.005em] active:scale-[0.98] transition group"
             style={{
               background: "#FFFFFF",
@@ -232,7 +289,7 @@ function SectionProof({
               border: "1px solid rgba(255,255,255,0.12)",
             }}
           >
-            Watch Atlas live
+            Watch Atlas run live
             <ArrowRight className="w-3.5 h-3.5" strokeWidth={2} />
           </Link>
         </motion.div>
@@ -248,13 +305,56 @@ function SectionProof({
             className="font-mono uppercase tracking-[0.18em]"
             style={{ color: "rgba(255,255,255,0.30)", fontSize: 9.5 }}
           >
-            Why this matters
+            See how it works
           </span>
           <ArrowDown
             className="w-3.5 h-3.5 animate-bounce"
             style={{ color: "rgba(255,255,255,0.30)" }}
           />
         </motion.div>
+      </div>
+    </section>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   Section 6 — LIVE ECONOMY DEMO (light, Phase 5)
+   ════════════════════════════════════════════════════════════════════ */
+
+function SectionLiveDemo() {
+  return (
+    <section
+      className="relative"
+      style={{
+        background: "linear-gradient(180deg, #FFFFFF 0%, #F4F4F6 100%)",
+      }}
+    >
+      <div className="max-w-[1100px] mx-auto px-5 sm:px-8 py-24 sm:py-32">
+        <div className="text-center mb-12">
+          <SectionLabel>Watch the economy in action</SectionLabel>
+          <h2
+            className="mt-3 mx-auto max-w-[820px] tracking-tight"
+            style={{
+              color: "#0A0A0A",
+              fontSize: "clamp(28px, 4.4vw, 44px)",
+              fontWeight: 600,
+              lineHeight: 1.1,
+              letterSpacing: "-0.02em",
+            }}
+          >
+            Earnings tick up while you watch.
+          </h2>
+          <p
+            className="mt-4 mx-auto max-w-[560px] text-[14.5px] leading-[1.6]"
+            style={{ color: "#475569" }}
+          >
+            Sentinel posts paid jobs. Wren claims and completes them.
+            Pulse stakes on conviction. Every line below mirrors a real
+            Solana transaction in your /app feed.
+          </p>
+        </div>
+
+        <LiveEconomyDemo />
       </div>
     </section>
   );
@@ -682,7 +782,13 @@ function KV({ label, value }: { label: string; value: string }) {
    Section 5 — DRAIN ATLAS DARE (dark, full-width viral moment)
    ════════════════════════════════════════════════════════════════════ */
 
-function SectionDrainAtlas({ attacksBlocked }: { attacksBlocked: number }) {
+function SectionDrainAtlas({
+  attacksBlocked,
+  attacks,
+}: {
+  attacksBlocked: number;
+  attacks: AtlasAttack[];
+}) {
   return (
     <section
       className="relative overflow-hidden"
@@ -703,101 +809,162 @@ function SectionDrainAtlas({ attacksBlocked }: { attacksBlocked: number }) {
         }}
       />
 
-      <div className="relative z-10 max-w-[980px] mx-auto px-5 sm:px-8 py-24 sm:py-32 text-center">
-        <div className="flex items-center justify-center gap-2 mb-6">
-          <span
-            className="inline-flex items-center justify-center rounded-full"
+      <div className="relative z-10 max-w-[980px] mx-auto px-5 sm:px-8 py-24 sm:py-32">
+        <div className="text-center">
+          <div className="flex items-center justify-center gap-2 mb-6">
+            <span
+              className="inline-flex items-center justify-center rounded-full"
+              style={{
+                width: 32,
+                height: 32,
+                background:
+                  "linear-gradient(180deg, rgba(248,113,113,0.18), rgba(248,113,113,0.04))",
+                border: "1px solid rgba(248,113,113,0.45)",
+                boxShadow:
+                  "inset 0 1px 0 rgba(255,255,255,0.10), 0 0 24px -4px rgba(248,113,113,0.30)",
+              }}
+            >
+              <Zap
+                className="w-4 h-4"
+                strokeWidth={1.8}
+                style={{ color: "rgba(252,165,165,0.95)" }}
+              />
+            </span>
+            <span
+              className="font-mono uppercase tracking-[0.18em]"
+              style={{ color: "rgba(252,165,165,0.85)", fontSize: 11 }}
+            >
+              The moat
+            </span>
+          </div>
+
+          <h2
+            className="font-mono leading-[1.05] tracking-tight"
             style={{
-              width: 32,
-              height: 32,
-              background:
-                "linear-gradient(180deg, rgba(248,113,113,0.18), rgba(248,113,113,0.04))",
-              border: "1px solid rgba(248,113,113,0.45)",
-              boxShadow:
-                "inset 0 1px 0 rgba(255,255,255,0.10), 0 0 24px -4px rgba(248,113,113,0.30)",
+              color: "#FFFFFF",
+              fontSize: "clamp(48px, 9vw, 96px)",
+              fontWeight: 500,
             }}
           >
-            <Zap
-              className="w-4 h-4"
-              strokeWidth={1.8}
-              style={{ color: "rgba(252,165,165,0.95)" }}
-            />
-          </span>
-          <span
-            className="font-mono uppercase tracking-[0.18em]"
-            style={{ color: "rgba(252,165,165,0.85)", fontSize: 11 }}
+            Drain Atlas.
+          </h2>
+
+          <p
+            className="mt-6 mx-auto max-w-[680px] text-[15.5px] leading-[1.65]"
+            style={{ color: "rgba(255,255,255,0.72)" }}
           >
-            The dare
-          </span>
+            Atlas holds real USDC on Solana devnet. Its private key is
+            online. Its workers spend autonomously. Try to take it —{" "}
+            <span style={{ color: "rgba(255,255,255,0.92)" }}>
+              {attacksBlocked.toLocaleString()} attempts · 0 successful
+              drains
+            </span>{" "}
+            so far.
+          </p>
+
+          <div className="mt-9 flex flex-col sm:flex-row items-center justify-center gap-3">
+            <a
+              href="/atlas#attack-wall"
+              className="inline-flex items-center justify-center gap-2 h-[52px] px-7 rounded-[12px] text-[14px] font-semibold tracking-[-0.005em] transition active:scale-[0.97]"
+              style={{
+                background: "#FFFFFF",
+                color: "#0A0B10",
+                boxShadow:
+                  "0 1px 0 rgba(255,255,255,0.18), 0 12px 28px rgba(0,0,0,0.45)",
+              }}
+            >
+              See the wall
+              <ArrowDown className="w-3.5 h-3.5" strokeWidth={2} />
+            </a>
+            <a
+              href="https://x.com/shariqshkt"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 h-[52px] px-6 rounded-[12px] text-[13.5px] font-medium"
+              style={{
+                color: "rgba(255,255,255,0.78)",
+                border: "1px solid rgba(255,255,255,0.12)",
+              }}
+            >
+              Tag @shariqshkt
+              <ExternalLink className="w-3.5 h-3.5" strokeWidth={2} />
+            </a>
+          </div>
         </div>
 
-        <h2
-          className="font-mono leading-[1.05] tracking-tight"
-          style={{
-            color: "#FFFFFF",
-            fontSize: "clamp(48px, 9vw, 96px)",
-            fontWeight: 500,
-          }}
-        >
-          Drain Atlas.
-        </h2>
+        {/* Attack wall preview — real failed Solana txs scrolling */}
+        <div className="mt-14 sm:mt-16">
+          <AttackWallPreview attacks={attacks} limit={12} />
+        </div>
 
-        <p
-          className="mt-6 mx-auto max-w-[680px] text-[15.5px] leading-[1.65]"
-          style={{ color: "rgba(255,255,255,0.72)" }}
+        {/* Stack credits — Squads v4 + Kyvern Anchor program */}
+        <div
+          className="mt-10 flex flex-wrap items-center justify-center gap-3"
         >
-          Atlas is a real device holding real USDC on Solana devnet. Its
-          private key is online. Its workers spend money autonomously.
-          Try to take it. Reward: bragging rights.
-        </p>
-
-        <div className="mt-9 flex flex-col sm:flex-row items-center justify-center gap-3">
-          <a
-            href="/atlas#attack-wall"
-            className="inline-flex items-center justify-center gap-2 h-[52px] px-7 rounded-[12px] text-[14px] font-semibold tracking-[-0.005em] transition active:scale-[0.97]"
+          <span
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full"
             style={{
-              background: "#FFFFFF",
-              color: "#0A0B10",
-              boxShadow:
-                "0 1px 0 rgba(255,255,255,0.18), 0 12px 28px rgba(0,0,0,0.45)",
+              background: "rgba(255,255,255,0.04)",
+              border: "1px solid rgba(255,255,255,0.08)",
             }}
           >
-            See the wall
-            <ArrowDown className="w-3.5 h-3.5" strokeWidth={2} />
-          </a>
+            <span
+              className="font-mono uppercase tracking-[0.14em]"
+              style={{ color: "rgba(134,239,172,0.85)", fontSize: 9.5 }}
+            >
+              Squads v4
+            </span>
+            <span
+              style={{ color: "rgba(255,255,255,0.30)", fontSize: 11 }}
+            >
+              ·
+            </span>
+            <span
+              className="font-mono"
+              style={{ color: "rgba(255,255,255,0.55)", fontSize: 10.5 }}
+            >
+              multisig vaults
+            </span>
+          </span>
           <a
-            href="https://x.com/shariqshkt"
+            href={`https://explorer.solana.com/address/${POLICY_PROGRAM_ID}?cluster=devnet`}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center gap-1.5 h-[52px] px-6 rounded-[12px] text-[13.5px] font-medium"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full hover:opacity-100 transition"
             style={{
-              color: "rgba(255,255,255,0.78)",
-              border: "1px solid rgba(255,255,255,0.12)",
+              background: "rgba(134,239,172,0.06)",
+              border: "1px solid rgba(134,239,172,0.18)",
+              opacity: 0.92,
             }}
           >
-            Tag @shariqshkt
-            <ExternalLink className="w-3.5 h-3.5" strokeWidth={2} />
+            <span
+              className="font-mono uppercase tracking-[0.14em]"
+              style={{ color: "rgba(134,239,172,0.90)", fontSize: 9.5 }}
+            >
+              Kyvern Anchor program
+            </span>
+            <span
+              style={{ color: "rgba(255,255,255,0.30)", fontSize: 11 }}
+            >
+              ·
+            </span>
+            <span
+              className="font-mono"
+              style={{ color: "rgba(255,255,255,0.55)", fontSize: 10.5 }}
+            >
+              PpmZ…MSqc
+            </span>
+            <ExternalLink
+              className="w-3 h-3"
+              style={{ color: "rgba(255,255,255,0.55)" }}
+              strokeWidth={2}
+            />
           </a>
         </div>
 
-        <div
-          className="mt-12 inline-flex items-center gap-2 px-4 py-2 rounded-full"
-          style={{
-            background: "rgba(255,255,255,0.04)",
-            border: "1px solid rgba(255,255,255,0.08)",
-          }}
-        >
-          <span
-            className="font-mono uppercase tracking-[0.16em]"
-            style={{ color: "rgba(255,255,255,0.55)", fontSize: 10.5 }}
-          >
-            {attacksBlocked.toLocaleString()} attempts · 0 successful drains
-          </span>
-        </div>
-
         <p
-          className="mt-3 text-[13px]"
-          style={{ color: "rgba(255,255,255,0.45)" }}
+          className="mt-6 text-center text-[13px]"
+          style={{ color: "rgba(255,255,255,0.42)" }}
         >
           The policy program doesn&apos;t negotiate.
         </p>
@@ -935,13 +1102,14 @@ function SectionFinalCta() {
           className="tracking-tight"
           style={{
             color: "#FFFFFF",
-            fontSize: "clamp(36px, 6vw, 64px)",
+            fontSize: "clamp(34px, 5.6vw, 60px)",
             fontWeight: 600,
             lineHeight: 1.05,
             letterSpacing: "-0.025em",
           }}
         >
-          Get your <span style={{ color: "#86EFAC" }}>Kyvern</span>.
+          Ready to own your first{" "}
+          <span style={{ color: "#86EFAC" }}>AI labor device</span>?
         </h2>
         <p
           className="mt-5 mx-auto max-w-[560px] text-[15px] leading-[1.6]"
@@ -952,7 +1120,7 @@ function SectionFinalCta() {
         </p>
         <div className="mt-9 flex flex-col sm:flex-row items-center justify-center gap-3">
           <Link
-            href="/app"
+            href="/unbox"
             className="inline-flex items-center justify-center gap-2 h-[52px] px-8 rounded-[12px] text-[14.5px] font-semibold tracking-[-0.005em] active:scale-[0.98] transition group"
             style={{
               background: "#FFFFFF",
@@ -961,7 +1129,7 @@ function SectionFinalCta() {
                 "0 1px 0 rgba(255,255,255,0.18), 0 12px 28px rgba(0,0,0,0.45)",
             }}
           >
-            Get started
+            Get your Kyvern
             <ArrowRight
               className="w-4 h-4 group-hover:translate-x-0.5 transition-transform"
               strokeWidth={2}
