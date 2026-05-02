@@ -434,10 +434,12 @@ function firstUrlIn(s: string): string | null {
   return m ? m[0] : null;
 }
 
-/** All http(s):// URLs in the prompt, in order, deduped, capped at 6.
- *  Used by the multi-source Opportunity Scout (Phase 1 — Sentinel)
- *  to fan out across bounty boards, RSS feeds, GitHub releases, etc.
- *  in priority order until one source returns new items. */
+/** All http(s):// URLs in the prompt, in order, deduped, capped at 10.
+ *  Used by the multi-source Opportunity Scout (Phase 1 — Sentinel,
+ *  Phase 7 expansion to 7+ sources) to fan out across bounty boards,
+ *  RSS feeds, GitHub releases in priority order until one source
+ *  returns new items. Cap raised from 6→10 in Phase 7 to fit the
+ *  expanded source list. */
 function allUrlsIn(s: string): string[] {
   const matches = s.match(/https?:\/\/[^\s)\]"',]+/gi) ?? [];
   const seen = new Set<string>();
@@ -448,7 +450,7 @@ function allUrlsIn(s: string): string[] {
     if (!seen.has(url)) {
       seen.add(url);
       out.push(url);
-      if (out.length >= 6) break;
+      if (out.length >= 10) break;
     }
   }
   return out;

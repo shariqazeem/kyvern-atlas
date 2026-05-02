@@ -167,11 +167,11 @@ export const TEMPLATES: AgentTemplateDef[] = [
     emoji: "🎯",
     suggestedName: "Sentinel",
     personalityPrompt:
-      "You are the Opportunity Scout. You scan high-signal sources every cycle — bounty boards, ecosystem feeds, hackathon platforms, GitHub releases — and turn high-value finds into paid jobs other workers can claim. You never just notify; you escrow first, then surface. You write tight subject lines and 2-4 factual evidence bullets per finding. Silence is a feature: if nothing new is worth flagging, you idle quietly.",
+      "You are the Opportunity Scout. You scan 7+ high-signal Solana ecosystem sources every cycle — bounty boards (Superteam), hackathon platforms (Colosseum), ecosystem feeds (Solana Foundation, Helius), and GitHub releases (Anchor, Agave, Metaplex) — and turn high-value finds into paid jobs other workers can claim. Bounties below $300 don't qualify. Minor patch releases don't qualify; only major releases that change a builder's day do. You never just notify; you escrow first, then surface. You write tight subject lines and 2-4 factual evidence bullets per finding. Silence is a feature: if nothing new is worth flagging across every source, you idle quietly.",
     jobPromptPlaceholder:
-      "Which sources should I watch? (paste 1-4 URLs — bounty boards, RSS feeds, hackathons, releases)",
+      "Which sources should I watch? (paste 1-7 URLs — bounty boards, RSS feeds, hackathons, releases)",
     jobPromptExample:
-      "Every cycle, scan these sources with watch_url:\n• https://superteam.fun/api/listings?take=25 (bounties)\n• https://blog.colosseum.com/rss (hackathon news)\n• https://solana.com/news/rss.xml (Solana ecosystem)\n• https://api.github.com/repos/coral-xyz/anchor/releases (Anchor releases)\nFor any new high-value find — bounty ≥$500, major grant, new hackathon, promising launch — post_task with a $0.15 research bounty AND message_user (kind='opportunity'). Idle silently when nothing new.",
+      "Every cycle, scan these 7 sources with watch_url, in priority order:\n• https://superteam.fun/api/listings?take=25 — bounties (any category, ≥$300)\n• https://blog.colosseum.com/rss — hackathon news\n• https://solana.com/news/rss.xml — Solana Foundation\n• https://www.helius.dev/blog/rss.xml — Helius dev blog\n• https://api.github.com/repos/coral-xyz/anchor/releases — Anchor (breaking changes)\n• https://api.github.com/repos/anza-xyz/agave/releases — Agave validator\n• https://api.github.com/repos/metaplex-foundation/mpl-core/releases — Metaplex assets\nFor any NEW high-value find (bounty ≥$300, hackathon, grant round, ecosystem launch, breaking release), post_task ($0.15 research bounty) + message_user kind='opportunity'. Idle silently when nothing new.",
     // Phase 1 (billion-dollar edition) — Sentinel becomes a true
     // multi-source Opportunity Scout. Toolset locked to the three
     // tools its lifecycle uses: watch_url (scan multiple sources),
@@ -182,39 +182,42 @@ export const TEMPLATES: AgentTemplateDef[] = [
     recommendedTools: ["watch_url", "post_task", "message_user"],
     defaultFrequencySeconds: 600,
     description:
-      "Finds high-value opportunities (bounties, grants, gigs, launches) and turns them into paid jobs other workers can complete.",
+      "Scans 7+ Solana sources (Superteam · Colosseum · Helius · Anchor · Agave · Metaplex · Solana Foundation) and turns high-value finds into paid jobs other workers can complete.",
     earningStyle: "Steady",
     activityLevel: "Balanced",
-    watches: "Bounties · grants · launches · releases",
-    pings: "Posts paid jobs from high-value finds",
+    watches: "7+ ecosystem sources",
+    pings: "Bounties ≥$300 · hackathons · grants · breaking releases",
     inPicker: true,
     jobSuggestions: [
       {
         label: "Multi-source scout (recommended)",
         job:
-          "Every cycle, fan out across four high-signal sources using watch_url with sinceLastCheck=true:\n" +
-          "• https://superteam.fun/api/listings?take=25 — Superteam bounties (all categories)\n" +
-          "• https://blog.colosseum.com/rss — Colosseum hackathon blog\n" +
-          "• https://solana.com/news/rss.xml — Solana Foundation news\n" +
-          "• https://api.github.com/repos/coral-xyz/anchor/releases — Anchor releases (breaking-change opportunities)\n\n" +
-          "For each NEW high-value item (Superteam bounty ≥$500, hackathon announcement, grant round, new ecosystem launch, major Anchor release), do BOTH:\n" +
-          "  1. post_task with taskType='research', bountyUsd=0.15, ttlSeconds=3600. payload JSON should include {ask, context, sourceUrl} where ask asks another worker to validate the opportunity.\n" +
-          "  2. message_user (Finding mode) with kind='opportunity', subject=title (≤80 chars), evidence including reward/USD where applicable + deadline + source. sourceUrl = item URL.\n\n" +
-          "If nothing new and high-value across all four sources → idle silently. Never just notify — always create a paid job when the find is worth it.",
+          "Every cycle, fan out across SEVEN high-signal Solana ecosystem sources using watch_url with sinceLastCheck=true. Scan in priority order, stop at the first source that returned new items:\n" +
+          "  1. https://superteam.fun/api/listings?take=25 minPrize=300 — Superteam bounties (≥$300, any category)\n" +
+          "  2. https://blog.colosseum.com/rss — Colosseum hackathon blog (judge announcements + ecosystem highlights)\n" +
+          "  3. https://solana.com/news/rss.xml — Solana Foundation news (grants, programs)\n" +
+          "  4. https://www.helius.dev/blog/rss.xml — Helius developer blog\n" +
+          "  5. https://api.github.com/repos/coral-xyz/anchor/releases — Anchor releases (breaking-change opportunities)\n" +
+          "  6. https://api.github.com/repos/anza-xyz/agave/releases — Agave validator (Solana protocol)\n" +
+          "  7. https://api.github.com/repos/metaplex-foundation/mpl-core/releases — Metaplex assets\n\n" +
+          "For each NEW high-value item (Superteam bounty ≥$300, hackathon announcement, grant round, new ecosystem launch, MAJOR release with breaking changes), do BOTH:\n" +
+          "  · post_task taskType='research' bountyUsd=0.15 ttlSeconds=3600 payload={ask, context, sourceUrl}\n" +
+          "  · message_user kind='opportunity' subject=title evidence=reward+deadline+source sourceUrl=item URL\n\n" +
+          "Skip minor patch releases (e.g. v0.X.Y bug fixes). If nothing new and high-value across all 7 sources → idle silently. Never just notify — always create a paid job when the find is worth it.",
       },
       {
-        label: "Bounty boards (Superteam ≥$2k)",
+        label: "Bounty boards only (Superteam ≥$1k)",
         job:
-          "Every cycle, watch_url on https://superteam.fun/api/listings?take=25 with minPrize=2000 and sinceLastCheck=true. NO category filter — the high-bar set spans design, content, development, and grants. For each NEW listing, do BOTH: (1) post_task with taskType='research', bountyUsd=0.15 to ask another worker to validate the opportunity (eligibility, deadline, fit); (2) message_user kind='opportunity' subject=title evidence=reward+deadline+sponsor+skills sourceUrl=listing URL. Idle when nothing new.",
+          "Every cycle, watch_url on https://superteam.fun/api/listings?take=25 with minPrize=1000 and sinceLastCheck=true. NO category filter — the high-bar set spans design, content, development, and grants. For each NEW listing, do BOTH: (1) post_task taskType='research' bountyUsd=0.15 asking another worker to validate the opportunity (eligibility, deadline, fit); (2) message_user kind='opportunity' subject=title evidence=reward+deadline+sponsor+skills sourceUrl=listing URL. Idle when nothing new.",
       },
       {
-        label: "Ecosystem announcements (Solana + Helius)",
+        label: "Releases & breaking changes (Anchor + Agave + Metaplex)",
         job:
-          "Every cycle, fan out across Solana ecosystem feeds with watch_url + sinceLastCheck=true:\n" +
-          "• https://solana.com/news/rss.xml format=rss — Solana Foundation\n" +
-          "• https://www.helius.dev/blog/rss.xml format=rss — Helius blog\n" +
-          "• https://blog.colosseum.com/rss format=rss — Colosseum hackathons\n\n" +
-          "For each NEW item that announces a grant round, hackathon, or major launch, do BOTH: (1) post_task with taskType='research', bountyUsd=0.15 asking another worker to assess relevance; (2) message_user kind='opportunity' subject=title evidence=excerpt+source+date sourceUrl=item URL. Idle when nothing new.",
+          "Every cycle, fan out across the Solana toolchain repos with watch_url + sinceLastCheck=true:\n" +
+          "  · https://api.github.com/repos/coral-xyz/anchor/releases\n" +
+          "  · https://api.github.com/repos/anza-xyz/agave/releases\n" +
+          "  · https://api.github.com/repos/metaplex-foundation/mpl-core/releases\n\n" +
+          "For each NEW major release (skip minor patches), do BOTH: (1) post_task taskType='research' bountyUsd=0.15 asking another worker to summarize breaking changes; (2) message_user kind='opportunity' subject=release-name evidence=tag+excerpt+date sourceUrl=release URL. Idle on patch releases.",
       },
     ],
   },

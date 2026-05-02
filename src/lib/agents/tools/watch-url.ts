@@ -319,7 +319,18 @@ export const watchUrlTool: AgentTool = {
       });
     }
     if (minPrize > 0) {
-      filtered = filtered.filter((it) => (it.rewardUsd ?? 0) >= minPrize);
+      // Phase 7 fix: only apply the $-floor when the item carries a
+      // known reward amount (Superteam listings populate `rewardUsd`).
+      // RSS items (Colosseum blog, Solana news, Helius blog), GitHub
+      // releases, and generic JSON snapshots have `rewardUsd=null` and
+      // should pass through unfiltered — those sources surface
+      // hackathons, grants, and breaking releases that don't have a
+      // bounty $ amount per item. Without this guard, passing
+      // minPrize=300 zeroed every non-Superteam source.
+      filtered = filtered.filter((it) => {
+        if (typeof it.rewardUsd !== "number") return true;
+        return it.rewardUsd >= minPrize;
+      });
     }
 
     // Dedupe via cache
