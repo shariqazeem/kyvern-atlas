@@ -293,52 +293,113 @@ function SummaryBar({
   completedCount: number;
   totalPaidOut: number;
 }) {
-  const items = [
-    { label: "open", value: String(openCount), tone: "#15803D" },
-    { label: "in progress", value: String(inProgress), tone: "#9CA3AF" },
-    { label: "completed", value: String(completedCount), tone: "#374151" },
-    {
-      label: "total paid out",
-      value: `$${totalPaidOut.toFixed(2)}`,
-      tone: "#0A0A0A",
-    },
-  ];
+  const hasPaidOut = totalPaidOut > 0;
   return (
     <div
-      className="grid grid-cols-2 sm:grid-cols-4 rounded-[14px] overflow-hidden"
+      className="rounded-[14px] overflow-hidden"
       style={{
-        background: "rgba(15,23,42,0.02)",
-        border: "1px solid rgba(15,23,42,0.05)",
+        background: hasPaidOut
+          ? "linear-gradient(180deg, #F0FDF4 0%, #FFFFFF 65%)"
+          : "linear-gradient(180deg, #FFFFFF 0%, #FAFAFB 100%)",
+        border: hasPaidOut
+          ? "1px solid rgba(34,197,94,0.18)"
+          : "1px solid rgba(15,23,42,0.06)",
+        boxShadow: hasPaidOut
+          ? "inset 0 1px 0 rgba(255,255,255,1), 0 1px 2px rgba(15,23,42,0.04), 0 6px 16px -8px rgba(34,197,94,0.14)"
+          : "inset 0 1px 0 rgba(255,255,255,1), 0 1px 2px rgba(15,23,42,0.03)",
       }}
     >
-      {items.map((it, i) => (
-        <div
-          key={it.label}
-          className="px-2 py-2.5 flex flex-col items-center text-center"
-          style={
-            i > 0
-              ? { borderLeft: "1px solid rgba(15,23,42,0.05)" }
-              : undefined
-          }
-        >
-          <span
-            className="font-mono text-[14px]"
+      {/* Hero: total paid out — the headline number */}
+      <div
+        className="flex items-baseline justify-between px-4 pt-3 pb-2.5"
+        style={{ borderBottom: "1px solid rgba(15,23,42,0.05)" }}
+      >
+        <div>
+          <p
+            className="font-mono uppercase tracking-[0.14em] mb-1"
             style={{
-              color: it.tone,
-              fontVariantNumeric: "tabular-nums",
-              fontWeight: 500,
+              color: hasPaidOut ? "#15803D" : "#9CA3AF",
+              fontSize: 9.5,
+              fontWeight: 600,
             }}
           >
-            {it.value}
-          </span>
+            Total paid out
+          </p>
           <span
-            className="font-mono text-[9px] uppercase tracking-[0.14em] mt-0.5"
-            style={{ color: "#9CA3AF" }}
+            className="font-mono tracking-tight font-light text-[#0A0A0A]"
+            style={{
+              fontSize: 28,
+              fontVariantNumeric: "tabular-nums",
+              lineHeight: 1.1,
+            }}
           >
-            {it.label}
+            ${totalPaidOut.toFixed(2)}
           </span>
         </div>
-      ))}
+        {completedCount > 0 && (
+          <span
+            className="font-mono text-[11px]"
+            style={{ color: "#9CA3AF", fontVariantNumeric: "tabular-nums" }}
+          >
+            across {completedCount} {completedCount === 1 ? "job" : "jobs"}
+          </span>
+        )}
+      </div>
+      {/* Sub-counts: open · in progress · completed */}
+      <div className="grid grid-cols-3">
+        <SummaryCell label="Open" value={openCount} tone="#15803D" />
+        <SummaryCell
+          label="In progress"
+          value={inProgress}
+          tone="#B45309"
+          divider
+        />
+        <SummaryCell
+          label="Completed"
+          value={completedCount}
+          tone="#374151"
+          divider
+        />
+      </div>
+    </div>
+  );
+}
+
+function SummaryCell({
+  label,
+  value,
+  tone,
+  divider,
+}: {
+  label: string;
+  value: number;
+  tone: string;
+  divider?: boolean;
+}) {
+  return (
+    <div
+      className="px-3 py-2.5 flex flex-col items-center text-center"
+      style={
+        divider ? { borderLeft: "1px solid rgba(15,23,42,0.05)" } : undefined
+      }
+    >
+      <span
+        className="font-mono"
+        style={{
+          color: tone,
+          fontSize: 16,
+          fontVariantNumeric: "tabular-nums",
+          fontWeight: 600,
+        }}
+      >
+        {value}
+      </span>
+      <span
+        className="font-mono uppercase tracking-[0.14em] mt-0.5"
+        style={{ color: "#9CA3AF", fontSize: 9.5 }}
+      >
+        {label}
+      </span>
     </div>
   );
 }

@@ -113,11 +113,12 @@ export function AtlasEarningsHero({
             duration={650}
             className="font-mono"
             style={{
-              color: "rgba(255,255,255,0.96)",
-              fontSize: "clamp(36px, 5.2vw, 60px)",
+              color: "rgba(255,255,255,0.98)",
+              fontSize: "clamp(40px, 6.2vw, 72px)",
               lineHeight: 1.0,
               fontVariantNumeric: "tabular-nums",
               fontWeight: 300,
+              letterSpacing: "-0.02em",
             }}
           />
           <p

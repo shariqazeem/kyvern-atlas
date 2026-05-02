@@ -20,7 +20,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { ArrowUpRight, ArrowDownRight } from "lucide-react";
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
@@ -82,6 +82,19 @@ export function EarningsHero({
   const hasEarnings = earnedToday > 0;
   const hasActivity = onChainToday > 0;
   const positive = netToday >= 0;
+
+  // Phase 4 — pulse on increment. When earnedToday ticks up, fire a
+  // subtle 1.4s outer-glow + scale flash. The "ka-ching" moment is the
+  // single most-rewarding micro-interaction on the demo, so it's worth
+  // dedicating a Framer Motion ring to it.
+  const prevEarnedRef = useRef(earnedToday);
+  const [pulseKey, setPulseKey] = useState(0);
+  useEffect(() => {
+    if (earnedToday > prevEarnedRef.current + 0.0001) {
+      setPulseKey((k) => k + 1);
+    }
+    prevEarnedRef.current = earnedToday;
+  }, [earnedToday]);
 
   // Empty state — workers running but no payments yet
   if (!hasEarnings && !hasActivity) {
@@ -153,6 +166,26 @@ export function EarningsHero({
             ].join(", "),
       }}
     >
+      {/* Phase 4 — pulse-on-increment glow ring. Fires when earnedToday
+          ticks up; AnimatePresence keys on pulseKey so each increment
+          re-mounts a fresh fade-in/out cycle (1.4s total). */}
+      <AnimatePresence>
+        {pulseKey > 0 && (
+          <motion.span
+            key={pulseKey}
+            aria-hidden
+            className="pointer-events-none absolute inset-0 rounded-[18px]"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: [0, 1, 0] }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 1.4, ease: "easeOut" }}
+            style={{
+              boxShadow:
+                "inset 0 0 0 2px rgba(34,197,94,0.45), inset 0 0 32px rgba(34,197,94,0.18), 0 0 0 6px rgba(34,197,94,0.10)",
+            }}
+          />
+        )}
+      </AnimatePresence>
       {/* eyebrow */}
       <div className="relative px-5 sm:px-6 pt-4 sm:pt-5 pb-1.5 flex items-center justify-between">
         <span
@@ -175,7 +208,7 @@ export function EarningsHero({
       <div className="relative px-5 sm:px-6 pb-3 flex items-baseline gap-2">
         <ScrambleAmount
           value={earnedToday}
-          className="font-mono text-[40px] sm:text-[56px] tracking-tight font-light text-[#0A0A0A] leading-none"
+          className="font-mono text-[44px] sm:text-[64px] tracking-[-0.02em] font-light text-[#0A0A0A] leading-none"
         />
         {hasEarnings && (
           <span

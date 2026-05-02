@@ -258,11 +258,11 @@ function TimelineRow({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, height: 0 }}
       transition={{ duration: 0.28, ease: EASE }}
-      className="px-4 py-2.5 flex items-center gap-2 flex-wrap"
+      className="px-4 py-2.5 flex items-center gap-2 flex-nowrap min-w-0 hover:bg-[rgba(15,23,42,0.015)] transition-colors"
     >
       {/* tool icon */}
       <span
-        className="w-5 h-5 rounded-[6px] flex items-center justify-center flex-none"
+        className="w-6 h-6 rounded-[7px] flex items-center justify-center flex-none"
         style={{
           background: failed
             ? "rgba(239,68,68,0.10)"
@@ -276,21 +276,27 @@ function TimelineRow({
               : "#374151",
         }}
       >
-        <Icon className="w-3 h-3" strokeWidth={2.2} />
+        <Icon className="w-3.5 h-3.5" strokeWidth={2.2} />
       </span>
 
       {/* time */}
       <span
-        className="font-mono"
+        className="font-mono flex-none"
         style={{ color: "#9CA3AF", fontSize: 10.5 }}
       >
         {fmtAgo(item.timestamp)}
       </span>
 
-      {/* verb */}
+      {/* verb + inline amount — flex-1 truncate so explorer pill +
+          status badge stay anchored on the right at narrow widths. */}
       <span
-        className="text-[12.5px] min-w-0"
+        className="text-[12.5px] min-w-0 flex-1 truncate"
         style={{ color: "#374151", lineHeight: 1.4 }}
+        title={
+          showAmount
+            ? `${verb} ${tone === "earned" && success ? "+" : ""}$${amount.toFixed(3)}`
+            : verb
+        }
       >
         {verb}
         {showAmount && (
@@ -312,7 +318,7 @@ function TimelineRow({
       {/* status badge */}
       {success && (
         <span
-          className="inline-flex items-center"
+          className="inline-flex items-center flex-none"
           style={{ color: "#15803D" }}
         >
           <Check className="w-3 h-3" strokeWidth={2.6} />
@@ -320,22 +326,20 @@ function TimelineRow({
       )}
       {failed && (
         <span
-          className="inline-flex items-center"
+          className="inline-flex items-center flex-none"
           style={{ color: "#B91C1C" }}
         >
           <X className="w-3 h-3" strokeWidth={2.6} />
         </span>
       )}
 
-      <span className="ml-auto" />
-
-      {/* explorer link */}
+      {/* explorer pill — sig hex hides on narrow viewports */}
       {item.signature && (
         <a
           href={explorerUrl(item.signature, network)}
           target="_blank"
           rel="noreferrer"
-          className="inline-flex items-center gap-1 px-2 py-0.5 rounded font-mono"
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded font-mono flex-none"
           style={{
             background: success
               ? "rgba(34,197,94,0.10)"
@@ -346,7 +350,9 @@ function TimelineRow({
           title="Open on Solana Explorer"
         >
           <Link2 className="w-2.5 h-2.5" strokeWidth={2.4} />
-          {item.signature.slice(0, 4)}…{item.signature.slice(-4)}
+          <span className="hidden sm:inline">
+            {item.signature.slice(0, 4)}…{item.signature.slice(-4)}
+          </span>
           <ExternalLink className="w-2.5 h-2.5" />
         </a>
       )}
