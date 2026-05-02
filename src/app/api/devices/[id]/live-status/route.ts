@@ -172,10 +172,42 @@ function verbForSignalKind(kind: string): string {
       return "triggered on price";
     case "github_release":
       return "found a release";
+    case "opportunity":
+      return "found an opportunity";
+    case "market_intel":
+      return "flagged market intel";
     case "observation":
     default:
       return "logged an observation";
   }
+}
+
+/** Phase 6 — pull the largest dollar amount mentioned anywhere in the
+ *  signal's subject + evidence. Matches "$1,500", "$10k", "$1.5M",
+ *  "$500", "$10,000" etc. Used to compute surfacedValueUsd on /app
+ *  home — "your workers found $58k worth of opportunities today" is
+ *  the discovery-first headline metric. Mirrors the client-side
+ *  `parseLargestDollar` in signal-severity.ts so the front-end and
+ *  back-end agree on a value. */
+function parseLargestDollar(s: string): number {
+  let max = 0;
+  // $X.YZk / $XM forms first
+  const sufRe = /\$\s*([\d,]+(?:\.\d+)?)\s*([kKmM])/g;
+  let m: RegExpExecArray | null;
+  while ((m = sufRe.exec(s)) !== null) {
+    const n = parseFloat(m[1].replace(/,/g, ""));
+    if (!isFinite(n)) continue;
+    const mult = m[2].toLowerCase() === "k" ? 1_000 : 1_000_000;
+    max = Math.max(max, n * mult);
+  }
+  // $X / $X.YZ / $X,YYY forms
+  const plainRe = /\$\s*([\d,]+(?:\.\d+)?)\b(?![kKmM])/g;
+  while ((m = plainRe.exec(s)) !== null) {
+    const n = parseFloat(m[1].replace(/,/g, ""));
+    if (!isFinite(n)) continue;
+    max = Math.max(max, n);
+  }
+  return max;
 }
 
 export async function GET(
@@ -243,6 +275,84 @@ export async function GET(
     unread: todayCounts?.unread ?? 0,
     read: todayCounts?.read ?? 0,
     actionable: todayCounts?.actionable ?? 0,
+  };
+
+  // Phase 6 — discovery-first headline metrics for /app home.
+  // The trio's economic loop is closed-circuit by design (the user-side
+  // earnings number is ~zero), but the *discovery* output is real:
+  // Sentinel finds Superteam bounties, Wren spots whale moves, Pulse
+  // catches band breaches. Lead /app with that, not the closed-loop $.
+  interface DiscoveryRow {
+    kind: string;
+    subject: string;
+    evidence_json: string;
+    source_url: string | null;
+    status: string;
+    created_at: number;
+  }
+  const todaySignalsRaw = db
+    .prepare(
+      `SELECT kind, subject, evidence_json, source_url, status, created_at
+         FROM signals
+        WHERE device_id = ? AND created_at >= ?`,
+    )
+    .all(params.id, todayMs) as DiscoveryRow[];
+
+  let opportunitiesCount = 0;
+  let surfacedValueUsd = 0;
+  let actionableCount = 0;
+  for (const r of todaySignalsRaw) {
+    // Phase 1/2 unified kinds for Sentinel + Wren count as "discoveries"
+    // alongside the legacy source-specific kinds (bounty, wallet_move).
+    const isOpp =
+      r.kind === "opportunity" ||
+      r.kind === "market_intel" ||
+      r.kind === "bounty" ||
+      r.kind === "wallet_move" ||
+      r.kind === "ecosystem_announcement" ||
+      r.kind === "github_release";
+    if (!isOpp) continue;
+    opportunitiesCount += 1;
+
+    // Sum the largest dollar amount surfaced in subject + evidence.
+    let evidenceText = "";
+    try {
+      const arr = JSON.parse(r.evidence_json) as unknown;
+      if (Array.isArray(arr))
+        evidenceText = (arr as unknown[]).map((e) => String(e)).join(" · ");
+    } catch {
+      /* ignore — empty evidence */
+    }
+    const dollars = parseLargestDollar(`${r.subject} ${evidenceText}`);
+    surfacedValueUsd += dollars;
+
+    // "Actionable" today = high-value finds the owner can click into
+    // (sourceUrl present + still unread, so not yet acted on).
+    if (r.source_url && r.status === "unread") actionableCount += 1;
+  }
+
+  // Validated today = completed validation/research tasks settled today
+  // where any worker on this device was involved (poster OR claimer).
+  // DISTINCT t.id avoids double-counting tasks where both sides live
+  // on the same device.
+  const validatedRow = db
+    .prepare(
+      `SELECT COUNT(DISTINCT t.id) AS n
+         FROM agent_tasks t
+         JOIN agents a ON (a.id = t.posting_agent_id OR a.id = t.claiming_agent_id)
+        WHERE a.device_id = ?
+          AND t.status = 'completed'
+          AND t.completed_at IS NOT NULL
+          AND t.completed_at >= ?`,
+    )
+    .get(params.id, todayMs) as { n: number } | undefined;
+  const validatedToday = validatedRow?.n ?? 0;
+
+  const discoveryToday = {
+    opportunities: opportunitiesCount,
+    surfacedValueUsd: Math.round(surfacedValueUsd),
+    validated: validatedToday,
+    actionable: actionableCount,
   };
 
   // Last action across all workers on this device — checks both signals
@@ -496,5 +606,7 @@ export async function GET(
     // Phase 5 — earnings-first home page payload
     actionFeed,
     policyLastAction,
+    // Phase 6 — discovery-first home page metrics (the new headline)
+    discoveryToday,
   });
 }

@@ -142,7 +142,7 @@ export function ActionFeed({ items, network }: ActionFeedProps) {
             className="font-mono uppercase tracking-[0.14em]"
             style={{ color: "#15803D", fontSize: 9.5, fontWeight: 600 }}
           >
-            Live action feed
+            Live loop
           </span>
           <motion.span
             aria-hidden

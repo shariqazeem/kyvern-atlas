@@ -1,23 +1,30 @@
 "use client";
 
 /**
- * /app — Device Home (Phase 5: earnings-first redesign).
+ * /app — Device Home (Phase 6: discovery-first reframe).
  *
- * The whole page IS the device. A premium light chassis with:
- *   • LED status strip (online dot · KVN-XXXX serial · live uptime)
- *   • EARNINGS HERO — "Your device earned $X.XX today" — the headline
- *   • LIVE ACTION FEED — chronological log of every economic event
- *     with Explorer links (post / claim / complete / stake)
- *   • POLICY SHIELD — compact bar showing the on-chain enforcement
- *     limits and last decision
- *   • WORKER STRIP — per-worker chip row (last action + earnings)
- *   • BALANCE ORBIT — secondary, smaller; orbital ring of workers
- *   • TODAY STRIP — earned · spent · signals · workers · on-chain
- *   • DeviceFAB — top-up / hire-worker (above tab bar)
+ * The closed-circuit trio economy ("$0.00 earned today") was the
+ * mathematically-truthful but narratively-hollow Phase 5 headline.
+ * Phase 6 re-leads with the *discovery* output of the workers — the
+ * real value the user actually wants:
  *
- * Live data: `/api/devices/[id]/live-status` polled every 5s, returning
- * actionFeed + policyLastAction + balances + worker rollups in one
- * round trip (added in Phase 5).
+ *   • DISCOVERY HERO — "Your workers found N opportunities today" —
+ *     headline, with $ surfaced + validated + actionable sub-pills,
+ *     and the closed-loop economy demoted to a small footer pill.
+ *   • LATEST OPPORTUNITIES — the inbox findings strip, promoted from
+ *     the demoted /app/inbox to the home page so users see what their
+ *     workers actually surfaced without an extra click.
+ *   • LIVE LOOP (formerly Action Feed) — economic activity log with
+ *     Explorer links. Stays as proof, not headline.
+ *   • POLICY SHIELD — on-chain enforcement bar.
+ *   • WORKER STRIP — per-worker chip row.
+ *   • BALANCE ORBIT — secondary visual signature.
+ *   • TODAY STRIP — full grid of today's stats.
+ *   • DeviceFAB — top-up / hire-worker.
+ *
+ * Live data: `/api/devices/[id]/live-status` polled every 5s, now
+ * returning a `discoveryToday` block (opportunities count, surfaced
+ * value USD, validated count, actionable count) added in Phase 6.
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -29,7 +36,8 @@ import { useDeviceStore } from "@/hooks/use-device-store";
 import { DeviceChassis } from "@/components/device/home/chassis";
 import { BalanceOrbit } from "@/components/device/home/balance-orbit";
 import { TodayStrip } from "@/components/device/home/today-strip";
-import { EarningsHero } from "@/components/device/home/earnings-hero";
+import { DiscoveryHero } from "@/components/device/home/discovery-hero";
+import { LatestOpportunities } from "@/components/device/home/latest-opportunities";
 import { ActionFeed } from "@/components/device/home/action-feed";
 import type { ActionFeedItem } from "@/components/device/home/action-feed";
 import { WorkerStrip } from "@/components/device/home/worker-strip";
@@ -80,6 +88,13 @@ interface LiveStatus {
     txSignature: string | null;
     createdAt: number;
   } | null;
+  // Phase 6 — discovery-first headline metrics
+  discoveryToday?: {
+    opportunities: number;
+    surfacedValueUsd: number;
+    validated: number;
+    actionable: number;
+  };
 }
 
 function devWallet(): string {
@@ -192,19 +207,30 @@ export default function DeviceHome() {
           network={status?.network ?? "devnet"}
         >
           <div className="flex flex-col gap-4 sm:gap-5">
-            {/* EARNINGS HERO — the screenshot. "Your device earned
-                $X.XX today" sits above everything else. */}
-            <EarningsHero
+            {/* DISCOVERY HERO (Phase 6) — leads with what workers
+                FOUND for the user, not the closed-loop $ they
+                shuffled. Pulse-on-increment glow when a new opp
+                lands. The closed-loop economy is demoted to a small
+                footer pill on this card so the proof is still here. */}
+            <DiscoveryHero
+              opportunitiesToday={status?.discoveryToday?.opportunities ?? 0}
+              surfacedValueUsd={status?.discoveryToday?.surfacedValueUsd ?? 0}
+              validatedToday={status?.discoveryToday?.validated ?? 0}
+              actionableToday={status?.discoveryToday?.actionable ?? 0}
               earnedToday={status?.pnlToday.earned ?? 0}
-              spentToday={status?.pnlToday.spent ?? 0}
-              netToday={status?.pnlToday.net ?? 0}
-              earningPerMinUsd={status?.earningPerMinUsd ?? 0}
-              workersActive={status?.workersActive ?? 0}
               onChainToday={status?.onChainToday ?? 0}
+              workersActive={status?.workersActive ?? 0}
             />
 
-            {/* LIVE ACTION FEED — every post / claim / complete /
-                stake, with Explorer links. The proof of life. */}
+            {/* LATEST OPPORTUNITIES — the inbox findings strip,
+                promoted to /app home so users see what their workers
+                actually surfaced without navigating to /app/inbox.
+                Auto-hides if no signals exist yet. */}
+            {deviceId && <LatestOpportunities deviceId={deviceId} />}
+
+            {/* LIVE LOOP (formerly Action Feed) — every post / claim /
+                complete / stake, with Explorer links. Demoted from
+                Phase-5 headline; stays as economic-loop proof. */}
             <ActionFeed
               items={status?.actionFeed ?? []}
               network={status?.network ?? "devnet"}
