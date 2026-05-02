@@ -5,9 +5,9 @@ import { readInitialAtlasSnapshot } from "@/lib/atlas/ssr";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Kyvern — A Device That Finds You Opportunities",
+  title: "Kyvern — Your Device Hires AI Workers That Earn Real USDC",
   description:
-    "AI workers on Solana with on-chain budget enforcement. Atlas has been running for 11+ days — 1,408 attacks blocked, $0 lost. Get your own device.",
+    "Own a Kyvern. Spawn AI workers that find opportunities, post jobs, claim work, and get paid — all enforced on-chain by your Solana policy program. Atlas, the reference agent, has been live on devnet for 12+ days surviving thousands of attacks with zero funds lost.",
   alternates: { canonical: "https://kyvernlabs.com" },
 };
 
