@@ -36,6 +36,7 @@ import {
   GitBranch,
   Sparkles,
   Target,
+  BarChart3,
   ExternalLink,
   Check,
   Clock,
@@ -62,6 +63,7 @@ const KIND_ICON: Record<SignalKind, LucideIcon> = {
   observation: Sparkles,
   condition_update: TrendingUp,
   opportunity: Target,
+  market_intel: BarChart3,
 };
 
 const KIND_LABEL: Record<SignalKind, string> = {
@@ -73,6 +75,7 @@ const KIND_LABEL: Record<SignalKind, string> = {
   observation: "OBSERVATION",
   condition_update: "UPDATE",
   opportunity: "OPPORTUNITY",
+  market_intel: "MARKET INTEL",
 };
 
 function fmtAgo(ms: number): string {

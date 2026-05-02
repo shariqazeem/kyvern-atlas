@@ -455,6 +455,7 @@ const DEDUPE_WINDOW_MS_BY_KIND: Record<SignalKind, number> = {
   observation: 6 * 60 * 60 * 1000,              // 6h (was 1h) — "wallet quiet" anomalies shouldn't repeat hourly
   condition_update: 4 * 60 * 60 * 1000,         // 4h — milestone updates inside a persistent condition
   opportunity: 24 * 60 * 60 * 1000,             // 24h — same opportunity shouldn't re-fire (Phase 1 — Sentinel)
+  market_intel: 60 * 60 * 1000,                 // 1h — Wren intel is movement-fast, mirrors wallet_move (Phase 2)
 };
 
 interface WriteSignalResult {

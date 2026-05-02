@@ -107,7 +107,13 @@ export type SignalKind =
   // (bounties, grants, hackathons, launches, freelance gigs). The
   // source-specific kinds above are still used by other workers and
   // for legacy rows; "opportunity" is Sentinel's default.
-  | "opportunity";
+  | "opportunity"
+  // Phase 2 (billion-dollar edition) — Wren as Market Intelligence
+  // Worker produces unified "market_intel" findings: whale moves,
+  // notable wallet rotations, completed validation tasks. Replaces
+  // the older "wallet_move" kind for new Wren output (existing rows
+  // keep wallet_move for back-compat).
+  | "market_intel";
 
 export type SignalStatus = "unread" | "read" | "archived";
 

@@ -29,6 +29,7 @@ const VALID_SIGNAL_KINDS: SignalKind[] = [
   "observation",
   "condition_update",
   "opportunity",
+  "market_intel",
 ];
 
 function isStructuredSignal(input: Record<string, unknown>): boolean {
@@ -65,7 +66,7 @@ export const messageUserTool: AgentTool = {
         type: "string",
         enum: [...VALID_SIGNAL_KINDS],
         description:
-          "Signal kind for Finding mode. opportunity=high-value opportunity from any source (bounty + grant + hackathon + launch + gig) — Sentinel's default kind · bounty=Superteam/hackathon listing (legacy/source-specific) · ecosystem_announcement=protocol launch/grant · wallet_move=on-chain whale activity · price_trigger=FIRST time the price crossed your band (or breach in opposite direction) · github_release=new release/commit · observation=genuinely unusual non-event (only fire if anomalous against your recent observations) · condition_update=meaningful milestone within an already-surfaced persistent condition (duration milestone, trend change, volume spike on top of existing breach).",
+          "Signal kind for Finding mode. opportunity=high-value opportunity from any source (bounty + grant + hackathon + launch + gig) — Sentinel's default kind · market_intel=whale moves, notable wallet rotations, validation outcomes — Wren's default kind · bounty=Superteam/hackathon listing (legacy/source-specific) · ecosystem_announcement=protocol launch/grant · wallet_move=on-chain whale activity (legacy — prefer market_intel for new Wren output) · price_trigger=FIRST time the price crossed your band (or breach in opposite direction) · github_release=new release/commit · observation=genuinely unusual non-event (only fire if anomalous against your recent observations) · condition_update=meaningful milestone within an already-surfaced persistent condition (duration milestone, trend change, volume spike on top of existing breach).",
       },
       subject: {
         type: "string",

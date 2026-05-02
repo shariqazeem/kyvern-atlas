@@ -1061,7 +1061,14 @@ const WHALE_TRACKER_VOICE: VoiceProfile = {
       }
     }
 
-    // ── Step 3 — fall back to whale-tracking when no tasks available ──
+    // ── Step 3 — Phase 2: Market Intelligence fallback. Scan wallets,
+    //   if a notable swap is found, post a $0.10 validation task AND
+    //   surface a market_intel signal. Idle if quiet.
+    //
+    //   The job prompt may list multiple wallets; we pick the FIRST
+    //   address only for the scripted path (LLM owns multi-wallet
+    //   fan-out). Single-wallet keeps each tick within the cycle
+    //   budget — each watch_wallet_swaps call is ~3-5s of RPC.
     const wallet = firstSolanaAddrIn(agent.jobPrompt);
     if (!wallet) {
       return {
@@ -1069,42 +1076,158 @@ const WHALE_TRACKER_VOICE: VoiceProfile = {
         decision: { action: "observe" },
       };
     }
-    const minUsd = parseMinUsd(agent.jobPrompt, 100);
-    return runDataGatherThenMaybeSignal(agent, toolCtx, {
-      dataToolId: "watch_wallet_swaps",
-      dataInput: {
-        address: wallet,
-        lookbackCount: 25,
-        minUsdThreshold: minUsd,
-      },
-      deriveSignal: (r) => {
-        const swaps = ((r.data as { swaps?: unknown[] })?.swaps ?? []) as Array<{
-          signature: string;
-          valueUsd?: number | null;
-          tokenInMint?: string;
-          tokenOutMint?: string;
-        }>;
-        if (!Array.isArray(swaps) || swaps.length === 0) return null;
-        const top = swaps[0];
-        const usd = typeof top.valueUsd === "number" ? top.valueUsd : null;
-        if (usd !== null && usd < minUsd) return null;
-        return {
-          kind: "wallet_move",
-          subject: `Whale moved ${usd ? `$${usd.toFixed(0)} ` : ""}on ${wallet.slice(0, 6)}…`,
-          evidence: [
-            `Signature: ${top.signature}`,
-            usd ? `Value: $${usd.toFixed(2)}` : "Value: unpriced",
-            top.tokenInMint && top.tokenOutMint
-              ? `Pair: ${top.tokenInMint.slice(0, 6)} → ${top.tokenOutMint.slice(0, 6)}`
-              : "",
-          ].filter(Boolean),
-          sourceUrl: `https://explorer.solana.com/tx/${top.signature}`,
-        };
-      },
-      idleThought: () => `wallet quiet · no qualifying swaps ≥ $${minUsd} · idle`,
-      surfacedThought: (_r, s) => `surfaced whale move · ${s.subject.slice(0, 50)}`,
-      parseFailedThought: () => "wallet RPC unavailable · idle",
+    const minUsd = parseMinUsd(agent.jobPrompt, 1_000);
+
+    const watchTool = getTool("watch_wallet_swaps");
+    if (!watchTool) {
+      return {
+        thought: "watch_wallet_swaps tool unavailable · idle",
+        decision: { action: "observe" },
+      };
+    }
+    const watchInput = {
+      address: wallet,
+      lookbackCount: 25,
+      minUsdThreshold: minUsd,
+    };
+    let watchResult: AgentToolResult;
+    try {
+      watchResult = await watchTool.execute(toolCtx, watchInput);
+    } catch (e) {
+      return {
+        thought: `watch_wallet_swaps failed: ${e instanceof Error ? e.message : "error"} · idle`,
+        decision: { action: "observe" },
+      };
+    }
+    if (!watchResult.ok) {
+      return {
+        thought: "wallet RPC unavailable · idle",
+        decision: {
+          action: "tool_call",
+          toolId: "watch_wallet_swaps",
+          toolInput: watchInput,
+          toolResult: watchResult,
+        },
+        toolResult: watchResult,
+      };
+    }
+    const swaps = ((watchResult.data as { swaps?: unknown[] } | undefined)
+      ?.swaps ?? []) as Array<{
+      signature: string;
+      valueUsd?: number | null;
+      tokenInMint?: string;
+      tokenOutMint?: string;
+      timestamp?: number | null;
+    }>;
+    if (!Array.isArray(swaps) || swaps.length === 0) {
+      return {
+        thought: `wallet quiet · no qualifying swaps ≥ $${minUsd} · idle`,
+        decision: {
+          action: "tool_call",
+          toolId: "watch_wallet_swaps",
+          toolInput: watchInput,
+          toolResult: watchResult,
+        },
+        toolResult: watchResult,
+      };
+    }
+
+    // Top swap = largest USD-valued. Pre-sorted by RPC scan order, but
+    // re-sort defensively in case the tool returns multiple.
+    const sortedSwaps = swaps.slice().sort((a, b) => {
+      const aV = typeof a.valueUsd === "number" ? a.valueUsd : 0;
+      const bV = typeof b.valueUsd === "number" ? b.valueUsd : 0;
+      return bV - aV;
     });
+    const top = sortedSwaps[0];
+    const usd = typeof top.valueUsd === "number" ? top.valueUsd : null;
+    const sigShort = `${top.signature.slice(0, 6)}…${top.signature.slice(-4)}`;
+    const subject = `Whale moved ${usd ? `$${usd.toFixed(0)} ` : ""}on ${wallet.slice(0, 6)}…`;
+    const sourceUrl = `https://explorer.solana.com/tx/${top.signature}`;
+    const evidence = [
+      `Signature: ${sigShort}`,
+      usd ? `Value: $${usd.toFixed(2)}` : "Value: unpriced",
+      top.tokenInMint && top.tokenOutMint
+        ? `Pair: ${top.tokenInMint.slice(0, 6)} → ${top.tokenOutMint.slice(0, 6)}`
+        : "",
+      top.timestamp
+        ? `When: ${new Date(top.timestamp * 1000).toISOString().slice(0, 16)}`
+        : "",
+    ].filter(Boolean);
+
+    // Step 3a — post_task for validation if the swap is HIGH-VALUE
+    // (≥ minUsd × 5 — i.e. 5× the data-gather floor). We don't want
+    // to spam $0.10 tasks for every dust above the floor.
+    const postWorthyThreshold = Math.max(minUsd, 5_000);
+    const isHighValue = usd !== null && usd >= postWorthyThreshold;
+    const postTool = isHighValue ? getTool("post_task") : null;
+    let postResult: AgentToolResult | null = null;
+    if (postTool) {
+      const ask = `Validate whale move: ${subject}`;
+      const context =
+        `Signature: ${top.signature}` +
+        (usd != null ? ` · Value: $${usd.toFixed(2)}` : "") +
+        (top.tokenInMint && top.tokenOutMint
+          ? ` · Pair: ${top.tokenInMint} → ${top.tokenOutMint}`
+          : "") +
+        ` · Wallet: ${wallet}`;
+      try {
+        postResult = await postTool.execute(toolCtx, {
+          taskType: "wallet_analysis",
+          payload: JSON.stringify({ ask, context, sourceUrl }),
+          bountyUsd: 0.1,
+          ttlSeconds: 3600,
+        });
+      } catch (e) {
+        postResult = {
+          ok: false,
+          message: `post_task failed: ${e instanceof Error ? e.message : "error"}`,
+        };
+      }
+    }
+
+    // Step 3b — write the market_intel signal regardless of post
+    // outcome. Owner sees the move in the inbox even if escrow blocked.
+    const writeRes = writeSignal({
+      agentId: agent.id,
+      deviceId: agent.deviceId,
+      kind: "market_intel",
+      subject,
+      evidence: evidence.slice(0, 4),
+      sourceUrl,
+    });
+    if (writeRes.created) {
+      toolCtx.log({
+        description: `Surfaced market intel · ${subject.slice(0, 60)}${subject.length > 60 ? "…" : ""}`,
+      });
+    }
+
+    if (postResult?.ok && postResult.signature) {
+      return {
+        thought: `posted validation task · escrowed $0.10 · ${subject.slice(0, 50)}`,
+        decision: {
+          action: "tool_call",
+          toolId: "post_task",
+          toolInput: { taskType: "wallet_analysis", bountyUsd: 0.1 },
+          toolResult: postResult,
+        },
+        toolResult: postResult,
+      };
+    }
+
+    // Post failed (or skipped — not high-value enough). Surface only.
+    return {
+      thought: postResult
+        ? `surfaced market intel · ${subject.slice(0, 40)} · post_task blocked: ${postResult.failedReason ?? postResult.message ?? "unknown"}`
+        : `surfaced market intel · ${subject.slice(0, 50)}${isHighValue ? "" : " · below post threshold"}`,
+      decision: {
+        action: "tool_call",
+        toolId: "watch_wallet_swaps",
+        toolInput: watchInput,
+        toolResult: watchResult,
+      },
+      toolResult: watchResult,
+    };
   },
 };
 

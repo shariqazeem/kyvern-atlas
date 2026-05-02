@@ -22,6 +22,7 @@ import {
   GitBranch,
   Sparkles,
   Target,
+  BarChart3,
   ExternalLink,
 } from "lucide-react";
 import type { Signal, SignalKind } from "@/lib/agents/types";
@@ -37,6 +38,7 @@ const KIND_ICON: Record<SignalKind, React.ComponentType<{ className?: string; st
   observation: Sparkles,
   condition_update: TrendingUp,
   opportunity: Target,
+  market_intel: BarChart3,
 };
 
 const KIND_LABEL: Record<SignalKind, string> = {
@@ -48,6 +50,7 @@ const KIND_LABEL: Record<SignalKind, string> = {
   observation: "OBSERVATION",
   condition_update: "CONDITION UPDATE",
   opportunity: "OPPORTUNITY",
+  market_intel: "MARKET INTEL",
 };
 
 function fmtAgo(ms: number): string {

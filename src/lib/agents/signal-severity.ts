@@ -76,7 +76,12 @@ export function severityForSignal(s: SignalLike): Severity {
     if (maxDollars >= 500 && isNearDeadline(text)) return "critical";
     if (maxDollars >= 500) return "important";
   }
-  if (s.kind === "wallet_move" && maxDollars >= 10_000) return "critical";
+  if (
+    (s.kind === "wallet_move" || s.kind === "market_intel") &&
+    maxDollars >= 10_000
+  ) {
+    return "critical";
+  }
 
   // On-chain action present → at least important.
   if (s.signature) return "important";
@@ -87,6 +92,7 @@ export function severityForSignal(s: SignalLike): Severity {
     case "opportunity":
       return "important"; // an opportunity is always worth a glance even if small
     case "wallet_move":
+    case "market_intel":
       return "important";
     case "ecosystem_announcement":
       return "info";

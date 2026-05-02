@@ -738,11 +738,19 @@ function migrate(db: Database.Database) {
       // a downstream worker's job, not Sentinel's.
       bounty_hunter: ["watch_url", "post_task", "message_user"],
       ecosystem_watcher: ["watch_url", "message_user", "post_task", "claim_task"],
-      // Phase 3 — Wren toolset locked to the claim+complete economic loop.
-      // Mirrors templates.ts. DROPPED watch_wallet (no-op duplicate of
-      // watch_wallet_swaps) and read_dex (Wren doesn't track tokens).
-      // ADDED complete_task (the new Phase 1 settlement tool).
-      whale_tracker: ["watch_wallet_swaps", "claim_task", "complete_task", "message_user"],
+      // Phase 2 (billion-dollar edition) — Wren as Market Intelligence
+      // Worker. Six-tool lock: claim_task + complete_task (primary
+      // earning), watch_wallet_swaps + watch_wallet (data gathering),
+      // post_task (NEW — Wren creates paid validation tasks),
+      // message_user (surface kind='market_intel').
+      whale_tracker: [
+        "watch_wallet_swaps",
+        "watch_wallet",
+        "claim_task",
+        "complete_task",
+        "post_task",
+        "message_user",
+      ],
       // Phase 4 — Pulse toolset locked. Mirrors templates.ts. DROPPED
       // watch_wallet_swaps (Wren's domain). ADDED complete_task +
       // stake_on_finding (the new Phase 1 settlement + conviction tools).
@@ -817,13 +825,19 @@ function migrate(db: Database.Database) {
   }
 
   try {
-    const phase3WhaleTrackerTools = [
+    // Phase 2 (billion-dollar edition) REPLACE — Wren as Market
+    // Intelligence Worker adds post_task + watch_wallet to the
+    // existing claim/complete/swap toolset. Existing alive
+    // whale_tracker agents now get 6 tools instead of 4.
+    const phase2WrenTools = [
       "watch_wallet_swaps",
+      "watch_wallet",
       "claim_task",
       "complete_task",
+      "post_task",
       "message_user",
     ];
-    const desired = JSON.stringify(phase3WhaleTrackerTools);
+    const desired = JSON.stringify(phase2WrenTools);
     db.prepare(
       `UPDATE agents SET allowed_tools = ?
          WHERE template = 'whale_tracker' AND status != 'retired'
