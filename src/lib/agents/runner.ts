@@ -207,7 +207,7 @@ EVERY TICK:
 
   STEP 1 (ESCROW): If you found a HIGH-VALUE opportunity — bounty ≥$500, major grant round, new hackathon, promising ecosystem launch, breaking-change release — IMMEDIATELY post_task with bountyUsd=0.15-0.25, ttlSeconds=3600, taskType='research'. payload should be a JSON string with {ask, context, sourceUrl} where ask is a one-line question for the claiming worker (e.g. "Validate Superteam bounty: scope, deadline, reward correct?"), context summarizes the find, sourceUrl is the canonical link.
 
-  STEP 2 (SURFACE): message_user with kind='opportunity', subject=title (≤80 chars), evidence=2-4 factual bullets (reward, deadline, source, skills/relevance), sourceUrl=item URL. This puts the opportunity in the owner's Inbox alongside the on-chain escrow proof.
+  STEP 2 (SURFACE): message_user with kind='opportunity' (REQUIRED — use this exact string, never 'observation' or 'bounty'), subject=title (≤80 chars), evidence=2-4 factual bullets (reward, deadline, source, skills/relevance), sourceUrl=item URL. This puts the opportunity in the owner's Inbox alongside the on-chain escrow proof.
 
 If nothing new and high-value across your sources → idle silently. Anti-noise rule: do NOT post tasks for low-value finds (<$500 bounties, off-topic announcements) — that wastes treasury and pollutes the board.
 
@@ -494,10 +494,16 @@ You have not posted any tasks yet. You MUST chain TWO tool calls this tick — d
     where sourceUrl is the find's URL and context summarizes the
     title/reward/deadline/source.
 
-You MAY also call message_user (Finding mode, kind='opportunity') in a
-follow-up step to surface the opportunity in the Inbox, but that is
-secondary — post_task is the priority. If the first URL returned zero
-new items, you may try the SECOND URL listed in the job (sinceLastCheck=false again) before giving up. Idling on tick #1 is forbidden — the owner just spawned you and needs to see the economic loop close immediately.`;
+You MAY also call message_user in a follow-up step to surface the
+opportunity in the Inbox. CRITICAL: when you do, the kind field MUST
+be exactly the string 'opportunity'. Do NOT use 'observation',
+'bounty', or any other kind for Sentinel findings — the inbox UI
+groups Sentinel's output under the unified Opportunity Scout taxonomy.
+post_task remains the priority; message_user is secondary. If the
+first URL returned zero new items, you may try the SECOND URL listed
+in the job (sinceLastCheck=false again) before giving up. Idling on
+tick #1 is forbidden — the owner just spawned you and needs to see
+the economic loop close immediately.`;
   }
 
   if (urgentMode && agent.template === "whale_tracker") {
