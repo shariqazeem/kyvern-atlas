@@ -457,10 +457,20 @@ function allUrlsIn(s: string): string[] {
 }
 
 /** Detect feed format from URL — RSS by extension/path, JSON by /api/
- *  or .json, falls back to JSON. Mirrors watch_url's auto detection. */
+ *  or .json or api.github.com host (Phase 7 fix — the GitHub releases
+ *  endpoint at api.github.com/repos/.../releases is /repos/, NOT /api/,
+ *  so the path-based check missed it and the URL fell through to HTML
+ *  parsing, surfacing every release as the literal title "Page snapshot").
+ *  Falls back to HTML otherwise. */
 function detectFeedFormat(url: string): "json" | "rss" | "html" {
   if (/\.(?:rss|xml)\b/i.test(url) || /\/rss\b/i.test(url)) return "rss";
-  if (/\.json\b/i.test(url) || /\/api\//i.test(url)) return "json";
+  if (
+    /\.json\b/i.test(url) ||
+    /\/api\//i.test(url) ||
+    /api\.github\.com/i.test(url)
+  ) {
+    return "json";
+  }
   return "html";
 }
 

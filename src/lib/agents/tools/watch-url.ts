@@ -50,7 +50,16 @@ function md5(s: string): string {
 
 function detectFormatFromUrl(url: string): "json" | "rss" | "html" {
   if (url.endsWith(".rss") || url.endsWith(".xml") || url.includes("/rss")) return "rss";
-  if (url.endsWith(".json") || url.includes("/api/")) return "json";
+  // Phase 7 — recognise api.github.com explicitly. The path is /repos/...
+  // not /api/..., so the substring check missed it and GitHub releases
+  // were being scraped as HTML instead of parsed from the JSON array.
+  if (
+    url.endsWith(".json") ||
+    url.includes("/api/") ||
+    /^https?:\/\/api\.github\.com\//i.test(url)
+  ) {
+    return "json";
+  }
   return "html";
 }
 
