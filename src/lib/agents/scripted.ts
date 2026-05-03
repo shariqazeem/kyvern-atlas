@@ -664,8 +664,8 @@ const BOUNTY_HUNTER_VOICE: VoiceProfile = {
   // deterministic safety net that fires when Commonstack rate-limits
   // or the LLM declines a tool call.
   pickActionAsync: async (agent, toolCtx) => {
-    const urls = allUrlsIn(agent.jobPrompt);
-    if (urls.length === 0) {
+    const allUrls = allUrlsIn(agent.jobPrompt);
+    if (allUrls.length === 0) {
       return {
         thought: "no source URLs parsed from job · idle",
         decision: { action: "observe" },
@@ -685,8 +685,20 @@ const BOUNTY_HUNTER_VOICE: VoiceProfile = {
     // the same bounty over and over.
     const isFreshBH = !hasAgentPostedTask(agent.id);
 
-    // Loop through URLs in order. Stop at the first source that
-    // returned new items. Each watch_url call is bounded to ~5s.
+    // Phase 7 — round-robin start position so each tick begins from a
+    // different URL. Without this, the loop "stop at first URL with
+    // new items" combined with Superteam's always-fresh listings means
+    // Sentinel never gets past URL #1 → multi-source promise unfulfilled.
+    // Rotate the starting index by totalThoughts so we eventually
+    // touch every source. Over N ticks, all N URLs get tried first.
+    const startIdx = (agent.totalThoughts ?? 0) % Math.max(1, allUrls.length);
+    const urls = [
+      ...allUrls.slice(startIdx),
+      ...allUrls.slice(0, startIdx),
+    ];
+
+    // Loop through URLs in (rotated) priority order. Stop at the first
+    // source that returned new items. Each watch_url call is ~5s.
     let scannedSummary = "";
     let chosenUrl: string | null = null;
     let chosenItems: Array<{
