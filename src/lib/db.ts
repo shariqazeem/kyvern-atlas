@@ -674,6 +674,29 @@ function migrate(db: Database.Database) {
       ON agent_stakes(agent_id, subject_hash, created_at);
   `);
 
+  // ── Revenue Terminal: external buyers paying for Atlas's signal feed ──
+  //
+  // x402-style: external entity sends USDC to Atlas's USDC ATA and
+  // submits the signature as `X-PAYMENT-SIG` header to /api/atlas/feed.
+  // We verify the on-chain transfer, mark the signature as consumed
+  // (UNIQUE — no replay), and return the latest Atlas opportunity
+  // signal. Closes the simulated-earnings narrative gap by producing
+  // REAL inbound USDC signatures the demo can click through to Explorer.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS feed_purchases (
+      id              TEXT PRIMARY KEY,
+      signature       TEXT NOT NULL UNIQUE,
+      buyer_pubkey    TEXT NOT NULL,
+      amount_usd      REAL NOT NULL,
+      signal_id       TEXT,
+      signal_kind     TEXT,
+      signal_subject  TEXT,
+      created_at      INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_feed_purchases_recent
+      ON feed_purchases(created_at DESC);
+  `);
+
   // ── Phase 1: Economy Engine migrations ────────────────────────────
   //
   // The Phase 1 split (post → escrow, claim → in_progress, complete →

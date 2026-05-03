@@ -37,6 +37,7 @@ import { DeviceChassis } from "@/components/device/home/chassis";
 import { BalanceOrbit } from "@/components/device/home/balance-orbit";
 import { TodayStrip } from "@/components/device/home/today-strip";
 import { DiscoveryHero } from "@/components/device/home/discovery-hero";
+import { RevenueTerminal } from "@/components/device/home/revenue-terminal";
 import { LatestOpportunities } from "@/components/device/home/latest-opportunities";
 import { ActionFeed } from "@/components/device/home/action-feed";
 import type { ActionFeedItem } from "@/components/device/home/action-feed";
@@ -221,6 +222,14 @@ export default function DeviceHome() {
               onChainToday={status?.onChainToday ?? 0}
               workersActive={status?.workersActive ?? 0}
             />
+
+            {/* REVENUE TERMINAL (Phase 8) — proves money is flowing
+                IN, not just shuffling between trio workers. External
+                buyer-bot pays Atlas's x402 feed every 30s; each
+                purchase is a real Solana settlement signature
+                clickable on Explorer. Closes the simulated-earnings
+                narrative gap. */}
+            <RevenueTerminal />
 
             {/* LATEST OPPORTUNITIES — the inbox findings strip,
                 promoted to /app home so users see what their workers
