@@ -9,7 +9,15 @@ import { getDb } from "@/lib/db";
  *   · totalRevenueUsd · totalPurchases · today + last 5 buyer pulses
  *
  * No auth — everything is already public on Explorer.
+ *
+ * Forced dynamic — without this, Next.js caches the empty first
+ * response forever (the route has no request input, so it's treated
+ * as static). The buyer-bot lands purchases every 30s; we need
+ * fresh DB reads on every poll.
  */
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 interface PurchaseRow {
   id: string;
