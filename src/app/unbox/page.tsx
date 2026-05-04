@@ -443,6 +443,12 @@ function BoxAndDevice({
 }) {
   const isOpenStarted = stage !== "closed";
 
+  // Geometry — sized to fit a portrait handheld device. The container is
+  // tall enough that the device clearing the lid still has air above it.
+  //   container: 280×340
+  //   box body : 240×170     (sits at the bottom)
+  //   box lid  : 240×42      (above the body, hinges at its bottom edge)
+  //   device   : 116×190     (portrait — chassis with a real inset screen)
   return (
     <button
       type="button"
@@ -450,26 +456,27 @@ function BoxAndDevice({
       disabled={isOpenStarted}
       className="relative outline-none disabled:cursor-default"
       style={{
-        width: 240,
-        height: 200,
-        perspective: 900,
+        width: 280,
+        height: 340,
+        perspective: 1100,
       }}
       aria-label="Open the Kyvern box"
     >
-      {/* Box body */}
+      {/* Box body — premium hardware shell, soft brushed register */}
       <motion.div
-        className="absolute left-1/2 -translate-x-1/2 rounded-[18px]"
+        className="absolute left-1/2 -translate-x-1/2 rounded-[20px]"
         style={{
-          width: 200,
-          height: 130,
+          width: 240,
+          height: 170,
           bottom: 8,
           background:
-            "linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 60%, #F1F5F9 100%)",
+            "linear-gradient(180deg, #FFFFFF 0%, #F4F6FA 55%, #E9ECF2 100%)",
           border: "1px solid rgba(15,23,42,0.08)",
           boxShadow: [
-            "inset 0 1px 0 rgba(255,255,255,0.8)",
+            "inset 0 1px 0 rgba(255,255,255,0.85)",
+            "inset 0 -8px 16px rgba(15,23,42,0.04)",
             "0 12px 28px rgba(0,0,0,0.06)",
-            "0 30px 60px -20px rgba(0,0,0,0.12)",
+            "0 36px 70px -22px rgba(0,0,0,0.14)",
           ].join(", "),
         }}
         animate={{
@@ -478,38 +485,50 @@ function BoxAndDevice({
         }}
         transition={{ duration: 0.6, ease: EASE }}
       >
-        {/* Bottom KYVERN wordmark — visible only on closed box */}
+        {/* Embossed wordmark — only visible on the closed box */}
         <div
           aria-hidden
-          className="absolute bottom-3 left-0 right-0 flex justify-center"
+          className="absolute bottom-4 left-0 right-0 flex flex-col items-center gap-1"
         >
           <span
             className="font-mono uppercase"
             style={{
-              fontSize: 9,
-              letterSpacing: "0.32em",
-              color: "rgba(15,23,42,0.35)",
+              fontSize: 10,
+              letterSpacing: "0.42em",
+              color: "rgba(15,23,42,0.32)",
+              textShadow: "0 1px 0 rgba(255,255,255,0.9)",
             }}
           >
             Kyvern
           </span>
+          <span
+            className="font-mono uppercase"
+            style={{
+              fontSize: 7,
+              letterSpacing: "0.32em",
+              color: "rgba(15,23,42,0.22)",
+            }}
+          >
+            Solana · devnet
+          </span>
         </div>
       </motion.div>
 
-      {/* Box lid — flips up on open */}
+      {/* Box lid — flips up on open. Slight lip overhang so the closed
+          box reads as a real fitted-cap container. */}
       <motion.div
-        className="absolute left-1/2 -translate-x-1/2 rounded-t-[18px]"
+        className="absolute left-1/2 -translate-x-1/2 rounded-t-[20px]"
         style={{
-          width: 200,
-          height: 36,
-          bottom: 130 + 8,
+          width: 244,
+          height: 42,
+          bottom: 170 + 8 - 4,
           background:
             "linear-gradient(180deg, #FFFFFF 0%, #F1F5F9 100%)",
           border: "1px solid rgba(15,23,42,0.08)",
           borderBottom: "none",
           transformOrigin: "bottom center",
           boxShadow:
-            "inset 0 1px 0 rgba(255,255,255,0.8), 0 -2px 6px rgba(0,0,0,0.04)",
+            "inset 0 1px 0 rgba(255,255,255,0.85), 0 -2px 6px rgba(0,0,0,0.04)",
         }}
         animate={
           isOpenStarted
@@ -528,11 +547,11 @@ function BoxAndDevice({
         {/* Lid seam highlight */}
         <div
           aria-hidden
-          className="absolute bottom-0 left-2 right-2"
+          className="absolute bottom-0 left-3 right-3"
           style={{
             height: 1,
             background:
-              "linear-gradient(to right, transparent, rgba(15,23,42,0.08), transparent)",
+              "linear-gradient(to right, transparent, rgba(15,23,42,0.10), transparent)",
           }}
         />
       </motion.div>
@@ -544,107 +563,360 @@ function BoxAndDevice({
             key="glow"
             aria-hidden
             initial={{ opacity: 0 }}
-            animate={{ opacity: 0.85 }}
+            animate={{ opacity: 0.9 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.6 }}
             className="absolute left-1/2 -translate-x-1/2 rounded-full pointer-events-none"
             style={{
-              width: 180,
-              height: 70,
-              bottom: 100,
+              width: 220,
+              height: 90,
+              bottom: 120,
               background:
-                "radial-gradient(closest-side, rgba(34,197,94,0.15) 0%, rgba(34,197,94,0) 75%)",
-              filter: "blur(3px)",
+                "radial-gradient(closest-side, rgba(34,197,94,0.18) 0%, rgba(34,197,94,0) 75%)",
+              filter: "blur(4px)",
             }}
           />
         )}
       </AnimatePresence>
 
-      {/* The device — hidden inside the box, slides up on open */}
+      {/* THE DEVICE — AI labor appliance. Compute-box register: squat-
+          portrait chassis, ventilation grilles down the sides (Mac Studio
+          cue), no phone buttons (network-managed), USB-C + policy program
+          ID line at the bottom, antenna seam + sensor pinhole at top.
+          The "screen" shows three worker status rows — Sentinel · Wren ·
+          Pulse running live. That's the tell: this is a device with AI
+          labor inside it, not a handheld. */}
       <motion.div
-        className="absolute left-1/2 -translate-x-1/2 rounded-[16px] flex items-center justify-center"
+        className="absolute left-1/2"
         style={{
-          width: 168,
-          height: 100,
-          bottom: 20,
-          background:
-            "linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%)",
-          border: "1px solid rgba(15,23,42,0.08)",
-          boxShadow: [
-            "inset 0 1px 0 rgba(255,255,255,0.8)",
-            "0 8px 22px rgba(0,0,0,0.08)",
-            "0 0 0 1px rgba(34,197,94,0.08)",
-          ].join(", "),
+          width: 130,
+          height: 164,
+          bottom: 30,
+          x: "-50%",
         }}
         initial={false}
         animate={
           isOpenStarted
             ? {
-                y: stage === "opening" ? -56 : -68,
+                y: stage === "opening" ? -82 : -106,
                 opacity: 1,
                 scale: stage === "opening" ? 1 : 1.02,
+                rotateX: stage === "opening" ? 4 : -2,
+                rotateZ: 0,
               }
-            : { y: 8, opacity: 0, scale: 0.94 }
+            : { y: 18, opacity: 0, scale: 0.92, rotateX: 12, rotateZ: -1 }
         }
         transition={{
-          duration: 0.9,
+          duration: 0.95,
           ease: EASE,
           delay: isOpenStarted ? 0.25 : 0,
         }}
       >
-        {/* Status LED on the device */}
-        <div className="absolute top-3 left-3 flex items-center gap-1.5">
-          <motion.span
-            className="rounded-full"
-            style={{
-              width: 6,
-              height: 6,
-              background: "#22C55E",
-              boxShadow: "0 0 0 3px rgba(34,197,94,0.18), 0 0 8px #22C55E",
-            }}
-            animate={{ opacity: [0.6, 1, 0.6] }}
-            transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
-          />
-          <span
-            className="font-mono uppercase"
-            style={{
-              fontSize: 8.5,
-              letterSpacing: "0.18em",
-              color: "rgba(15,23,42,0.6)",
-            }}
-          >
-            Live
-          </span>
-        </div>
-
-        {/* Device wordmark */}
-        <span
-          className="font-mono uppercase"
+        {/* Chassis — brushed aluminum compute appliance */}
+        <div
+          className="relative w-full h-full rounded-[18px]"
           style={{
-            fontSize: 11,
-            letterSpacing: "0.32em",
-            color: "rgba(15,23,42,0.85)",
+            background:
+              "linear-gradient(180deg, #FBFBFD 0%, #EEF1F5 50%, #E2E6EE 100%)",
+            border: "1px solid rgba(15,23,42,0.10)",
+            boxShadow: [
+              "inset 0 1px 0 rgba(255,255,255,0.95)",
+              "inset 0 -1px 0 rgba(15,23,42,0.05)",
+              "inset 1px 0 0 rgba(255,255,255,0.6)",
+              "inset -1px 0 0 rgba(15,23,42,0.05)",
+              "0 10px 24px rgba(0,0,0,0.10)",
+              "0 24px 50px -16px rgba(0,0,0,0.18)",
+              "0 0 0 1px rgba(34,197,94,0.10)",
+            ].join(", "),
           }}
         >
-          Kyvern
-        </span>
+          {/* Top antenna seam + center pinhole sensor */}
+          <div
+            aria-hidden
+            className="absolute top-1.5 left-3 right-3"
+            style={{
+              height: 1,
+              background:
+                "linear-gradient(to right, transparent, rgba(15,23,42,0.10), transparent)",
+            }}
+          />
+          <div
+            aria-hidden
+            className="absolute top-2 left-1/2 -translate-x-1/2 rounded-full"
+            style={{
+              width: 3,
+              height: 3,
+              background:
+                "radial-gradient(circle at 30% 30%, #2A2F3A 0%, #0A0A0A 70%)",
+              boxShadow: "inset 0 0 1px rgba(255,255,255,0.15)",
+            }}
+          />
 
-        {/* Faux connector pins along the bottom */}
-        <div
-          aria-hidden
-          className="absolute bottom-2 left-4 right-4 flex justify-between"
-        >
-          {Array.from({ length: 7 }).map((_, i) => (
-            <span
+          {/* Side ventilation grilles — Mac Studio register. Vertical
+              hairline grooves down each edge of the body. */}
+          <div
+            aria-hidden
+            className="absolute"
+            style={{
+              left: 4,
+              top: 36,
+              bottom: 32,
+              width: 2,
+              background:
+                "repeating-linear-gradient(to bottom, rgba(15,23,42,0.10) 0 1px, transparent 1px 4px)",
+              opacity: 0.7,
+            }}
+          />
+          <div
+            aria-hidden
+            className="absolute"
+            style={{
+              right: 4,
+              top: 36,
+              bottom: 32,
+              width: 2,
+              background:
+                "repeating-linear-gradient(to bottom, rgba(15,23,42,0.10) 0 1px, transparent 1px 4px)",
+              opacity: 0.7,
+            }}
+          />
+
+          {/* Tiny PCB-style screw at the top corners */}
+          {[
+            { left: 6, top: 6 },
+            { right: 6, top: 6 },
+          ].map((pos, i) => (
+            <div
               key={i}
-              className="rounded-sm"
+              aria-hidden
+              className="absolute rounded-full"
               style={{
-                width: 5,
-                height: 2,
-                background: "rgba(15,23,42,0.1)",
+                ...pos,
+                width: 3,
+                height: 3,
+                background:
+                  "radial-gradient(circle at 30% 30%, #FFFFFF 0%, #C9CFD8 60%, #8E96A2 100%)",
+                boxShadow: "inset 0 0 0 0.5px rgba(15,23,42,0.18)",
               }}
             />
           ))}
+
+          {/* THE SCREEN — inset glass face showing the three workers
+              running. Off-state: dark gradient. Awake: three worker
+              status rows light up. */}
+          <div
+            className="absolute rounded-[10px] overflow-hidden"
+            style={{
+              top: 14,
+              left: 10,
+              right: 10,
+              bottom: 28,
+              background:
+                stage === "closed" || stage === "opening"
+                  ? "linear-gradient(180deg, #14171F 0%, #0A0B10 100%)"
+                  : "radial-gradient(120% 100% at 50% 0%, #1B2230 0%, #0A0B10 100%)",
+              border: "1px solid rgba(0,0,0,0.55)",
+              boxShadow: [
+                "inset 0 2px 6px rgba(0,0,0,0.45)",
+                "inset 0 0 0 1px rgba(255,255,255,0.04)",
+              ].join(", "),
+              transition: "background 0.6s ease",
+            }}
+          >
+            {/* Specular reflection — sells the screen as glass */}
+            <div
+              aria-hidden
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                background:
+                  "linear-gradient(155deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0) 38%, rgba(255,255,255,0) 60%, rgba(255,255,255,0.04) 100%)",
+              }}
+            />
+
+            {/* Faint scanline texture for "running display" feel */}
+            <div
+              aria-hidden
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                background:
+                  "repeating-linear-gradient(0deg, rgba(255,255,255,0.025) 0 1px, transparent 1px 3px)",
+                opacity: 0.6,
+              }}
+            />
+
+            {/* Screen content — three worker status rows. Only renders
+                once the device is "awake" (post-opening). */}
+            <AnimatePresence>
+              {stage !== "closed" && stage !== "opening" && (
+                <motion.div
+                  key="screen-on"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.55, ease: EASE }}
+                  className="absolute inset-0 flex flex-col px-2.5 py-2"
+                >
+                  {/* Header — KYVERN OS line */}
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span
+                      className="font-mono uppercase"
+                      style={{
+                        fontSize: 6.5,
+                        letterSpacing: "0.24em",
+                        color: "rgba(134,239,172,0.85)",
+                        textShadow: "0 0 6px rgba(134,239,172,0.30)",
+                      }}
+                    >
+                      Kyvern OS
+                    </span>
+                    <motion.span
+                      className="rounded-full"
+                      style={{
+                        width: 4,
+                        height: 4,
+                        background: "#22C55E",
+                        boxShadow:
+                          "0 0 0 1.5px rgba(34,197,94,0.20), 0 0 6px #22C55E",
+                      }}
+                      animate={{ opacity: [0.55, 1, 0.55] }}
+                      transition={{
+                        duration: 1.6,
+                        repeat: Infinity,
+                        ease: "easeInOut",
+                      }}
+                    />
+                  </div>
+
+                  {/* Three worker status rows — the "AI labor inside"
+                      tell. Each row: status LED · emoji · name · activity
+                      tick. Real trio: Sentinel · Wren · Pulse. */}
+                  <div className="flex flex-col gap-[3px] flex-1 justify-center">
+                    {[
+                      { emoji: "🎯", name: "Sentinel", delay: 0 },
+                      { emoji: "🐋", name: "Wren", delay: 0.4 },
+                      { emoji: "📈", name: "Pulse", delay: 0.8 },
+                    ].map((w) => (
+                      <div
+                        key={w.name}
+                        className="flex items-center gap-1.5"
+                        style={{ height: 14 }}
+                      >
+                        <motion.span
+                          className="rounded-full"
+                          style={{
+                            width: 4,
+                            height: 4,
+                            background: "#22C55E",
+                            boxShadow: "0 0 4px rgba(34,197,94,0.6)",
+                            flexShrink: 0,
+                          }}
+                          animate={{ opacity: [0.4, 1, 0.4] }}
+                          transition={{
+                            duration: 1.4,
+                            repeat: Infinity,
+                            ease: "easeInOut",
+                            delay: w.delay,
+                          }}
+                        />
+                        <span style={{ fontSize: 9, lineHeight: 1 }}>
+                          {w.emoji}
+                        </span>
+                        <span
+                          className="font-mono"
+                          style={{
+                            fontSize: 7.5,
+                            letterSpacing: "0.04em",
+                            color: "rgba(231,233,238,0.85)",
+                            flex: 1,
+                          }}
+                        >
+                          {w.name}
+                        </span>
+                        <motion.span
+                          className="font-mono"
+                          style={{
+                            fontSize: 6.5,
+                            letterSpacing: "0.10em",
+                            color: "rgba(134,239,172,0.75)",
+                          }}
+                          animate={{ opacity: [0.3, 1, 0.3] }}
+                          transition={{
+                            duration: 1.6,
+                            repeat: Infinity,
+                            ease: "easeInOut",
+                            delay: w.delay + 0.2,
+                          }}
+                        >
+                          ●●●
+                        </motion.span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Footer — policy program ID stamp */}
+                  <div
+                    className="font-mono uppercase text-center"
+                    style={{
+                      fontSize: 5.5,
+                      letterSpacing: "0.20em",
+                      color: "rgba(231,233,238,0.35)",
+                      marginTop: 2,
+                    }}
+                  >
+                    Policy · PpmZ…MSqc
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* Bottom edge — USB-C port + power LED + memo of program */}
+          <div
+            aria-hidden
+            className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full"
+            style={{
+              width: 18,
+              height: 4,
+              background:
+                "linear-gradient(180deg, #0A0B10 0%, #14171F 100%)",
+              boxShadow:
+                "inset 0 1px 2px rgba(0,0,0,0.6), 0 1px 0 rgba(255,255,255,0.6)",
+            }}
+          />
+          {/* Power LED — bottom-left, always on */}
+          <motion.span
+            aria-hidden
+            className="absolute rounded-full"
+            style={{
+              left: 12,
+              bottom: 4,
+              width: 3,
+              height: 3,
+              background: "#22C55E",
+              boxShadow: "0 0 4px rgba(34,197,94,0.7)",
+            }}
+            animate={{ opacity: [0.55, 1, 0.55] }}
+            transition={{
+              duration: 2,
+              repeat: Infinity,
+              ease: "easeInOut",
+            }}
+          />
+          {/* AI LABOR DEVICE wordmark — embossed bottom-right */}
+          <span
+            aria-hidden
+            className="absolute font-mono uppercase"
+            style={{
+              right: 8,
+              bottom: 3,
+              fontSize: 5,
+              letterSpacing: "0.32em",
+              color: "rgba(15,23,42,0.30)",
+              textShadow: "0 1px 0 rgba(255,255,255,0.85)",
+            }}
+          >
+            AI Labor
+          </span>
         </div>
       </motion.div>
     </button>
