@@ -36,6 +36,9 @@ export interface ActionFeedItem {
   signatureStatus: "success" | "failed" | null;
   counterparty: string | null;
   message: string | null;
+  /** Live Engine — sponsor brand resolved server-side from
+   *  counterparty + message. Null when no recognizable brand matched. */
+  brand?: string | null;
 }
 
 interface ActionFeedProps {

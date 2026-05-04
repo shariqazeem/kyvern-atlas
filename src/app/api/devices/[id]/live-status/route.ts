@@ -129,7 +129,28 @@ async function fetchVaultBalances(
   }
 }
 
-function verbFor(toolUsed: string | null): string {
+/** Map a URL host or counterparty hint to a recognizable sponsor /
+ *  ecosystem name. Live Engine uses these inside worker verbs so the
+ *  judge sees real platforms ("Helius bounty", "Squads task") instead
+ *  of generic verbs. Returns null when nothing recognizable matches. */
+function brandFromHint(hint: string | null | undefined): string | null {
+  if (!hint) return null;
+  const h = hint.toLowerCase();
+  if (h.includes("superteam")) return "Superteam";
+  if (h.includes("colosseum")) return "Colosseum";
+  if (h.includes("helius")) return "Helius";
+  if (h.includes("anza-xyz") || h.includes("agave")) return "Agave";
+  if (h.includes("anchor")) return "Anchor";
+  if (h.includes("metaplex")) return "Metaplex";
+  if (h.includes("solana.com") || h.includes("solana foundation"))
+    return "Solana Foundation";
+  if (h.includes("jupiter") || h.includes("jup.ag")) return "Jupiter";
+  if (h.includes("squads")) return "Squads";
+  return null;
+}
+
+function verbFor(toolUsed: string | null, hint?: string | null): string {
+  const brand = brandFromHint(hint);
   if (!toolUsed) return "thought";
   switch (toolUsed) {
     case "read_dex":
@@ -137,7 +158,7 @@ function verbFor(toolUsed: string | null): string {
     case "read_onchain":
       return "read on-chain data";
     case "watch_url":
-      return "scanned a feed";
+      return brand ? `scanned ${brand}` : "scanned a feed";
     case "watch_wallet":
       return "watched a wallet";
     case "watch_wallet_swaps":
@@ -149,9 +170,13 @@ function verbFor(toolUsed: string | null): string {
     case "subscribe_to_agent":
       return "paid another worker";
     case "post_task":
-      return "posted a task";
+      return brand ? `posted a ${brand} task` : "posted a task";
     case "claim_task":
-      return "claimed a task";
+      return brand ? `claimed a ${brand} task` : "claimed a task";
+    case "complete_task":
+      return brand ? `completed a ${brand} task` : "completed a task";
+    case "stake_on_finding":
+      return "staked on a finding";
     default:
       return toolUsed.replace(/_/g, " ");
   }
@@ -530,6 +555,11 @@ export async function GET(
     } catch {
       /* ignore */
     }
+    // Live Engine — sponsor brand resolved from counterparty + message.
+    // Surfaces "Squads / Helius / Superteam / Metaplex / etc." inside
+    // worker verbs so the rail copy reads as an ecosystem-aware product.
+    const brand =
+      brandFromHint(r.counterparty) ?? brandFromHint(toolMessage);
     return {
       id: r.id,
       timestamp: r.timestamp,
@@ -540,6 +570,7 @@ export async function GET(
       signatureStatus: r.signature_status as "success" | "failed" | null,
       counterparty: r.counterparty,
       message: toolMessage,
+      brand,
     };
   });
 
@@ -578,6 +609,47 @@ export async function GET(
       }
     : null;
 
+  // Live Engine — bottom-rail scoreboard. One scan over today's
+  // vault_payments produces every counter the rail needs.
+  const todayPaymentsAll = db
+    .prepare(
+      `SELECT amount_usd, status, tx_signature, created_at
+         FROM vault_payments
+        WHERE vault_id = ?
+        ORDER BY created_at DESC`,
+    )
+    .all(params.id) as Array<{
+    amount_usd: number;
+    status: string;
+    tx_signature: string | null;
+    created_at: string;
+  }>;
+  let dailySpentUsd = 0;
+  let callsToday = 0;
+  let blockedToday = 0;
+  let lastSettledTxSignature: string | null = null;
+  for (const r of todayPaymentsAll) {
+    const ms = tsToMs(r.created_at);
+    if (ms < todayMs) continue;
+    callsToday += 1;
+    const approved = r.status === "allowed" || r.status === "settled";
+    if (approved) {
+      dailySpentUsd += r.amount_usd ?? 0;
+      if (!lastSettledTxSignature && r.tx_signature) {
+        lastSettledTxSignature = r.tx_signature;
+      }
+    } else {
+      blockedToday += 1;
+    }
+  }
+  const policySummary = {
+    dailyLimitUsd: vault.dailyLimitUsd,
+    dailySpentUsd,
+    callsToday,
+    blockedToday,
+    lastSettledTxSignature,
+  };
+
   // On-chain balances (legacy vaults without a PDA report zero)
   const balances = vault.vaultPda
     ? await fetchVaultBalances(vault.vaultPda, vault.network)
@@ -608,5 +680,7 @@ export async function GET(
     policyLastAction,
     // Phase 6 — discovery-first home page metrics (the new headline)
     discoveryToday,
+    // Live Engine — bottom-rail scoreboard summary
+    policySummary,
   });
 }

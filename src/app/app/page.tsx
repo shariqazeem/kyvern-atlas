@@ -1,39 +1,46 @@
 "use client";
 
 /**
- * /app — Device Home (Phase 6: discovery-first reframe).
+ * /app — the Live Engine.
  *
- * The closed-circuit trio economy ("$0.00 earned today") was the
- * mathematically-truthful but narratively-hollow Phase 5 headline.
- * Phase 6 re-leads with the *discovery* output of the workers — the
- * real value the user actually wants:
+ * The pre-Live-Engine /app stacked nine separate dashboard cards inside
+ * the device chassis. It was a dashboard. Dashboards force the viewer
+ * to interpret the story; a Frontier judge swiping on a phone for eight
+ * seconds will not. So the headline is now exactly three things:
  *
- *   • DISCOVERY HERO — "Your workers found N opportunities today" —
- *     headline, with $ surfaced + validated + actionable sub-pills,
- *     and the closed-loop economy demoted to a small footer pill.
- *   • LATEST OPPORTUNITIES — the inbox findings strip, promoted from
- *     the demoted /app/inbox to the home page so users see what their
- *     workers actually surfaced without an extra click.
- *   • LIVE LOOP (formerly Action Feed) — economic activity log with
- *     Explorer links. Stays as proof, not headline.
- *   • POLICY SHIELD — on-chain enforcement bar.
- *   • WORKER STRIP — per-worker chip row.
- *   • BALANCE ORBIT — secondary visual signature.
- *   • TODAY STRIP — full grid of today's stats.
- *   • DeviceFAB — top-up / hire-worker.
+ *   1. TOP RAIL — the device frame (KVN serial · uptime · vault USDC ·
+ *      "Secured by Squads"). The device noun, made tangible.
+ *   2. WORKER STAGE — three vertical tiles, one per worker. Each tile
+ *      shows status LED + verb + outcome line ("Tried $0.40 → ❌
+ *      Blocked (daily cap)" / "Earned $0.15 → Settled") + Explorer
+ *      pill. Tap → /app/agents/[id]. The worker noun, made the
+ *      protagonist. The outcome line surfaces the chain as the
+ *      antagonist — the unforgettable thing.
+ *   3. BOTTOM RAIL — daily-cap gauge + calls today + blocked today +
+ *      latest settled tx pill. The dollar noun, made the scoreboard.
  *
- * Live data: `/api/devices/[id]/live-status` polled every 5s, now
- * returning a `discoveryToday` block (opportunities count, surfaced
- * value USD, validated count, actionable count) added in Phase 6.
+ * Everything else (ActionFeed · RevenueTerminal · PolicyShield ·
+ * LatestOpportunities · DiscoveryHero · TodayStrip · BalanceOrbit) is
+ * still alive — it just lives inside the "View full activity" pull-up
+ * sheet now. One layer of depth, not nine columns of breadth.
+ *
+ * Data: `/api/devices/[id]/live-status` polled every 5s. Same payload
+ * as before plus an additive `policySummary` block for the bottom rail.
+ * No new endpoints, no new tools, no new fetches — exactly the data we
+ * already had, just shown as a scene instead of a wall.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, ChevronUp } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useDeviceStore } from "@/hooks/use-device-store";
 import { DeviceChassis } from "@/components/device/home/chassis";
+import { TopRail } from "@/components/device/home/top-rail";
+import { BottomRail } from "@/components/device/home/bottom-rail";
+import { WorkerTile } from "@/components/device/home/worker-tile";
+import { ActivitySheet } from "@/components/device/home/activity-sheet";
 import { BalanceOrbit } from "@/components/device/home/balance-orbit";
 import { TodayStrip } from "@/components/device/home/today-strip";
 import { DiscoveryHero } from "@/components/device/home/discovery-hero";
@@ -41,7 +48,6 @@ import { RevenueTerminal } from "@/components/device/home/revenue-terminal";
 import { LatestOpportunities } from "@/components/device/home/latest-opportunities";
 import { ActionFeed } from "@/components/device/home/action-feed";
 import type { ActionFeedItem } from "@/components/device/home/action-feed";
-import { WorkerStrip } from "@/components/device/home/worker-strip";
 import { PolicyShield } from "@/components/device/home/policy-shield";
 import { DeviceFAB } from "@/components/device/home/device-fab";
 import { TopUpDrawer } from "@/components/device/top-up-drawer";
@@ -96,6 +102,14 @@ interface LiveStatus {
     validated: number;
     actionable: number;
   };
+  // Live Engine — bottom-rail scoreboard summary
+  policySummary?: {
+    dailyLimitUsd: number;
+    dailySpentUsd: number;
+    callsToday: number;
+    blockedToday: number;
+    lastSettledTxSignature: string | null;
+  };
 }
 
 function devWallet(): string {
@@ -110,14 +124,6 @@ function devWallet(): string {
   return s;
 }
 
-const VERB_BY_TOOL: Record<string, string> = {
-  post_task: "posted a task",
-  claim_task: "claimed a task",
-  complete_task: "completed a task",
-  stake_on_finding: "staked on a finding",
-  subscribe_to_agent: "subscribed to feed",
-};
-
 export default function DeviceHome() {
   const { wallet, isLoading } = useAuth();
   const { init } = useDeviceStore();
@@ -126,6 +132,7 @@ export default function DeviceHome() {
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<LiveStatus | null>(null);
   const [topUpOpen, setTopUpOpen] = useState(false);
+  const [activityOpen, setActivityOpen] = useState(false);
 
   // Resolve the user's primary device once
   useEffect(() => {
@@ -171,16 +178,13 @@ export default function DeviceHome() {
 
   const onTopUp = useCallback(() => setTopUpOpen(true), []);
 
-  // Derive last-verb-by-agent from the action feed so the WorkerStrip
-  // shows a real recent action ("staked", "completed", etc.) instead
-  // of the template's default verb. Falls back inside WorkerStrip.
-  const lastVerbByAgent = useMemo(() => {
+  // Live Engine — most recent ActionFeedItem per worker. Each
+  // WorkerTile uses its own to render the verb + outcome line.
+  const lastActionByWorker = useMemo(() => {
     const feed = status?.actionFeed ?? [];
-    const map: Record<string, string> = {};
+    const map: Record<string, ActionFeedItem> = {};
     for (const item of feed) {
-      if (map[item.worker.id]) continue;
-      const v = VERB_BY_TOOL[item.tool];
-      if (v) map[item.worker.id] = v;
+      if (!map[item.worker.id]) map[item.worker.id] = item;
     }
     return map;
   }, [status?.actionFeed]);
@@ -244,92 +248,98 @@ export default function DeviceHome() {
           paused={status?.paused ?? false}
           network={status?.network ?? "devnet"}
         >
-          <div className="flex flex-col gap-4 sm:gap-5">
-            {/* DISCOVERY HERO (Phase 6) — leads with what workers
-                FOUND for the user, not the closed-loop $ they
-                shuffled. Pulse-on-increment glow when a new opp
-                lands. The closed-loop economy is demoted to a small
-                footer pill on this card so the proof is still here. */}
-            <DiscoveryHero
-              opportunitiesToday={status?.discoveryToday?.opportunities ?? 0}
-              surfacedValueUsd={status?.discoveryToday?.surfacedValueUsd ?? 0}
-              validatedToday={status?.discoveryToday?.validated ?? 0}
-              actionableToday={status?.discoveryToday?.actionable ?? 0}
-              earnedToday={status?.pnlToday.earned ?? 0}
-              onChainToday={status?.onChainToday ?? 0}
-              workersActive={status?.workersActive ?? 0}
+          <div className="flex flex-col gap-3.5 sm:gap-4">
+            {/* TOP RAIL — device frame. Serial · uptime · vault · Squads. */}
+            <TopRail
+              serial={status?.serial ?? null}
+              bornAt={status?.bornAt ?? null}
+              usdcBalance={status?.usdcBalance ?? 0}
+              network={status?.network ?? "devnet"}
+              paused={status?.paused ?? false}
             />
 
-            {/* REVENUE TERMINAL (Phase 8) — proves money is flowing
-                IN, not just shuffling between trio workers. External
-                buyer-bot pays Atlas's x402 feed every 30s; each
-                purchase is a real Solana settlement signature
-                clickable on Explorer. Closes the simulated-earnings
-                narrative gap. */}
-            <RevenueTerminal />
+            {/* WORKER STAGE — three vertical tiles, the protagonists.
+                Each tile renders verb + outcome line ("Tried $X →
+                Approved" / "Attempted $X → Blocked (cap)") so the
+                chain reads as the visible enforcer. Tap → /app/agents/[id]. */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-3.5">
+              {(status?.workers ?? []).map((w) => (
+                <WorkerTile
+                  key={w.id}
+                  worker={w}
+                  action={lastActionByWorker[w.id] ?? null}
+                  network={status?.network ?? "devnet"}
+                />
+              ))}
+              {(!status || status.workers.length === 0) && (
+                <NoWorkersState />
+              )}
+            </div>
 
-            {/* LATEST OPPORTUNITIES — the inbox findings strip,
-                promoted to /app home so users see what their workers
-                actually surfaced without navigating to /app/inbox.
-                Auto-hides if no signals exist yet. */}
-            {deviceId && <LatestOpportunities deviceId={deviceId} />}
-
-            {/* LIVE LOOP (formerly Action Feed) — every post / claim /
-                complete / stake, with Explorer links. Demoted from
-                Phase-5 headline; stays as economic-loop proof. */}
-            <ActionFeed
-              items={status?.actionFeed ?? []}
+            {/* BOTTOM RAIL — daily-cap gauge · calls today · blocked
+                today · last settled tx pill. The dollar scoreboard. */}
+            <BottomRail
+              summary={status?.policySummary ?? null}
               network={status?.network ?? "devnet"}
             />
 
-            {/* POLICY SHIELD — compact "what the chain enforced last"
-                bar. Owns its own polling at a slower cadence (15s)
-                so we don't load it from this page's status feed. */}
-            {deviceId && <PolicyShield deviceId={deviceId} />}
-
-            {/* WORKERS — compact chip row showing each worker's last
-                tool verb + total earnings. Demoted from the old
-                scrollable findings strip per Phase 5. */}
-            <WorkerStrip
-              workers={status?.workers ?? []}
-              lastVerbByAgent={lastVerbByAgent}
-            />
-
-            {/* BALANCE ORBIT — secondary now. Still the device's
-                visual signature for screenshots, but no longer the
-                headline. */}
-            <BalanceOrbit
-              usdcBalance={status?.usdcBalance ?? 0}
-              pnlNet={status?.pnlToday.net ?? 0}
-              earningPerMinUsd={status?.earningPerMinUsd ?? 0}
-              workers={status?.workers ?? []}
-              workerHref={(id) => `/app/agents/${id}`}
-              hireHref="/app/agents/spawn"
-            />
-
-            {/* TODAY STRIP — full grid of today's stats. */}
-            <TodayStrip
-              earnedToday={status?.pnlToday.earned ?? 0}
-              spentToday={status?.pnlToday.spent ?? 0}
-              signalsToday={status?.signalsToday?.total ?? 0}
-              workersActive={status?.workersActive ?? 0}
-              workersTotal={(status?.workers ?? []).length}
-              onChainToday={status?.onChainToday ?? 0}
-            />
-
-            <div className="flex items-center justify-center pt-1">
-              <Link
-                href="/atlas"
-                className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#9CA3AF] hover:text-[#0A0A0A] transition"
-              >
-                Watch Atlas →
-              </Link>
-            </div>
+            {/* The single seam to the demoted dashboard. One tap. */}
+            <button
+              type="button"
+              onClick={() => setActivityOpen(true)}
+              className="self-center inline-flex items-center gap-1.5 font-mono uppercase tracking-[0.16em] hover:opacity-80 transition py-2"
+              style={{
+                fontSize: 10.5,
+                color: "rgba(15,23,42,0.55)",
+              }}
+            >
+              View full activity
+              <ChevronUp className="w-3.5 h-3.5" strokeWidth={2} />
+            </button>
           </div>
         </DeviceChassis>
       </div>
 
       <DeviceFAB onTopUp={onTopUp} hireHref="/app/agents/spawn" />
+
+      {/* The deeper dashboard, kept whole but moved one tap away. */}
+      <ActivitySheet
+        open={activityOpen}
+        onClose={() => setActivityOpen(false)}
+      >
+        <DiscoveryHero
+          opportunitiesToday={status?.discoveryToday?.opportunities ?? 0}
+          surfacedValueUsd={status?.discoveryToday?.surfacedValueUsd ?? 0}
+          validatedToday={status?.discoveryToday?.validated ?? 0}
+          actionableToday={status?.discoveryToday?.actionable ?? 0}
+          earnedToday={status?.pnlToday.earned ?? 0}
+          onChainToday={status?.onChainToday ?? 0}
+          workersActive={status?.workersActive ?? 0}
+        />
+        <RevenueTerminal />
+        {deviceId && <LatestOpportunities deviceId={deviceId} />}
+        <ActionFeed
+          items={status?.actionFeed ?? []}
+          network={status?.network ?? "devnet"}
+        />
+        {deviceId && <PolicyShield deviceId={deviceId} />}
+        <BalanceOrbit
+          usdcBalance={status?.usdcBalance ?? 0}
+          pnlNet={status?.pnlToday.net ?? 0}
+          earningPerMinUsd={status?.earningPerMinUsd ?? 0}
+          workers={status?.workers ?? []}
+          workerHref={(id) => `/app/agents/${id}`}
+          hireHref="/app/agents/spawn"
+        />
+        <TodayStrip
+          earnedToday={status?.pnlToday.earned ?? 0}
+          spentToday={status?.pnlToday.spent ?? 0}
+          signalsToday={status?.signalsToday?.total ?? 0}
+          workersActive={status?.workersActive ?? 0}
+          workersTotal={(status?.workers ?? []).length}
+          onChainToday={status?.onChainToday ?? 0}
+        />
+      </ActivitySheet>
 
       <TopUpDrawer
         open={topUpOpen}
@@ -341,6 +351,28 @@ export default function DeviceHome() {
         usdcBalance={status?.usdcBalance ?? 0}
       />
     </>
+  );
+}
+
+function NoWorkersState() {
+  return (
+    <div
+      className="col-span-full rounded-[16px] px-5 py-8 text-center"
+      style={{
+        background: "#FFFFFF",
+        border: "1px dashed rgba(15,23,42,0.10)",
+      }}
+    >
+      <div
+        className="font-mono uppercase tracking-[0.18em] mb-2"
+        style={{ color: "rgba(15,23,42,0.55)", fontSize: 10.5 }}
+      >
+        No workers yet
+      </div>
+      <p className="text-[13px]" style={{ color: "#475569" }}>
+        Spawn your first worker to see the engine come alive.
+      </p>
+    </div>
   );
 }
 

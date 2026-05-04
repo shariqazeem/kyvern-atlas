@@ -1,0 +1,410 @@
+"use client";
+
+/**
+ * WorkerTile — the protagonist of the /app Live Engine.
+ *
+ * One vertical tile per worker (Sentinel · Wren · Pulse). Each tile
+ * tells the judge in five seconds:
+ *
+ *   1. The worker is alive (status LED, idle / thinking / acting)
+ *   2. What it just tried to do (verb, with sponsor brand when present)
+ *   3. Whether the chain approved or blocked it (outcome line — the
+ *      tension that turns a dashboard into a Live Engine)
+ *   4. A one-tap link to the real Solana signature (Explorer pill)
+ *   5. A one-tap zoom into the worker's full thought feed (tap anywhere)
+ *
+ * Data: a single `actionFeedItem` filtered upstream from the action
+ * feed — first entry that matches this worker's id. When a worker has
+ * no recent action in the feed window, we fall back to the static
+ * worker meta (totalEarnedUsd, totalThoughts) so the tile is never
+ * blank.
+ *
+ * One tile shape, three workers' worth of stories. The chain is the
+ * antagonist; the green vs red on the outcome line makes that visible.
+ */
+
+import Link from "next/link";
+import { motion } from "framer-motion";
+import { ArrowUpRight, Check, X } from "lucide-react";
+
+const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
+
+export interface WorkerTileWorker {
+  id: string;
+  name: string;
+  emoji: string;
+  template: string;
+  isThinking: boolean;
+  totalThoughts: number;
+  totalEarnedUsd: number;
+}
+
+export interface WorkerTileAction {
+  id: string;
+  timestamp: number;
+  tool: string;
+  amountUsd: number | null;
+  signature: string | null;
+  signatureStatus: "success" | "failed" | null;
+  counterparty: string | null;
+  message: string | null;
+  brand?: string | null;
+}
+
+interface Props {
+  worker: WorkerTileWorker;
+  /** Most recent action_feed row that belongs to this worker. */
+  action: WorkerTileAction | null;
+  network: "devnet" | "mainnet";
+  /** Optional shorthand for a sponsor brand resolved upstream. */
+  fallbackBrand?: string | null;
+}
+
+/* ────────────────────────────────────────────────────────────────────
+   Tile
+   ──────────────────────────────────────────────────────────────────── */
+
+export function WorkerTile({ worker, action, network, fallbackBrand }: Props) {
+  const status = resolveStatus(worker, action);
+  const verb = resolveVerb(action, fallbackBrand);
+  const outcome = resolveOutcome(worker, action);
+
+  return (
+    <Link
+      href={`/app/agents/${worker.id}`}
+      className="group relative flex flex-col rounded-[16px] overflow-hidden no-underline"
+      style={{
+        background: "#FFFFFF",
+        border: "1px solid rgba(15,23,42,0.08)",
+        boxShadow:
+          "0 1px 2px rgba(15,23,42,0.04), 0 8px 24px -12px rgba(15,23,42,0.10)",
+        transition: "transform 0.2s ease, box-shadow 0.2s ease",
+      }}
+    >
+      {/* TOP — identity + status LED */}
+      <div className="flex items-center justify-between px-4 pt-4 pb-3">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div
+            className="w-9 h-9 rounded-[10px] flex items-center justify-center text-[18px] flex-shrink-0"
+            style={{
+              background:
+                "linear-gradient(180deg, #F8FAFC 0%, #FFFFFF 100%)",
+              border: "1px solid rgba(15,23,42,0.06)",
+              boxShadow: "inset 0 1px 0 rgba(255,255,255,0.9)",
+            }}
+          >
+            {worker.emoji}
+          </div>
+          <div className="min-w-0">
+            <div
+              className="text-[13.5px] font-semibold tracking-[-0.005em] truncate"
+              style={{ color: "#0A0A0A" }}
+            >
+              {worker.name}
+            </div>
+            <div
+              className="font-mono uppercase tracking-[0.12em] truncate"
+              style={{ color: "#9CA3AF", fontSize: 9.5 }}
+            >
+              {labelForTemplate(worker.template)}
+            </div>
+          </div>
+        </div>
+        <StatusLED kind={status} />
+      </div>
+
+      {/* MIDDLE — verb + outcome line. The actual story. */}
+      <div className="px-4 pb-3 flex flex-col gap-2 flex-1">
+        <div
+          className="text-[12.5px] leading-[1.45]"
+          style={{ color: "rgba(15,23,42,0.78)" }}
+        >
+          {verb}
+        </div>
+        <OutcomeLine outcome={outcome} />
+      </div>
+
+      {/* BOTTOM — Explorer pill (or quiet placeholder) + tap-to-zoom */}
+      <div
+        className="flex items-center justify-between px-4 py-2.5"
+        style={{
+          borderTop: "1px solid rgba(15,23,42,0.05)",
+          background: "rgba(15,23,42,0.02)",
+        }}
+      >
+        {action?.signature ? (
+          <a
+            href={`https://explorer.solana.com/tx/${action.signature}?cluster=${network}`}
+            target="_blank"
+            rel="noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="inline-flex items-center gap-1 font-mono"
+            style={{
+              fontSize: 10.5,
+              letterSpacing: "0.04em",
+              color: "#15803D",
+            }}
+          >
+            {action.signature.slice(0, 6)}…{action.signature.slice(-4)}
+            <ArrowUpRight className="w-3 h-3" strokeWidth={2} />
+          </a>
+        ) : (
+          <span
+            className="font-mono"
+            style={{
+              fontSize: 10.5,
+              letterSpacing: "0.04em",
+              color: "rgba(15,23,42,0.35)",
+            }}
+          >
+            no settled tx yet
+          </span>
+        )}
+        <span
+          className="font-mono uppercase tracking-[0.14em] inline-flex items-center gap-1"
+          style={{
+            fontSize: 9.5,
+            color: "rgba(15,23,42,0.45)",
+          }}
+        >
+          Open
+          <ArrowUpRight
+            className="w-3 h-3 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform"
+            strokeWidth={2}
+          />
+        </span>
+      </div>
+    </Link>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────────
+   Sub-components
+   ──────────────────────────────────────────────────────────────────── */
+
+type StatusKind = "acting" | "thinking" | "idle" | "blocked";
+
+function StatusLED({ kind }: { kind: StatusKind }) {
+  const colour =
+    kind === "acting"
+      ? "#22C55E"
+      : kind === "blocked"
+        ? "#F59E0B"
+        : kind === "thinking"
+          ? "#22C55E"
+          : "rgba(15,23,42,0.20)";
+  const label =
+    kind === "acting"
+      ? "Acting"
+      : kind === "blocked"
+        ? "Blocked"
+        : kind === "thinking"
+          ? "Thinking"
+          : "Idle";
+  return (
+    <div className="flex items-center gap-1.5">
+      <motion.span
+        className="rounded-full"
+        style={{
+          width: 6,
+          height: 6,
+          background: colour,
+          boxShadow:
+            kind === "idle"
+              ? "none"
+              : `0 0 0 3px ${colour}26, 0 0 8px ${colour}aa`,
+        }}
+        animate={kind === "idle" ? undefined : { opacity: [0.55, 1, 0.55] }}
+        transition={{
+          duration: 1.6,
+          repeat: Infinity,
+          ease: "easeInOut",
+        }}
+      />
+      <span
+        className="font-mono uppercase tracking-[0.14em]"
+        style={{
+          fontSize: 9.5,
+          color: "rgba(15,23,42,0.55)",
+        }}
+      >
+        {label}
+      </span>
+    </div>
+  );
+}
+
+function OutcomeLine({
+  outcome,
+}: {
+  outcome: { tone: "approved" | "blocked" | "pending" | "neutral"; text: string };
+}) {
+  if (outcome.tone === "neutral") {
+    return (
+      <div
+        className="font-mono"
+        style={{
+          fontSize: 11.5,
+          letterSpacing: "0.02em",
+          color: "rgba(15,23,42,0.45)",
+        }}
+      >
+        {outcome.text}
+      </div>
+    );
+  }
+
+  const palette =
+    outcome.tone === "approved"
+      ? { fg: "#15803D", bg: "rgba(34,197,94,0.08)", border: "rgba(34,197,94,0.20)" }
+      : outcome.tone === "blocked"
+        ? { fg: "#B45309", bg: "rgba(245,158,11,0.10)", border: "rgba(245,158,11,0.30)" }
+        : { fg: "#475569", bg: "rgba(15,23,42,0.04)", border: "rgba(15,23,42,0.10)" };
+
+  return (
+    <motion.div
+      key={outcome.text}
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, ease: EASE }}
+      className="inline-flex items-center gap-1.5 font-mono w-fit rounded-[8px] px-2 py-1"
+      style={{
+        fontSize: 11,
+        letterSpacing: "0.01em",
+        color: palette.fg,
+        background: palette.bg,
+        border: `1px solid ${palette.border}`,
+      }}
+    >
+      {outcome.tone === "approved" ? (
+        <Check className="w-3 h-3" strokeWidth={2.5} />
+      ) : outcome.tone === "blocked" ? (
+        <X className="w-3 h-3" strokeWidth={2.5} />
+      ) : null}
+      {outcome.text}
+    </motion.div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────────
+   Resolvers — pull data from the API into copy
+   ──────────────────────────────────────────────────────────────────── */
+
+function resolveStatus(
+  worker: WorkerTileWorker,
+  action: WorkerTileAction | null,
+): StatusKind {
+  if (action?.signatureStatus === "failed") return "blocked";
+  if (action && action.timestamp > Date.now() - 90_000) return "acting";
+  if (worker.isThinking) return "thinking";
+  return "idle";
+}
+
+/** Verb the worker is currently doing. Hybrid copy that surfaces the
+ *  sponsor brand when one is recognized in the row's counterparty or
+ *  message — that's how "scanned a feed" becomes "scanned Helius" and
+ *  the rail starts reading as an ecosystem-aware product. */
+function resolveVerb(
+  action: WorkerTileAction | null,
+  fallbackBrand?: string | null,
+): string {
+  if (!action) return "Standing by — waiting for the next tick.";
+  const brand = action.brand ?? fallbackBrand ?? null;
+  switch (action.tool) {
+    case "post_task":
+      return brand ? `Posted a ${brand} task` : "Posted a paid task";
+    case "claim_task":
+      return brand ? `Claimed a ${brand} task` : "Claimed a paid task";
+    case "complete_task":
+      return brand ? `Completed a ${brand} task` : "Completed a paid task";
+    case "stake_on_finding":
+      return "Staked on a finding";
+    case "subscribe_to_agent":
+      return "Paid another worker";
+    default:
+      return action.tool.replace(/_/g, " ");
+  }
+}
+
+/** The outcome line — the tension. "Tried $X → ✅ Approved" or
+ *  "Attempted $X → ❌ Blocked (reason)" makes the chain visible as the
+ *  enforcer. Falls back to a neutral line when the worker has no
+ *  recent action with money attached. */
+function resolveOutcome(
+  worker: WorkerTileWorker,
+  action: WorkerTileAction | null,
+): { tone: "approved" | "blocked" | "pending" | "neutral"; text: string } {
+  if (!action) {
+    if (worker.totalEarnedUsd > 0) {
+      return {
+        tone: "neutral",
+        text: `Earned $${worker.totalEarnedUsd.toFixed(2)} so far`,
+      };
+    }
+    return {
+      tone: "neutral",
+      text: `${worker.totalThoughts} cycle${worker.totalThoughts === 1 ? "" : "s"} so far`,
+    };
+  }
+
+  const amt = action.amountUsd != null ? action.amountUsd : 0;
+  const amtStr = amt > 0 ? `$${amt.toFixed(2)}` : "an action";
+
+  if (action.signatureStatus === "failed") {
+    const reason = compressReason(action.message);
+    return {
+      tone: "blocked",
+      text: reason
+        ? `Attempted ${amtStr} → Blocked (${reason})`
+        : `Attempted ${amtStr} → Blocked by chain`,
+    };
+  }
+  if (action.signatureStatus === "success") {
+    if (action.tool === "stake_on_finding") {
+      return { tone: "approved", text: `Staked ${amtStr} → Settled` };
+    }
+    if (action.tool === "complete_task") {
+      return { tone: "approved", text: `Earned ${amtStr} → Settled` };
+    }
+    return { tone: "approved", text: `Spent ${amtStr} → Approved` };
+  }
+  return {
+    tone: "pending",
+    text: amt > 0 ? `Trying ${amtStr}…` : "Trying…",
+  };
+}
+
+/** Trim raw policy / RPC failure messages into a 2-3 word badge.
+ *  "Spending limit exceeded — daily cap" → "daily cap"
+ *  "merchant not in allowlist (api.openai.com)" → "merchant not allowed" */
+function compressReason(message: string | null): string | null {
+  if (!message) return null;
+  const m = message.toLowerCase();
+  if (m.includes("daily cap") || m.includes("daily limit")) return "daily cap";
+  if (m.includes("weekly cap") || m.includes("weekly limit")) return "weekly cap";
+  if (m.includes("per-tx") || m.includes("max per tx") || m.includes("per tx max"))
+    return "per-tx cap";
+  if (m.includes("velocity") || m.includes("rate limit")) return "rate limit";
+  if (m.includes("merchant") || m.includes("allowlist")) return "merchant blocked";
+  if (m.includes("memo")) return "memo missing";
+  if (m.includes("paused") || m.includes("kill")) return "kill switch";
+  if (m.includes("insufficient")) return "low balance";
+  return null;
+}
+
+function labelForTemplate(template: string): string {
+  switch (template) {
+    case "bounty_hunter":
+      return "Opportunity scout";
+    case "whale_tracker":
+      return "Market intel";
+    case "token_pulse":
+      return "Validation · staking";
+    case "ecosystem_watcher":
+      return "Ecosystem scout";
+    case "github_watcher":
+      return "Release watcher";
+    default:
+      return template.replace(/_/g, " ");
+  }
+}
