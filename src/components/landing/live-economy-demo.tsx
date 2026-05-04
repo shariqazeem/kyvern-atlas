@@ -50,13 +50,20 @@ function fakeSig(): string {
   return s;
 }
 
+// Deterministic placeholders for the very first paint so server-rendered
+// HTML matches the client hydration. The useEffect below replaces them
+// with random sig prefixes after mount.
+const SEED_SIGS = ["5xK3Bn2P", "Tq9aR4mZ", "Jh7PvX1L", "4kNs8WpC"];
+
 export function LiveEconomyDemo() {
   // Start with 4 seeded actions so the feed is never empty on first paint.
+  // Seeds are deterministic to avoid SSR/CSR hydration mismatch; we
+  // randomize them in the useEffect below.
   const [actions, setActions] = useState<DemoAction[]>(() => {
     const seeded: DemoAction[] = [];
     for (let i = 0; i < 4; i++) {
       const tpl = ACTION_TEMPLATES[i % ACTION_TEMPLATES.length];
-      seeded.push({ ...tpl, id: -i, sigPrefix: fakeSig() });
+      seeded.push({ ...tpl, id: -i, sigPrefix: SEED_SIGS[i] });
     }
     return seeded;
   });

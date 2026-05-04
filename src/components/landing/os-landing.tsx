@@ -38,6 +38,7 @@ import {
 } from "@/components/landing/hero-device";
 import { LandingTrustBar } from "@/components/landing/landing-trust-bar";
 import { LiveEconomyDemo } from "@/components/landing/live-economy-demo";
+import { MouseGlowCard } from "@/components/landing/mouse-glow-card";
 
 const POLICY_PROGRAM_ID = "PpmZErWfT5zpeo1fJtTbpqezFGbRUamaNNRWViaMSqc";
 
@@ -143,8 +144,8 @@ function SectionHeroDevice({
       style={{
         minHeight: "100vh",
         background:
-          "radial-gradient(120% 100% at 30% 0%, #1B2230 0%, #0E1320 55%, #080B14 100%)",
-        color: "rgba(255,255,255,0.92)",
+          "radial-gradient(120% 100% at 30% 0%, #FFFFFF 0%, #F8FAFC 55%, #F1F5F9 100%)",
+        color: "#0A0A0A",
       }}
     >
       {/* fine-grain noise */}
@@ -154,8 +155,8 @@ function SectionHeroDevice({
         style={{
           background:
             "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100'><filter id='n'><feTurbulence baseFrequency='0.9' numOctaves='2' /></filter><rect width='100' height='100' filter='url(%23n)' opacity='0.5'/></svg>\")",
-          opacity: 0.022,
-          mixBlendMode: "overlay",
+          opacity: 0.03,
+          mixBlendMode: "multiply",
           zIndex: 0,
         }}
       />
@@ -199,7 +200,7 @@ function SectionHeroDevice({
           <span
             className="font-mono uppercase"
             style={{
-              color: "rgba(255,255,255,0.55)",
+              color: "rgba(15,23,42,0.65)",
               fontSize: 10.5,
               letterSpacing: "0.20em",
             }}
@@ -229,10 +230,10 @@ function SectionHeroDevice({
           transition={{ duration: 0.7, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
           className="text-center mx-auto max-w-[920px] tracking-tight leading-[1.05] mb-5"
           style={{
-            color: "rgba(255,255,255,0.98)",
+            color: "#0A0A0A",
             fontSize: "clamp(34px, 6.4vw, 64px)",
-            fontWeight: 600,
-            letterSpacing: "-0.025em",
+            fontWeight: 700,
+            letterSpacing: "-0.03em",
           }}
         >
           Your device hires AI workers. They earn{" "}
@@ -247,7 +248,7 @@ function SectionHeroDevice({
           transition={{ duration: 0.6, delay: 0.32 }}
           className="text-center mx-auto max-w-[640px] leading-[1.55]"
           style={{
-            color: "rgba(255,255,255,0.62)",
+            color: "rgba(15,23,42,0.7)",
             fontSize: "clamp(14px, 1.6vw, 16px)",
           }}
         >
@@ -267,11 +268,11 @@ function SectionHeroDevice({
             href="/unbox"
             className="inline-flex items-center justify-center gap-2 h-[52px] px-8 rounded-[12px] text-[14.5px] font-semibold tracking-[-0.005em] active:scale-[0.98] transition group"
             style={{
-              background: "#FFFFFF",
-              color: "#0A0B10",
-              border: "1px solid rgba(134,239,172,0.45)",
+              background: "#0A0A0A",
+              color: "#FFFFFF",
+              border: "1px solid rgba(0,0,0,0.8)",
               boxShadow:
-                "0 1px 0 rgba(255,255,255,0.18), 0 0 0 4px rgba(134,239,172,0.10), 0 12px 28px rgba(0,0,0,0.45)",
+                "0 4px 14px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.08)",
             }}
           >
             Get your Kyvern
@@ -284,9 +285,10 @@ function SectionHeroDevice({
             href="/atlas"
             className="inline-flex items-center gap-1.5 h-[52px] px-6 rounded-[12px] text-[13.5px] font-medium tracking-[-0.005em]"
             style={{
-              color: "rgba(255,255,255,0.78)",
-              background: "transparent",
-              border: "1px solid rgba(255,255,255,0.12)",
+              color: "rgba(15,23,42,0.85)",
+              background: "#FFFFFF",
+              border: "1px solid rgba(15,23,42,0.12)",
+              boxShadow: "0 1px 2px rgba(15,23,42,0.04)",
             }}
           >
             Watch Atlas run live
@@ -303,13 +305,13 @@ function SectionHeroDevice({
         >
           <span
             className="font-mono uppercase tracking-[0.18em]"
-            style={{ color: "rgba(255,255,255,0.30)", fontSize: 9.5 }}
+            style={{ color: "rgba(15,23,42,0.40)", fontSize: 9.5 }}
           >
             See how it works
           </span>
           <ArrowDown
             className="w-3.5 h-3.5 animate-bounce"
-            style={{ color: "rgba(255,255,255,0.30)" }}
+            style={{ color: "rgba(15,23,42,0.40)" }}
           />
         </motion.div>
       </div>
@@ -409,30 +411,26 @@ function SectionProblem() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: "-80px" }}
               transition={{ duration: 0.5, delay: i * 0.06 }}
-              className="rounded-[16px] p-6"
-              style={{
-                background: "#FFFFFF",
-                border: "1px solid rgba(15,23,42,0.06)",
-                boxShadow: "0 1px 2px rgba(15,23,42,0.04)",
-              }}
             >
-              <h3
-                className="mb-2 tracking-tight"
-                style={{
-                  color: "#0A0A0A",
-                  fontSize: 17,
-                  fontWeight: 600,
-                  letterSpacing: "-0.01em",
-                }}
-              >
-                {c.title}
-              </h3>
-              <p
-                className="text-[13.5px] leading-[1.6]"
-                style={{ color: "#475569" }}
-              >
-                {c.body}
-              </p>
+              <MouseGlowCard className="p-6 h-full">
+                <h3
+                  className="mb-2 tracking-tight"
+                  style={{
+                    color: "#0A0A0A",
+                    fontSize: 17,
+                    fontWeight: 600,
+                    letterSpacing: "-0.01em",
+                  }}
+                >
+                  {c.title}
+                </h3>
+                <p
+                  className="text-[13.5px] leading-[1.6]"
+                  style={{ color: "#475569" }}
+                >
+                  {c.body}
+                </p>
+              </MouseGlowCard>
             </motion.div>
           ))}
         </div>
@@ -524,27 +522,24 @@ function SectionDevice() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: "-80px" }}
               transition={{ duration: 0.5, delay: i * 0.06 }}
-              className="rounded-[16px] p-6"
-              style={{
-                background: "#FFFFFF",
-                border: "1px solid rgba(15,23,42,0.06)",
-              }}
             >
-              <div
-                className="font-mono uppercase tracking-[0.16em] mb-2"
-                style={{ color: "#9CA3AF", fontSize: 10 }}
-              >
-                {l.tag}
-              </div>
-              <h3
-                className="text-[17px] font-semibold tracking-tight mb-2"
-                style={{ color: "#0A0A0A" }}
-              >
-                {l.title}
-              </h3>
-              <p className="text-[13.5px] leading-[1.6]" style={{ color: "#475569" }}>
-                {l.body}
-              </p>
+              <MouseGlowCard className="p-6 h-full">
+                <div
+                  className="font-mono uppercase tracking-[0.16em] mb-2"
+                  style={{ color: "#9CA3AF", fontSize: 10 }}
+                >
+                  {l.tag}
+                </div>
+                <h3
+                  className="text-[17px] font-semibold tracking-tight mb-2"
+                  style={{ color: "#0A0A0A" }}
+                >
+                  {l.title}
+                </h3>
+                <p className="text-[13.5px] leading-[1.6]" style={{ color: "#475569" }}>
+                  {l.body}
+                </p>
+              </MouseGlowCard>
             </motion.div>
           ))}
         </div>
@@ -674,67 +669,63 @@ function SectionWorkers() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: "-80px" }}
               transition={{ duration: 0.5, delay: i * 0.05 }}
-              className="rounded-[16px] p-5 flex flex-col"
-              style={{
-                background: "#FFFFFF",
-                border: "1px solid rgba(15,23,42,0.06)",
-                boxShadow: "0 1px 2px rgba(15,23,42,0.03)",
-              }}
             >
-              <div className="flex items-center gap-2.5 mb-4">
+              <MouseGlowCard className="p-5 h-full flex flex-col">
+                <div className="flex items-center gap-2.5 mb-4">
+                  <div
+                    className="w-11 h-11 rounded-[12px] flex items-center justify-center text-[22px]"
+                    style={{
+                      background:
+                        "linear-gradient(180deg, #F4F5F7 0%, #FFFFFF 100%)",
+                      border: "1px solid rgba(15,23,42,0.06)",
+                      boxShadow: "inset 0 1px 1px rgba(15,23,42,0.04)",
+                    }}
+                  >
+                    {w.emoji}
+                  </div>
+                  <div className="min-w-0">
+                    <div
+                      className="text-[14px] font-semibold tracking-tight truncate"
+                      style={{ color: "#0A0A0A" }}
+                    >
+                      {w.name}
+                    </div>
+                    <div
+                      className="font-mono uppercase tracking-[0.10em]"
+                      style={{ color: "#9CA3AF", fontSize: 9.5 }}
+                    >
+                      {w.role}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2 mb-4">
+                  <KV label="Watches" value={w.watches} />
+                  <KV label="Pings on" value={w.pings} />
+                </div>
+
+                {/* Realistic finding example */}
                 <div
-                  className="w-11 h-11 rounded-[12px] flex items-center justify-center text-[22px]"
+                  className="mt-auto rounded-[12px] p-3"
                   style={{
-                    background:
-                      "linear-gradient(180deg, #F4F5F7 0%, #FFFFFF 100%)",
-                    border: "1px solid rgba(15,23,42,0.06)",
-                    boxShadow: "inset 0 1px 1px rgba(15,23,42,0.04)",
+                    background: "rgba(15,23,42,0.025)",
+                    border: "1px dashed rgba(15,23,42,0.10)",
                   }}
                 >
-                  {w.emoji}
-                </div>
-                <div className="min-w-0">
                   <div
-                    className="text-[14px] font-semibold tracking-tight truncate"
-                    style={{ color: "#0A0A0A" }}
+                    className="font-mono uppercase tracking-[0.14em] mb-1.5"
+                    style={{ color: "#9CA3AF", fontSize: 9 }}
                   >
-                    {w.name}
+                    Example finding
                   </div>
-                  <div
-                    className="font-mono uppercase tracking-[0.10em]"
-                    style={{ color: "#9CA3AF", fontSize: 9.5 }}
+                  <p
+                    className="text-[12.5px] leading-[1.55]"
+                    style={{ color: "#374151" }}
                   >
-                    {w.role}
-                  </div>
+                    {w.example}
+                  </p>
                 </div>
-              </div>
-
-              <div className="space-y-2 mb-4">
-                <KV label="Watches" value={w.watches} />
-                <KV label="Pings on" value={w.pings} />
-              </div>
-
-              {/* Realistic finding example */}
-              <div
-                className="mt-auto rounded-[12px] p-3"
-                style={{
-                  background: "rgba(15,23,42,0.025)",
-                  border: "1px dashed rgba(15,23,42,0.10)",
-                }}
-              >
-                <div
-                  className="font-mono uppercase tracking-[0.14em] mb-1.5"
-                  style={{ color: "#9CA3AF", fontSize: 9 }}
-                >
-                  Example finding
-                </div>
-                <p
-                  className="text-[12.5px] leading-[1.55]"
-                  style={{ color: "#374151" }}
-                >
-                  {w.example}
-                </p>
-              </div>
+              </MouseGlowCard>
             </motion.div>
           ))}
         </div>
@@ -794,8 +785,8 @@ function SectionDrainAtlas({
       className="relative overflow-hidden"
       style={{
         background:
-          "radial-gradient(120% 100% at 70% 0%, #1B2230 0%, #0E1320 55%, #080B14 100%)",
-        color: "rgba(255,255,255,0.92)",
+          "radial-gradient(120% 100% at 70% 0%, #FFFFFF 0%, #F8FAFC 55%, #F1F5F9 100%)",
+        color: "#0A0A0A",
       }}
     >
       {/* Red ambient glow at top-right */}
@@ -841,9 +832,9 @@ function SectionDrainAtlas({
           <h2
             className="font-mono leading-[1.05] tracking-tight"
             style={{
-              color: "#FFFFFF",
+              color: "#0A0A0A",
               fontSize: "clamp(48px, 9vw, 96px)",
-              fontWeight: 500,
+              fontWeight: 600,
             }}
           >
             Drain Atlas.
@@ -851,11 +842,11 @@ function SectionDrainAtlas({
 
           <p
             className="mt-6 mx-auto max-w-[680px] text-[15.5px] leading-[1.65]"
-            style={{ color: "rgba(255,255,255,0.72)" }}
+            style={{ color: "rgba(15,23,42,0.72)" }}
           >
             Atlas holds real USDC on Solana devnet. Its private key is
             online. Its workers spend autonomously. Try to take it —{" "}
-            <span style={{ color: "rgba(255,255,255,0.92)" }}>
+            <span style={{ color: "#0A0A0A", fontWeight: 500 }}>
               {attacksBlocked.toLocaleString()} attempts · 0 successful
               drains
             </span>{" "}
@@ -867,10 +858,10 @@ function SectionDrainAtlas({
               href="/atlas#attack-wall"
               className="inline-flex items-center justify-center gap-2 h-[52px] px-7 rounded-[12px] text-[14px] font-semibold tracking-[-0.005em] transition active:scale-[0.97]"
               style={{
-                background: "#FFFFFF",
-                color: "#0A0B10",
+                background: "#0A0A0A",
+                color: "#FFFFFF",
                 boxShadow:
-                  "0 1px 0 rgba(255,255,255,0.18), 0 12px 28px rgba(0,0,0,0.45)",
+                  "0 4px 14px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.08)",
               }}
             >
               See the wall
@@ -882,8 +873,10 @@ function SectionDrainAtlas({
               rel="noreferrer"
               className="inline-flex items-center gap-1.5 h-[52px] px-6 rounded-[12px] text-[13.5px] font-medium"
               style={{
-                color: "rgba(255,255,255,0.78)",
-                border: "1px solid rgba(255,255,255,0.12)",
+                color: "rgba(15,23,42,0.85)",
+                border: "1px solid rgba(15,23,42,0.12)",
+                background: "#FFFFFF",
+                boxShadow: "0 1px 2px rgba(15,23,42,0.04)",
               }}
             >
               Tag @shariqshkt
@@ -904,24 +897,25 @@ function SectionDrainAtlas({
           <span
             className="inline-flex items-center gap-2 px-4 py-2 rounded-full"
             style={{
-              background: "rgba(255,255,255,0.04)",
-              border: "1px solid rgba(255,255,255,0.08)",
+              background: "#FFFFFF",
+              border: "1px solid rgba(15,23,42,0.08)",
+              boxShadow: "0 1px 2px rgba(15,23,42,0.04)",
             }}
           >
             <span
               className="font-mono uppercase tracking-[0.14em]"
-              style={{ color: "rgba(134,239,172,0.85)", fontSize: 9.5 }}
+              style={{ color: "#15803D", fontSize: 9.5 }}
             >
               Squads v4
             </span>
             <span
-              style={{ color: "rgba(255,255,255,0.30)", fontSize: 11 }}
+              style={{ color: "rgba(15,23,42,0.25)", fontSize: 11 }}
             >
               ·
             </span>
             <span
               className="font-mono"
-              style={{ color: "rgba(255,255,255,0.55)", fontSize: 10.5 }}
+              style={{ color: "rgba(15,23,42,0.65)", fontSize: 10.5 }}
             >
               multisig vaults
             </span>
@@ -932,31 +926,31 @@ function SectionDrainAtlas({
             rel="noreferrer"
             className="inline-flex items-center gap-2 px-4 py-2 rounded-full hover:opacity-100 transition"
             style={{
-              background: "rgba(134,239,172,0.06)",
-              border: "1px solid rgba(134,239,172,0.18)",
-              opacity: 0.92,
+              background: "#FFFFFF",
+              border: "1px solid rgba(21,128,61,0.25)",
+              boxShadow: "0 1px 2px rgba(15,23,42,0.04)",
             }}
           >
             <span
               className="font-mono uppercase tracking-[0.14em]"
-              style={{ color: "rgba(134,239,172,0.90)", fontSize: 9.5 }}
+              style={{ color: "#15803D", fontSize: 9.5 }}
             >
               Kyvern Anchor program
             </span>
             <span
-              style={{ color: "rgba(255,255,255,0.30)", fontSize: 11 }}
+              style={{ color: "rgba(15,23,42,0.25)", fontSize: 11 }}
             >
               ·
             </span>
             <span
               className="font-mono"
-              style={{ color: "rgba(255,255,255,0.55)", fontSize: 10.5 }}
+              style={{ color: "rgba(15,23,42,0.65)", fontSize: 10.5 }}
             >
               PpmZ…MSqc
             </span>
             <ExternalLink
               className="w-3 h-3"
-              style={{ color: "rgba(255,255,255,0.55)" }}
+              style={{ color: "rgba(15,23,42,0.55)" }}
               strokeWidth={2}
             />
           </a>
@@ -964,7 +958,7 @@ function SectionDrainAtlas({
 
         <p
           className="mt-6 text-center text-[13px]"
-          style={{ color: "rgba(255,255,255,0.42)" }}
+          style={{ color: "rgba(15,23,42,0.55)" }}
         >
           The policy program doesn&apos;t negotiate.
         </p>
@@ -1039,29 +1033,29 @@ function SectionBuilders() {
           <div
             className="rounded-[14px] overflow-hidden"
             style={{
-              background: "#0E1320",
-              border: "1px solid rgba(255,255,255,0.06)",
+              background: "#FAFAFA",
+              border: "1px solid rgba(15,23,42,0.08)",
               boxShadow:
-                "inset 0 1px 0 rgba(255,255,255,0.04), 0 14px 32px rgba(15,23,42,0.18)",
+                "inset 0 1px 0 rgba(255,255,255,0.8), 0 14px 32px rgba(15,23,42,0.06)",
             }}
           >
             <div
               className="px-4 py-2.5 flex items-center gap-2"
               style={{
-                background: "rgba(255,255,255,0.02)",
-                borderBottom: "1px solid rgba(255,255,255,0.04)",
+                background: "#FFFFFF",
+                borderBottom: "1px solid rgba(15,23,42,0.08)",
               }}
             >
               <span
                 className="font-mono uppercase tracking-[0.16em]"
-                style={{ color: "rgba(255,255,255,0.40)", fontSize: 9.5 }}
+                style={{ color: "rgba(15,23,42,0.55)", fontSize: 9.5 }}
               >
                 @kyvernlabs/sdk
               </span>
             </div>
             <pre
               className="px-5 py-5 font-mono text-[12.5px] leading-[1.7] overflow-x-auto"
-              style={{ color: "rgba(255,255,255,0.85)" }}
+              style={{ color: "#0A0A0A" }}
             >
 {`import { OnChainVault } from "@kyvernlabs/sdk";
 
@@ -1093,17 +1087,17 @@ function SectionFinalCta() {
       className="relative overflow-hidden"
       style={{
         background:
-          "radial-gradient(120% 100% at 50% 100%, #1B2230 0%, #0E1320 55%, #080B14 100%)",
-        color: "rgba(255,255,255,0.92)",
+          "radial-gradient(120% 100% at 50% 100%, #FFFFFF 0%, #F8FAFC 55%, #F1F5F9 100%)",
+        color: "#0A0A0A",
       }}
     >
       <div className="relative z-10 max-w-[820px] mx-auto px-5 sm:px-8 py-24 sm:py-32 text-center">
         <h2
           className="tracking-tight"
           style={{
-            color: "#FFFFFF",
+            color: "#0A0A0A",
             fontSize: "clamp(34px, 5.6vw, 60px)",
-            fontWeight: 600,
+            fontWeight: 700,
             lineHeight: 1.05,
             letterSpacing: "-0.025em",
           }}
@@ -1113,7 +1107,7 @@ function SectionFinalCta() {
         </h2>
         <p
           className="mt-5 mx-auto max-w-[560px] text-[15px] leading-[1.6]"
-          style={{ color: "rgba(255,255,255,0.65)" }}
+          style={{ color: "rgba(15,23,42,0.65)" }}
         >
           Your device hires workers. They earn real money. You control
           every dollar — enforced on-chain by a Solana policy program.
@@ -1123,10 +1117,11 @@ function SectionFinalCta() {
             href="/unbox"
             className="inline-flex items-center justify-center gap-2 h-[52px] px-8 rounded-[12px] text-[14.5px] font-semibold tracking-[-0.005em] active:scale-[0.98] transition group"
             style={{
-              background: "#FFFFFF",
-              color: "#0A0B10",
+              background: "#0A0A0A",
+              color: "#FFFFFF",
+              border: "1px solid rgba(0,0,0,0.8)",
               boxShadow:
-                "0 1px 0 rgba(255,255,255,0.18), 0 12px 28px rgba(0,0,0,0.45)",
+                "0 4px 14px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.08)",
             }}
           >
             Get your Kyvern
@@ -1139,8 +1134,10 @@ function SectionFinalCta() {
             href="/atlas"
             className="inline-flex items-center gap-1.5 h-[52px] px-6 rounded-[12px] text-[13.5px] font-medium"
             style={{
-              color: "rgba(255,255,255,0.78)",
-              border: "1px solid rgba(255,255,255,0.12)",
+              color: "rgba(15,23,42,0.85)",
+              border: "1px solid rgba(15,23,42,0.12)",
+              background: "#FFFFFF",
+              boxShadow: "0 1px 2px rgba(15,23,42,0.04)",
             }}
           >
             Watch Atlas
@@ -1161,14 +1158,14 @@ function FooterMini() {
     <footer
       className="relative"
       style={{
-        background: "#080B14",
-        borderTop: "1px solid rgba(255,255,255,0.04)",
+        background: "#FFFFFF",
+        borderTop: "1px solid rgba(15,23,42,0.08)",
       }}
     >
       <div className="max-w-[1100px] mx-auto px-5 sm:px-8 py-8 flex flex-col sm:flex-row items-center justify-between gap-3">
         <span
           className="font-mono uppercase tracking-[0.16em]"
-          style={{ color: "rgba(255,255,255,0.32)", fontSize: 10 }}
+          style={{ color: "rgba(15,23,42,0.5)", fontSize: 10 }}
         >
           Kyvern · Solana devnet · Policy{" "}
           <a
@@ -1183,15 +1180,15 @@ function FooterMini() {
         <div className="flex items-center gap-5">
           <Link
             href="/atlas"
-            className="font-mono uppercase tracking-[0.16em] hover:text-white transition"
-            style={{ color: "rgba(255,255,255,0.45)", fontSize: 10 }}
+            className="font-mono uppercase tracking-[0.16em] hover:text-slate-900 transition"
+            style={{ color: "rgba(15,23,42,0.65)", fontSize: 10 }}
           >
             Atlas
           </Link>
           <Link
             href="/docs"
-            className="font-mono uppercase tracking-[0.16em] hover:text-white transition"
-            style={{ color: "rgba(255,255,255,0.45)", fontSize: 10 }}
+            className="font-mono uppercase tracking-[0.16em] hover:text-slate-900 transition"
+            style={{ color: "rgba(15,23,42,0.65)", fontSize: 10 }}
           >
             Docs
           </Link>
@@ -1199,8 +1196,8 @@ function FooterMini() {
             href="https://github.com/shariqazeem/kyvern-atlas"
             target="_blank"
             rel="noreferrer"
-            className="font-mono uppercase tracking-[0.16em] hover:text-white transition"
-            style={{ color: "rgba(255,255,255,0.45)", fontSize: 10 }}
+            className="font-mono uppercase tracking-[0.16em] hover:text-slate-900 transition"
+            style={{ color: "rgba(15,23,42,0.65)", fontSize: 10 }}
           >
             GitHub
           </a>

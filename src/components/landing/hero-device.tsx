@@ -20,7 +20,6 @@ import { motion, AnimatePresence } from "framer-motion";
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
-const ACCENT = "#86EFAC"; // matches /atlas observatory accent
 const GREEN = "#22C55E";
 
 interface HeroDeviceProps {
@@ -139,13 +138,13 @@ export function HeroDevice({
           className="relative w-full h-full rounded-[28px] overflow-hidden"
           style={{
             background:
-              "linear-gradient(180deg, #2A2F3F 0%, #1A1E2C 55%, #0F1320 100%)",
-            border: "1px solid rgba(231,233,238,0.14)",
+              "linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 55%, #F1F5F9 100%)",
+            border: "1px solid rgba(15,23,42,0.08)",
             boxShadow: [
-              "inset 0 1px 0 rgba(255,255,255,0.10)",
-              "0 18px 42px -12px rgba(0,0,0,0.65)",
-              "0 36px 72px -28px rgba(0,0,0,0.55)",
-              "0 0 0 1px rgba(134,239,172,0.06)",
+              "inset 0 1px 0 rgba(255,255,255,0.8)",
+              "0 18px 42px -12px rgba(0,0,0,0.12)",
+              "0 36px 72px -28px rgba(0,0,0,0.08)",
+              "0 0 0 1px rgba(34,197,94,0.08)",
             ].join(", "),
           }}
         >
@@ -156,7 +155,7 @@ export function HeroDevice({
             style={{
               height: 1,
               background:
-                "linear-gradient(to right, transparent, rgba(255,255,255,0.22), transparent)",
+                "linear-gradient(to right, transparent, rgba(255,255,255,0.8), transparent)",
             }}
           />
 
@@ -177,7 +176,7 @@ export function HeroDevice({
               <span
                 className="font-mono uppercase"
                 style={{
-                  color: "rgba(231,233,238,0.55)",
+                  color: "rgba(15,23,42,0.55)",
                   fontSize: 8.5,
                   letterSpacing: "0.18em",
                 }}
@@ -188,7 +187,7 @@ export function HeroDevice({
             <span
               className="font-mono"
               style={{
-                color: "rgba(231,233,238,0.38)",
+                color: "rgba(15,23,42,0.38)",
                 fontSize: 8.5,
                 letterSpacing: "0.10em",
               }}
@@ -202,10 +201,10 @@ export function HeroDevice({
             className="relative mx-3 my-2 rounded-[18px] overflow-hidden"
             style={{
               background:
-                "radial-gradient(140% 100% at 50% 0%, rgba(34,197,94,0.08) 0%, rgba(0,0,0,0) 70%), linear-gradient(180deg, rgba(231,233,238,0.04) 0%, rgba(0,0,0,0.18) 100%)",
-              border: "1px solid rgba(134,239,172,0.14)",
+                "radial-gradient(140% 100% at 50% 0%, rgba(34,197,94,0.05) 0%, rgba(0,0,0,0) 70%), linear-gradient(180deg, rgba(255,255,255,1) 0%, rgba(248,250,252,1) 100%)",
+              border: "1px solid rgba(15,23,42,0.06)",
               boxShadow:
-                "inset 0 1px 0 rgba(255,255,255,0.06), inset 0 0 32px rgba(34,197,94,0.04)",
+                "inset 0 2px 4px rgba(0,0,0,0.02), 0 1px 2px rgba(0,0,0,0.04)",
             }}
           >
             {/* Faint scan-line texture for screen feel */}
@@ -223,7 +222,7 @@ export function HeroDevice({
               <span
                 className="font-mono uppercase"
                 style={{
-                  color: ACCENT,
+                  color: "#15803D",
                   fontSize: 9,
                   letterSpacing: "0.20em",
                   fontWeight: 600,
@@ -234,11 +233,11 @@ export function HeroDevice({
               <span
                 className="font-mono mt-1.5"
                 style={{
-                  color: "rgba(255,255,255,0.98)",
+                  color: "#0A0A0A",
                   fontSize: "clamp(28px, 5.6vw, 44px)",
                   fontVariantNumeric: "tabular-nums",
-                  fontWeight: 300,
-                  letterSpacing: "-0.02em",
+                  fontWeight: 400,
+                  letterSpacing: "-0.04em",
                   lineHeight: 1.0,
                 }}
               >
@@ -247,9 +246,10 @@ export function HeroDevice({
               <span
                 className="font-mono mt-1.5"
                 style={{
-                  color: "rgba(231,233,238,0.45)",
+                  color: "rgba(15,23,42,0.45)",
                   fontSize: 9.5,
                   letterSpacing: "0.14em",
+                  fontWeight: 500,
                 }}
               >
                 {daysLive} {daysLive === 1 ? "DAY" : "DAYS"} · DEVNET
@@ -326,14 +326,15 @@ export function HeroDevice({
                     top: "50%",
                     left: "50%",
                     fontSize: 10.5,
-                    color: "rgba(231,233,238,0.95)",
+                    fontWeight: 500,
+                    color: "#0A0A0A",
                     background:
-                      "linear-gradient(180deg, rgba(20,24,38,0.92) 0%, rgba(14,17,28,0.92) 100%)",
-                    border: "1px solid rgba(134,239,172,0.30)",
+                      "rgba(255,255,255,0.95)",
+                    border: "1px solid rgba(15,23,42,0.08)",
                     borderRadius: 10,
-                    padding: "5px 10px",
+                    padding: "6px 12px",
                     boxShadow:
-                      "0 8px 22px rgba(0,0,0,0.55), 0 0 0 4px rgba(34,197,94,0.06)",
+                      "0 8px 22px rgba(0,0,0,0.08), 0 0 0 4px rgba(255,255,255,0.4)",
                     transformOrigin: "center",
                     backdropFilter: "blur(4px)",
                   }}
@@ -364,11 +365,11 @@ function WorkerTile({ emoji, active }: { emoji: string; active: boolean }) {
         className="relative w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center text-[22px] sm:text-[26px]"
         style={{
           background:
-            "linear-gradient(180deg, #232838 0%, #14171F 100%)",
-          border: "1px solid rgba(134,239,172,0.25)",
+            "linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%)",
+          border: "1px solid rgba(15,23,42,0.08)",
           boxShadow: active
-            ? `0 0 0 1.5px ${ACCENT}66, 0 0 22px rgba(134,239,172,0.30), inset 0 1px 0 rgba(255,255,255,0.10)`
-            : "0 6px 14px -4px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.08)",
+            ? `0 0 0 2px rgba(34,197,94,0.4), 0 8px 24px rgba(34,197,94,0.15), inset 0 1px 0 rgba(255,255,255,0.8)`
+            : "0 6px 14px -4px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.8)",
         }}
       >
         {emoji}
@@ -377,7 +378,7 @@ function WorkerTile({ emoji, active }: { emoji: string; active: boolean }) {
         <motion.div
           aria-hidden
           className="absolute inset-[-6px] rounded-full pointer-events-none"
-          style={{ border: "1.25px dashed rgba(134,239,172,0.55)" }}
+          style={{ border: "1.25px dashed rgba(34,197,94,0.4)" }}
           animate={{ rotate: 360 }}
           transition={{ duration: 6, repeat: Infinity, ease: "linear" }}
         />
