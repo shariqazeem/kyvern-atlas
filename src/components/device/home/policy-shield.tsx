@@ -115,17 +115,17 @@ export function PolicyShield({ deviceId }: { deviceId: string }) {
           background: "linear-gradient(180deg, #FFFFFF 0%, #FAFBFC 100%)",
           border: hasRejection
             ? "1px solid rgba(217,119,6,0.30)"
-            : "1px solid rgba(15,23,42,0.06)",
+            : "1px solid rgba(34,197,94,0.18)",
           boxShadow: hasRejection
             ? "inset 0 1px 0 rgba(255,255,255,1), 0 1px 2px rgba(15,23,42,0.04), 0 0 0 3px rgba(217,119,6,0.08)"
-            : "inset 0 1px 0 rgba(255,255,255,1), 0 1px 2px rgba(15,23,42,0.03)",
+            : "inset 0 1px 0 rgba(255,255,255,1), 0 1px 2px rgba(15,23,42,0.03), 0 0 0 3px rgba(34,197,94,0.05)",
         }}
       >
-        {/* Left side */}
+        {/* Left side — POLICY INTEGRITY headline as system-health */}
         <div className="flex items-center gap-2 flex-wrap min-w-0 flex-1">
           <span className="inline-flex items-center gap-1.5 shrink-0">
             <ShieldCheck
-              className="w-3.5 h-3.5"
+              className="w-4 h-4"
               strokeWidth={2.2}
               style={{ color: data.paused ? "#9CA3AF" : "#15803D" }}
             />
@@ -133,11 +133,45 @@ export function PolicyShield({ deviceId }: { deviceId: string }) {
               className="font-mono uppercase tracking-[0.12em]"
               style={{
                 color: data.paused ? "#9CA3AF" : "#15803D",
-                fontSize: 9.5,
-                fontWeight: 600,
+                fontSize: 10,
+                fontWeight: 700,
               }}
             >
-              {data.paused ? "Paused" : "Policy active"}
+              {data.paused
+                ? "Policy paused"
+                : "Policy integrity · 100%"}
+            </span>
+            {!data.paused && (
+              <motion.span
+                aria-hidden
+                className="rounded-full ml-0.5"
+                style={{
+                  width: 5,
+                  height: 5,
+                  background: "#22C55E",
+                  boxShadow: "0 0 0 2.5px rgba(34,197,94,0.16)",
+                }}
+                animate={{ opacity: [0.5, 1, 0.5] }}
+                transition={{
+                  duration: 2.2,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }}
+              />
+            )}
+          </span>
+          <span
+            className="font-mono"
+            style={{ color: "#374151", fontSize: 11 }}
+          >
+            <span style={{ color: "#0A0A0A", fontWeight: 600 }}>
+              {data.today.rejected}
+            </span>
+            <span style={{ color: "#9CA3AF", marginLeft: 4 }}>blocked</span>
+            <span style={{ color: "#D1D5DB", margin: "0 6px" }}>·</span>
+            <span style={{ color: "#15803D", fontWeight: 600 }}>$0</span>
+            <span style={{ color: "#9CA3AF", marginLeft: 4 }}>
+              unauthorized
             </span>
           </span>
           <span style={{ color: "#D1D5DB", fontSize: 11 }}>·</span>
@@ -147,20 +181,6 @@ export function PolicyShield({ deviceId }: { deviceId: string }) {
             label="Weekly"
             value={fmtUsd(data.budgets.weeklyLimitUsd)}
           />
-          {hasRejection && (
-            <span
-              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-mono"
-              style={{
-                background: "rgba(217,119,6,0.10)",
-                color: "#B45309",
-                fontSize: 10,
-                fontWeight: 600,
-              }}
-            >
-              <X className="w-2.5 h-2.5" strokeWidth={2.4} />
-              {data.today.rejected} blocked today
-            </span>
-          )}
         </div>
 
         {/* Right side — last action */}

@@ -29,6 +29,8 @@ import {
   Sparkles,
   Target,
   BarChart3,
+  Send,
+  Check,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { Signal, SignalKind } from "@/lib/agents/types";
@@ -178,6 +180,33 @@ function OpportunityRow({ signal }: { signal: SignalWithWorker }) {
   const Icon = KIND_ICON[signal.kind] ?? Sparkles;
   const label = KIND_LABEL[signal.kind] ?? "SIGNAL";
   const isUnread = signal.status === "unread";
+  const dispatchable =
+    signal.kind === "bounty" ||
+    signal.kind === "opportunity" ||
+    signal.kind === "market_intel";
+
+  // Dispatch state for the "Execute via Wren" button. Calls existing
+  // /api/signals/[id]/post-as-task to create a paid task on the device's
+  // board. Wren typically claims it on the next tick — the user feels
+  // like they dispatched a worker rather than just bookmarked a URL.
+  const [dispatching, setDispatching] = useState(false);
+  const [dispatched, setDispatched] = useState(false);
+  const onDispatch = async () => {
+    if (dispatching || dispatched) return;
+    setDispatching(true);
+    try {
+      const res = await fetch(`/api/signals/${signal.id}/post-as-task`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bountyUsd: 0.1 }),
+      });
+      if (res.ok) {
+        setDispatched(true);
+      }
+    } finally {
+      setDispatching(false);
+    }
+  };
 
   return (
     <motion.li
@@ -250,7 +279,50 @@ function OpportunityRow({ signal }: { signal: SignalWithWorker }) {
           {fmtAgo(signal.createdAt)}
         </span>
 
-        {/* Apply / Open source — primary action */}
+        {/* Execute via Wren — dispatch the signal to the worker pool.
+            Posts a paid task to the device's board; Wren typically
+            claims it on the next tick. Hidden when the kind isn't
+            something a worker can act on. */}
+        {dispatchable && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              void onDispatch();
+            }}
+            disabled={dispatching || dispatched}
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded font-mono flex-none transition disabled:opacity-100"
+            style={{
+              background: dispatched
+                ? "rgba(34,197,94,0.18)"
+                : "#0A0A0A",
+              color: dispatched ? "#15803D" : "#FFFFFF",
+              fontSize: 10.5,
+              fontWeight: 600,
+            }}
+            title={
+              dispatched
+                ? "Wren is on it"
+                : "Dispatch this opportunity to Wren"
+            }
+          >
+            {dispatched ? (
+              <>
+                <Check className="w-2.5 h-2.5" strokeWidth={2.6} />
+                <span className="hidden sm:inline">Dispatched</span>
+              </>
+            ) : (
+              <>
+                <Send className="w-2.5 h-2.5" strokeWidth={2.4} />
+                <span className="hidden sm:inline">
+                  {dispatching ? "…" : "Execute via Wren"}
+                </span>
+              </>
+            )}
+          </button>
+        )}
+
+        {/* Apply / Open source — secondary action (the link out). */}
         {signal.sourceUrl && (
           <a
             href={signal.sourceUrl}

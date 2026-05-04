@@ -160,16 +160,19 @@ export function TopUpAtlas() {
           enforced by the budget program.
         </p>
 
+        {/* USDC token account first — Circle's devnet faucet handles
+            standard ATAs reliably but silently fails on off-curve (PDA)
+            destinations. Same fix shipped on /app top-up-drawer. */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4">
           <CopyRow
-            label="Vault address (paste in faucet)"
-            value={ATLAS_VAULT_PDA}
-            explorerHref={`https://explorer.solana.com/address/${ATLAS_VAULT_PDA}?cluster=devnet`}
-          />
-          <CopyRow
-            label="USDC token account"
+            label="USDC address (paste in faucet) ✓"
             value={ATLAS_USDC_ATA}
             explorerHref={`https://explorer.solana.com/address/${ATLAS_USDC_ATA}?cluster=devnet`}
+          />
+          <CopyRow
+            label="Vault PDA (info — for SOL faucet)"
+            value={ATLAS_VAULT_PDA}
+            explorerHref={`https://explorer.solana.com/address/${ATLAS_VAULT_PDA}?cluster=devnet`}
           />
         </div>
 
@@ -202,11 +205,26 @@ export function TopUpAtlas() {
 
         <div
           className="mt-3 text-[11px] leading-relaxed"
-          style={{ color: "rgba(255,255,255,0.4)" }}
+          style={{ color: "rgba(255,255,255,0.45)" }}
         >
-          Steps: open the faucet → choose <strong>Solana Devnet</strong> +
-          USDC → paste the vault address → send. Atlas&apos;s next cycle picks
-          it up within ~3 min. Devnet only; mainnet USDC will not work.
+          On the Circle faucet, choose{" "}
+          <strong style={{ color: "rgba(255,255,255,0.78)" }}>
+            Solana Devnet
+          </strong>{" "}
+          +{" "}
+          <strong style={{ color: "rgba(255,255,255,0.78)" }}>USDC</strong>,
+          paste the{" "}
+          <strong style={{ color: "#86EFAC" }}>top address</strong> (USDC
+          token account), and send. Atlas&apos;s next cycle picks it up within
+          ~3 min. Devnet only; mainnet USDC will not work.
+        </div>
+        <div
+          className="mt-1.5 text-[10.5px] leading-relaxed"
+          style={{ color: "rgba(255,255,255,0.35)" }}
+        >
+          Why two addresses? Solana token accounts are derived per-token.
+          Circle sends best to the explicit USDC token account; PDA-owned
+          wallets sometimes confuse it.
         </div>
       </div>
     </motion.section>

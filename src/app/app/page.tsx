@@ -27,9 +27,9 @@
  * value USD, validated count, actionable count) added in Phase 6.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useDeviceStore } from "@/hooks/use-device-store";
@@ -185,6 +185,21 @@ export default function DeviceHome() {
     return map;
   }, [status?.actionFeed]);
 
+  // Phase 8 — chassis-level "the device just lit up" bezel flash. Fires
+  // when a new opportunity lands (discoveryToday.opportunities ticks up).
+  // The DiscoveryHero + RevenueTerminal cards have their own pulse glow
+  // rings; this is the higher-level "the whole device noticed" cue.
+  const prevOpportunitiesRef = useRef<number | null>(null);
+  const [bezelFlashKey, setBezelFlashKey] = useState(0);
+  useEffect(() => {
+    const opps = status?.discoveryToday?.opportunities ?? 0;
+    const prev = prevOpportunitiesRef.current;
+    if (prev !== null && opps > prev) {
+      setBezelFlashKey((k) => k + 1);
+    }
+    prevOpportunitiesRef.current = opps;
+  }, [status?.discoveryToday?.opportunities]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -200,6 +215,28 @@ export default function DeviceHome() {
 
   return (
     <>
+      {/* Phase 8 — chassis bezel-flash. Pointer-events:none so it never
+          intercepts clicks. Inset green glow + outer halo, 1.4s fade.
+          Fires on opportunity arrival; the rest of /app's per-card
+          pulses still trigger normally on top. */}
+      <AnimatePresence>
+        {bezelFlashKey > 0 && (
+          <motion.div
+            key={bezelFlashKey}
+            aria-hidden
+            className="pointer-events-none fixed inset-0 z-30"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: [0, 1, 0] }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 1.4, ease: "easeOut" }}
+            style={{
+              boxShadow:
+                "inset 0 0 0 2px rgba(34,197,94,0.55), inset 0 0 80px rgba(34,197,94,0.18)",
+            }}
+          />
+        )}
+      </AnimatePresence>
+
       <div className="py-2">
         <DeviceChassis
           serial={status?.serial ?? null}
