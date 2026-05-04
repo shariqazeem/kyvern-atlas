@@ -293,8 +293,8 @@ export default function UnboxPage() {
         // pushed under the home indicator.
         minHeight: "100dvh",
         background:
-          "radial-gradient(ellipse 90% 60% at 50% 50%, #161821 0%, #0A0B10 70%, #04050A 100%)",
-        color: "#E7E9EE",
+          "radial-gradient(ellipse 90% 60% at 50% 50%, #FFFFFF 0%, #F8FAFC 70%, #F1F5F9 100%)",
+        color: "#0A0A0A",
       }}
     >
       {/* Faint dot grid backdrop */}
@@ -303,7 +303,7 @@ export default function UnboxPage() {
         className="absolute inset-0 -z-0 pointer-events-none"
         style={{
           backgroundImage:
-            "radial-gradient(rgba(231,233,238,0.06) 1px, transparent 1px)",
+            "radial-gradient(rgba(15,23,42,0.04) 1px, transparent 1px)",
           backgroundSize: "22px 22px",
           maskImage:
             "radial-gradient(ellipse 70% 55% at 50% 50%, black 30%, transparent 100%)",
@@ -320,7 +320,7 @@ export default function UnboxPage() {
         />
         <span
           className="font-mono uppercase tracking-[0.18em]"
-          style={{ color: "rgba(231,233,238,0.55)", fontSize: 10 }}
+          style={{ color: "rgba(15,23,42,0.55)", fontSize: 10 }}
         >
           Unboxing your device
         </span>
@@ -416,7 +416,7 @@ export default function UnboxPage() {
             animate={{ opacity: 1 }}
             transition={{ delay: 0.6, duration: 0.6 }}
             className="font-mono text-[10.5px] uppercase tracking-[0.18em]"
-            style={{ color: "rgba(231,233,238,0.45)" }}
+            style={{ color: "rgba(15,23,42,0.45)" }}
           >
             Tap or click the box to begin
           </motion.div>
@@ -464,12 +464,12 @@ function BoxAndDevice({
           height: 130,
           bottom: 8,
           background:
-            "linear-gradient(180deg, #1E2230 0%, #14171F 60%, #0E1018 100%)",
-          border: "1px solid rgba(231,233,238,0.10)",
+            "linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 60%, #F1F5F9 100%)",
+          border: "1px solid rgba(15,23,42,0.08)",
           boxShadow: [
-            "inset 0 1px 0 rgba(255,255,255,0.08)",
-            "0 12px 28px rgba(0,0,0,0.55)",
-            "0 30px 60px -20px rgba(0,0,0,0.85)",
+            "inset 0 1px 0 rgba(255,255,255,0.8)",
+            "0 12px 28px rgba(0,0,0,0.06)",
+            "0 30px 60px -20px rgba(0,0,0,0.12)",
           ].join(", "),
         }}
         animate={{
@@ -488,7 +488,7 @@ function BoxAndDevice({
             style={{
               fontSize: 9,
               letterSpacing: "0.32em",
-              color: "rgba(231,233,238,0.35)",
+              color: "rgba(15,23,42,0.35)",
             }}
           >
             Kyvern
@@ -504,12 +504,12 @@ function BoxAndDevice({
           height: 36,
           bottom: 130 + 8,
           background:
-            "linear-gradient(180deg, #232838 0%, #161A26 100%)",
-          border: "1px solid rgba(231,233,238,0.10)",
+            "linear-gradient(180deg, #FFFFFF 0%, #F1F5F9 100%)",
+          border: "1px solid rgba(15,23,42,0.08)",
           borderBottom: "none",
           transformOrigin: "bottom center",
           boxShadow:
-            "inset 0 1px 0 rgba(255,255,255,0.10), 0 -2px 6px rgba(0,0,0,0.40)",
+            "inset 0 1px 0 rgba(255,255,255,0.8), 0 -2px 6px rgba(0,0,0,0.04)",
         }}
         animate={
           isOpenStarted
@@ -532,7 +532,7 @@ function BoxAndDevice({
           style={{
             height: 1,
             background:
-              "linear-gradient(to right, transparent, rgba(231,233,238,0.18), transparent)",
+              "linear-gradient(to right, transparent, rgba(15,23,42,0.08), transparent)",
           }}
         />
       </motion.div>
@@ -553,7 +553,7 @@ function BoxAndDevice({
               height: 70,
               bottom: 100,
               background:
-                "radial-gradient(closest-side, rgba(120,170,255,0.30) 0%, rgba(120,170,255,0) 75%)",
+                "radial-gradient(closest-side, rgba(34,197,94,0.15) 0%, rgba(34,197,94,0) 75%)",
               filter: "blur(3px)",
             }}
           />
@@ -568,12 +568,12 @@ function BoxAndDevice({
           height: 100,
           bottom: 20,
           background:
-            "linear-gradient(180deg, #2A2F3F 0%, #161A26 100%)",
-          border: "1px solid rgba(231,233,238,0.18)",
+            "linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%)",
+          border: "1px solid rgba(15,23,42,0.08)",
           boxShadow: [
-            "inset 0 1px 0 rgba(255,255,255,0.10)",
-            "0 8px 22px rgba(0,0,0,0.55)",
-            "0 0 0 1px rgba(120,170,255,0.05)",
+            "inset 0 1px 0 rgba(255,255,255,0.8)",
+            "0 8px 22px rgba(0,0,0,0.08)",
+            "0 0 0 1px rgba(34,197,94,0.08)",
           ].join(", "),
         }}
         initial={false}
@@ -610,7 +610,7 @@ function BoxAndDevice({
             style={{
               fontSize: 8.5,
               letterSpacing: "0.18em",
-              color: "rgba(231,233,238,0.55)",
+              color: "rgba(15,23,42,0.6)",
             }}
           >
             Live
@@ -623,7 +623,7 @@ function BoxAndDevice({
           style={{
             fontSize: 11,
             letterSpacing: "0.32em",
-            color: "rgba(231,233,238,0.85)",
+            color: "rgba(15,23,42,0.85)",
           }}
         >
           Kyvern
@@ -641,7 +641,7 @@ function BoxAndDevice({
               style={{
                 width: 5,
                 height: 2,
-                background: "rgba(231,233,238,0.20)",
+                background: "rgba(15,23,42,0.1)",
               }}
             />
           ))}
@@ -676,8 +676,8 @@ function SerialStamp({ text }: { text: string }) {
       style={{
         fontSize: 16,
         letterSpacing: "0.22em",
-        color: "#E7E9EE",
-        textShadow: "0 0 12px rgba(120,170,255,0.18)",
+        color: "#0A0A0A",
+        textShadow: "0 0 12px rgba(0,0,0,0.05)",
       }}
     >
       {shown}
@@ -687,7 +687,7 @@ function SerialStamp({ text }: { text: string }) {
           style={{
             width: 8,
             height: 14,
-            background: "#E7E9EE",
+            background: "#0A0A0A",
             verticalAlign: "-2px",
           }}
           animate={{ opacity: [1, 0.2, 1] }}
@@ -713,7 +713,7 @@ function BornLine() {
       style={{
         fontSize: 10,
         letterSpacing: "0.18em",
-        color: "rgba(231,233,238,0.45)",
+        color: "rgba(15,23,42,0.45)",
       }}
     >
       Born · {date}
@@ -756,8 +756,9 @@ function LedBoot({ stageReady }: { stageReady: boolean }) {
     <div
       className="flex items-center gap-5 px-5 py-3 rounded-[12px]"
       style={{
-        background: "rgba(231,233,238,0.04)",
-        border: "1px solid rgba(231,233,238,0.08)",
+        background: "#FFFFFF",
+        border: "1px solid rgba(15,23,42,0.08)",
+        boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
       }}
     >
       {dots.map((d, i) => {
@@ -771,9 +772,9 @@ function LedBoot({ stageReady }: { stageReady: boolean }) {
               style={{
                 width: 8,
                 height: 8,
-                background: active ? showColor : "rgba(231,233,238,0.16)",
+                background: active ? showColor : "rgba(15,23,42,0.08)",
                 boxShadow: active
-                  ? `0 0 0 3px ${showColor}26, 0 0 12px ${showColor}88`
+                  ? `0 0 0 3px ${showColor}26, 0 0 12px ${showColor}40`
                   : "none",
               }}
               animate={
@@ -788,7 +789,7 @@ function LedBoot({ stageReady }: { stageReady: boolean }) {
               style={{
                 fontSize: 10,
                 letterSpacing: "0.16em",
-                color: active ? "rgba(231,233,238,0.85)" : "rgba(231,233,238,0.40)",
+                color: active ? "rgba(15,23,42,0.85)" : "rgba(15,23,42,0.40)",
               }}
             >
               {d.label}
@@ -822,16 +823,16 @@ function RevealCard({
       transition={{ duration: 0.5, ease: EASE, delay: 0.2 }}
       className="w-full rounded-[16px] px-5 py-5"
       style={{
-        background: "rgba(231,233,238,0.04)",
-        border: "1px solid rgba(231,233,238,0.10)",
-        boxShadow: "0 8px 24px rgba(0,0,0,0.35)",
+        background: "#FFFFFF",
+        border: "1px solid rgba(15,23,42,0.08)",
+        boxShadow: "0 8px 24px rgba(0,0,0,0.06)",
       }}
     >
       <div className="text-center">
         <div
           className="font-mono uppercase mb-2"
           style={{
-            color: "rgba(231,233,238,0.55)",
+            color: "rgba(15,23,42,0.55)",
             fontSize: 10.5,
             letterSpacing: "0.18em",
           }}
@@ -840,10 +841,10 @@ function RevealCard({
         </div>
         <p
           className="text-[13.5px] leading-[1.55] mb-4"
-          style={{ color: "rgba(231,233,238,0.78)" }}
+          style={{ color: "rgba(15,23,42,0.78)" }}
         >
           Your Kyvern device is a Solana wallet. The key below is the
-          only way to recover it. <strong style={{ color: "#FFFFFF" }}>We can&apos;t recover it for you.</strong>
+          only way to recover it. <strong style={{ color: "#0A0A0A" }}>We can&apos;t recover it for you.</strong>
         </p>
 
         <motion.button
@@ -853,10 +854,11 @@ function RevealCard({
           whileTap={{ scale: 0.98 }}
           className="inline-flex items-center gap-2 h-[48px] px-6 rounded-[12px] text-[13.5px] font-semibold tracking-[-0.005em]"
           style={{
-            background: "#FFFFFF",
-            color: "#0A0B10",
+            background: "#0A0A0A",
+            color: "#FFFFFF",
+            border: "1px solid rgba(0,0,0,0.8)",
             boxShadow:
-              "0 1px 0 rgba(255,255,255,0.18), 0 12px 28px rgba(0,0,0,0.45)",
+              "0 4px 14px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.08)",
           }}
         >
           <Eye className="w-4 h-4" strokeWidth={1.8} />
@@ -880,7 +882,7 @@ function RevealCard({
           className="mt-4 font-mono"
           style={{
             fontSize: 10,
-            color: "rgba(231,233,238,0.40)",
+            color: "rgba(15,23,42,0.45)",
             letterSpacing: "0.06em",
           }}
         >
@@ -913,15 +915,15 @@ function ManagedCard({
       transition={{ duration: 0.5, ease: EASE, delay: 0.2 }}
       className="w-full rounded-[16px] px-5 py-5 text-center"
       style={{
-        background: "rgba(231,233,238,0.04)",
-        border: "1px solid rgba(231,233,238,0.10)",
-        boxShadow: "0 8px 24px rgba(0,0,0,0.35)",
+        background: "#FFFFFF",
+        border: "1px solid rgba(15,23,42,0.08)",
+        boxShadow: "0 8px 24px rgba(0,0,0,0.06)",
       }}
     >
       <div
         className="font-mono uppercase mb-2"
         style={{
-          color: "rgba(231,233,238,0.55)",
+          color: "rgba(15,23,42,0.55)",
           fontSize: 10.5,
           letterSpacing: "0.18em",
         }}
@@ -930,7 +932,7 @@ function ManagedCard({
       </div>
       <p
         className="text-[13.5px] leading-[1.55] mb-4"
-        style={{ color: "rgba(231,233,238,0.78)" }}
+        style={{ color: "rgba(15,23,42,0.78)" }}
       >
         Your device key already lives in {walletLabel}. Sign there
         when your worker spends — Kyvern stays out of the way.
@@ -942,10 +944,11 @@ function ManagedCard({
         whileTap={{ scale: 0.98 }}
         className="inline-flex items-center gap-2 h-[48px] px-6 rounded-[12px] text-[13.5px] font-semibold tracking-[-0.005em]"
         style={{
-          background: "#FFFFFF",
-          color: "#0A0B10",
+          background: "#0A0A0A",
+          color: "#FFFFFF",
+          border: "1px solid rgba(0,0,0,0.8)",
           boxShadow:
-            "0 1px 0 rgba(255,255,255,0.18), 0 12px 28px rgba(0,0,0,0.45)",
+            "0 4px 14px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.08)",
         }}
       >
         Open Kyvern
@@ -991,19 +994,19 @@ function VerifyCard({
       transition={{ duration: 0.45, ease: EASE }}
       className="w-full rounded-[16px] px-5 py-5"
       style={{
-        background: "rgba(231,233,238,0.04)",
+        background: "#FFFFFF",
         border: valid
           ? "1px solid rgba(34,197,94,0.45)"
           : wrong
             ? "1px solid rgba(245,158,11,0.45)"
-            : "1px solid rgba(231,233,238,0.10)",
-        boxShadow: "0 8px 24px rgba(0,0,0,0.35)",
+            : "1px solid rgba(15,23,42,0.08)",
+        boxShadow: "0 8px 24px rgba(0,0,0,0.06)",
       }}
     >
       <div
         className="font-mono uppercase mb-2 text-center"
         style={{
-          color: valid ? "#22C55E" : "rgba(231,233,238,0.55)",
+          color: valid ? "#22C55E" : "rgba(15,23,42,0.55)",
           fontSize: 10.5,
           letterSpacing: "0.18em",
         }}
@@ -1016,7 +1019,7 @@ function VerifyCard({
       </div>
       <p
         className="text-[13.5px] leading-[1.55] mb-3 text-center"
-        style={{ color: "rgba(231,233,238,0.78)" }}
+        style={{ color: "rgba(15,23,42,0.78)" }}
       >
         Paste your device key here to prove you&apos;ve got it.
       </p>
@@ -1032,11 +1035,11 @@ function VerifyCard({
         rows={3}
         className="w-full font-mono text-[13px] leading-[1.4] outline-none resize-none rounded-[10px] px-3 py-3"
         style={{
-          background: "rgba(0,0,0,0.40)",
-          color: "#E7E9EE",
+          background: "#FAFAFA",
+          color: "#0A0A0A",
           border: justPasted
             ? "1px solid rgba(34,197,94,0.45)"
-            : "1px solid rgba(231,233,238,0.12)",
+            : "1px solid rgba(15,23,42,0.12)",
           letterSpacing: "0.01em",
           transition: "border-color 0.3s ease",
           // Belt-and-suspenders: explicit text selection so iOS
@@ -1054,7 +1057,7 @@ function VerifyCard({
           className="inline-flex items-center gap-1.5 font-mono uppercase tracking-[0.16em] hover:underline min-h-[36px] px-1.5"
           style={{
             fontSize: 10.5,
-            color: "rgba(231,233,238,0.65)",
+            color: "rgba(15,23,42,0.65)",
           }}
         >
           <RefreshCw className="w-3 h-3" />
@@ -1069,12 +1072,12 @@ function VerifyCard({
           whileTap={valid ? { scale: 0.97 } : undefined}
           className="inline-flex items-center gap-1.5 h-11 px-5 rounded-[10px] text-[13px] font-semibold tracking-[-0.005em] disabled:cursor-not-allowed"
           style={{
-            background: valid ? "#22C55E" : "rgba(231,233,238,0.10)",
-            color: valid ? "#04050A" : "rgba(231,233,238,0.45)",
-            border: valid ? "none" : "1px solid rgba(231,233,238,0.10)",
+            background: valid ? "#22C55E" : "#FFFFFF",
+            color: valid ? "#FFFFFF" : "rgba(15,23,42,0.45)",
+            border: valid ? "none" : "1px solid rgba(15,23,42,0.10)",
             boxShadow: valid
               ? "0 6px 16px rgba(34,197,94,0.35)"
-              : "none",
+              : "0 1px 2px rgba(0,0,0,0.04)",
           }}
         >
           {valid ? (
@@ -1105,14 +1108,14 @@ function VerifyCard({
           open at all (dashboard misconfig, popup blocker, etc.) and
           the user can't get their key into the textarea. They can
           still use Kyvern; their wallet stays recoverable via account. */}
-      <div className="mt-4 pt-3 text-center" style={{ borderTop: "1px solid rgba(231,233,238,0.08)" }}>
+      <div className="mt-4 pt-3 text-center" style={{ borderTop: "1px solid rgba(15,23,42,0.08)" }}>
         <button
           type="button"
           onClick={onBypass}
           className="font-mono uppercase tracking-[0.16em] hover:underline min-h-[40px] px-2 inline-flex items-center justify-center"
           style={{
             fontSize: 10.5,
-            color: "rgba(231,233,238,0.55)",
+            color: "rgba(15,23,42,0.55)",
           }}
         >
           Modal not opening? Continue without saving
@@ -1151,10 +1154,10 @@ function ClaimedCard({
       className="w-full rounded-[16px] px-5 py-6 text-center"
       style={{
         background:
-          "linear-gradient(180deg, rgba(34,197,94,0.10) 0%, rgba(231,233,238,0.04) 100%)",
+          "linear-gradient(180deg, #FFFFFF 0%, #FAFAFA 100%)",
         border: "1px solid rgba(34,197,94,0.30)",
         boxShadow:
-          "0 8px 28px rgba(0,0,0,0.40), 0 0 0 4px rgba(34,197,94,0.06)",
+          "0 8px 28px rgba(0,0,0,0.08), 0 0 0 4px rgba(34,197,94,0.06)",
       }}
     >
       <motion.div
@@ -1183,13 +1186,13 @@ function ClaimedCard({
       </div>
       <h2
         className="text-[20px] font-semibold tracking-[-0.015em] mb-3"
-        style={{ color: "#FFFFFF" }}
+        style={{ color: "#0A0A0A" }}
       >
         Your device is yours.
       </h2>
       <p
         className="text-[13px] leading-[1.55] mb-4"
-        style={{ color: "rgba(231,233,238,0.72)" }}
+        style={{ color: "rgba(15,23,42,0.72)" }}
       >
         {isManaged
           ? `Signed in via ${walletLabel}. Your workers are waiting.`
@@ -1204,10 +1207,11 @@ function ClaimedCard({
         whileTap={provisioning ? undefined : { scale: 0.98 }}
         className="inline-flex items-center gap-2 h-[48px] px-6 rounded-[12px] text-[13.5px] font-semibold tracking-[-0.005em] disabled:cursor-wait"
         style={{
-          background: "#FFFFFF",
-          color: "#0A0B10",
+          background: "#0A0A0A",
+          color: "#FFFFFF",
+          border: "1px solid rgba(0,0,0,0.8)",
           boxShadow:
-            "0 1px 0 rgba(255,255,255,0.18), 0 12px 28px rgba(0,0,0,0.45)",
+            "0 4px 14px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.08)",
           opacity: provisioning ? 0.85 : 1,
         }}
       >
@@ -1216,8 +1220,8 @@ function ClaimedCard({
             <motion.span
               className="w-3.5 h-3.5 border-2 rounded-full"
               style={{
-                borderColor: "rgba(10,11,16,0.18)",
-                borderTopColor: "#0A0B10",
+                borderColor: "rgba(255,255,255,0.18)",
+                borderTopColor: "#FFFFFF",
               }}
               animate={{ rotate: 360 }}
               transition={{ duration: 0.9, repeat: Infinity, ease: "linear" }}
