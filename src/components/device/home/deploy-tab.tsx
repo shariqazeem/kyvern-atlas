@@ -107,15 +107,10 @@ export function DeployTab({ deviceId, onDeployed }: Props) {
     setDeploying(preset.id);
     setError(null);
     try {
-      const res = await fetch("/api/agents", {
+      const res = await fetch(`/api/devices/${deviceId}/deploy-preset`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          deviceId,
-          template: preset.template,
-          name: preset.name,
-          emoji: preset.emoji,
-        }),
+        body: JSON.stringify({ template: preset.template }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => null);

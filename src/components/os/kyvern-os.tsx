@@ -16,13 +16,28 @@ import { StatusBar } from "./status-bar";
 import { Unboxing } from "./unboxing";
 
 const UNBOX_KEY = "kyvern:unboxed";
+const GUEST_WALLET_KEY = "kyvern:dev-wallet";
 
 export function KyvernOS({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
   const [showUnboxing, setShowUnboxing] = useState(false);
   const [unboxChecked, setUnboxChecked] = useState(false);
+  const [isGuest, setIsGuest] = useState(false);
+  const [guestChecked, setGuestChecked] = useState(false);
 
-  // Check if user has seen the unboxing
+  // Detect guest mode — /try plants a kyvern:dev-wallet in localStorage.
+  // When present and the user is NOT Privy-authenticated, we treat the
+  // session as a sandbox visitor: skip the ConnectGate redirect, render
+  // the OS, but never trigger the unbox cinematic.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const guestWallet = window.localStorage.getItem(GUEST_WALLET_KEY);
+    setIsGuest(!!guestWallet && !isAuthenticated);
+    setGuestChecked(true);
+  }, [isAuthenticated]);
+
+  // Check if user has seen the unboxing — only relevant for real
+  // authenticated users; guests already saw /try's cinematic.
   useEffect(() => {
     if (!isAuthenticated) return;
     const seen = window.localStorage.getItem(UNBOX_KEY);
@@ -37,7 +52,7 @@ export function KyvernOS({ children }: { children: React.ReactNode }) {
     setShowUnboxing(false);
   }, []);
 
-  if (isLoading) {
+  if (isLoading || !guestChecked) {
     return (
       <div
         className="min-h-screen flex items-center justify-center"
@@ -54,7 +69,7 @@ export function KyvernOS({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!isAuthenticated) {
+  if (!isAuthenticated && !isGuest) {
     return (
       <div className="min-h-screen" style={{ background: "#FAFAFA" }}>
         <ConnectGate>{null}</ConnectGate>
@@ -62,8 +77,9 @@ export function KyvernOS({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // Wait until we've checked localStorage before rendering
-  if (!unboxChecked) return null;
+  // Wait until we've checked localStorage before rendering. Guests
+  // skip the unbox cinematic check entirely (they came in via /try).
+  if (isAuthenticated && !unboxChecked) return null;
 
   return (
     <>
