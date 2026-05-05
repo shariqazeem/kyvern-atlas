@@ -223,7 +223,10 @@ function SectionHeroDevice({
           />
         </motion.div>
 
-        {/* Massive headline */}
+        {/* Massive headline — device-led. The locked plan's three nouns
+            (Device · Worker · Dollar) compressed into one sentence that
+            tells the judge what this is, who it's for, and why the
+            chain matters — in 8 seconds. */}
         <motion.h1
           initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
@@ -236,28 +239,33 @@ function SectionHeroDevice({
             letterSpacing: "-0.03em",
           }}
         >
-          Your device hires AI workers. They earn{" "}
-          <span style={{ color: "#86EFAC" }}>real USDC</span>.{" "}
-          You control every dollar.
+          A Solana device for your AI agent.{" "}
+          <span style={{ color: "#15803D" }}>The chain decides</span>{" "}
+          every dollar it spends.
         </motion.h1>
 
-        {/* Subheadline */}
+        {/* Subheadline — undeniable proof + the dare. The 6,557 number
+            is the moat; surfacing it here turns the hero into a
+            credential, not a pitch. */}
         <motion.p
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.32 }}
-          className="text-center mx-auto max-w-[640px] leading-[1.55]"
+          className="text-center mx-auto max-w-[680px] leading-[1.55]"
           style={{
             color: "rgba(15,23,42,0.7)",
             fontSize: "clamp(14px, 1.6vw, 16px)",
           }}
         >
-          Own a Kyvern. Spawn workers that find opportunities, post jobs,
-          claim work, and get paid — all enforced on-chain by your Solana
-          policy program.
+          Atlas — our reference device — has been alive {daysLive > 0 ? `${daysLive} ${daysLive === 1 ? "day" : "days"}` : "for days"} on Solana
+          devnet. <strong style={{ color: "#0A0A0A" }}>6,557 attempts blocked. $0 drained.</strong>{" "}
+          Try to be the 6,558th, or put your own agent inside.
         </motion.p>
 
-        {/* CTAs */}
+        {/* CTAs — primary sends judges to /atlas (no login, public),
+            secondary opens an unboxed device for real users. The
+            no-login parenthetical is critical — it tells the tired
+            judge "you don't have to do anything." */}
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
@@ -265,7 +273,7 @@ function SectionHeroDevice({
           className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3"
         >
           <Link
-            href="/unbox"
+            href="/atlas"
             className="inline-flex items-center justify-center gap-2 h-[52px] px-8 rounded-[12px] text-[14.5px] font-semibold tracking-[-0.005em] active:scale-[0.98] transition group"
             style={{
               background: "#0A0A0A",
@@ -275,14 +283,14 @@ function SectionHeroDevice({
                 "0 4px 14px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.08)",
             }}
           >
-            Get your Kyvern
+            See it live · no login
             <ArrowRight
               className="w-4 h-4 group-hover:translate-x-0.5 transition-transform"
               strokeWidth={2}
             />
           </Link>
           <Link
-            href="/atlas"
+            href="/unbox"
             className="inline-flex items-center gap-1.5 h-[52px] px-6 rounded-[12px] text-[13.5px] font-medium tracking-[-0.005em]"
             style={{
               color: "rgba(15,23,42,0.85)",
@@ -291,9 +299,25 @@ function SectionHeroDevice({
               boxShadow: "0 1px 2px rgba(15,23,42,0.04)",
             }}
           >
-            Watch Atlas run live
+            Unbox your own
             <ArrowRight className="w-3.5 h-3.5" strokeWidth={2} />
           </Link>
+        </motion.div>
+
+        {/* Pay.sh-aware micro-line — optical association with the
+            announcement that landed today. Quiet, but it's there. */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.6, duration: 0.6 }}
+          className="mt-5 flex items-center justify-center gap-2 flex-wrap"
+        >
+          <span
+            className="font-mono uppercase tracking-[0.16em]"
+            style={{ color: "rgba(15,23,42,0.45)", fontSize: 10 }}
+          >
+            For Pay.sh + x402 buyers · agent-grade wallet · five-line SDK
+          </span>
         </motion.div>
 
         {/* Scroll hint */}

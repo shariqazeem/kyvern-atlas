@@ -67,13 +67,18 @@ interface Props {
   network: "devnet" | "mainnet";
   /** Optional shorthand for a sponsor brand resolved upstream. */
   fallbackBrand?: string | null;
+  /** When true, renders a small "DEMO" pill on the tile. The three
+   *  trio workers seeded by /unbox are demos. User-deployed workers
+   *  are not. The pill kills the marketplace-confusion problem in
+   *  half a second of judge attention. */
+  isDemo?: boolean;
 }
 
 /* ────────────────────────────────────────────────────────────────────
    Tile
    ──────────────────────────────────────────────────────────────────── */
 
-export function WorkerTile({ worker, action, network, fallbackBrand }: Props) {
+export function WorkerTile({ worker, action, network, fallbackBrand, isDemo }: Props) {
   const status = resolveStatus(worker, action);
   const verb = resolveVerb(worker, action, fallbackBrand);
   const outcome = resolveOutcome(worker, action);
@@ -90,6 +95,27 @@ export function WorkerTile({ worker, action, network, fallbackBrand }: Props) {
         transition: "transform 0.2s ease, box-shadow 0.2s ease",
       }}
     >
+      {/* DEMO ribbon — top-right corner. Visible only on the seeded
+          trio so judges instantly understand the workers are example
+          tenants, not the product. */}
+      {isDemo && (
+        <span
+          className="absolute font-mono uppercase tracking-[0.18em] rounded-[6px]"
+          style={{
+            top: 8,
+            right: 8,
+            fontSize: 8.5,
+            padding: "2px 6px",
+            color: "#B45309",
+            background: "rgba(245,158,11,0.10)",
+            border: "1px solid rgba(245,158,11,0.30)",
+            zIndex: 1,
+          }}
+        >
+          Demo
+        </span>
+      )}
+
       {/* TOP — identity + status LED */}
       <div className="flex items-center justify-between px-4 pt-4 pb-3">
         <div className="flex items-center gap-2.5 min-w-0">

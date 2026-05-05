@@ -41,6 +41,9 @@ import { TopRail } from "@/components/device/home/top-rail";
 import { BottomRail } from "@/components/device/home/bottom-rail";
 import { WorkerTile } from "@/components/device/home/worker-tile";
 import { ActivitySheet } from "@/components/device/home/activity-sheet";
+import { DeviceTabs, type DeviceTab } from "@/components/device/home/device-tabs";
+import { DeployTab } from "@/components/device/home/deploy-tab";
+import { PayEnforceTab } from "@/components/device/home/pay-enforce-tab";
 import { BalanceOrbit } from "@/components/device/home/balance-orbit";
 import { TodayStrip } from "@/components/device/home/today-strip";
 import { DiscoveryHero } from "@/components/device/home/discovery-hero";
@@ -133,6 +136,7 @@ export default function DeviceHome() {
   const [status, setStatus] = useState<LiveStatus | null>(null);
   const [topUpOpen, setTopUpOpen] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
+  const [tab, setTab] = useState<DeviceTab>("live");
 
   // Resolve the user's primary device once
   useEffect(() => {
@@ -249,7 +253,7 @@ export default function DeviceHome() {
           network={status?.network ?? "devnet"}
         >
           <div className="flex flex-col gap-3.5 sm:gap-4">
-            {/* TOP RAIL — device frame. Serial · uptime · vault · Squads. */}
+            {/* TOP RAIL — device frame. Always visible across tabs. */}
             <TopRail
               serial={status?.serial ?? null}
               bornAt={status?.bornAt ?? null}
@@ -258,35 +262,76 @@ export default function DeviceHome() {
               paused={status?.paused ?? false}
             />
 
-            {/* WORKER STAGE — three vertical tiles, the protagonists.
-                Each tile renders verb + outcome line ("Tried $X →
-                Approved" / "Attempted $X → Blocked (cap)") so the
-                chain reads as the visible enforcer. Tap → /app/agents/[id]. */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-3.5">
-              {(status?.workers ?? []).map((w) => (
-                <WorkerTile
-                  key={w.id}
-                  worker={w}
-                  action={lastActionByWorker[w.id] ?? null}
-                  network={status?.network ?? "devnet"}
-                />
-              ))}
-              {(!status || status.workers.length === 0) && (
-                <NoWorkersState />
-              )}
-            </div>
+            {/* TABS — Live Inside · Deploy Worker · Pay & Enforce.
+                The device has three modes: watch demos, drop your
+                own agent, use it right now. Tabs make the surface
+                area legible without sacrificing the device metaphor. */}
+            <DeviceTabs active={tab} onChange={setTab} />
 
-            {/* BOTTOM RAIL — daily-cap gauge · calls today · blocked
-                today · last settled tx pill. The dollar scoreboard.
-                On a fresh-unbox device with $0 vault, the rail's
-                last-tx slot becomes a "Fund to fire engine" CTA
-                pointing at the top-up drawer. */}
+            {/* TAB 1 — LIVE INSIDE. The Live Engine: banner declares
+                the workers are demos, three tiles show real chain
+                tension, breadcrumb under banner makes Tabs 2 & 3
+                visible to a 60-second judge without a tab click. */}
+            {tab === "live" && (
+              <>
+                <LiveInsideBanner onSwitchTab={setTab} />
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-3.5">
+                  {(status?.workers ?? []).map((w) => (
+                    <WorkerTile
+                      key={w.id}
+                      worker={w}
+                      action={lastActionByWorker[w.id] ?? null}
+                      network={status?.network ?? "devnet"}
+                      isDemo
+                    />
+                  ))}
+                  {(!status || status.workers.length === 0) && (
+                    <NoWorkersState />
+                  )}
+                </div>
+              </>
+            )}
+
+            {/* TAB 2 — DEPLOY YOUR WORKER. 1-click presets, custom
+                template flow, SDK snippet. */}
+            {tab === "deploy" && (
+              <DeployTab deviceId={deviceId} onDeployed={() => setTab("live")} />
+            )}
+
+            {/* TAB 3 — PAY & ENFORCE. Real x402 buy from Atlas, real
+                drain attempt, working cURL. Not a demo. */}
+            {tab === "use" && (
+              <PayEnforceTab
+                deviceId={deviceId}
+                agentKey={null}
+                network={status?.network ?? "devnet"}
+                vaultEmpty={(status?.usdcBalance ?? 0) < 0.01}
+                onTopUp={onTopUp}
+              />
+            )}
+
+            {/* BOTTOM RAIL — daily-cap gauge · calls · blocked · last
+                tx. Always visible across tabs so the scoreboard never
+                disappears. */}
             <BottomRail
               summary={status?.policySummary ?? null}
               network={status?.network ?? "devnet"}
               vaultEmpty={(status?.usdcBalance ?? 0) < 0.01}
               onTopUp={onTopUp}
             />
+
+            {/* MANIFESTO LINE — the device's promise, in human words.
+                Always visible. Sets the brand on every tab. */}
+            <div
+              className="text-center font-mono uppercase tracking-[0.16em]"
+              style={{
+                color: "rgba(15,23,42,0.40)",
+                fontSize: 9.5,
+                letterSpacing: "0.18em",
+              }}
+            >
+              $5/day cap · chain decides every dollar · everything else gets stopped
+            </div>
 
             {/* The single seam to the demoted dashboard. One tap. */}
             <button
@@ -377,6 +422,75 @@ function NoWorkersState() {
       <p className="text-[13px]" style={{ color: "#475569" }}>
         Spawn your first worker to see the engine come alive.
       </p>
+    </div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────────
+   LiveInsideBanner — the message + breadcrumb above the worker stage.
+   Job: kill the marketplace confusion in 0.5 seconds AND make Tabs 2
+   and 3 visible to a 60-second judge without forcing them to click.
+   ──────────────────────────────────────────────────────────────────── */
+
+function LiveInsideBanner({
+  onSwitchTab,
+}: {
+  onSwitchTab: (tab: DeviceTab) => void;
+}) {
+  return (
+    <div
+      className="rounded-[14px] px-4 py-3.5"
+      style={{
+        background: "#FFFFFF",
+        border: "1px solid rgba(15,23,42,0.06)",
+        boxShadow: "0 1px 2px rgba(15,23,42,0.04)",
+      }}
+    >
+      <div
+        className="font-mono uppercase tracking-[0.16em] mb-1.5"
+        style={{ color: "#9CA3AF", fontSize: 10 }}
+      >
+        Live inside the device
+      </div>
+      <p
+        className="text-[13.5px] leading-[1.5] mb-3"
+        style={{ color: "#0A0A0A" }}
+      >
+        Three demo workers are running inside this device right now. They try
+        to spend USDC. <strong>The chain decides what goes through.</strong>
+      </p>
+      <div className="flex items-center gap-3 flex-wrap">
+        <button
+          type="button"
+          onClick={() => onSwitchTab("deploy")}
+          className="inline-flex items-center gap-1 font-mono uppercase tracking-[0.14em] hover:opacity-80 transition"
+          style={{
+            fontSize: 10,
+            color: "#15803D",
+          }}
+        >
+          Deploy your own worker
+          <ArrowRight className="w-3 h-3" strokeWidth={2} />
+        </button>
+        <span
+          className="font-mono"
+          style={{ color: "rgba(15,23,42,0.20)", fontSize: 10 }}
+        >
+          ·
+        </span>
+        <button
+          type="button"
+          onClick={() => onSwitchTab("use")}
+          className="inline-flex items-center gap-1 font-mono uppercase tracking-[0.14em] hover:opacity-80 transition"
+          style={{
+            fontSize: 10,
+            color: "#15803D",
+          }}
+        >
+          Use the device now
+          <ArrowRight className="w-3 h-3" strokeWidth={2} />
+        </button>
+      </div>
     </div>
   );
 }
