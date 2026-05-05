@@ -273,7 +273,7 @@ function SectionHeroDevice({
           className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3"
         >
           <Link
-            href="/atlas"
+            href="/try"
             className="inline-flex items-center justify-center gap-2 h-[52px] px-8 rounded-[12px] text-[14.5px] font-semibold tracking-[-0.005em] active:scale-[0.98] transition group"
             style={{
               background: "#0A0A0A",
@@ -283,14 +283,14 @@ function SectionHeroDevice({
                 "0 4px 14px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.08)",
             }}
           >
-            See it live · no login
+            Try a Kyvern · no login
             <ArrowRight
               className="w-4 h-4 group-hover:translate-x-0.5 transition-transform"
               strokeWidth={2}
             />
           </Link>
           <Link
-            href="/unbox"
+            href="/atlas"
             className="inline-flex items-center gap-1.5 h-[52px] px-6 rounded-[12px] text-[13.5px] font-medium tracking-[-0.005em]"
             style={{
               color: "rgba(15,23,42,0.85)",
@@ -299,7 +299,7 @@ function SectionHeroDevice({
               boxShadow: "0 1px 2px rgba(15,23,42,0.04)",
             }}
           >
-            Unbox your own
+            See Atlas live
             <ArrowRight className="w-3.5 h-3.5" strokeWidth={2} />
           </Link>
         </motion.div>

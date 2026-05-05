@@ -33,6 +33,7 @@ interface DrainResult {
   ok: boolean;
   signature: string | null;
   reason: string | null;
+  chainProof?: { signature: string; reason: string | null } | null;
 }
 
 interface Props {
@@ -130,6 +131,7 @@ export function PayEnforceTab({
         ok: !!data?.ok,
         signature: data?.signature ?? null,
         reason: data?.reason ?? null,
+        chainProof: data?.chainProof ?? null,
       });
     } catch (e) {
       setDrainResult({
@@ -361,6 +363,7 @@ export function PayEnforceTab({
                 signature={drainResult.signature}
                 signal={null}
                 reason={drainResult.reason}
+                chainProof={drainResult.chainProof ?? null}
                 explorer={explorer}
               />
             </motion.div>
@@ -470,12 +473,14 @@ function ResultBlock({
   signature,
   signal,
   reason,
+  chainProof,
   explorer,
 }: {
   ok: boolean;
   signature: string | null;
   signal: { kind: string; subject: string; sourceUrl: string | null } | null;
   reason: string | null;
+  chainProof?: { signature: string; reason: string | null } | null;
   explorer: (sig: string) => string;
 }) {
   if (ok && signal) {
@@ -577,25 +582,50 @@ function ResultBlock({
           <ArrowUpRight className="w-3 h-3" strokeWidth={2} />
         </a>
       ) : (
-        <div className="flex flex-col gap-1.5">
+        <div className="flex flex-col gap-2">
           <div
             className="text-[11px] leading-[1.45]"
             style={{ color: "rgba(146,64,14,0.85)" }}
           >
-            Caught by your device&apos;s local mirror of the policy
-            program — sub-millisecond rejection, no on-chain noise.
-            The same rules run on-chain at the Anchor program below.
+            Caught by your device&apos;s local mirror in sub-ms — saves
+            SOL + RPC. The same rules run on-chain. Here&apos;s a real
+            on-chain rejection from Atlas&apos;s public attack history
+            (one of 6,557):
           </div>
-          <a
-            href="https://explorer.solana.com/address/PpmZErWfT5zpeo1fJtTbpqezFGbRUamaNNRWViaMSqc?cluster=devnet"
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-1 font-mono"
-            style={{ color: "#B45309", fontSize: 10.5 }}
-          >
-            Verify program · PpmZ…MSqc
-            <ArrowUpRight className="w-3 h-3" strokeWidth={2} />
-          </a>
+          {chainProof ? (
+            <a
+              href={explorer(chainProof.signature)}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 font-mono rounded-[8px] px-2.5 py-1.5 w-fit"
+              style={{
+                fontSize: 10.5,
+                color: "#B45309",
+                background: "rgba(245,158,11,0.10)",
+                border: "1px solid rgba(245,158,11,0.30)",
+              }}
+            >
+              <span style={{ color: "rgba(180,83,9,0.7)" }}>
+                real failed tx
+              </span>
+              <span>
+                {chainProof.signature.slice(0, 8)}…
+                {chainProof.signature.slice(-6)}
+              </span>
+              <ArrowUpRight className="w-3 h-3" strokeWidth={2} />
+            </a>
+          ) : (
+            <a
+              href="https://explorer.solana.com/address/PpmZErWfT5zpeo1fJtTbpqezFGbRUamaNNRWViaMSqc?cluster=devnet"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 font-mono"
+              style={{ color: "#B45309", fontSize: 10.5 }}
+            >
+              Verify program · PpmZ…MSqc
+              <ArrowUpRight className="w-3 h-3" strokeWidth={2} />
+            </a>
+          )}
         </div>
       )}
     </div>
@@ -606,7 +636,7 @@ function curlSnippet(agentKey: string | null): string {
   const key = agentKey ?? "kv_live_…  # mint a fresh key below";
   return `curl -X POST https://app.kyvernlabs.com/api/vault/pay \\
   -H "Content-Type: application/json" \\
-  -H "x-kyvern-agent-key: ${key}" \\
+  -H "Authorization: Bearer ${key}" \\
   -d '{
     "merchant": "api.openai.com",
     "amountUsd": 0.05,
