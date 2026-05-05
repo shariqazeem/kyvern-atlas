@@ -17,10 +17,10 @@
  * the option being visible is the conversion moment.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowRight, Check, Copy, Sparkles } from "lucide-react";
+import { ArrowRight, Check, Copy, Eye, Sparkles } from "lucide-react";
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
@@ -67,6 +67,40 @@ export function DeployTab({ deviceId, onDeployed }: Props) {
   const [deploying, setDeploying] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [keyPrefix, setKeyPrefix] = useState<string | null>(null);
+  const [revealedKey, setRevealedKey] = useState<string | null>(null);
+  const [revealing, setRevealing] = useState(false);
+
+  // Fetch the device's existing agent key prefix on mount so the SDK
+  // snippet feels real, not a placeholder.
+  useEffect(() => {
+    if (!deviceId) return;
+    fetch(`/api/devices/${deviceId}/agent-key`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d?.keyPrefix) setKeyPrefix(d.keyPrefix);
+      })
+      .catch(() => {});
+  }, [deviceId]);
+
+  async function mintKey() {
+    if (!deviceId || revealing) return;
+    setRevealing(true);
+    try {
+      const res = await fetch(`/api/devices/${deviceId}/agent-key`, {
+        method: "POST",
+      });
+      const d = await res.json();
+      if (d?.rawKey) {
+        setRevealedKey(d.rawKey);
+        if (d.keyPrefix) setKeyPrefix(d.keyPrefix);
+      }
+    } catch {
+      /* ignore */
+    } finally {
+      setRevealing(false);
+    }
+  }
 
   async function deployPreset(preset: (typeof PRESETS)[number]) {
     if (!deviceId || deploying) return;
@@ -250,7 +284,7 @@ export function DeployTab({ deviceId, onDeployed }: Props) {
         </Link>
       </div>
 
-      {/* SDK */}
+      {/* SDK + LIVE AGENT KEY */}
       <div>
         <div
           className="font-mono uppercase tracking-[0.14em] mb-2 px-1"
@@ -273,12 +307,14 @@ export function DeployTab({ deviceId, onDeployed }: Props) {
               className="font-mono uppercase tracking-[0.14em]"
               style={{ color: "rgba(255,255,255,0.55)", fontSize: 9.5 }}
             >
-              @kyvernlabs/sdk
+              @kyvernlabs/sdk · this device
             </span>
             <button
               type="button"
               onClick={() => {
-                navigator.clipboard.writeText(SDK_SNIPPET);
+                navigator.clipboard.writeText(
+                  buildSnippet(revealedKey, keyPrefix),
+                );
                 setCopied(true);
                 setTimeout(() => setCopied(false), 1500);
               }}
@@ -302,31 +338,78 @@ export function DeployTab({ deviceId, onDeployed }: Props) {
             </button>
           </div>
           <pre
-            className="px-4 py-3 font-mono text-[11.5px] leading-[1.55] overflow-x-auto"
+            className="px-4 py-3 font-mono text-[11.5px] leading-[1.55] overflow-x-auto whitespace-pre"
             style={{ color: "rgba(255,255,255,0.92)" }}
           >
-{SDK_SNIPPET}
+{buildSnippet(revealedKey, keyPrefix)}
           </pre>
         </div>
-        <Link
-          href="/docs"
-          className="inline-flex items-center gap-1 font-mono uppercase tracking-[0.14em] mt-2 px-1 hover:opacity-80 transition"
-          style={{
-            fontSize: 10,
-            color: "rgba(15,23,42,0.55)",
-          }}
-        >
-          Read the docs
-          <ArrowRight className="w-3 h-3" strokeWidth={2} />
-        </Link>
+
+        {/* Reveal flow — surfacing the device's actual agent key. */}
+        <div className="mt-2 flex items-center gap-2 flex-wrap px-1">
+          {revealedKey ? (
+            <span
+              className="inline-flex items-center gap-1.5 font-mono uppercase tracking-[0.14em] rounded-full px-2.5 py-1"
+              style={{
+                fontSize: 9.5,
+                color: "#B45309",
+                background: "rgba(245,158,11,0.10)",
+                border: "1px solid rgba(245,158,11,0.30)",
+              }}
+            >
+              <Eye className="w-3 h-3" strokeWidth={2} />
+              Shown once · save it now
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={mintKey}
+              disabled={!deviceId || revealing}
+              className="inline-flex items-center gap-1.5 font-mono uppercase tracking-[0.14em] rounded-full px-2.5 py-1 hover:opacity-90 transition disabled:opacity-50"
+              style={{
+                fontSize: 9.5,
+                color: "#FFFFFF",
+                background: "#0A0A0A",
+                border: "1px solid rgba(0,0,0,0.8)",
+              }}
+            >
+              {revealing ? "Minting…" : "Mint a fresh key (one-time reveal)"}
+              <ArrowRight className="w-3 h-3" strokeWidth={2} />
+            </button>
+          )}
+          <Link
+            href="/docs"
+            className="inline-flex items-center gap-1 font-mono uppercase tracking-[0.14em] hover:opacity-80 transition"
+            style={{
+              fontSize: 10,
+              color: "rgba(15,23,42,0.55)",
+            }}
+          >
+            Read the docs
+            <ArrowRight className="w-3 h-3" strokeWidth={2} />
+          </Link>
+        </div>
       </div>
     </div>
   );
 }
 
-const SDK_SNIPPET = `import { OnChainVault } from "@kyvernlabs/sdk";
+/** Build the SDK snippet with the real agent key when revealed,
+ *  the key prefix as a placeholder when not, or the env-var fallback
+ *  when nothing is known yet. The first form lets a builder paste-
+ *  and-go from the chassis itself. */
+function buildSnippet(
+  rawKey: string | null,
+  keyPrefix: string | null,
+): string {
+  const apiKey = rawKey
+    ? `"${rawKey}"`
+    : keyPrefix
+      ? `"${keyPrefix}…" /* mint to reveal full key */`
+      : `process.env.KYVERN_AGENT_KEY`;
+  return `import { OnChainVault } from "@kyvernlabs/sdk";
 
-const vault = new OnChainVault({ apiKey: process.env.KYVERN_AGENT_KEY });
+const vault = new OnChainVault({ apiKey: ${apiKey} });
 
 await vault.pay({
   merchant: "api.openai.com",
@@ -334,5 +417,6 @@ await vault.pay({
   memo: "gpt-4 inference",
 });
 // → real Solana tx · enforced on-chain by PpmZ…MSqc`;
+}
 
 void EASE;

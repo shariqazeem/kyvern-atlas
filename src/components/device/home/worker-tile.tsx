@@ -95,9 +95,11 @@ export function WorkerTile({ worker, action, network, fallbackBrand, isDemo }: P
         transition: "transform 0.2s ease, box-shadow 0.2s ease",
       }}
     >
-      {/* DEMO ribbon — top-right corner. Visible only on the seeded
-          trio so judges instantly understand the workers are example
-          tenants, not the product. */}
+      {/* STARTER ribbon — top-right corner. The trio is pre-installed
+          on every device by /unbox; they're real workers running under
+          the policy program, not synthetic props. The pill says
+          "starter" so the judge understands these came with the box —
+          and that they can deploy their own alongside. */}
       {isDemo && (
         <span
           className="absolute font-mono uppercase tracking-[0.18em] rounded-[6px]"
@@ -106,13 +108,13 @@ export function WorkerTile({ worker, action, network, fallbackBrand, isDemo }: P
             right: 8,
             fontSize: 8.5,
             padding: "2px 6px",
-            color: "#B45309",
-            background: "rgba(245,158,11,0.10)",
-            border: "1px solid rgba(245,158,11,0.30)",
+            color: "#15803D",
+            background: "rgba(34,197,94,0.08)",
+            border: "1px solid rgba(34,197,94,0.25)",
             zIndex: 1,
           }}
         >
-          Demo
+          Starter
         </span>
       )}
 

@@ -303,7 +303,6 @@ export default function DeviceHome() {
             {tab === "use" && (
               <PayEnforceTab
                 deviceId={deviceId}
-                agentKey={null}
                 network={status?.network ?? "devnet"}
                 vaultEmpty={(status?.usdcBalance ?? 0) < 0.01}
                 onTopUp={onTopUp}
@@ -456,8 +455,9 @@ function LiveInsideBanner({
         className="text-[13.5px] leading-[1.5] mb-3"
         style={{ color: "#0A0A0A" }}
       >
-        Three demo workers are running inside this device right now. They try
-        to spend USDC. <strong>The chain decides what goes through.</strong>
+        Three starter workers come pre-installed with every device. They try
+        to spend USDC. <strong>The chain decides what goes through.</strong>{" "}
+        Deploy your own next to them.
       </p>
       <div className="flex items-center gap-3 flex-wrap">
         <button

@@ -16,9 +16,9 @@
  * chain decides, they keep a real transaction history.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowUpRight, Check, Copy, Loader2, ShieldX, X } from "lucide-react";
+import { ArrowRight, ArrowUpRight, Check, Copy, Eye, Loader2, ShieldX, X } from "lucide-react";
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
@@ -37,7 +37,6 @@ interface DrainResult {
 
 interface Props {
   deviceId: string | null;
-  agentKey: string | null;
   network: "devnet" | "mainnet";
   vaultEmpty: boolean;
   onTopUp: () => void;
@@ -45,7 +44,6 @@ interface Props {
 
 export function PayEnforceTab({
   deviceId,
-  agentKey,
   network,
   vaultEmpty,
   onTopUp,
@@ -56,7 +54,42 @@ export function PayEnforceTab({
   const [draining, setDraining] = useState(false);
   const [drainResult, setDrainResult] = useState<DrainResult | null>(null);
 
+  const [keyPrefix, setKeyPrefix] = useState<string | null>(null);
+  const [revealedKey, setRevealedKey] = useState<string | null>(null);
+  const [revealing, setRevealing] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  // Fetch the device's existing agent key prefix on mount.
+  useEffect(() => {
+    if (!deviceId) return;
+    fetch(`/api/devices/${deviceId}/agent-key`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d?.keyPrefix) setKeyPrefix(d.keyPrefix);
+      })
+      .catch(() => {});
+  }, [deviceId]);
+
+  async function mintKey() {
+    if (!deviceId || revealing) return;
+    setRevealing(true);
+    try {
+      const res = await fetch(`/api/devices/${deviceId}/agent-key`, {
+        method: "POST",
+      });
+      const d = await res.json();
+      if (d?.rawKey) {
+        setRevealedKey(d.rawKey);
+        if (d.keyPrefix) setKeyPrefix(d.keyPrefix);
+      }
+    } catch {
+      /* ignore */
+    } finally {
+      setRevealing(false);
+    }
+  }
+
+  const displayKey = revealedKey ?? (keyPrefix ? `${keyPrefix}…` : null);
 
   async function buySignal() {
     if (buying || !deviceId) return;
@@ -335,7 +368,7 @@ export function PayEnforceTab({
         </AnimatePresence>
       </div>
 
-      {/* TERTIARY — cURL */}
+      {/* TERTIARY — cURL with the device's actual agent key */}
       <div>
         <div
           className="font-mono uppercase tracking-[0.14em] mb-2 px-1"
@@ -358,44 +391,74 @@ export function PayEnforceTab({
               className="font-mono uppercase tracking-[0.14em]"
               style={{ color: "rgba(255,255,255,0.55)", fontSize: 9.5 }}
             >
-              cURL · your device · {network}
+              cURL · this device · {network}
             </span>
-            {agentKey && (
-              <button
-                type="button"
-                onClick={() => {
-                  navigator.clipboard.writeText(curlSnippet(agentKey));
-                  setCopied(true);
-                  setTimeout(() => setCopied(false), 1500);
-                }}
-                className="inline-flex items-center gap-1 font-mono uppercase tracking-[0.14em] hover:opacity-80 transition"
-                style={{
-                  fontSize: 9.5,
-                  color: copied ? "#86EFAC" : "rgba(255,255,255,0.55)",
-                }}
-              >
-                {copied ? (
-                  <>
-                    <Check className="w-3 h-3" strokeWidth={2.5} />
-                    Copied
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-3 h-3" strokeWidth={2} />
-                    Copy
-                  </>
-                )}
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => {
+                navigator.clipboard.writeText(curlSnippet(displayKey));
+                setCopied(true);
+                setTimeout(() => setCopied(false), 1500);
+              }}
+              className="inline-flex items-center gap-1 font-mono uppercase tracking-[0.14em] hover:opacity-80 transition"
+              style={{
+                fontSize: 9.5,
+                color: copied ? "#86EFAC" : "rgba(255,255,255,0.55)",
+              }}
+            >
+              {copied ? (
+                <>
+                  <Check className="w-3 h-3" strokeWidth={2.5} />
+                  Copied
+                </>
+              ) : (
+                <>
+                  <Copy className="w-3 h-3" strokeWidth={2} />
+                  Copy
+                </>
+              )}
+            </button>
           </div>
           <pre
             className="px-4 py-3 font-mono text-[11.5px] leading-[1.55] overflow-x-auto whitespace-pre"
             style={{ color: "rgba(255,255,255,0.92)" }}
           >
-{agentKey
-  ? curlSnippet(agentKey)
-  : "# Generate an agent key in /app/keys to enable terminal access."}
+{curlSnippet(displayKey)}
           </pre>
+        </div>
+
+        {/* Reveal flow — surfaces the user's actual agent key once. */}
+        <div className="mt-2 flex items-center gap-2 flex-wrap px-1">
+          {revealedKey ? (
+            <span
+              className="inline-flex items-center gap-1.5 font-mono uppercase tracking-[0.14em] rounded-full px-2.5 py-1"
+              style={{
+                fontSize: 9.5,
+                color: "#B45309",
+                background: "rgba(245,158,11,0.10)",
+                border: "1px solid rgba(245,158,11,0.30)",
+              }}
+            >
+              <Eye className="w-3 h-3" strokeWidth={2} />
+              Shown once · save it now
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={mintKey}
+              disabled={!deviceId || revealing}
+              className="inline-flex items-center gap-1.5 font-mono uppercase tracking-[0.14em] rounded-full px-2.5 py-1 hover:opacity-90 transition disabled:opacity-50"
+              style={{
+                fontSize: 9.5,
+                color: "#FFFFFF",
+                background: "#0A0A0A",
+                border: "1px solid rgba(0,0,0,0.8)",
+              }}
+            >
+              {revealing ? "Minting…" : "Mint a fresh key (one-time reveal)"}
+              <ArrowRight className="w-3 h-3" strokeWidth={2} />
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -497,31 +560,53 @@ function ResultBlock({
         Blocked by chain
       </div>
       <div
-        className="text-[12.5px] leading-[1.45]"
+        className="text-[12.5px] leading-[1.5] mb-2"
         style={{ color: "#92400E" }}
       >
         {reason ?? "policy program rejected the spend"}
       </div>
-      {signature && (
+      {signature ? (
         <a
           href={explorer(signature)}
           target="_blank"
           rel="noreferrer"
-          className="inline-flex items-center gap-1 font-mono mt-2"
+          className="inline-flex items-center gap-1 font-mono"
           style={{ color: "#B45309", fontSize: 10.5 }}
         >
           {signature.slice(0, 8)}…{signature.slice(-6)}
           <ArrowUpRight className="w-3 h-3" strokeWidth={2} />
         </a>
+      ) : (
+        <div className="flex flex-col gap-1.5">
+          <div
+            className="text-[11px] leading-[1.45]"
+            style={{ color: "rgba(146,64,14,0.85)" }}
+          >
+            Caught by your device&apos;s local mirror of the policy
+            program — sub-millisecond rejection, no on-chain noise.
+            The same rules run on-chain at the Anchor program below.
+          </div>
+          <a
+            href="https://explorer.solana.com/address/PpmZErWfT5zpeo1fJtTbpqezFGbRUamaNNRWViaMSqc?cluster=devnet"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 font-mono"
+            style={{ color: "#B45309", fontSize: 10.5 }}
+          >
+            Verify program · PpmZ…MSqc
+            <ArrowUpRight className="w-3 h-3" strokeWidth={2} />
+          </a>
+        </div>
       )}
     </div>
   );
 }
 
-function curlSnippet(agentKey: string): string {
+function curlSnippet(agentKey: string | null): string {
+  const key = agentKey ?? "kv_live_…  # mint a fresh key below";
   return `curl -X POST https://app.kyvernlabs.com/api/vault/pay \\
   -H "Content-Type: application/json" \\
-  -H "x-kyvern-agent-key: ${agentKey}" \\
+  -H "x-kyvern-agent-key: ${key}" \\
   -d '{
     "merchant": "api.openai.com",
     "amountUsd": 0.05,
