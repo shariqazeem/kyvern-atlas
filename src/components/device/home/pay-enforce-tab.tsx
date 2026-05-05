@@ -41,6 +41,10 @@ interface Props {
   network: "devnet" | "mainnet";
   vaultEmpty: boolean;
   onTopUp: () => void;
+  /** Guest mode — Buy signal + Try drain stay interactive (those are
+   *  the moat demo). Mint key is gated behind a Sign-in CTA. */
+  isGuest?: boolean;
+  onSignIn?: () => void;
 }
 
 export function PayEnforceTab({
@@ -48,6 +52,8 @@ export function PayEnforceTab({
   network,
   vaultEmpty,
   onTopUp,
+  isGuest,
+  onSignIn,
 }: Props) {
   const [buying, setBuying] = useState(false);
   const [buyResult, setBuyResult] = useState<BuyResult | null>(null);
@@ -72,6 +78,10 @@ export function PayEnforceTab({
   }, [deviceId]);
 
   async function mintKey() {
+    if (isGuest) {
+      onSignIn?.();
+      return;
+    }
     if (!deviceId || revealing) return;
     setRevealing(true);
     try {
@@ -97,9 +107,13 @@ export function PayEnforceTab({
     setBuying(true);
     setBuyResult(null);
     try {
-      const res = await fetch(`/api/devices/${deviceId}/buy-atlas-signal`, {
-        method: "POST",
-      });
+      // Guest mode → server routes the spend through Atlas's vault
+      // (sandbox treasury) so the buy actually settles even though
+      // the user's vault is empty. Real signature, real signal returned.
+      const url = isGuest
+        ? `/api/devices/${deviceId}/buy-atlas-signal?guest=1`
+        : `/api/devices/${deviceId}/buy-atlas-signal`;
+      const res = await fetch(url, { method: "POST" });
       const data = await res.json();
       setBuyResult({
         ok: !!data?.ok,
@@ -458,7 +472,11 @@ export function PayEnforceTab({
                 border: "1px solid rgba(0,0,0,0.8)",
               }}
             >
-              {revealing ? "Minting…" : "Mint a fresh key (one-time reveal)"}
+              {revealing
+                ? "Minting…"
+                : isGuest
+                  ? "Sign in to mint a real key"
+                  : "Mint a fresh key (one-time reveal)"}
               <ArrowRight className="w-3 h-3" strokeWidth={2} />
             </button>
           )}

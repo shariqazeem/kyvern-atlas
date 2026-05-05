@@ -61,9 +61,14 @@ const PRESETS: Array<{
 interface Props {
   deviceId: string | null;
   onDeployed?: () => void;
+  /** Guest mode — show the UI but gate writes (deploy + mint key)
+   *  behind a Sign-in CTA. The 3 starter workers and the SDK snippet
+   *  remain visible because they're informative, not transactional. */
+  isGuest?: boolean;
+  onSignIn?: () => void;
 }
 
-export function DeployTab({ deviceId, onDeployed }: Props) {
+export function DeployTab({ deviceId, onDeployed, isGuest, onSignIn }: Props) {
   const [deploying, setDeploying] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -84,6 +89,10 @@ export function DeployTab({ deviceId, onDeployed }: Props) {
   }, [deviceId]);
 
   async function mintKey() {
+    if (isGuest) {
+      onSignIn?.();
+      return;
+    }
     if (!deviceId || revealing) return;
     setRevealing(true);
     try {
@@ -103,6 +112,10 @@ export function DeployTab({ deviceId, onDeployed }: Props) {
   }
 
   async function deployPreset(preset: (typeof PRESETS)[number]) {
+    if (isGuest) {
+      onSignIn?.();
+      return;
+    }
     if (!deviceId || deploying) return;
     setDeploying(preset.id);
     setError(null);
@@ -157,6 +170,19 @@ export function DeployTab({ deviceId, onDeployed }: Props) {
           program. Pick a preset to deploy in 5 seconds, customize a
           template, or wrap your own agent via the SDK.
         </p>
+        {isGuest && (
+          <p
+            className="text-[12px] leading-[1.5] mt-2 pt-2"
+            style={{
+              color: "#B45309",
+              borderTop: "1px solid rgba(245,158,11,0.20)",
+            }}
+          >
+            <strong>Sandbox · sign-in required to deploy.</strong> Real
+            workers cost real Solana fees and need to be tied to a
+            recoverable account.
+          </p>
+        )}
       </div>
 
       {/* PRESETS — 1-click deploy */}
@@ -212,13 +238,22 @@ export function DeployTab({ deviceId, onDeployed }: Props) {
                 className="inline-flex items-center gap-1 font-mono uppercase tracking-[0.14em] flex-shrink-0 ml-3"
                 style={{
                   fontSize: 9.5,
-                  color: deploying === p.id ? "#22C55E" : "rgba(15,23,42,0.55)",
+                  color: deploying === p.id
+                    ? "#22C55E"
+                    : isGuest
+                      ? "#B45309"
+                      : "rgba(15,23,42,0.55)",
                 }}
               >
                 {deploying === p.id ? (
                   <>
                     <Sparkles className="w-3 h-3" strokeWidth={2} />
                     Deploying
+                  </>
+                ) : isGuest ? (
+                  <>
+                    Sign in
+                    <ArrowRight className="w-3 h-3" strokeWidth={2} />
                   </>
                 ) : (
                   <>
@@ -368,7 +403,11 @@ export function DeployTab({ deviceId, onDeployed }: Props) {
                 border: "1px solid rgba(0,0,0,0.8)",
               }}
             >
-              {revealing ? "Minting…" : "Mint a fresh key (one-time reveal)"}
+              {revealing
+                ? "Minting…"
+                : isGuest
+                  ? "Sign in to mint a real key"
+                  : "Mint a fresh key (one-time reveal)"}
               <ArrowRight className="w-3 h-3" strokeWidth={2} />
             </button>
           )}

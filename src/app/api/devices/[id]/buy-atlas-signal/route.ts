@@ -21,9 +21,10 @@ import { getVault } from "@/lib/vault-store";
 
 const PRICE_USD = 0.01;
 const ATLAS_AGENT_ID = "agt_atlas";
+const ATLAS_VAULT_ID = process.env.ATLAS_VAULT_ID ?? "vlt_QcCPbp3XTzHtF5";
 
 export async function POST(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: { id: string } },
 ) {
   const vault = getVault(params.id);
@@ -34,12 +35,24 @@ export async function POST(
     );
   }
 
+  // Guest detection: clients in /try mode pass ?guest=1 so we know to
+  // route the spend through Atlas's vault (the sandbox treasury) instead
+  // of the empty guest vault. Without this, every guest's "Buy signal"
+  // bounces with low-balance, killing the moat-demo moment.
+  //
+  // The signature is still real on-chain. Atlas pays its own x402 feed,
+  // which is honest dogfooding — Kyvern devices already trade with each
+  // other. Cost: $0.01 of Atlas's USDC per guest visit, capped by RPC
+  // rate limits.
+  const isGuest = req.nextUrl.searchParams.get("guest") === "1";
+  const sourceVaultId = isGuest ? ATLAS_VAULT_ID : params.id;
+
   // Step 1 — fire the policy-enforced payment. Real on-chain or real
   // failed tx, depending on what the chain decides.
   const recipient = treasuryRecipientPubkey();
   const tag = `KVN feed buy ${Math.random().toString(36).slice(2, 8)}`;
   const pay = await serverVaultPay({
-    vaultId: params.id,
+    vaultId: sourceVaultId,
     merchant: "atlas.kyvernlabs.com",
     recipientPubkey: recipient,
     amountUsd: PRICE_USD,
@@ -47,7 +60,9 @@ export async function POST(
     logEvent: {
       eventType: "spending_sent",
       counterparty: "Atlas x402 feed",
-      description: `Bought a signal from Atlas — ${tag}`,
+      description: isGuest
+        ? `Sandbox: bought a signal from Atlas — ${tag}`
+        : `Bought a signal from Atlas — ${tag}`,
     },
   });
 

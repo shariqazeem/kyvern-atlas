@@ -44,6 +44,7 @@ import { ActivitySheet } from "@/components/device/home/activity-sheet";
 import { DeviceTabs, type DeviceTab } from "@/components/device/home/device-tabs";
 import { DeployTab } from "@/components/device/home/deploy-tab";
 import { PayEnforceTab } from "@/components/device/home/pay-enforce-tab";
+import { SandboxBanner } from "@/components/device/home/sandbox-banner";
 import { BalanceOrbit } from "@/components/device/home/balance-orbit";
 import { TodayStrip } from "@/components/device/home/today-strip";
 import { DiscoveryHero } from "@/components/device/home/discovery-hero";
@@ -128,8 +129,16 @@ function devWallet(): string {
 }
 
 export default function DeviceHome() {
-  const { wallet, isLoading } = useAuth();
+  const { wallet, isAuthenticated, isLoading, signIn } = useAuth();
   const { init } = useDeviceStore();
+  // Guest mode = synthetic dev-wallet in localStorage AND no Privy
+  // session. Determines the SANDBOX banner + the gates on Tab 2/3.
+  const [isGuest, setIsGuest] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const dev = window.localStorage.getItem("kyvern:dev-wallet");
+    setIsGuest(!!dev && !isAuthenticated);
+  }, [isAuthenticated]);
 
   const [vault, setVault] = useState<VaultBrief | null>(null);
   const [loading, setLoading] = useState(true);
@@ -245,6 +254,15 @@ export default function DeviceHome() {
         )}
       </AnimatePresence>
 
+      {/* SANDBOX BANNER — guests see this above the chassis. The CTA
+          triggers Privy login so they can convert their ephemeral
+          device into a real account. */}
+      {isGuest && (
+        <div className="px-2 pt-2">
+          <SandboxBanner />
+        </div>
+      )}
+
       <div className="py-2">
         <DeviceChassis
           serial={status?.serial ?? null}
@@ -293,19 +311,28 @@ export default function DeviceHome() {
             )}
 
             {/* TAB 2 — DEPLOY YOUR WORKER. 1-click presets, custom
-                template flow, SDK snippet. */}
+                template flow, SDK snippet. Gated for guests — they
+                see the UI but the buttons trigger sign-in. */}
             {tab === "deploy" && (
-              <DeployTab deviceId={deviceId} onDeployed={() => setTab("live")} />
+              <DeployTab
+                deviceId={deviceId}
+                onDeployed={() => setTab("live")}
+                isGuest={isGuest}
+                onSignIn={signIn}
+              />
             )}
 
             {/* TAB 3 — PAY & ENFORCE. Real x402 buy from Atlas, real
-                drain attempt, working cURL. Not a demo. */}
+                drain attempt, working cURL. Mint-key gated for guests;
+                buy + drain stay interactive (the moat demo). */}
             {tab === "use" && (
               <PayEnforceTab
                 deviceId={deviceId}
                 network={status?.network ?? "devnet"}
                 vaultEmpty={(status?.usdcBalance ?? 0) < 0.01}
                 onTopUp={onTopUp}
+                isGuest={isGuest}
+                onSignIn={signIn}
               />
             )}
 
