@@ -258,22 +258,67 @@ export async function GET(
     )
     .all(params.id) as AgentRow[];
 
+  // Per-worker most-recent signal (Live Engine "lastFinding"). Sentinel
+  // does most of its work via watch_url → signals; those scans never
+  // hit the actionFeed. Without this lookup, a worker that has surfaced
+  // 5 opportunities still reads as "Standing by" on its tile because
+  // the actionFeed only knows about economic tools. Run one batched
+  // SELECT per device, group client-side.
+  interface WorkerSignalRow {
+    agent_id: string;
+    kind: string;
+    subject: string;
+    source_url: string | null;
+    created_at: number;
+  }
+  const lastSignalByAgent = new Map<string, WorkerSignalRow>();
+  if (agents.length > 0) {
+    const ids = agents.map((a) => a.id);
+    const placeholders = ids.map(() => "?").join(",");
+    const rows = db
+      .prepare(
+        `SELECT agent_id, kind, subject, source_url, created_at
+           FROM signals
+          WHERE agent_id IN (${placeholders})
+          ORDER BY created_at DESC
+          LIMIT 60`,
+      )
+      .all(...ids) as WorkerSignalRow[];
+    for (const r of rows) {
+      if (!lastSignalByAgent.has(r.agent_id)) {
+        lastSignalByAgent.set(r.agent_id, r);
+      }
+    }
+  }
+
   const workersActive = agents.filter((a) => a.status === "alive").length;
-  const workers = agents.map((a) => ({
-    id: a.id,
-    name: a.name,
-    emoji: a.emoji,
-    template: a.template,
-    // "thinking" if alive AND ticked recently — wide enough that the orbit
-    // ring is reliably visible in screenshots, narrow enough to mean it
-    isThinking:
-      a.status === "alive" &&
-      a.last_thought_at != null &&
-      now - a.last_thought_at < 90_000,
-    lastThoughtAt: a.last_thought_at,
-    totalThoughts: a.total_thoughts,
-    totalEarnedUsd: a.total_earned_usd,
-  }));
+  const workers = agents.map((a) => {
+    const sig = lastSignalByAgent.get(a.id);
+    const lastFinding = sig
+      ? {
+          kind: sig.kind,
+          subject: sig.subject,
+          brand: brandFromHint(sig.source_url),
+          ts: sig.created_at,
+        }
+      : null;
+    return {
+      id: a.id,
+      name: a.name,
+      emoji: a.emoji,
+      template: a.template,
+      // "thinking" if alive AND ticked recently — wide enough that the orbit
+      // ring is reliably visible in screenshots, narrow enough to mean it
+      isThinking:
+        a.status === "alive" &&
+        a.last_thought_at != null &&
+        now - a.last_thought_at < 90_000,
+      lastThoughtAt: a.last_thought_at,
+      totalThoughts: a.total_thoughts,
+      totalEarnedUsd: a.total_earned_usd,
+      lastFinding,
+    };
+  });
 
   // Path C — Today's signal counts (pulls from `signals` table for this device)
   const todayMidnight = new Date();

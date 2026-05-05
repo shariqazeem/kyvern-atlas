@@ -37,6 +37,15 @@ export interface WorkerTileWorker {
   isThinking: boolean;
   totalThoughts: number;
   totalEarnedUsd: number;
+  /** Live Engine — most recent signal this worker emitted. Sentinel's
+   *  watch_url scans surface here even though they never hit the
+   *  actionFeed (signals != economic tools). */
+  lastFinding?: {
+    kind: string;
+    subject: string;
+    brand: string | null;
+    ts: number;
+  } | null;
 }
 
 export interface WorkerTileAction {
@@ -66,7 +75,7 @@ interface Props {
 
 export function WorkerTile({ worker, action, network, fallbackBrand }: Props) {
   const status = resolveStatus(worker, action);
-  const verb = resolveVerb(action, fallbackBrand);
+  const verb = resolveVerb(worker, action, fallbackBrand);
   const outcome = resolveOutcome(worker, action);
 
   return (
@@ -303,27 +312,96 @@ function resolveStatus(
 /** Verb the worker is currently doing. Hybrid copy that surfaces the
  *  sponsor brand when one is recognized in the row's counterparty or
  *  message — that's how "scanned a feed" becomes "scanned Helius" and
- *  the rail starts reading as an ecosystem-aware product. */
+ *  the rail starts reading as an ecosystem-aware product.
+ *
+ *  Tense flips on failure: when signatureStatus === "failed" the verb
+ *  switches to attempt-tense ("Tried to complete a task") so it never
+ *  contradicts the red Blocked outcome line below it. */
 function resolveVerb(
+  worker: WorkerTileWorker,
   action: WorkerTileAction | null,
   fallbackBrand?: string | null,
 ): string {
-  if (!action) return "Standing by — waiting for the next tick.";
+  // No recent action — surface the worker's most recent finding so a
+  // Sentinel-style scout that just found three bounties doesn't read
+  // as "Standing by".
+  if (!action) {
+    if (worker.lastFinding) {
+      const fb = worker.lastFinding.brand;
+      const subj = compressSubject(worker.lastFinding.subject);
+      switch (worker.lastFinding.kind) {
+        case "opportunity":
+        case "bounty":
+          return fb
+            ? `Found a ${fb} bounty${subj ? ` — ${subj}` : ""}`
+            : subj
+              ? `Found ${subj}`
+              : "Found an opportunity";
+        case "github_release":
+          return fb ? `Spotted ${fb} release` : "Spotted a release";
+        case "ecosystem_announcement":
+          return fb
+            ? `Spotted ${fb} announcement`
+            : "Spotted an ecosystem move";
+        case "wallet_move":
+          return "Flagged a whale move";
+        case "market_intel":
+          return "Flagged market intel";
+        case "price_trigger":
+          return "Triggered on price";
+        default:
+          return subj ? `Logged: ${subj}` : "Logged an observation";
+      }
+    }
+    return "Standing by — waiting for the next tick.";
+  }
+
   const brand = action.brand ?? fallbackBrand ?? null;
+  const failed = action.signatureStatus === "failed";
+
   switch (action.tool) {
     case "post_task":
-      return brand ? `Posted a ${brand} task` : "Posted a paid task";
+      return failed
+        ? brand
+          ? `Tried to post a ${brand} task`
+          : "Tried to post a paid task"
+        : brand
+          ? `Posted a ${brand} task`
+          : "Posted a paid task";
     case "claim_task":
-      return brand ? `Claimed a ${brand} task` : "Claimed a paid task";
+      return failed
+        ? brand
+          ? `Tried to claim a ${brand} task`
+          : "Tried to claim a paid task"
+        : brand
+          ? `Claimed a ${brand} task`
+          : "Claimed a paid task";
     case "complete_task":
-      return brand ? `Completed a ${brand} task` : "Completed a paid task";
+      return failed
+        ? brand
+          ? `Tried to complete a ${brand} task`
+          : "Tried to complete a paid task"
+        : brand
+          ? `Completed a ${brand} task`
+          : "Completed a paid task";
     case "stake_on_finding":
-      return "Staked on a finding";
+      return failed ? "Tried to stake" : "Staked on a finding";
     case "subscribe_to_agent":
-      return "Paid another worker";
+      return failed ? "Tried to pay another worker" : "Paid another worker";
     default:
       return action.tool.replace(/_/g, " ");
   }
+}
+
+/** Trim a long signal subject down to a punchy one-line. The /app
+ *  worker tile only has ~280px of horizontal room for the verb so we
+ *  drop dollar amounts and tail clauses. */
+function compressSubject(s: string): string {
+  if (!s) return "";
+  // Drop anything past the first " — " or " · " — those are usually
+  // metadata (reward, deadline) we already render in the activity sheet.
+  const cut = s.split(/\s[—·]\s/)[0];
+  return cut.length > 42 ? `${cut.slice(0, 40)}…` : cut;
 }
 
 /** The outcome line — the tension. "Tried $X → ✅ Approved" or
@@ -375,20 +453,49 @@ function resolveOutcome(
 }
 
 /** Trim raw policy / RPC failure messages into a 2-3 word badge.
- *  "Spending limit exceeded — daily cap" → "daily cap"
- *  "merchant not in allowlist (api.openai.com)" → "merchant not allowed" */
+ *  Patterns expanded to cover the actual error strings the chain
+ *  returns on a fresh-vault device:
+ *    "Attempt to debit an account but found no record of a prior
+ *     credit"  → "low balance"   (most common on $0 vault)
+ *    "Insufficient funds"        → "low balance"
+ *    "fee payer ... no SOL"      → "no fee gas"
+ *  Plus the policy-program codes (daily cap, weekly cap, per-tx,
+ *  velocity, allowlist, memo, kill switch). */
 function compressReason(message: string | null): string | null {
   if (!message) return null;
   const m = message.toLowerCase();
+  // Chain-side failures — these are what fresh-vault users hit first
+  if (
+    m.includes("no record of a prior credit") ||
+    m.includes("insufficient funds") ||
+    m.includes("insufficient balance") ||
+    m.includes("balance too low") ||
+    m.includes("not enough usdc") ||
+    m.includes("insufficient")
+  )
+    return "low balance";
+  if (
+    m.includes("fee payer") ||
+    m.includes("no sol") ||
+    m.includes("not enough sol") ||
+    m.includes("blockhash not found")
+  )
+    return "no fee gas";
+  // Policy-program rejections
   if (m.includes("daily cap") || m.includes("daily limit")) return "daily cap";
   if (m.includes("weekly cap") || m.includes("weekly limit")) return "weekly cap";
+  if (
+    m.includes("spending limit exceeded") ||
+    m.includes("limit exceeded") ||
+    m.includes("daily")
+  )
+    return "daily cap";
   if (m.includes("per-tx") || m.includes("max per tx") || m.includes("per tx max"))
     return "per-tx cap";
   if (m.includes("velocity") || m.includes("rate limit")) return "rate limit";
   if (m.includes("merchant") || m.includes("allowlist")) return "merchant blocked";
   if (m.includes("memo")) return "memo missing";
   if (m.includes("paused") || m.includes("kill")) return "kill switch";
-  if (m.includes("insufficient")) return "low balance";
   return null;
 }
 

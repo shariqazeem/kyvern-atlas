@@ -27,6 +27,11 @@ import { BootSequence } from "@/components/agent/boot-sequence";
 import { LiveWorkerCard } from "@/components/agent/live-worker-card";
 import { FirstSignalToast } from "@/components/agent/first-signal-toast";
 import { EconomicTimeline } from "@/components/agent/economic-timeline";
+import {
+  LiveStateStrip,
+  type LiveStateAction,
+  type LiveStateFinding,
+} from "@/components/agent/live-state-strip";
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
@@ -69,6 +74,9 @@ export default function AgentDetailPage({ params }: { params: { id: string } }) 
   const [chat, setChat] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [lastAction, setLastAction] = useState<LiveStateAction | null>(null);
+  const [lastFinding, setLastFinding] = useState<LiveStateFinding | null>(null);
+  const [specOpen, setSpecOpen] = useState(false);
 
   const [inputValue, setInputValue] = useState("");
   const [sending, setSending] = useState(false);
@@ -119,6 +127,8 @@ export default function AgentDetailPage({ params }: { params: { id: string } }) 
       const agentJson = await agentRes.json();
       const chatJson = await chatRes.json();
       setAgent(agentJson.agent);
+      setLastAction((agentJson.lastAction as LiveStateAction | null) ?? null);
+      setLastFinding((agentJson.lastFinding as LiveStateFinding | null) ?? null);
       setChat(chatJson.messages ?? []);
       setLoading(false);
     } catch {
@@ -139,7 +149,11 @@ export default function AgentDetailPage({ params }: { params: { id: string } }) 
     const iv = setInterval(() => {
       fetch(`/api/agents/${params.id}`)
         .then((r) => (r.ok ? r.json() : null))
-        .then((d) => d?.agent && setAgent(d.agent as Agent))
+        .then((d) => {
+          if (d?.agent) setAgent(d.agent as Agent);
+          setLastAction((d?.lastAction as LiveStateAction | null) ?? null);
+          setLastFinding((d?.lastFinding as LiveStateFinding | null) ?? null);
+        })
         .catch(() => {});
       fetch(`/api/agents/${params.id}/chat?limit=30`)
         .then((r) => (r.ok ? r.json() : null))
@@ -500,45 +514,102 @@ export default function AgentDetailPage({ params }: { params: { id: string } }) 
         </div>
       </motion.div>
 
-      {/* Spec card — Personality / Job / Tools */}
+      {/* LIVE STATE STRIP — the zoom-in of the home tile. The thing
+          they tapped is echoed at the top of the detail page so the
+          user never loses context. Same verb + outcome + Explorer
+          pill shape, laid out horizontally. */}
+      <LiveStateStrip
+        action={lastAction}
+        finding={lastFinding}
+        network="devnet"
+      />
+
+      {/* TOOLS — keep visible inline (small, informative).
+          Personality + Job are walls of system-prompt text and live
+          inside the collapsible "Specs" disclosure below. */}
+      <div
+        className="flex flex-wrap items-center gap-1.5 mb-3"
+      >
+        <span
+          className="font-mono uppercase tracking-[0.16em] mr-1.5"
+          style={{
+            color: "#9CA3AF",
+            fontSize: 9.5,
+          }}
+        >
+          Tools
+        </span>
+        {agent.allowedTools.map((t) => (
+          <span
+            key={t}
+            className="font-mono text-[10px] px-2 py-0.5 rounded-md"
+            style={{
+              background: "rgba(15,23,42,0.04)",
+              color: "#374151",
+              border: "1px solid rgba(15,23,42,0.05)",
+            }}
+          >
+            {t}
+          </span>
+        ))}
+      </div>
+
+      {/* SPECS — collapsible. Personality + Job are the worker's
+          system prompt — useful for power users + judges who want to
+          inspect, but they shouldn't dominate the page. Default
+          closed; one tap to expand. */}
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.05, duration: 0.45, ease: EASE }}
-        className="rounded-[16px] p-4 mb-4"
+        className="rounded-[14px] mb-4 overflow-hidden"
         style={{
           background: "#FFFFFF",
           border: "1px solid rgba(15,23,42,0.06)",
           boxShadow: "0 1px 2px rgba(15,23,42,0.03)",
         }}
       >
-        <SpecBlock label="Personality">
-          <p className="text-[13px] text-[#0A0A0A] leading-[1.55]">
-            {agent.personalityPrompt}
-          </p>
-        </SpecBlock>
-        <SpecBlock label="Job">
-          <p className="text-[13px] text-[#0A0A0A] leading-[1.55]">
-            {agent.jobPrompt}
-          </p>
-        </SpecBlock>
-        <SpecBlock label="Tools" last>
-          <div className="flex flex-wrap gap-1.5">
-            {agent.allowedTools.map((t) => (
-              <span
-                key={t}
-                className="font-mono text-[10px] px-2 py-0.5 rounded-md"
-                style={{
-                  background: "rgba(15,23,42,0.04)",
-                  color: "#374151",
-                  border: "1px solid rgba(15,23,42,0.05)",
-                }}
-              >
-                {t}
-              </span>
-            ))}
+        <button
+          type="button"
+          onClick={() => setSpecOpen((v) => !v)}
+          className="w-full flex items-center justify-between px-4 py-3 hover:bg-black/[0.015] transition"
+        >
+          <span
+            className="font-mono uppercase tracking-[0.16em]"
+            style={{
+              color: "rgba(15,23,42,0.65)",
+              fontSize: 10.5,
+            }}
+          >
+            Specs · personality + job
+          </span>
+          <span
+            className="font-mono uppercase tracking-[0.14em]"
+            style={{
+              color: "rgba(15,23,42,0.45)",
+              fontSize: 10,
+            }}
+          >
+            {specOpen ? "Hide" : "Show"}
+          </span>
+        </button>
+        {specOpen && (
+          <div
+            className="px-4 pb-4"
+            style={{ borderTop: "1px solid rgba(15,23,42,0.05)" }}
+          >
+            <SpecBlock label="Personality">
+              <p className="text-[13px] text-[#0A0A0A] leading-[1.55]">
+                {agent.personalityPrompt}
+              </p>
+            </SpecBlock>
+            <SpecBlock label="Job" last>
+              <p className="text-[13px] text-[#0A0A0A] leading-[1.55]">
+                {agent.jobPrompt}
+              </p>
+            </SpecBlock>
           </div>
-        </SpecBlock>
+        )}
       </motion.div>
 
       {/* First-60s region — replaces the old activation banner.

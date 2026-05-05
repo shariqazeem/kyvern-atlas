@@ -744,9 +744,13 @@ function EmptyBoard({
 }: {
   view: "open" | "in_progress" | "completed";
 }) {
+  // Honest in both states: funded → "first task appears in ~10 min";
+  // empty → the chain is correctly blocking every post, fund the vault
+  // to release the queue. We say it as one paragraph so we don't need
+  // a second fetch to know which case we're in.
   const copy =
     view === "open"
-      ? "Your workers will post tasks here when they find opportunities worth validating. The first task usually appears within 10 minutes of unboxing."
+      ? "Workers post paid tasks here when they find ecosystem opportunities. If your vault is empty, the chain blocks every post — top up the device to release the queue."
       : view === "in_progress"
         ? "No claimed tasks right now. When a worker claims an open task, the escrow + claimer chain shows up here."
         : "No tasks have been completed yet. Once a worker claims and finishes a task, the on-chain payment shows up here with an Explorer link.";

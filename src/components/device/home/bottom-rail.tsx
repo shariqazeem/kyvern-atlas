@@ -28,9 +28,13 @@ interface PolicySummary {
 interface Props {
   summary: PolicySummary | null;
   network: "devnet" | "mainnet";
+  /** When true, the rail surfaces a contextual "fund the engine" pill
+   *  instead of the no-tx-yet placeholder. Fresh-unbox state. */
+  vaultEmpty?: boolean;
+  onTopUp?: () => void;
 }
 
-export function BottomRail({ summary, network }: Props) {
+export function BottomRail({ summary, network, vaultEmpty, onTopUp }: Props) {
   const dailyLimit = summary?.dailyLimitUsd ?? 0;
   const dailySpent = summary?.dailySpentUsd ?? 0;
   const usedPct =
@@ -105,7 +109,10 @@ export function BottomRail({ summary, network }: Props) {
             as "the chain DID stop something today" — the brag. */}
         <Counter label="Blocked" value={blocked} tone={blocked > 0 ? "amber" : "neutral"} />
 
-        {/* Latest settled tx pill */}
+        {/* Latest settled tx pill — or, when the vault is empty, the
+            "fund to fire the engine" CTA. The fresh-unbox lands here
+            with $0 vault and zero approved txs; that's the moment the
+            user needs to be told what to do, not shown a dead "no tx". */}
         {sig ? (
           <a
             href={`https://explorer.solana.com/tx/${sig}?cluster=${network}`}
@@ -126,6 +133,25 @@ export function BottomRail({ summary, network }: Props) {
             </span>
             <ArrowUpRight className="w-3 h-3" strokeWidth={2} />
           </a>
+        ) : vaultEmpty && onTopUp ? (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onTopUp();
+            }}
+            className="inline-flex items-center gap-1.5 font-mono uppercase tracking-[0.14em] rounded-full px-3 py-1 hover:opacity-90 transition"
+            style={{
+              fontSize: 9.5,
+              color: "#B45309",
+              background: "rgba(245,158,11,0.10)",
+              border: "1px solid rgba(245,158,11,0.30)",
+              boxShadow: "0 0 0 0 rgba(245,158,11,0.0)",
+            }}
+          >
+            <span>Fund to fire engine</span>
+            <ArrowUpRight className="w-3 h-3" strokeWidth={2} />
+          </button>
         ) : (
           <span
             className="font-mono uppercase tracking-[0.14em]"

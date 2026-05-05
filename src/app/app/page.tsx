@@ -277,10 +277,15 @@ export default function DeviceHome() {
             </div>
 
             {/* BOTTOM RAIL — daily-cap gauge · calls today · blocked
-                today · last settled tx pill. The dollar scoreboard. */}
+                today · last settled tx pill. The dollar scoreboard.
+                On a fresh-unbox device with $0 vault, the rail's
+                last-tx slot becomes a "Fund to fire engine" CTA
+                pointing at the top-up drawer. */}
             <BottomRail
               summary={status?.policySummary ?? null}
               network={status?.network ?? "devnet"}
+              vaultEmpty={(status?.usdcBalance ?? 0) < 0.01}
+              onTopUp={onTopUp}
             />
 
             {/* The single seam to the demoted dashboard. One tap. */}
