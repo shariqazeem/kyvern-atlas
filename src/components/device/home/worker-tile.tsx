@@ -118,99 +118,89 @@ export function WorkerTile({ worker, action, network, fallbackBrand, isDemo }: P
         </span>
       )}
 
-      {/* TOP — identity + status LED */}
-      <div className="flex items-center justify-between px-4 pt-4 pb-3">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div
-            className="w-9 h-9 rounded-[10px] flex items-center justify-center text-[18px] flex-shrink-0"
-            style={{
-              background:
-                "linear-gradient(180deg, #F8FAFC 0%, #FFFFFF 100%)",
-              border: "1px solid rgba(15,23,42,0.06)",
-              boxShadow: "inset 0 1px 0 rgba(255,255,255,0.9)",
-            }}
-          >
-            {worker.emoji}
-          </div>
-          <div className="min-w-0">
-            <div
-              className="text-[13.5px] font-semibold tracking-[-0.005em] truncate"
-              style={{ color: "#0A0A0A" }}
-            >
-              {worker.name}
-            </div>
-            <div
-              className="font-mono uppercase tracking-[0.12em] truncate"
-              style={{ color: "#9CA3AF", fontSize: 9.5 }}
-            >
-              {labelForTemplate(worker.template)}
-            </div>
-          </div>
+      {/* HERO — visual emoji + status. Apple-minimal. The role
+          label is moved to the detail page; the chassis only shows
+          who they are + what they're doing. */}
+      <div className="px-5 pt-5 pb-2 flex items-start justify-between">
+        <div
+          className="rounded-[14px] flex items-center justify-center flex-shrink-0"
+          style={{
+            width: 48,
+            height: 48,
+            fontSize: 28,
+            background:
+              "linear-gradient(180deg, #F8FAFC 0%, #FFFFFF 100%)",
+            border: "1px solid rgba(15,23,42,0.06)",
+            boxShadow:
+              "inset 0 1px 0 rgba(255,255,255,1), 0 1px 2px rgba(15,23,42,0.04)",
+          }}
+        >
+          {worker.emoji}
         </div>
         <StatusLED kind={status} />
       </div>
 
-      {/* MIDDLE — verb + outcome line. The actual story. */}
-      <div className="px-4 pb-3 flex flex-col gap-2 flex-1">
+      {/* IDENTITY */}
+      <div className="px-5 pt-3 pb-2">
+        <div
+          className="text-[16px] font-semibold tracking-[-0.01em]"
+          style={{ color: "#0A0A0A" }}
+        >
+          {worker.name}
+        </div>
+      </div>
+
+      {/* VERB + OUTCOME — the story */}
+      <div className="px-5 pb-4 flex flex-col gap-2 flex-1">
         <div
           className="text-[12.5px] leading-[1.45]"
-          style={{ color: "rgba(15,23,42,0.78)" }}
+          style={{ color: "rgba(15,23,42,0.65)" }}
         >
           {verb}
         </div>
         <OutcomeLine outcome={outcome} />
       </div>
 
-      {/* BOTTOM — Explorer pill (or quiet placeholder) + tap-to-zoom */}
-      <div
-        className="flex items-center justify-between px-4 py-2.5"
-        style={{
-          borderTop: "1px solid rgba(15,23,42,0.05)",
-          background: "rgba(15,23,42,0.02)",
-        }}
-      >
-        {action?.signature ? (
-          <a
-            href={`https://explorer.solana.com/tx/${action.signature}?cluster=${network}`}
-            target="_blank"
-            rel="noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            className="inline-flex items-center gap-1 font-mono"
-            style={{
-              fontSize: 10.5,
-              letterSpacing: "0.04em",
-              color: "#15803D",
-            }}
-          >
-            {action.signature.slice(0, 6)}…{action.signature.slice(-4)}
-            <ArrowUpRight className="w-3 h-3" strokeWidth={2} />
-          </a>
-        ) : (
-          <span
-            className="font-mono"
-            style={{
-              fontSize: 10.5,
-              letterSpacing: "0.04em",
-              color: "rgba(15,23,42,0.35)",
-            }}
-          >
-            no settled tx yet
-          </span>
-        )}
-        <span
-          className="font-mono uppercase tracking-[0.14em] inline-flex items-center gap-1"
+      {/* TX FOOTER — quiet, single line */}
+      {action?.signature ? (
+        <a
+          href={`https://explorer.solana.com/tx/${action.signature}?cluster=${network}`}
+          target="_blank"
+          rel="noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className="flex items-center justify-between px-5 py-2.5 font-mono"
           style={{
-            fontSize: 9.5,
-            color: "rgba(15,23,42,0.45)",
+            borderTop: "1px solid rgba(15,23,42,0.05)",
+            background: "rgba(15,23,42,0.02)",
+            fontSize: 10.5,
+            letterSpacing: "0.04em",
+            color: "#15803D",
           }}
         >
-          Open
-          <ArrowUpRight
-            className="w-3 h-3 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform"
-            strokeWidth={2}
-          />
-        </span>
-      </div>
+          <span>
+            {action.signature.slice(0, 6)}…{action.signature.slice(-4)}
+          </span>
+          <ArrowUpRight className="w-3 h-3" strokeWidth={2} />
+        </a>
+      ) : (
+        <div
+          className="flex items-center justify-end px-5 py-2.5 font-mono uppercase tracking-[0.14em]"
+          style={{
+            borderTop: "1px solid rgba(15,23,42,0.05)",
+            background: "rgba(15,23,42,0.02)",
+            fontSize: 9.5,
+            color: "rgba(15,23,42,0.40)",
+          }}
+        >
+          <span className="inline-flex items-center gap-1">
+            Open
+            <ArrowUpRight
+              className="w-3 h-3 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform"
+              strokeWidth={2}
+            />
+          </span>
+        </div>
+      )}
     </Link>
   );
 }
@@ -541,19 +531,3 @@ function compressReason(message: string | null): string | null {
   return null;
 }
 
-function labelForTemplate(template: string): string {
-  switch (template) {
-    case "bounty_hunter":
-      return "Opportunity scout";
-    case "whale_tracker":
-      return "Market intel";
-    case "token_pulse":
-      return "Validation · staking";
-    case "ecosystem_watcher":
-      return "Ecosystem scout";
-    case "github_watcher":
-      return "Release watcher";
-    default:
-      return template.replace(/_/g, " ");
-  }
-}

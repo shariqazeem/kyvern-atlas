@@ -333,6 +333,8 @@ export default function DeviceHome() {
                 onTopUp={onTopUp}
                 isGuest={isGuest}
                 onSignIn={signIn}
+                policySummary={status?.policySummary ?? null}
+                perTxMaxUsd={0.5}
               />
             )}
 
