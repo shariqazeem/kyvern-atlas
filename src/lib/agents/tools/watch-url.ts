@@ -304,6 +304,18 @@ export const watchUrlTool: AgentTool = {
     if (SUPERTEAM_HOSTS.has(parsedUrl.host)) {
       result = await fetchSuperteam(url);
       kindHint = "bounty";
+    } else if (
+      parsedUrl.host === "api.github.com" ||
+      parsedUrl.pathname.includes("/releases")
+    ) {
+      // GitHub releases endpoint — JSON-shaped but semantically a
+      // release announcement, not a generic observation. Phase 7 fixed
+      // the format detector to parse api.github.com as JSON; this keeps
+      // the kindHint accurate so Sentinel emits kind='github_release'
+      // and the inbox + worker tiles render "Spotted release" instead
+      // of "Found a bounty" with stub Reward / Deadline / Filtered ≥ $X.
+      result = await fetchGenericJson(url);
+      kindHint = "github_release";
     } else if (format === "rss") {
       result = await fetchRss(url);
       kindHint = "ecosystem_announcement";

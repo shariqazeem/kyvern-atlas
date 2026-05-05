@@ -333,15 +333,17 @@ function resolveVerb(
         case "opportunity":
         case "bounty":
           return fb
-            ? `Found a ${fb} bounty${subj ? ` — ${subj}` : ""}`
+            ? `Found ${articleFor(fb)} ${fb} bounty${subj ? ` — ${subj}` : ""}`
             : subj
               ? `Found ${subj}`
               : "Found an opportunity";
         case "github_release":
-          return fb ? `Spotted ${fb} release` : "Spotted a release";
+          return fb
+            ? `Spotted ${fb} release${subj ? ` — ${subj}` : ""}`
+            : "Spotted a release";
         case "ecosystem_announcement":
           return fb
-            ? `Spotted ${fb} announcement`
+            ? `Spotted ${fb} announcement${subj ? ` — ${subj}` : ""}`
             : "Spotted an ecosystem move";
         case "wallet_move":
           return "Flagged a whale move";
@@ -358,31 +360,32 @@ function resolveVerb(
 
   const brand = action.brand ?? fallbackBrand ?? null;
   const failed = action.signatureStatus === "failed";
+  const a = brand ? articleFor(brand) : "a";
 
   switch (action.tool) {
     case "post_task":
       return failed
         ? brand
-          ? `Tried to post a ${brand} task`
+          ? `Tried to post ${a} ${brand} task`
           : "Tried to post a paid task"
         : brand
-          ? `Posted a ${brand} task`
+          ? `Posted ${a} ${brand} task`
           : "Posted a paid task";
     case "claim_task":
       return failed
         ? brand
-          ? `Tried to claim a ${brand} task`
+          ? `Tried to claim ${a} ${brand} task`
           : "Tried to claim a paid task"
         : brand
-          ? `Claimed a ${brand} task`
+          ? `Claimed ${a} ${brand} task`
           : "Claimed a paid task";
     case "complete_task":
       return failed
         ? brand
-          ? `Tried to complete a ${brand} task`
+          ? `Tried to complete ${a} ${brand} task`
           : "Tried to complete a paid task"
         : brand
-          ? `Completed a ${brand} task`
+          ? `Completed ${a} ${brand} task`
           : "Completed a paid task";
     case "stake_on_finding":
       return failed ? "Tried to stake" : "Staked on a finding";
@@ -391,6 +394,17 @@ function resolveVerb(
     default:
       return action.tool.replace(/_/g, " ");
   }
+}
+
+/** Pick "a" or "an" before a brand name based on its first letter.
+ *  Vowel start → "an" (Anchor, Agave, Anza). Consonant → "a"
+ *  (Squads, Superteam, Helius, Metaplex, Colosseum, Jupiter, Solana). */
+function articleFor(brand: string | null | undefined): "a" | "an" {
+  if (!brand) return "a";
+  const c = brand[0]?.toLowerCase() ?? "";
+  return c === "a" || c === "e" || c === "i" || c === "o" || c === "u"
+    ? "an"
+    : "a";
 }
 
 /** Trim a long signal subject down to a punchy one-line. The /app

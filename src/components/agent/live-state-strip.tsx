@@ -164,15 +164,17 @@ function resolveVerb(
         case "opportunity":
         case "bounty":
           return brand
-            ? `Found a ${brand} bounty${subj ? ` — ${subj}` : ""}`
+            ? `Found ${articleFor(brand)} ${brand} bounty${subj ? ` — ${subj}` : ""}`
             : subj
               ? `Found ${subj}`
               : "Found an opportunity";
         case "github_release":
-          return brand ? `Spotted ${brand} release` : "Spotted a release";
+          return brand
+            ? `Spotted ${brand} release${subj ? ` — ${subj}` : ""}`
+            : "Spotted a release";
         case "ecosystem_announcement":
           return brand
-            ? `Spotted ${brand} announcement`
+            ? `Spotted ${brand} announcement${subj ? ` — ${subj}` : ""}`
             : "Spotted an ecosystem move";
         case "wallet_move":
           return "Flagged a whale move";
@@ -189,31 +191,32 @@ function resolveVerb(
 
   const brand = action.brand ?? null;
   const failed = action.signatureStatus === "failed";
+  const a = brand ? articleFor(brand) : "a";
 
   switch (action.tool) {
     case "post_task":
       return failed
         ? brand
-          ? `Tried to post a ${brand} task`
+          ? `Tried to post ${a} ${brand} task`
           : "Tried to post a paid task"
         : brand
-          ? `Posted a ${brand} task`
+          ? `Posted ${a} ${brand} task`
           : "Posted a paid task";
     case "claim_task":
       return failed
         ? brand
-          ? `Tried to claim a ${brand} task`
+          ? `Tried to claim ${a} ${brand} task`
           : "Tried to claim a paid task"
         : brand
-          ? `Claimed a ${brand} task`
+          ? `Claimed ${a} ${brand} task`
           : "Claimed a paid task";
     case "complete_task":
       return failed
         ? brand
-          ? `Tried to complete a ${brand} task`
+          ? `Tried to complete ${a} ${brand} task`
           : "Tried to complete a paid task"
         : brand
-          ? `Completed a ${brand} task`
+          ? `Completed ${a} ${brand} task`
           : "Completed a paid task";
     case "stake_on_finding":
       return failed ? "Tried to stake" : "Staked on a finding";
@@ -222,6 +225,14 @@ function resolveVerb(
     default:
       return action.tool.replace(/_/g, " ");
   }
+}
+
+function articleFor(brand: string | null | undefined): "a" | "an" {
+  if (!brand) return "a";
+  const c = brand[0]?.toLowerCase() ?? "";
+  return c === "a" || c === "e" || c === "i" || c === "o" || c === "u"
+    ? "an"
+    : "a";
 }
 
 function resolveOutcome(

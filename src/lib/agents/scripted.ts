@@ -800,12 +800,58 @@ const BOUNTY_HUNTER_VOICE: VoiceProfile = {
         ? top.skills
         : "";
 
-    // Always use kind='opportunity' for Sentinel's findings. The
-    // chosenKindHint from watch_url is informational only — the
-    // unified Opportunity Scout taxonomy collapses bounties + grants +
-    // releases + announcements under one kind so the inbox reads as a
-    // single intelligence stream.
-    void chosenKindHint;
+    // Per-source signal kind. Phase 1 collapsed everything into
+    // kind='opportunity', which made GitHub releases render with the
+    // bounty evidence template ("Reward: see listing · Filtered ≥ $300")
+    // even though releases have no rewards. Live Engine: respect the
+    // chosenKindHint so the inbox + worker tiles render kind-appropriate
+    // copy.
+    //   bounty                  → kind='opportunity' (Superteam + similar)
+    //   github_release          → kind='github_release'
+    //   ecosystem_announcement  → kind='ecosystem_announcement'
+    //   observation             → fallback to 'opportunity'
+    const signalKind: "opportunity" | "github_release" | "ecosystem_announcement" =
+      chosenKindHint === "github_release"
+        ? "github_release"
+        : chosenKindHint === "ecosystem_announcement"
+          ? "ecosystem_announcement"
+          : "opportunity";
+
+    // Evidence array varies by kind. Bounty kind keeps the historical
+    // (Reward / Deadline / Skills / Filtered) shape because Superteam
+    // listings actually carry those fields. Releases get repo + source.
+    // Announcements get host + summary + date.
+    const sourceHost = new URL(chosenUrl).host;
+    let signalEvidence: string[];
+    if (signalKind === "github_release") {
+      // For api.github.com/repos/<owner>/<repo>/releases the repo lives
+      // in the path; pull it back out for a tidy "Repo: x/y" line.
+      let repo = sourceHost;
+      const m = chosenUrl.match(/\/repos\/([^/]+\/[^/]+)/);
+      if (m) repo = m[1];
+      signalEvidence = [
+        `Tag: ${title}`,
+        `Repo: ${repo}`,
+        top.deadline ? `Released: ${top.deadline}` : `Source: ${sourceHost}`,
+      ];
+    } else if (signalKind === "ecosystem_announcement") {
+      const summary = top.summary
+        ? String(top.summary).slice(0, 120)
+        : null;
+      signalEvidence = [
+        `Source: ${sourceHost}`,
+        summary ? summary : "New post on this feed",
+        top.deadline ? `Date: ${top.deadline}` : "Recently published",
+      ];
+    } else {
+      // Default 'opportunity' — bounty register, current evidence.
+      signalEvidence = [
+        rewardUsd != null ? `Reward: $${rewardUsd}` : "Reward: see listing",
+        top.deadline ? `Deadline: ${top.deadline}` : "Deadline: see listing",
+        skills ? `Skills: ${skills}` : `Source: ${sourceHost}`,
+        minPrize ? `Filtered ≥ $${minPrize}` : "No minimum filter",
+      ].slice(0, 4);
+    }
 
     // Step 2 — escrow + post the research task. Goes first because
     // ECONOMY PRIORITY puts post_task ahead of message_user.
@@ -835,20 +881,17 @@ const BOUNTY_HUNTER_VOICE: VoiceProfile = {
       }
     }
 
-    // Step 3 — write the opportunity signal regardless of post
-    // outcome. The owner still wants to see the find in their inbox
-    // even if the policy program rejected the escrow.
+    // Step 3 — write the signal regardless of post outcome. The owner
+    // still wants to see the find in their inbox even if the policy
+    // program rejected the escrow. Kind + evidence come from the
+    // per-source resolution above, so a release renders as a release
+    // and a Superteam bounty renders as a bounty.
     const writeResult = writeSignal({
       agentId: agent.id,
       deviceId: agent.deviceId,
-      kind: "opportunity",
+      kind: signalKind,
       subject: title,
-      evidence: [
-        rewardUsd != null ? `Reward: $${rewardUsd}` : "Reward: see listing",
-        top.deadline ? `Deadline: ${top.deadline}` : "Deadline: see listing",
-        skills ? `Skills: ${skills}` : `Source: ${new URL(chosenUrl).host}`,
-        minPrize ? `Filtered ≥ $${minPrize}` : "No minimum filter",
-      ].slice(0, 4),
+      evidence: signalEvidence,
       sourceUrl,
     });
 
