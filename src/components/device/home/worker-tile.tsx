@@ -118,21 +118,20 @@ export function WorkerTile({ worker, action, network, fallbackBrand, isDemo }: P
         </span>
       )}
 
-      {/* HERO — visual emoji + status. Apple-minimal. The role
-          label is moved to the detail page; the chassis only shows
-          who they are + what they're doing. */}
+      {/* HERO — visual emoji + status. Bigger than before so a
+          newbie's eye lands here first. */}
       <div className="px-5 pt-5 pb-2 flex items-start justify-between">
         <div
-          className="rounded-[14px] flex items-center justify-center flex-shrink-0"
+          className="rounded-[16px] flex items-center justify-center flex-shrink-0"
           style={{
-            width: 48,
-            height: 48,
-            fontSize: 28,
+            width: 56,
+            height: 56,
+            fontSize: 34,
             background:
               "linear-gradient(180deg, #F8FAFC 0%, #FFFFFF 100%)",
             border: "1px solid rgba(15,23,42,0.06)",
             boxShadow:
-              "inset 0 1px 0 rgba(255,255,255,1), 0 1px 2px rgba(15,23,42,0.04)",
+              "inset 0 1px 0 rgba(255,255,255,1), 0 1px 2px rgba(15,23,42,0.04), 0 8px 22px -10px rgba(15,23,42,0.10)",
           }}
         >
           {worker.emoji}
@@ -141,23 +140,24 @@ export function WorkerTile({ worker, action, network, fallbackBrand, isDemo }: P
       </div>
 
       {/* IDENTITY */}
-      <div className="px-5 pt-3 pb-2">
+      <div className="px-5 pt-3 pb-1.5">
         <div
-          className="text-[16px] font-semibold tracking-[-0.01em]"
+          className="text-[17px] font-semibold tracking-[-0.01em]"
           style={{ color: "#0A0A0A" }}
         >
           {worker.name}
         </div>
       </div>
 
-      {/* VERB + OUTCOME — the story */}
-      <div className="px-5 pb-4 flex flex-col gap-2 flex-1">
+      {/* VERB — what they're doing now (subtle, supports the outcome) */}
+      <div className="px-5 pb-3 flex flex-col gap-2.5 flex-1">
         <div
-          className="text-[12.5px] leading-[1.45]"
-          style={{ color: "rgba(15,23,42,0.65)" }}
+          className="text-[13px] leading-[1.45]"
+          style={{ color: "rgba(15,23,42,0.55)" }}
         >
           {verb}
         </div>
+        {/* OUTCOME — the STAR. Bigger, bolder, the moat moment. */}
         <OutcomeLine outcome={outcome} />
       </div>
 
@@ -196,16 +196,23 @@ export function WorkerTile({ worker, action, network, fallbackBrand, isDemo }: P
         </a>
       ) : (
         <div
-          className="flex items-center justify-end px-5 py-2.5 font-mono uppercase tracking-[0.14em]"
+          className="flex items-center justify-between px-5 py-2.5"
           style={{
             borderTop: "1px solid rgba(15,23,42,0.05)",
             background: "rgba(15,23,42,0.02)",
-            fontSize: 9.5,
-            color: "rgba(15,23,42,0.40)",
           }}
         >
-          <span className="inline-flex items-center gap-1">
-            Open
+          <span
+            className="font-mono uppercase tracking-[0.14em]"
+            style={{ fontSize: 9.5, color: "rgba(15,23,42,0.40)" }}
+          >
+            Live log
+          </span>
+          <span
+            className="font-mono uppercase tracking-[0.14em] inline-flex items-center gap-1"
+            style={{ fontSize: 9.5, color: "rgba(15,23,42,0.55)" }}
+          >
+            View full log
             <ArrowUpRight
               className="w-3 h-3 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform"
               strokeWidth={2}
@@ -306,19 +313,20 @@ function OutcomeLine({
       initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: EASE }}
-      className="inline-flex items-center gap-1.5 font-mono w-fit rounded-[8px] px-2 py-1"
+      className="inline-flex items-center gap-1.5 font-mono w-fit rounded-[10px] px-2.5 py-1.5"
       style={{
-        fontSize: 11,
-        letterSpacing: "0.01em",
+        fontSize: 12.5,
+        fontWeight: 500,
+        letterSpacing: "0.005em",
         color: palette.fg,
         background: palette.bg,
         border: `1px solid ${palette.border}`,
       }}
     >
       {outcome.tone === "approved" ? (
-        <Check className="w-3 h-3" strokeWidth={2.5} />
+        <Check className="w-3.5 h-3.5" strokeWidth={2.5} />
       ) : outcome.tone === "blocked" ? (
-        <X className="w-3 h-3" strokeWidth={2.5} />
+        <X className="w-3.5 h-3.5" strokeWidth={2.5} />
       ) : null}
       {outcome.text}
     </motion.div>
@@ -463,9 +471,11 @@ function resolveOutcome(
         text: `Earned $${worker.totalEarnedUsd.toFixed(2)} so far`,
       };
     }
+    // Newbie-friendly fallback — no "cycles" jargon. The chassis is
+    // about ownership; this should read as a friendly idle state.
     return {
       tone: "neutral",
-      text: `${worker.totalThoughts} cycle${worker.totalThoughts === 1 ? "" : "s"} so far`,
+      text: "Standing by",
     };
   }
 

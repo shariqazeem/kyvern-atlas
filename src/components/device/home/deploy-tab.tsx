@@ -12,7 +12,13 @@
 import { useState } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowRight, Check, Loader2, Sliders } from "lucide-react";
+import {
+  ArrowRight,
+  Check,
+  CheckCircle2,
+  Loader2,
+  Sliders,
+} from "lucide-react";
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
@@ -87,18 +93,61 @@ export function DeployTab({
         throw new Error(data?.message || data?.error || "Deploy failed");
       }
       setJustDeployed(preset.id);
-      // Brief celebration before switching tabs.
+      // Celebration runs ~1.6s before auto-switching to Tab 1 so the
+      // user feels the success: card ring lights up, then the
+      // floating toast slides in saying "Worker added to your device".
       setTimeout(() => {
         onDeployed?.();
-      }, 1200);
+      }, 1600);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Deploy failed");
       setDeploying(null);
     }
   }
 
+  // The deployed preset's display name for the celebration toast.
+  const justDeployedPreset = justDeployed
+    ? PRESETS.find((p) => p.id === justDeployed)
+    : null;
+
   return (
-    <div className="flex flex-col gap-5">
+    <div className="relative flex flex-col gap-5">
+      {/* CELEBRATION TOAST — slides in when a preset deploy lands.
+          The card ring + check animation plays inside the preset card;
+          this is the higher-level "Worker added to your device" win
+          confirmation. Fades out as the tab auto-switches to Tab 1. */}
+      <AnimatePresence>
+        {justDeployedPreset && (
+          <motion.div
+            key="deploy-toast"
+            initial={{ opacity: 0, y: -10, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -8, scale: 0.96 }}
+            transition={{ duration: 0.35, ease: EASE }}
+            className="absolute left-1/2 -translate-x-1/2 -top-2 z-30 inline-flex items-center gap-2 rounded-full px-3.5 py-2 pointer-events-none"
+            style={{
+              background: "#0A0A0A",
+              color: "#FFFFFF",
+              border: "1px solid rgba(0,0,0,0.8)",
+              boxShadow:
+                "0 8px 28px rgba(15,23,42,0.18), 0 0 0 4px rgba(34,197,94,0.10)",
+            }}
+          >
+            <CheckCircle2
+              className="w-4 h-4"
+              strokeWidth={2}
+              style={{ color: "#86EFAC" }}
+            />
+            <span
+              className="text-[12px] font-semibold tracking-[-0.005em]"
+            >
+              {justDeployedPreset.emoji}{" "}
+              {justDeployedPreset.name} added to your device
+            </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* HEADER — ownership-first language. The user OWNS this device;
           workers are tenants they ADD to it, not people they HIRE. */}
       <div>

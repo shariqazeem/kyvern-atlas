@@ -25,6 +25,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowUpRight,
   Check,
+  ChevronDown,
+  Code2,
   Loader2,
   ShieldX,
   X,
@@ -88,6 +90,10 @@ export function PayEnforceTab({
   const [keyPrefix, setKeyPrefix] = useState<string | null>(null);
   const [revealedKey, setRevealedKey] = useState<string | null>(null);
   const [revealing, setRevealing] = useState(false);
+  // Newbies see only the two hero actions by default. Builders click
+  // the Advanced toggle to reveal the playground form + integrate
+  // SDK / Pay.sh code panes.
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   useEffect(() => {
     if (!deviceId) return;
@@ -212,10 +218,10 @@ export function PayEnforceTab({
         </div>
       )}
 
-      {/* ─── SECTION 1: POLICY IN ACTION ─────────────────────────── */}
+      {/* ─── SECTION 1: USE YOUR DEVICE RIGHT NOW ─────────────────── */}
       <section>
         <SectionHeader
-          eyebrow="Policy in action"
+          eyebrow="Use your device right now"
           title="See the chain decide."
           subtitle="Two real on-chain actions. One settles. One gets blocked."
         />
@@ -281,36 +287,70 @@ export function PayEnforceTab({
         </div>
       </section>
 
-      {/* ─── SECTION 2: POLICY PLAYGROUND ────────────────────────── */}
-      <section>
-        <SectionHeader
-          eyebrow="Test the policy"
-          title="Punch in any payment. Watch the chain decide."
-          subtitle="No code. No docs. Real on-chain enforcement of the rules below."
+      {/* ─── ADVANCED EXPANDER ────────────────────────────────────
+          Newbies see only the two hero actions above. Builders click
+          "For builders" to reveal the playground form + the SDK +
+          Pay.sh integrate card. Progressive disclosure. */}
+      <button
+        type="button"
+        onClick={() => setAdvancedOpen((v) => !v)}
+        className="self-center inline-flex items-center gap-1.5 font-mono uppercase tracking-[0.16em] hover:opacity-80 transition py-2"
+        style={{
+          fontSize: 10.5,
+          color: "rgba(15,23,42,0.55)",
+        }}
+      >
+        <Code2 className="w-3.5 h-3.5" strokeWidth={1.8} />
+        {advancedOpen ? "Hide builder tools" : "For builders · test + integrate"}
+        <ChevronDown
+          className="w-3.5 h-3.5 transition-transform"
+          strokeWidth={2}
+          style={{ transform: advancedOpen ? "rotate(180deg)" : "rotate(0deg)" }}
         />
-        <PolicyPlayground
-          deviceId={deviceId}
-          network={network}
-          policySummary={policySummary ?? null}
-          perTxMaxUsd={perTxMaxUsd}
-        />
-      </section>
+      </button>
 
-      {/* ─── SECTION 3: WRAP YOUR OWN AGENT ──────────────────────── */}
-      <section>
-        <SectionHeader
-          eyebrow="Integrate"
-          title="Wrap your own agent in five lines."
-          subtitle="The same SDK works with Pay.sh — Solana × Google Cloud's agent commerce rail."
-        />
-        <IntegrateCard
-          keyPrefix={keyPrefix}
-          revealedKey={revealedKey}
-          onMint={mintKey}
-          revealing={revealing}
-          isGuest={isGuest}
-        />
-      </section>
+      <AnimatePresence>
+        {advancedOpen && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.4, ease: EASE }}
+            className="flex flex-col gap-5 overflow-hidden"
+          >
+            {/* PLAYGROUND */}
+            <section>
+              <SectionHeader
+                eyebrow="Test the policy"
+                title="Punch in any payment. Watch the chain decide."
+                subtitle="No code. No docs. Real on-chain enforcement of the rules below."
+              />
+              <PolicyPlayground
+                deviceId={deviceId}
+                network={network}
+                policySummary={policySummary ?? null}
+                perTxMaxUsd={perTxMaxUsd}
+              />
+            </section>
+
+            {/* INTEGRATE */}
+            <section>
+              <SectionHeader
+                eyebrow="Integrate"
+                title="Wrap your own agent in five lines."
+                subtitle="The same SDK works with Pay.sh — Solana × Google Cloud's agent commerce rail."
+              />
+              <IntegrateCard
+                keyPrefix={keyPrefix}
+                revealedKey={revealedKey}
+                onMint={mintKey}
+                revealing={revealing}
+                isGuest={isGuest}
+              />
+            </section>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
