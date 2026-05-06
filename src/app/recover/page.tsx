@@ -67,22 +67,31 @@ type Phase =
 export default function RecoverPage() {
   const router = useRouter();
   const { isAuthenticated, isLoading } = useAuth();
-  const { login } = usePrivy();
+  const { login, authenticated } = usePrivy();
   const { createGuestAccount } = useGuestAccounts();
   const { importWallet } = useImportWallet();
 
   const [phase, setPhase] = useState<Phase>("input");
   const [pasted, setPasted] = useState("");
   const [error, setError] = useState<string | null>(null);
+  // Two-step recovery: phase A (guest auth) resolves the Privy promise,
+  // but the React `authenticated` flag flips on a later render. We can't
+  // call importWallet inside the same callback — Privy throws "User must
+  // be authenticated before linking an account." So we stash the pending
+  // key here and let an effect fire importWallet once `authenticated`
+  // becomes true.
+  const [pendingImportKey, setPendingImportKey] = useState<string | null>(
+    null,
+  );
 
-  // If the user is already authenticated and lands here, bounce them
-  // straight to /app — no recovery needed.
+  // If the user is already authenticated and lands here without a pending
+  // import in flight, bounce them straight to /app — no recovery needed.
   useEffect(() => {
     if (isLoading) return;
-    if (isAuthenticated && phase === "input") {
+    if (isAuthenticated && phase === "input" && !pendingImportKey) {
       router.replace("/app");
     }
-  }, [isLoading, isAuthenticated, phase, router]);
+  }, [isLoading, isAuthenticated, phase, pendingImportKey, router]);
 
   const decoded = useMemo(() => decodeDeviceKey(pasted), [pasted]);
   const validKey = !!decoded;
@@ -93,23 +102,48 @@ export default function RecoverPage() {
     setPhase("recovering");
     setError(null);
     try {
-      // 1. Silent guest account — no email/social UI shown.
+      // Stash the trimmed key BEFORE calling createGuestAccount. The
+      // import effect below will pick it up once Privy's auth state
+      // flips to authenticated.
+      setPendingImportKey(pasted.trim());
+      // Silent guest account — no email/social UI shown. The Promise
+      // resolves once Privy's iframe replies, but the React state
+      // (`authenticated`) updates on the next render after that.
       await createGuestAccount();
-      // 2. Attach the pasted key as a Solana embedded wallet for this
-      //    account. Privy validates the key + adds it to the user's
-      //    wallets. Bytes leave the browser only here, going directly
-      //    to Privy's iframe — never to our server.
-      await importWallet({ privateKey: pasted.trim() });
-      // Burn the paste from React state — the imported wallet is now
-      // managed by Privy.
-      setPasted("");
-      setPhase("recovered");
     } catch (e) {
+      setPendingImportKey(null);
       const msg = e instanceof Error ? e.message : "Recovery failed.";
       setError(msg);
       setPhase("error");
     }
-  }, [decoded, createGuestAccount, importWallet, pasted]);
+  }, [decoded, createGuestAccount, pasted]);
+
+  // Phase B — once authenticated flips to true AND we have a pending key
+  // queued from the recover click, call importWallet. This sidesteps the
+  // "User must be authenticated before linking an account" race.
+  useEffect(() => {
+    if (!pendingImportKey) return;
+    if (!authenticated) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        await importWallet({ privateKey: pendingImportKey });
+        if (cancelled) return;
+        setPasted("");
+        setPendingImportKey(null);
+        setPhase("recovered");
+      } catch (e) {
+        if (cancelled) return;
+        setPendingImportKey(null);
+        const msg = e instanceof Error ? e.message : "Recovery failed.";
+        setError(msg);
+        setPhase("error");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [authenticated, pendingImportKey, importWallet]);
 
   const handleAccountFallback = useCallback(() => {
     // Standard Privy login — restores existing embedded wallet via
