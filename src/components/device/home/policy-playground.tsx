@@ -58,6 +58,13 @@ const SCENARIOS: Array<{
   hint: "approve" | "block";
 }> = [
   {
+    label: "Pay.sh · Gemini",
+    merchant: "api.pay.sh/gemini",
+    amountUsd: 0.05,
+    memo: "gemini-pro: weather",
+    hint: "approve",
+  },
+  {
     label: "$0.05 to OpenAI",
     merchant: "api.openai.com",
     amountUsd: 0.05,
@@ -65,14 +72,7 @@ const SCENARIOS: Array<{
     hint: "approve",
   },
   {
-    label: "$0.40 to Helius",
-    merchant: "api.helius.xyz",
-    amountUsd: 0.4,
-    memo: "rpc query",
-    hint: "approve",
-  },
-  {
-    label: "$5 to ranger.com",
+    label: "$5 → over cap",
     merchant: "ranger.com",
     amountUsd: 5,
     memo: "test over cap",

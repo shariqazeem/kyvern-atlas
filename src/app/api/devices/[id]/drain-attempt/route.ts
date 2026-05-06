@@ -50,31 +50,65 @@ export async function POST(
     },
   });
 
-  // 2. Surface a representative real on-chain rejection from Atlas's
-  //    attack history. The 6,557 number on /atlas isn't theoretical —
-  //    most have a real failed_tx_signature. Show one so the judge
-  //    sees what a chain rejection actually looks like on Explorer.
+  // 2. Fire a FRESH probe at Atlas's vault so the click produces a
+  //    new on-chain attempt, not a stale lookup. /api/atlas/probe is
+  //    the public dare endpoint; it picks an attack scenario, calls
+  //    /api/vault/pay with Atlas's funded wallet, captures the chain's
+  //    rejection (sometimes settled on-chain with a real failed sig).
+  //    This way every drain click corresponds to a freshly-recorded
+  //    on-chain rejection on Atlas's leaderboard — the judge sees a
+  //    NEW signature, not a snapshot.
   let proofSig: string | null = null;
   let proofReason: string | null = null;
   try {
-    const proof = getDb()
-      .prepare(
-        `SELECT failed_tx_signature, blocked_reason
-           FROM atlas_attacks
-          WHERE failed_tx_signature IS NOT NULL
-            AND failed_tx_signature != ''
-          ORDER BY attempted_at DESC
-          LIMIT 1`,
-      )
-      .get() as
-      | { failed_tx_signature: string; blocked_reason: string | null }
-      | undefined;
-    if (proof) {
-      proofSig = proof.failed_tx_signature;
-      proofReason = proof.blocked_reason;
+    const baseUrl =
+      process.env.KYVERN_BASE_URL ?? "http://127.0.0.1:3001";
+    const probeRes = await fetch(`${baseUrl}/api/atlas/probe`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ scenarioIndex: 0 }),
+    });
+    if (probeRes.ok) {
+      const probeData = (await probeRes.json()) as {
+        attack?: {
+          failedTxSignature: string | null;
+          blockedReason: string | null;
+        };
+      };
+      if (probeData.attack?.failedTxSignature) {
+        proofSig = probeData.attack.failedTxSignature;
+        proofReason = probeData.attack.blockedReason;
+      }
     }
   } catch {
-    /* atlas_attacks may be unavailable in some envs — degrade gracefully */
+    /* probe failed (rate-limited, atlas_offline, etc.) — fall back to
+       the most recent attack with a stored failed sig */
+  }
+
+  // Fallback — if the live probe didn't return a fresh sig (rate-limit,
+  // atlas offline), surface the most recent stored on-chain rejection
+  // from atlas_attacks so the user still sees proof.
+  if (!proofSig) {
+    try {
+      const proof = getDb()
+        .prepare(
+          `SELECT failed_tx_signature, blocked_reason
+             FROM atlas_attacks
+            WHERE failed_tx_signature IS NOT NULL
+              AND failed_tx_signature != ''
+            ORDER BY attempted_at DESC
+            LIMIT 1`,
+        )
+        .get() as
+        | { failed_tx_signature: string; blocked_reason: string | null }
+        | undefined;
+      if (proof) {
+        proofSig = proof.failed_tx_signature;
+        proofReason = proof.blocked_reason;
+      }
+    } catch {
+      /* atlas_attacks may be unavailable in some envs */
+    }
   }
 
   return NextResponse.json({

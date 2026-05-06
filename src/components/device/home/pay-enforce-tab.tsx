@@ -23,15 +23,14 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  ArrowRight,
   ArrowUpRight,
   Check,
-  Eye,
   Loader2,
   ShieldX,
   X,
 } from "lucide-react";
 import { PolicyPlayground } from "./policy-playground";
+import { IntegrateCard } from "./integrate-card";
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
@@ -89,7 +88,6 @@ export function PayEnforceTab({
   const [keyPrefix, setKeyPrefix] = useState<string | null>(null);
   const [revealedKey, setRevealedKey] = useState<string | null>(null);
   const [revealing, setRevealing] = useState(false);
-  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (!deviceId) return;
@@ -179,7 +177,6 @@ export function PayEnforceTab({
 
   const explorer = (sig: string) =>
     `https://explorer.solana.com/tx/${sig}?cluster=${network}`;
-  const displayKey = revealedKey ?? (keyPrefix ? `${keyPrefix}…` : null);
 
   return (
     <div className="flex flex-col gap-5">
@@ -287,9 +284,9 @@ export function PayEnforceTab({
       {/* ─── SECTION 2: POLICY PLAYGROUND ────────────────────────── */}
       <section>
         <SectionHeader
-          eyebrow="Build with the policy program"
+          eyebrow="Test the policy"
           title="Punch in any payment. Watch the chain decide."
-          subtitle="No code, no terminal, no docs. Real on-chain enforcement of the rules below."
+          subtitle="No code. No docs. Real on-chain enforcement of the rules below."
         />
         <PolicyPlayground
           deviceId={deviceId}
@@ -299,83 +296,20 @@ export function PayEnforceTab({
         />
       </section>
 
-      {/* ─── KEY UTILITY ROW (quiet, not dominant) ───────────────── */}
-      <section
-        className="flex items-center justify-between gap-3 flex-wrap rounded-[10px] px-3.5 py-2.5"
-        style={{
-          background: "rgba(15,23,42,0.025)",
-          border: "1px solid rgba(15,23,42,0.05)",
-        }}
-      >
-        <div className="flex items-center gap-2 min-w-0 flex-1">
-          <span
-            className="font-mono uppercase tracking-[0.14em]"
-            style={{ color: "#9CA3AF", fontSize: 9.5 }}
-          >
-            Agent key
-          </span>
-          <span
-            className="font-mono truncate"
-            style={{
-              fontSize: 11,
-              color: revealedKey ? "#0A0A0A" : "rgba(15,23,42,0.55)",
-            }}
-          >
-            {displayKey ?? "no key minted yet"}
-          </span>
-          {revealedKey && (
-            <button
-              type="button"
-              onClick={() => {
-                navigator.clipboard.writeText(revealedKey);
-                setCopied(true);
-                setTimeout(() => setCopied(false), 1500);
-              }}
-              className="inline-flex items-center gap-1 font-mono uppercase tracking-[0.14em] hover:opacity-80 transition"
-              style={{
-                fontSize: 9.5,
-                color: copied ? "#15803D" : "rgba(15,23,42,0.55)",
-              }}
-            >
-              {copied ? (
-                <>
-                  <Check className="w-3 h-3" strokeWidth={2.5} />
-                  Copied
-                </>
-              ) : (
-                "Copy"
-              )}
-            </button>
-          )}
-        </div>
-        <button
-          type="button"
-          onClick={mintKey}
-          disabled={!deviceId || revealing}
-          className="inline-flex items-center gap-1.5 font-mono uppercase tracking-[0.14em] rounded-full px-2.5 py-1 hover:opacity-90 transition disabled:opacity-50 flex-shrink-0"
-          style={{
-            fontSize: 9.5,
-            color: "#FFFFFF",
-            background: "#0A0A0A",
-            border: "1px solid rgba(0,0,0,0.8)",
-          }}
-        >
-          {revealing ? (
-            "Minting…"
-          ) : isGuest ? (
-            "Sign in to mint"
-          ) : revealedKey ? (
-            <>
-              <Eye className="w-3 h-3" strokeWidth={2} />
-              Shown once
-            </>
-          ) : (
-            <>
-              Mint a fresh key
-              <ArrowRight className="w-3 h-3" strokeWidth={2} />
-            </>
-          )}
-        </button>
+      {/* ─── SECTION 3: WRAP YOUR OWN AGENT ──────────────────────── */}
+      <section>
+        <SectionHeader
+          eyebrow="Integrate"
+          title="Wrap your own agent in five lines."
+          subtitle="The same SDK works with Pay.sh — Solana × Google Cloud's agent commerce rail."
+        />
+        <IntegrateCard
+          keyPrefix={keyPrefix}
+          revealedKey={revealedKey}
+          onMint={mintKey}
+          revealing={revealing}
+          isGuest={isGuest}
+        />
       </section>
     </div>
   );
