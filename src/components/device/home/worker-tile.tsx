@@ -161,26 +161,38 @@ export function WorkerTile({ worker, action, network, fallbackBrand, isDemo }: P
         <OutcomeLine outcome={outcome} />
       </div>
 
-      {/* TX FOOTER — quiet, single line */}
+      {/* TX FOOTER — quiet, single line. Labels the receipt as
+          "Last settled" so the judge reads the row as proof, not
+          mystery hex. */}
       {action?.signature ? (
         <a
           href={`https://explorer.solana.com/tx/${action.signature}?cluster=${network}`}
           target="_blank"
           rel="noreferrer"
           onClick={(e) => e.stopPropagation()}
-          className="flex items-center justify-between px-5 py-2.5 font-mono"
+          className="flex items-center justify-between px-5 py-2.5"
           style={{
             borderTop: "1px solid rgba(15,23,42,0.05)",
             background: "rgba(15,23,42,0.02)",
-            fontSize: 10.5,
-            letterSpacing: "0.04em",
-            color: "#15803D",
           }}
         >
-          <span>
-            {action.signature.slice(0, 6)}…{action.signature.slice(-4)}
+          <span
+            className="font-mono uppercase tracking-[0.14em]"
+            style={{ fontSize: 9.5, color: "rgba(15,23,42,0.40)" }}
+          >
+            Last settled
           </span>
-          <ArrowUpRight className="w-3 h-3" strokeWidth={2} />
+          <span
+            className="font-mono inline-flex items-center gap-1"
+            style={{
+              fontSize: 10.5,
+              letterSpacing: "0.04em",
+              color: "#15803D",
+            }}
+          >
+            {action.signature.slice(0, 6)}…{action.signature.slice(-4)}
+            <ArrowUpRight className="w-3 h-3" strokeWidth={2} />
+          </span>
         </a>
       ) : (
         <div

@@ -51,9 +51,18 @@ interface Props {
   onDeployed?: () => void;
   isGuest?: boolean;
   onSignIn?: () => void;
+  /** Click handler for the "Already have an agent?" SDK teaser —
+   *  switches to Tab 3 where the Integrate card lives. */
+  onOpenSdk?: () => void;
 }
 
-export function DeployTab({ deviceId, onDeployed, isGuest, onSignIn }: Props) {
+export function DeployTab({
+  deviceId,
+  onDeployed,
+  isGuest,
+  onSignIn,
+  onOpenSdk,
+}: Props) {
   const [deploying, setDeploying] = useState<string | null>(null);
   const [justDeployed, setJustDeployed] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -90,7 +99,8 @@ export function DeployTab({ deviceId, onDeployed, isGuest, onSignIn }: Props) {
 
   return (
     <div className="flex flex-col gap-5">
-      {/* HEADER */}
+      {/* HEADER — ownership-first language. The user OWNS this device;
+          workers are tenants they ADD to it, not people they HIRE. */}
       <div>
         <div
           className="font-mono uppercase tracking-[0.18em] mb-1"
@@ -99,15 +109,18 @@ export function DeployTab({ deviceId, onDeployed, isGuest, onSignIn }: Props) {
           Deploy worker
         </div>
         <h3
-          className="text-[16px] font-semibold tracking-[-0.005em] mb-0.5"
+          className="text-[20px] font-semibold tracking-[-0.015em] mb-1"
           style={{ color: "#0A0A0A" }}
         >
-          Drop a worker into this device.
+          Add a worker to this device.
         </h3>
-        <p className="text-[12px] leading-[1.5]" style={{ color: "#6B7280" }}>
+        <p
+          className="text-[12.5px] leading-[1.55]"
+          style={{ color: "#6B7280" }}
+        >
           {isGuest
-            ? "Sign in to deploy. Workers run under the same Anchor policy program."
-            : "Pick a preset or roll your own. Every worker runs under the same policy program."}
+            ? "Sign in to deploy. Every worker runs inside this device under the same policy program."
+            : "Every worker you add runs inside this device — under the same Anchor policy program. Pick a preset or wrap your own agent."}
         </p>
       </div>
 
@@ -134,34 +147,50 @@ export function DeployTab({ deviceId, onDeployed, isGuest, onSignIn }: Props) {
                   : "0 1px 2px rgba(15,23,42,0.04), 0 8px 24px -12px rgba(15,23,42,0.10)",
               }}
             >
-              {/* HERO ICON */}
+              {/* HERO ICON — 72×72 — the visual anchor of the card.
+                  Reads as "installing an app on your device", not
+                  "browsing a marketplace." */}
               <div
-                className="rounded-[14px] flex items-center justify-center mb-3"
+                className="rounded-[18px] flex items-center justify-center mb-4"
                 style={{
-                  width: 56,
-                  height: 56,
-                  fontSize: 32,
+                  width: 72,
+                  height: 72,
+                  fontSize: 40,
                   background:
                     "linear-gradient(180deg, #F8FAFC 0%, #FFFFFF 100%)",
                   border: "1px solid rgba(15,23,42,0.06)",
                   boxShadow:
-                    "inset 0 1px 0 rgba(255,255,255,1), 0 1px 2px rgba(15,23,42,0.04)",
+                    "inset 0 1px 0 rgba(255,255,255,1), 0 1px 2px rgba(15,23,42,0.04), 0 8px 22px -10px rgba(15,23,42,0.10)",
                 }}
               >
                 {p.emoji}
               </div>
 
               <div
-                className="text-[16px] font-semibold tracking-[-0.01em] mb-1"
+                className="text-[17px] font-semibold tracking-[-0.01em] mb-1"
                 style={{ color: "#0A0A0A" }}
               >
                 {p.name}
               </div>
               <p
-                className="text-[12px] leading-[1.45] mb-3 flex-1"
+                className="text-[12px] leading-[1.45] mb-2"
                 style={{ color: "#6B7280" }}
               >
                 {p.oneLine}
+              </p>
+
+              {/* OWNERSHIP LINE — kills the marketplace feel. Every
+                  card says the same thing: this lives inside the
+                  user's device, not in some shared catalog. */}
+              <p
+                className="font-mono mb-3 flex-1"
+                style={{
+                  color: "rgba(15,23,42,0.45)",
+                  fontSize: 10,
+                  letterSpacing: "0.02em",
+                }}
+              >
+                Runs inside your device · enforced by the chain
               </p>
 
               {/* ACTION ROW */}
@@ -176,7 +205,7 @@ export function DeployTab({ deviceId, onDeployed, isGuest, onSignIn }: Props) {
                         ? "#15803D"
                         : isGuest
                           ? "#B45309"
-                          : "rgba(15,23,42,0.55)",
+                          : "rgba(15,23,42,0.65)",
                   }}
                 >
                   {isDone
@@ -185,7 +214,7 @@ export function DeployTab({ deviceId, onDeployed, isGuest, onSignIn }: Props) {
                       ? "Deploying"
                       : isGuest
                         ? "Sign in to deploy"
-                        : "Deploy"}
+                        : "Deploy to this device"}
                 </span>
                 <span
                   className="rounded-full flex items-center justify-center"
@@ -249,51 +278,104 @@ export function DeployTab({ deviceId, onDeployed, isGuest, onSignIn }: Props) {
         </p>
       )}
 
-      {/* CUSTOM */}
-      <Link
-        href="/app/agents/spawn"
-        className="rounded-[14px] p-4 flex items-center justify-between gap-3 transition active:scale-[0.99]"
-        style={{
-          background: "#FFFFFF",
-          border: "1px solid rgba(15,23,42,0.06)",
-          boxShadow: "0 1px 2px rgba(15,23,42,0.03)",
-        }}
-      >
-        <div className="flex items-center gap-3 min-w-0">
-          <div
-            className="rounded-[10px] flex items-center justify-center flex-shrink-0"
-            style={{
-              width: 40,
-              height: 40,
-              background:
-                "linear-gradient(180deg, #F8FAFC 0%, #FFFFFF 100%)",
-              border: "1px solid rgba(15,23,42,0.06)",
-            }}
-          >
-            <Sliders
-              className="w-4 h-4"
-              strokeWidth={1.6}
-              style={{ color: "rgba(15,23,42,0.55)" }}
-            />
-          </div>
-          <div className="min-w-0">
+      {/* SECONDARY OPTIONS — bring your own (custom flow) + SDK teaser.
+          Same visual register but tighter — the headline is the three
+          presets; these are for builders who want more. */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {/* Or bring your own agent — full template picker */}
+        <Link
+          href="/app/agents/spawn"
+          className="rounded-[14px] p-4 flex items-center justify-between gap-3 transition active:scale-[0.99]"
+          style={{
+            background: "#FFFFFF",
+            border: "1px solid rgba(15,23,42,0.06)",
+            boxShadow: "0 1px 2px rgba(15,23,42,0.03)",
+          }}
+        >
+          <div className="flex items-center gap-3 min-w-0">
             <div
-              className="text-[13.5px] font-semibold tracking-[-0.005em]"
-              style={{ color: "#0A0A0A" }}
+              className="rounded-[10px] flex items-center justify-center flex-shrink-0"
+              style={{
+                width: 40,
+                height: 40,
+                background:
+                  "linear-gradient(180deg, #F8FAFC 0%, #FFFFFF 100%)",
+                border: "1px solid rgba(15,23,42,0.06)",
+              }}
             >
-              Roll your own
+              <Sliders
+                className="w-4 h-4"
+                strokeWidth={1.6}
+                style={{ color: "rgba(15,23,42,0.55)" }}
+              />
             </div>
-            <div className="text-[11.5px]" style={{ color: "#6B7280" }}>
-              Pick a template, tweak prompt + tools + budget.
+            <div className="min-w-0">
+              <div
+                className="text-[13.5px] font-semibold tracking-[-0.005em]"
+                style={{ color: "#0A0A0A" }}
+              >
+                Or bring your own agent
+              </div>
+              <div className="text-[11.5px]" style={{ color: "#6B7280" }}>
+                Pick a template, tweak prompt + tools + budget.
+              </div>
             </div>
           </div>
-        </div>
-        <ArrowRight
-          className="w-4 h-4 flex-shrink-0"
-          style={{ color: "rgba(15,23,42,0.45)" }}
-          strokeWidth={2}
-        />
-      </Link>
+          <ArrowRight
+            className="w-4 h-4 flex-shrink-0"
+            style={{ color: "rgba(15,23,42,0.45)" }}
+            strokeWidth={2}
+          />
+        </Link>
+
+        {/* SDK teaser — points to Tab 3's Integrate card */}
+        <button
+          type="button"
+          onClick={onOpenSdk}
+          className="rounded-[14px] p-4 flex items-center justify-between gap-3 text-left transition active:scale-[0.99]"
+          style={{
+            background:
+              "linear-gradient(180deg, #0A0A0A 0%, #1A1A1A 100%)",
+            border: "1px solid rgba(15,23,42,0.10)",
+            boxShadow: "0 1px 2px rgba(15,23,42,0.04)",
+          }}
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <div
+              className="rounded-[10px] flex items-center justify-center flex-shrink-0 font-mono"
+              style={{
+                width: 40,
+                height: 40,
+                fontSize: 16,
+                background: "rgba(255,255,255,0.06)",
+                border: "1px solid rgba(255,255,255,0.10)",
+                color: "#86EFAC",
+              }}
+            >
+              {"</>"}
+            </div>
+            <div className="min-w-0">
+              <div
+                className="text-[13.5px] font-semibold tracking-[-0.005em]"
+                style={{ color: "#FFFFFF" }}
+              >
+                Already have an agent?
+              </div>
+              <div
+                className="text-[11.5px]"
+                style={{ color: "rgba(255,255,255,0.55)" }}
+              >
+                Wrap it in 5 lines · SDK + Pay.sh
+              </div>
+            </div>
+          </div>
+          <ArrowRight
+            className="w-4 h-4 flex-shrink-0"
+            style={{ color: "rgba(255,255,255,0.65)" }}
+            strokeWidth={2}
+          />
+        </button>
+      </div>
     </div>
   );
 }

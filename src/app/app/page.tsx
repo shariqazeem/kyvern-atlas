@@ -319,6 +319,7 @@ export default function DeviceHome() {
                 onDeployed={() => setTab("live")}
                 isGuest={isGuest}
                 onSignIn={signIn}
+                onOpenSdk={() => setTab("use")}
               />
             )}
 
@@ -484,9 +485,9 @@ function LiveInsideBanner({
         className="text-[13.5px] leading-[1.5] mb-3"
         style={{ color: "#0A0A0A" }}
       >
-        Three starter workers come pre-installed with every device. They try
-        to spend USDC. <strong>The chain decides what goes through.</strong>{" "}
-        Deploy your own next to them.
+        Three starter workers come pre-installed in every Kyvern device.
+        They <strong>earn, spend, and get blocked by the chain.</strong>{" "}
+        Deploy your own agent next to them.
       </p>
       <div className="flex items-center gap-3 flex-wrap">
         <button
