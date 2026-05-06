@@ -92,6 +92,23 @@ const ACTIONS: Array<Omit<DecisionProposal, "reasoning">> = [
     amountUsd: 0.09,
     memo: "claude · cross-check signal",
   },
+  // Pay.sh / Gemini — Solana × Google Cloud (May 2026). Atlas pays for
+  // a Gemini-flash inference via the Pay.sh rail; Kyvern's Anchor
+  // program gates the call before USDC moves. Two variants so the
+  // catalogue rotates two distinct memos and the activity log doesn't
+  // read like one merchant on repeat.
+  {
+    action: "reason",
+    merchant: "api.pay.sh/gemini",
+    amountUsd: 0.05,
+    memo: "gemini-flash · validate today's signal",
+  },
+  {
+    action: "buy_data",
+    merchant: "api.pay.sh/gemini",
+    amountUsd: 0.03,
+    memo: "gemini-flash · cross-check news embedding",
+  },
   {
     action: "publish",
     merchant: "api.arweave.net",
@@ -126,10 +143,16 @@ function reasoningFor(
       if (merchant?.includes("perplexity")) {
         return `Buying fresh market/agent-economy news from Perplexity${stale}.`;
       }
+      if (merchant?.includes("pay.sh")) {
+        return `Cross-checking news embedding via Pay.sh / Gemini-flash — Solana × Google Cloud rail.`;
+      }
       return `Running a Brave verification pass on yesterday's forecast to catch drift.`;
     case "reason":
       if (merchant?.includes("anthropic")) {
         return `Cross-checking today's signal with Claude — GPT alone leaves blind spots.`;
+      }
+      if (merchant?.includes("pay.sh")) {
+        return `Validating today's signal through Pay.sh / Gemini-flash — Kyvern gates the call before USDC moves.`;
       }
       return `Generating today's forecast with GPT from the freshest data on hand.`;
     case "publish":

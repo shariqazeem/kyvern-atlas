@@ -62,6 +62,9 @@ const ALLOWED_MERCHANTS = [
   "api.perplexity.ai",
   "api.brave.com",
   "api.arweave.net",
+  // Solana × Google Cloud (May 2026) — Atlas pays Pay.sh for Gemini
+  // inference; Kyvern's Anchor program gates the call before USDC moves.
+  "api.pay.sh/gemini",
 ];
 
 let _client: OpenAI | null = null;
@@ -92,7 +95,7 @@ OUTPUT: return ONLY valid JSON matching this schema, no prose:
 {
   "reasoning": "A short first-person sentence explaining WHY you chose this action. Sound like YOU deciding, not like a narrator. Be specific to your context (time, recent actions, totals). 10-25 words.",
   "action": "buy_data" | "reason" | "publish" | "self_report" | "idle",
-  "merchant": "api.perplexity.ai" | "api.brave.com" | "api.openai.com" | "api.anthropic.com" | "api.arweave.net" | null,
+  "merchant": "api.perplexity.ai" | "api.brave.com" | "api.openai.com" | "api.anthropic.com" | "api.arweave.net" | "api.pay.sh/gemini" | null,
   "amountUsd": <number between 0.01 and 0.30>,
   "memo": "short memo string, or null"
 }

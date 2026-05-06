@@ -1,165 +1,199 @@
 "use client";
 
 /**
- * WorkerCanvas — Tab 1's hero scene.
+ * WorkerCanvas — Tab 1's hero scene (v2).
  *
- * Replaces the 3-card worker grid with a single connected machine:
- * the Vault node at the bottom centre is the gravity well; each worker
- * sits in the upper field, connected to the Vault by a live wire that
- * encodes its current state.
+ * The dashboard is a machine, not a card grid. Workers sit in a tight
+ * arc above the Vault; SVG wires between them encode each worker's
+ * current state in colour + dash flow; the whole worker chip (not a
+ * 4px LED) IS the state indicator. Below the canvas, a streaming
+ * ticker pairs every wire pulse with a real, clickable signature so
+ * the "real on-chain enforcement" claim is self-evident.
  *
- *           ┌─────────┐    ┌──────┐   ┌─────────┐
- *           │ Sentinel│    │ Wren │   │  Pulse  │
- *           └────┬────┘    └──┬───┘   └────┬────┘
- *                │            │            │
- *                ╲           │            ╱
- *                 ╲          │           ╱
- *                  ╲         │          ╱
- *                   ╲        │         ╱
- *                    ╲       │        ╱
- *                     ┌──────────────┐
- *                     │   $0.42      │
- *                     │   VAULT      │
- *                     └──────────────┘
+ *   Three workers. One vault. The chain decides every wire.
  *
- * Wire colour + dash flow encode state per worker:
- *   • settled (success) — green, dashes flow toward the worker that earned
- *   • blocked (failed)  — red, brief pulse, no flow
+ *      🎯              🐋              📈
+ *    Sentinel        Wren            Pulse
+ *  earned $0.15 ✓ BLOCKED $0.10 ✗ → Pay.sh thinking
+ *        ╲            │             ╱
+ *         ╲ red flash │ amber pulse╱  green flow
+ *          ╲          │           ╱
+ *           ┌─────────┴──────────┐
+ *           │   $12.40   USDC    │
+ *           │   ████░░░░░░       │
+ *           │   $1.22 / $5 today │
+ *           │   🛡 Squads · devnet│
+ *           └────────────────────┘
+ *
+ *   ── LIVE TICKER ──────────────────────────────────────
+ *   • Sentinel  earned  $0.15 settled  5xK3…hjvx ↗  0:04
+ *   • Pulse  →  Pay.sh/gemini  $0.003 settled       0:11
+ *   • Wren  attempted  $0.10  BLOCKED daily cap     0:18
+ *
+ * Wire colour + dash flow:
+ *   • settled (success) — green, dashes flow toward vault
+ *   • blocked (failed)  — red, brief pulse ring at the worker
  *   • thinking          — amber, slow breath
  *   • idle              — soft gray, no animation
  *
- * Tap a worker node → /app/agents/[id] (preserves the existing per-worker
- * deep page; this is just a different framing of the same data).
- *
- * Empty state (no workers) is handled by the parent — the canvas only
- * renders when at least one worker is on the device.
+ * Tap a worker node → /app/agents/[id].
  */
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { motion } from "framer-motion";
-import { ShieldCheck } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { ArrowUpRight, ShieldCheck } from "lucide-react";
 import type { WorkerTileWorker, WorkerTileAction } from "./worker-tile";
+import type { ActionFeedItem } from "./action-feed";
 
 interface Props {
   workers: WorkerTileWorker[];
   lastActionByWorker: Record<string, WorkerTileAction | null>;
+  /** Full recent action feed — fed into the live ticker below the canvas. */
+  actionFeed: ActionFeedItem[];
   usdcBalance: number;
   network: "devnet" | "mainnet";
   paused: boolean;
+  /** Daily cap — used inside the vault card to render the progress bar. */
+  dailyLimitUsd?: number;
+  dailySpentUsd?: number;
 }
 
 type WireState = "idle" | "thinking" | "settled" | "blocked";
 
-interface WirePoint {
+interface Pt {
   x: number;
   y: number;
 }
 
-// Canvas geometry. We pin a 360×340 viewBox and let the SVG scale to the
-// container. Strokes use vector-effect=non-scaling-stroke so wires read
-// the same on a phone or a desktop.
+// Canvas geometry — tighter, vault-dominant. Workers sit on a short
+// arc above a substantial vault card so the eye anchors at the centre.
 const VBW = 360;
-const VBH = 340;
-const VAULT_CY = VBH - 56;
+const VBH = 300;
+const VAULT_W = 184;
+const VAULT_H = 96;
 const VAULT_CX = VBW / 2;
-const WORKER_Y = 64;
+const VAULT_CY = VBH - VAULT_H / 2 - 14;
+const VAULT_TOP_Y = VAULT_CY - VAULT_H / 2;
+const WORKER_Y = 70;
 
 export function WorkerCanvas({
   workers,
   lastActionByWorker,
+  actionFeed,
   usdcBalance,
   network,
   paused,
+  dailyLimitUsd,
+  dailySpentUsd,
 }: Props) {
   const slots = layoutSlots(workers.length);
 
   return (
-    <div
-      className="relative w-full overflow-hidden"
-      style={{
-        aspectRatio: `${VBW} / ${VBH}`,
-        background:
-          "radial-gradient(ellipse at 50% 92%, rgba(34,197,94,0.06) 0%, transparent 55%), linear-gradient(180deg, #FAFAFA 0%, #FFFFFF 100%)",
-        borderRadius: 16,
-        border: "1px solid rgba(15,23,42,0.05)",
-      }}
-    >
-      {/* Faint hex/dot grid backdrop — sells the "scene" without competing */}
-      <div
-        aria-hidden
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          backgroundImage:
-            "radial-gradient(rgba(15,23,42,0.05) 1px, transparent 1px)",
-          backgroundSize: "14px 14px",
-          opacity: 0.6,
-          maskImage:
-            "radial-gradient(ellipse at 50% 50%, black 50%, transparent 90%)",
-        }}
-      />
+    <div className="flex flex-col gap-3">
+      {/* Whisper line — replaces the old multi-paragraph banner */}
+      <div className="text-center px-4">
+        <p
+          className="text-[12.5px] tracking-[-0.005em]"
+          style={{ color: "rgba(15,23,42,0.55)" }}
+        >
+          Three workers. One vault. The chain decides every wire.
+        </p>
+      </div>
 
-      {/* Wires layer */}
-      <svg
-        className="absolute inset-0 w-full h-full pointer-events-none"
-        viewBox={`0 0 ${VBW} ${VBH}`}
-        preserveAspectRatio="none"
+      {/* Canvas — workers on a short arc, vault as the anchor */}
+      <div
+        className="relative w-full overflow-hidden"
+        style={{
+          aspectRatio: `${VBW} / ${VBH}`,
+          background:
+            "radial-gradient(ellipse at 50% 88%, rgba(34,197,94,0.08) 0%, transparent 55%), linear-gradient(180deg, #FAFAFA 0%, #FFFFFF 100%)",
+          borderRadius: 16,
+          border: "1px solid rgba(15,23,42,0.05)",
+        }}
       >
-        {slots.map((slot, i) => {
-          const w = workers[i];
-          if (!w) return null;
+        {/* Faint dot grid backdrop, masked to the centre so it never
+            competes with the foreground */}
+        <div
+          aria-hidden
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            backgroundImage:
+              "radial-gradient(rgba(15,23,42,0.05) 1px, transparent 1px)",
+            backgroundSize: "14px 14px",
+            opacity: 0.6,
+            maskImage:
+              "radial-gradient(ellipse at 50% 50%, black 50%, transparent 90%)",
+          }}
+        />
+
+        {/* Wires layer */}
+        <svg
+          className="absolute inset-0 w-full h-full pointer-events-none"
+          viewBox={`0 0 ${VBW} ${VBH}`}
+          preserveAspectRatio="none"
+        >
+          {slots.map((slot, i) => {
+            const w = workers[i];
+            if (!w) return null;
+            const action = lastActionByWorker[w.id] ?? null;
+            const state = wireStateFor(w, action);
+            return (
+              <Wire
+                key={w.id}
+                from={{ x: slot.x, y: WORKER_Y }}
+                to={{ x: VAULT_CX, y: VAULT_TOP_Y }}
+                state={state}
+              />
+            );
+          })}
+        </svg>
+
+        {/* Vault — the gravity well, substantial centre card */}
+        <VaultCard
+          usdcBalance={usdcBalance}
+          paused={paused}
+          network={network}
+          dailyLimitUsd={dailyLimitUsd ?? 0}
+          dailySpentUsd={dailySpentUsd ?? 0}
+        />
+
+        {/* Workers — chip-as-state, taps route to detail page */}
+        {workers.map((w, i) => {
+          const slot = slots[i];
+          if (!slot) return null;
           const action = lastActionByWorker[w.id] ?? null;
           const state = wireStateFor(w, action);
           return (
-            <Wire
+            <WorkerNode
               key={w.id}
-              from={{ x: slot.x, y: WORKER_Y }}
-              to={{ x: VAULT_CX, y: VAULT_CY }}
+              worker={w}
+              action={action}
               state={state}
+              cxPct={(slot.x / VBW) * 100}
+              cyPct={(WORKER_Y / VBH) * 100}
             />
           );
         })}
-      </svg>
+      </div>
 
-      {/* Vault node — gravity well, bottom-centre */}
-      <VaultNode
-        usdcBalance={usdcBalance}
-        paused={paused}
-        network={network}
-      />
-
-      {/* Worker nodes — taps route to detail page */}
-      {workers.map((w, i) => {
-        const slot = slots[i];
-        if (!slot) return null;
-        const action = lastActionByWorker[w.id] ?? null;
-        const state = wireStateFor(w, action);
-        return (
-          <WorkerNode
-            key={w.id}
-            worker={w}
-            action={action}
-            state={state}
-            cxPct={(slot.x / VBW) * 100}
-            cyPct={(WORKER_Y / VBH) * 100}
-          />
-        );
-      })}
+      {/* Live ticker — every wire pulse paired with a clickable signature */}
+      <LiveTicker items={actionFeed} network={network} />
     </div>
   );
 }
 
 /* ────────────────────────────────────────────────────────────────────
-   Layout — distribute workers along the top arc
+   Layout — distribute workers along a tight arc above the vault
    ──────────────────────────────────────────────────────────────────── */
 
 function layoutSlots(n: number): { x: number }[] {
   if (n === 0) return [];
   if (n === 1) return [{ x: VBW / 2 }];
-  if (n === 2) return [{ x: VBW * 0.3 }, { x: VBW * 0.7 }];
+  if (n === 2) return [{ x: VBW * 0.32 }, { x: VBW * 0.68 }];
   if (n === 3)
-    return [{ x: VBW * 0.18 }, { x: VBW * 0.5 }, { x: VBW * 0.82 }];
-  // 4+ — distribute evenly with some inset
-  const inset = 0.12;
+    return [{ x: VBW * 0.22 }, { x: VBW * 0.5 }, { x: VBW * 0.78 }];
+  const inset = 0.14;
   return Array.from({ length: n }).map((_, i) => ({
     x: VBW * (inset + (i / (n - 1)) * (1 - 2 * inset)),
   }));
@@ -181,11 +215,10 @@ function Wire({
   to,
   state,
 }: {
-  from: WirePoint;
-  to: WirePoint;
+  from: Pt;
+  to: Pt;
   state: WireState;
 }) {
-  // Quadratic bezier with a gentle inward bow toward the vault
   const midX = (from.x + to.x) / 2;
   const midY = from.y + (to.y - from.y) * 0.55;
   const d = `M ${from.x} ${from.y} Q ${midX} ${midY} ${to.x} ${to.y}`;
@@ -194,7 +227,6 @@ function Wire({
 
   return (
     <g>
-      {/* Halo for active wires — blurred under-stroke */}
       {animated && (
         <path
           d={d}
@@ -206,7 +238,6 @@ function Wire({
           vectorEffect="non-scaling-stroke"
         />
       )}
-      {/* Base line */}
       <path
         d={d}
         fill="none"
@@ -215,7 +246,6 @@ function Wire({
         strokeLinecap="round"
         vectorEffect="non-scaling-stroke"
       />
-      {/* Flowing dashes for settled/thinking */}
       {animated && (
         <motion.path
           d={d}
@@ -225,7 +255,9 @@ function Wire({
           strokeLinecap="round"
           strokeDasharray="6 10"
           vectorEffect="non-scaling-stroke"
-          animate={{ strokeDashoffset: state === "settled" ? [0, -160] : [0, -48] }}
+          animate={{
+            strokeDashoffset: state === "settled" ? [0, -160] : [0, -48],
+          }}
           transition={{
             duration: state === "settled" ? 2.2 : 4.5,
             repeat: Infinity,
@@ -233,7 +265,6 @@ function Wire({
           }}
         />
       )}
-      {/* Blocked wires get a brief red ring at the worker end */}
       {state === "blocked" && (
         <motion.circle
           cx={from.x}
@@ -243,7 +274,7 @@ function Wire({
           stroke={color}
           strokeWidth={1.5}
           vectorEffect="non-scaling-stroke"
-          animate={{ opacity: [0, 0.9, 0], r: [4, 12, 16] }}
+          animate={{ opacity: [0, 0.9, 0], r: [4, 12, 18] }}
           transition={{ duration: 1.4, repeat: Infinity, ease: "easeOut" }}
         />
       )}
@@ -252,73 +283,81 @@ function Wire({
 }
 
 /* ────────────────────────────────────────────────────────────────────
-   Vault node — gravity well at the bottom
+   Vault — the gravity well. Substantial card with USDC, daily-cap,
+   and Squads attribution all inline.
    ──────────────────────────────────────────────────────────────────── */
 
-function VaultNode({
+function VaultCard({
   usdcBalance,
   paused,
   network,
+  dailyLimitUsd,
+  dailySpentUsd,
 }: {
   usdcBalance: number;
   paused: boolean;
   network: "devnet" | "mainnet";
+  dailyLimitUsd: number;
+  dailySpentUsd: number;
 }) {
+  const dailyPct =
+    dailyLimitUsd > 0
+      ? Math.min(100, Math.max(0, (dailySpentUsd / dailyLimitUsd) * 100))
+      : 0;
+
   return (
     <div
       className="absolute"
       style={{
         left: "50%",
-        bottom: 12,
+        bottom: 14,
         transform: "translateX(-50%)",
+        width: VAULT_W,
+        height: VAULT_H,
       }}
     >
       <motion.div
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
-        className="relative rounded-[18px] flex flex-col items-center justify-center px-5 py-3"
+        transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
+        className="relative w-full h-full rounded-[16px] flex flex-col justify-center px-4"
         style={{
           background: "linear-gradient(180deg, #FFFFFF 0%, #F7F8FA 100%)",
-          border: "1px solid rgba(15,23,42,0.08)",
+          border: "1px solid rgba(15,23,42,0.10)",
           boxShadow: [
             "inset 0 1px 0 rgba(255,255,255,1)",
+            "inset 0 0 0 1px rgba(255,255,255,0.6)",
             "0 1px 2px rgba(15,23,42,0.04)",
-            "0 14px 38px -16px rgba(15,23,42,0.20)",
+            "0 16px 40px -16px rgba(15,23,42,0.20)",
             "0 0 0 8px rgba(34,197,94,0.04)",
-            "0 0 0 16px rgba(34,197,94,0.02)",
+            "0 0 0 18px rgba(34,197,94,0.02)",
           ].join(", "),
-          minWidth: 132,
         }}
       >
-        {/* Soft pulsing halo — sells "alive" without being busy */}
+        {/* Halo — sells "alive" without busy detail */}
         <motion.div
           aria-hidden
-          className="absolute inset-0 pointer-events-none rounded-[18px]"
-          style={{
-            boxShadow: paused
-              ? "0 0 0 0 rgba(245,158,11,0.0)"
-              : "0 0 0 0 rgba(34,197,94,0.0)",
-          }}
+          className="absolute inset-0 pointer-events-none rounded-[16px]"
           animate={
             paused
               ? {
                   boxShadow: [
                     "0 0 0 0 rgba(245,158,11,0.20)",
-                    "0 0 0 14px rgba(245,158,11,0.0)",
+                    "0 0 0 16px rgba(245,158,11,0.0)",
                   ],
                 }
               : {
                   boxShadow: [
                     "0 0 0 0 rgba(34,197,94,0.18)",
-                    "0 0 0 14px rgba(34,197,94,0.0)",
+                    "0 0 0 16px rgba(34,197,94,0.0)",
                   ],
                 }
           }
-          transition={{ duration: 2.4, repeat: Infinity, ease: "easeOut" }}
+          transition={{ duration: 2.6, repeat: Infinity, ease: "easeOut" }}
         />
 
-        <div className="flex items-baseline gap-1.5">
+        {/* Row 1 — VAULT label + USDC balance */}
+        <div className="flex items-baseline justify-between gap-2">
           <span
             className="font-mono uppercase tracking-[0.18em]"
             style={{ fontSize: 9, color: "rgba(15,23,42,0.45)" }}
@@ -326,37 +365,73 @@ function VaultNode({
             Vault
           </span>
           <span
-            className="font-mono tabular-nums"
-            style={{
-              fontSize: 22,
-              color: "#0A0A0A",
-              letterSpacing: "-0.02em",
-              fontWeight: 500,
-            }}
+            className="font-mono uppercase tracking-[0.14em]"
+            style={{ fontSize: 8.5, color: "rgba(15,23,42,0.45)" }}
           >
-            ${usdcBalance.toFixed(2)}
+            USDC
           </span>
         </div>
-        <div className="flex items-center gap-1 mt-0.5">
-          <ShieldCheck
-            className="w-3 h-3"
-            strokeWidth={1.8}
-            style={{ color: "rgba(15,23,42,0.50)" }}
-          />
-          <span
-            className="font-mono uppercase tracking-[0.16em]"
-            style={{ fontSize: 8.5, color: "rgba(15,23,42,0.50)" }}
-          >
-            Squads · {network}
-          </span>
+        <div
+          className="font-mono tabular-nums leading-none"
+          style={{
+            fontSize: 26,
+            color: "#0A0A0A",
+            letterSpacing: "-0.02em",
+            fontWeight: 500,
+            marginTop: 2,
+          }}
+        >
+          ${usdcBalance.toFixed(2)}
         </div>
+
+        {/* Row 2 — daily-cap progress bar */}
+        {dailyLimitUsd > 0 && (
+          <div className="mt-2">
+            <div
+              className="rounded-full overflow-hidden"
+              style={{
+                height: 4,
+                background: "rgba(15,23,42,0.06)",
+              }}
+            >
+              <motion.div
+                className="h-full rounded-full"
+                initial={{ width: 0 }}
+                animate={{ width: `${dailyPct}%` }}
+                transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+                style={{
+                  background:
+                    dailyPct > 85
+                      ? "linear-gradient(90deg, #F59E0B, #EF4444)"
+                      : "linear-gradient(90deg, #15803D, #22C55E)",
+                }}
+              />
+            </div>
+            <div className="flex items-baseline justify-between mt-1">
+              <span
+                className="font-mono tabular-nums"
+                style={{ fontSize: 9.5, color: "rgba(15,23,42,0.55)" }}
+              >
+                ${dailySpentUsd.toFixed(2)} / ${dailyLimitUsd.toFixed(0)} today
+              </span>
+              <span
+                className="inline-flex items-center gap-0.5 font-mono uppercase tracking-[0.14em]"
+                style={{ fontSize: 8.5, color: "rgba(15,23,42,0.55)" }}
+              >
+                <ShieldCheck className="w-2.5 h-2.5" strokeWidth={2} />
+                Squads · {network}
+              </span>
+            </div>
+          </div>
+        )}
       </motion.div>
     </div>
   );
 }
 
 /* ────────────────────────────────────────────────────────────────────
-   Worker node — emoji puck + name + 1-line status
+   Worker node — chip-IS-the-state. Whole tile glows / rings /
+   pulses based on current wire state.
    ──────────────────────────────────────────────────────────────────── */
 
 function WorkerNode({
@@ -382,6 +457,38 @@ function WorkerNode({
           ? "#B45309"
           : "rgba(15,23,42,0.50)";
 
+  // Each non-idle state animates the chip border + outer halo so the
+  // worker's mood is legible from across a room.
+  const chipAnimate =
+    state === "settled"
+      ? {
+          boxShadow: [
+            "0 0 0 0 rgba(34,197,94,0.0), 0 0 0 1px rgba(34,197,94,0.55), 0 4px 14px -4px rgba(34,197,94,0.35)",
+            "0 0 0 6px rgba(34,197,94,0.10), 0 0 0 1px rgba(34,197,94,0.65), 0 6px 18px -4px rgba(34,197,94,0.45)",
+            "0 0 0 0 rgba(34,197,94,0.0), 0 0 0 1px rgba(34,197,94,0.55), 0 4px 14px -4px rgba(34,197,94,0.35)",
+          ],
+        }
+      : state === "blocked"
+        ? {
+            boxShadow: [
+              "0 0 0 0 rgba(239,68,68,0.0), 0 0 0 1px rgba(239,68,68,0.55), 0 4px 14px -4px rgba(239,68,68,0.35)",
+              "0 0 0 8px rgba(239,68,68,0.10), 0 0 0 1px rgba(239,68,68,0.65), 0 6px 18px -4px rgba(239,68,68,0.45)",
+              "0 0 0 0 rgba(239,68,68,0.0), 0 0 0 1px rgba(239,68,68,0.55), 0 4px 14px -4px rgba(239,68,68,0.35)",
+            ],
+          }
+        : state === "thinking"
+          ? {
+              boxShadow: [
+                "0 0 0 0 rgba(245,158,11,0.0), 0 0 0 1px rgba(245,158,11,0.50), 0 4px 14px -4px rgba(245,158,11,0.30)",
+                "0 0 0 5px rgba(245,158,11,0.10), 0 0 0 1px rgba(245,158,11,0.60), 0 6px 18px -4px rgba(245,158,11,0.40)",
+                "0 0 0 0 rgba(245,158,11,0.0), 0 0 0 1px rgba(245,158,11,0.50), 0 4px 14px -4px rgba(245,158,11,0.30)",
+              ],
+            }
+          : {};
+
+  const chipDuration =
+    state === "blocked" ? 1.0 : state === "settled" ? 1.6 : 2.4;
+
   return (
     <Link
       href={`/app/agents/${worker.id}`}
@@ -393,66 +500,49 @@ function WorkerNode({
       }}
     >
       <motion.div
-        initial={{ scale: 0.9, opacity: 0 }}
+        initial={{ scale: 0.92, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
         whileTap={{ scale: 0.96 }}
         className="flex flex-col items-center"
       >
-        {/* Emoji puck */}
-        <div
-          className="relative rounded-full flex items-center justify-center"
+        {/* The chip IS the state — no LED dot. Whole element animates. */}
+        <motion.div
+          className="rounded-full flex items-center justify-center"
           style={{
-            width: 52,
-            height: 52,
+            width: 64,
+            height: 64,
             background:
-              "linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%)",
-            border: "1px solid rgba(15,23,42,0.08)",
+              state === "settled"
+                ? "linear-gradient(180deg, #FFFFFF 0%, #F0FDF4 100%)"
+                : state === "blocked"
+                  ? "linear-gradient(180deg, #FFFFFF 0%, #FEF2F2 100%)"
+                  : state === "thinking"
+                    ? "linear-gradient(180deg, #FFFFFF 0%, #FFFBEB 100%)"
+                    : "linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%)",
+            border:
+              state === "idle"
+                ? "1px solid rgba(15,23,42,0.10)"
+                : "1px solid transparent",
             boxShadow:
-              "inset 0 1px 0 rgba(255,255,255,1), 0 4px 14px -6px rgba(15,23,42,0.18)",
-            fontSize: 26,
+              state === "idle"
+                ? "inset 0 1px 0 rgba(255,255,255,1), 0 4px 14px -6px rgba(15,23,42,0.18)"
+                : undefined,
+            fontSize: 32,
+          }}
+          animate={chipAnimate}
+          transition={{
+            duration: chipDuration,
+            repeat: Infinity,
+            ease: "easeInOut",
           }}
         >
           {worker.emoji}
-          {/* Status LED, top-right of puck */}
-          <motion.span
-            className="absolute rounded-full"
-            style={{
-              width: 9,
-              height: 9,
-              top: -2,
-              right: -2,
-              background:
-                state === "settled"
-                  ? "#22C55E"
-                  : state === "blocked"
-                    ? "#EF4444"
-                    : state === "thinking"
-                      ? "#F59E0B"
-                      : "#94A3B8",
-              boxShadow:
-                state === "idle"
-                  ? "0 0 0 2px rgba(255,255,255,1)"
-                  : `0 0 0 2px rgba(255,255,255,1), 0 0 8px ${
-                      state === "settled"
-                        ? "rgba(34,197,94,0.7)"
-                        : state === "blocked"
-                          ? "rgba(239,68,68,0.7)"
-                          : "rgba(245,158,11,0.7)"
-                    }`,
-            }}
-            animate={
-              state === "idle"
-                ? {}
-                : { opacity: [0.6, 1, 0.6] }
-            }
-            transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
-          />
-        </div>
+        </motion.div>
 
         {/* Name */}
         <div
-          className="text-[12px] font-semibold tracking-[-0.005em] mt-1.5"
+          className="text-[12.5px] font-semibold tracking-[-0.005em] mt-1.5"
           style={{ color: "#0A0A0A" }}
         >
           {worker.name}
@@ -460,8 +550,13 @@ function WorkerNode({
 
         {/* Verb / status */}
         <div
-          className="font-mono uppercase tracking-[0.10em] truncate max-w-[110px] text-center"
-          style={{ fontSize: 8.5, color: stateColor, marginTop: 1 }}
+          className="font-mono uppercase tracking-[0.10em] truncate text-center"
+          style={{
+            fontSize: 8.5,
+            color: stateColor,
+            marginTop: 1,
+            maxWidth: 110,
+          }}
         >
           {verb}
         </div>
@@ -471,15 +566,189 @@ function WorkerNode({
 }
 
 /* ────────────────────────────────────────────────────────────────────
-   State + verb derivation
+   Live ticker — streaming list of recent on-chain events.
+   Pairs every wire pulse with a clickable signature so the on-chain
+   claim is self-evident, not aspirational.
+   ──────────────────────────────────────────────────────────────────── */
+
+function LiveTicker({
+  items,
+  network,
+}: {
+  items: ActionFeedItem[];
+  network: "devnet" | "mainnet";
+}) {
+  // Re-render every 15s so age strings stay live without thrash
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const iv = setInterval(() => setTick((n) => n + 1), 15_000);
+    return () => clearInterval(iv);
+  }, []);
+
+  const visible = items.slice(0, 6);
+  if (visible.length === 0) return null;
+
+  return (
+    <div
+      className="rounded-[14px] overflow-hidden"
+      style={{
+        background: "#FFFFFF",
+        border: "1px solid rgba(15,23,42,0.06)",
+        boxShadow: "0 1px 2px rgba(15,23,42,0.03)",
+      }}
+    >
+      <div
+        className="flex items-center justify-between px-3.5 py-2"
+        style={{ borderBottom: "1px solid rgba(15,23,42,0.04)" }}
+      >
+        <div className="flex items-center gap-1.5">
+          <motion.span
+            className="rounded-full"
+            style={{
+              width: 6,
+              height: 6,
+              background: "#22C55E",
+              boxShadow: "0 0 0 2px rgba(34,197,94,0.18), 0 0 6px rgba(34,197,94,0.7)",
+            }}
+            animate={{ opacity: [0.55, 1, 0.55] }}
+            transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+          />
+          <span
+            className="font-mono uppercase tracking-[0.16em]"
+            style={{ fontSize: 9.5, color: "rgba(15,23,42,0.55)" }}
+          >
+            Live ticker
+          </span>
+        </div>
+        <span
+          className="font-mono uppercase tracking-[0.14em]"
+          style={{ fontSize: 8.5, color: "rgba(15,23,42,0.40)" }}
+        >
+          On-chain · Solana {network}
+        </span>
+      </div>
+      <ol className="flex flex-col">
+        <AnimatePresence initial={false}>
+          {visible.map((it, i) => (
+            <motion.li
+              key={it.id}
+              initial={{ opacity: 0, y: -6 }}
+              animate={{
+                opacity: i === 0 ? 1 : Math.max(0.45, 1 - i * 0.12),
+                y: 0,
+              }}
+              exit={{ opacity: 0, y: 6 }}
+              transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+              className="flex items-center gap-2 px-3.5 py-2"
+              style={{
+                borderBottom:
+                  i < visible.length - 1
+                    ? "1px solid rgba(15,23,42,0.04)"
+                    : "none",
+              }}
+            >
+              <TickerRow item={it} network={network} />
+            </motion.li>
+          ))}
+        </AnimatePresence>
+      </ol>
+    </div>
+  );
+}
+
+function TickerRow({
+  item,
+  network,
+}: {
+  item: ActionFeedItem;
+  network: "devnet" | "mainnet";
+}) {
+  const settled = item.signatureStatus === "success";
+  const failed = item.signatureStatus === "failed";
+  const amt = item.amountUsd != null ? `$${item.amountUsd.toFixed(2)}` : null;
+  const verb = verbForTicker(item);
+
+  const dotColor = settled ? "#22C55E" : failed ? "#EF4444" : "#94A3B8";
+
+  return (
+    <>
+      {/* Worker emoji */}
+      <span style={{ fontSize: 14 }}>{item.worker.emoji}</span>
+
+      {/* Worker name */}
+      <span
+        className="text-[11.5px] font-semibold tracking-[-0.005em]"
+        style={{ color: "#0A0A0A", flexShrink: 0 }}
+      >
+        {item.worker.name}
+      </span>
+
+      {/* Verb + amount, single line, truncates */}
+      <span
+        className="text-[11.5px] truncate flex-1 min-w-0"
+        style={{ color: "rgba(15,23,42,0.65)" }}
+      >
+        {verb}
+        {amt && (
+          <span className="font-mono tabular-nums ml-1" style={{ color: "#0A0A0A" }}>
+            {amt}
+          </span>
+        )}
+      </span>
+
+      {/* Outcome dot */}
+      <span
+        className="rounded-full flex-shrink-0"
+        style={{ width: 6, height: 6, background: dotColor }}
+      />
+
+      {/* Tx pill — clickable Explorer link, only when we have a sig */}
+      {item.signature && settled && (
+        <Link
+          href={explorerUrlFor(item.signature, network)}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className="inline-flex items-center gap-0.5 font-mono px-1.5 py-0.5 rounded-md flex-shrink-0"
+          style={{
+            background: "rgba(34,197,94,0.08)",
+            color: "#15803D",
+            fontSize: 9.5,
+            border: "1px solid rgba(34,197,94,0.20)",
+          }}
+        >
+          {item.signature.slice(0, 4)}…{item.signature.slice(-4)}
+          <ArrowUpRight className="w-2.5 h-2.5" strokeWidth={2.5} />
+        </Link>
+      )}
+      {failed && (
+        <span
+          className="font-mono uppercase tracking-[0.10em] flex-shrink-0"
+          style={{ fontSize: 8.5, color: "#B91C1C" }}
+        >
+          Blocked
+        </span>
+      )}
+
+      {/* Age */}
+      <span
+        className="font-mono tabular-nums flex-shrink-0"
+        style={{ fontSize: 9.5, color: "rgba(15,23,42,0.40)" }}
+      >
+        {fmtAgo(item.timestamp)}
+      </span>
+    </>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────────
+   State / verb derivation
    ──────────────────────────────────────────────────────────────────── */
 
 function wireStateFor(
   worker: WorkerTileWorker,
   action: WorkerTileAction | null,
 ): WireState {
-  // Recent on-chain action wins (60s freshness window keeps the wire
-  // honest — old success/blocked decays to idle).
   if (action) {
     const age = Date.now() - action.timestamp;
     const fresh = age < 90_000;
@@ -504,9 +773,44 @@ function verbFor(
     const amt = action?.amountUsd != null ? `$${action.amountUsd.toFixed(2)}` : "";
     return amt ? `Blocked ${amt}` : "Blocked";
   }
-  // Idle — show a hint based on template so the node isn't blank
   if (worker.template === "bounty_hunter") return "Watching feeds";
   if (worker.template === "whale_tracker") return "Watching wallets";
   if (worker.template === "token_pulse") return "Watching prices";
   return "Standing by";
+}
+
+function verbForTicker(item: ActionFeedItem): string {
+  const failed = item.signatureStatus === "failed";
+  const settled = item.signatureStatus === "success";
+  const counter = item.counterparty?.replace(/^[^\w]+/, "").trim() ?? "";
+
+  switch (item.tool) {
+    case "post_task":
+      return failed ? "tried to post task — escrow blocked " : "posted task ";
+    case "claim_task":
+      return "claimed task ";
+    case "complete_task":
+      return settled ? "earned " : "tried to earn ";
+    case "stake_on_finding":
+      return counter.includes("Pay.sh")
+        ? "→ Pay.sh / Gemini "
+        : "staked on finding ";
+    case "subscribe_to_agent":
+      return "subscribed ";
+    default:
+      return failed ? "blocked " : "settled ";
+  }
+}
+
+function fmtAgo(ms: number): string {
+  const diff = Math.max(0, Date.now() - ms) / 1000;
+  if (diff < 60) return `${Math.floor(diff)}s`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
+  return `${Math.floor(diff / 86400)}d`;
+}
+
+function explorerUrlFor(sig: string, network: "devnet" | "mainnet"): string {
+  const cluster = network === "mainnet" ? "" : `?cluster=${network}`;
+  return `https://explorer.solana.com/tx/${sig}${cluster}`;
 }

@@ -284,17 +284,23 @@ export default function DeviceHome() {
 
             {/* TAB 1 — LIVE INSIDE. The Live Engine: workers connected
                 to the vault by live wires that encode every cycle's
-                state in colour + flow. The dashboard becomes a scene. */}
+                state in colour + flow. Live ticker pairs every wire
+                pulse with a clickable signature so the on-chain claim
+                is self-evident. The whisper line above the canvas
+                replaces the multi-paragraph banner — let the canvas
+                speak. */}
             {tab === "live" && (
               <>
-                <LiveInsideBanner onSwitchTab={setTab} />
                 {status && status.workers.length > 0 ? (
                   <WorkerCanvas
                     workers={status.workers}
                     lastActionByWorker={lastActionByWorker}
+                    actionFeed={status.actionFeed ?? []}
                     usdcBalance={status.usdcBalance}
                     network={status.network}
                     paused={status.paused}
+                    dailyLimitUsd={status.policySummary?.dailyLimitUsd}
+                    dailySpentUsd={status.policySummary?.dailySpentUsd}
                   />
                 ) : (
                   <NoWorkersState />
@@ -444,76 +450,6 @@ function NoWorkersState() {
       <p className="text-[13px]" style={{ color: "#475569" }}>
         Spawn your first worker to see the engine come alive.
       </p>
-    </div>
-  );
-}
-
-/* ────────────────────────────────────────────────────────────────────
-   LiveInsideBanner — the message + breadcrumb above the worker stage.
-   Job: kill the marketplace confusion in 0.5 seconds AND make Tabs 2
-   and 3 visible to a 60-second judge without forcing them to click.
-   ──────────────────────────────────────────────────────────────────── */
-
-function LiveInsideBanner({
-  onSwitchTab,
-}: {
-  onSwitchTab: (tab: DeviceTab) => void;
-}) {
-  return (
-    <div
-      className="rounded-[14px] px-4 py-3.5"
-      style={{
-        background: "#FFFFFF",
-        border: "1px solid rgba(15,23,42,0.06)",
-        boxShadow: "0 1px 2px rgba(15,23,42,0.04)",
-      }}
-    >
-      <div
-        className="font-mono uppercase tracking-[0.16em] mb-1.5"
-        style={{ color: "#9CA3AF", fontSize: 10 }}
-      >
-        Live inside the device
-      </div>
-      <p
-        className="text-[13.5px] leading-[1.5] mb-3"
-        style={{ color: "#0A0A0A" }}
-      >
-        Three starter workers come pre-installed in every Kyvern device.
-        They <strong>earn, spend, and get blocked by the chain.</strong>{" "}
-        Deploy your own agent next to them.
-      </p>
-      <div className="flex items-center gap-3 flex-wrap">
-        <button
-          type="button"
-          onClick={() => onSwitchTab("deploy")}
-          className="inline-flex items-center gap-1 font-mono uppercase tracking-[0.14em] hover:opacity-80 transition"
-          style={{
-            fontSize: 10,
-            color: "#15803D",
-          }}
-        >
-          Deploy your own worker
-          <ArrowRight className="w-3 h-3" strokeWidth={2} />
-        </button>
-        <span
-          className="font-mono"
-          style={{ color: "rgba(15,23,42,0.20)", fontSize: 10 }}
-        >
-          ·
-        </span>
-        <button
-          type="button"
-          onClick={() => onSwitchTab("use")}
-          className="inline-flex items-center gap-1 font-mono uppercase tracking-[0.14em] hover:opacity-80 transition"
-          style={{
-            fontSize: 10,
-            color: "#15803D",
-          }}
-        >
-          Use the device now
-          <ArrowRight className="w-3 h-3" strokeWidth={2} />
-        </button>
-      </div>
     </div>
   );
 }
