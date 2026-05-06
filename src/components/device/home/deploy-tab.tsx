@@ -1,26 +1,39 @@
 "use client";
 
 /**
- * DeployTab — Tab 2. Apple-minimal: three hero cards for the trio
- * presets, one custom card secondary. No SDK section here — Tab 3's
- * Policy Playground replaces the static code reference.
+ * DeployTab — Tab 2. The device-bay metaphor: this device has 5 bays.
+ * Workers occupy them. Empty bays pulse. Tap an empty bay to slot in
+ * a tenant.
  *
- * Click → animated deploy moment → tab-switches back to Live Inside
- * where the new worker is already on stage.
+ *   ┌────┐ ┌────┐ ┌────┐ ┌╌╌╌╌┐ ┌╌╌╌╌┐
+ *   │ 🎯 │ │ 🐋 │ │ 📈 │ │ +  │ │ +  │
+ *   │ ON │ │ ON │ │ ON │ │EMPT│ │EMPT│
+ *   └────┘ └────┘ └────┘ └╌╌╌╌┘ └╌╌╌╌┘
+ *
+ * Click an empty bay → inline panel below with two co-equal tabs:
+ *   1. Pick a preset (3 preset cards)
+ *   2. Wrap my own agent (BYO form: name + emoji + job + cadence)
+ *
+ * On submit → slot fill animation → toast → auto-switch to Tab 1.
+ *
+ * Replaces the previous "card grid" layout. The chassis metaphor is
+ * preserved at the deploy moment, not just in copy.
  */
 
 import { useState } from "react";
-import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowRight,
-  Check,
   CheckCircle2,
   Loader2,
-  Sliders,
+  Plus,
+  Sparkles,
+  X,
 } from "lucide-react";
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
+
+const TOTAL_BAYS = 5;
 
 const PRESETS: Array<{
   id: string;
@@ -33,7 +46,7 @@ const PRESETS: Array<{
     id: "sentinel",
     emoji: "🎯",
     name: "Sentinel",
-    oneLine: "Scans 7 ecosystem feeds. Posts paid jobs on every find ≥$300.",
+    oneLine: "Scans 7 ecosystem feeds. Posts paid jobs on finds ≥$300.",
     template: "bounty_hunter",
   },
   {
@@ -52,36 +65,72 @@ const PRESETS: Array<{
   },
 ];
 
+interface OccupiedWorker {
+  id: string;
+  emoji: string;
+  name: string;
+}
+
 interface Props {
   deviceId: string | null;
+  workers?: OccupiedWorker[];
   onDeployed?: () => void;
   isGuest?: boolean;
   onSignIn?: () => void;
-  /** Click handler for the "Already have an agent?" SDK teaser —
-   *  switches to Tab 3 where the Integrate card lives. */
   onOpenSdk?: () => void;
 }
 
+type DeployMode = "preset" | "byo";
+
+interface ByoForm {
+  name: string;
+  emoji: string;
+  jobPrompt: string;
+  cadence: number; // seconds
+}
+
+const BYO_DEFAULTS: ByoForm = {
+  name: "My Agent",
+  emoji: "🤖",
+  jobPrompt:
+    "Watch on-chain activity and message me when something interesting happens. Be brief.",
+  cadence: 600,
+};
+
 export function DeployTab({
   deviceId,
+  workers = [],
   onDeployed,
   isGuest,
   onSignIn,
   onOpenSdk,
 }: Props) {
-  const [deploying, setDeploying] = useState<string | null>(null);
-  const [justDeployed, setJustDeployed] = useState<string | null>(null);
+  const [openBay, setOpenBay] = useState<number | null>(null);
+  const [mode, setMode] = useState<DeployMode>("preset");
+  const [deploying, setDeploying] = useState(false);
+  const [justFilledBay, setJustFilledBay] = useState<number | null>(null);
+  const [justFilledEmoji, setJustFilledEmoji] = useState<string | null>(null);
+  const [justFilledName, setJustFilledName] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [byo, setByo] = useState<ByoForm>(BYO_DEFAULTS);
 
-  async function deployPreset(preset: (typeof PRESETS)[number]) {
+  const occupied = workers.slice(0, TOTAL_BAYS);
+  const emptyCount = Math.max(0, TOTAL_BAYS - occupied.length);
+
+  function openBayPanel(bayIdx: number) {
     if (isGuest) {
       onSignIn?.();
       return;
     }
-    if (!deviceId || deploying) return;
-    setDeploying(preset.id);
+    setOpenBay(bayIdx);
+    setMode("preset");
     setError(null);
-    setJustDeployed(null);
+  }
+
+  async function deployPreset(preset: (typeof PRESETS)[number]) {
+    if (!deviceId || deploying || openBay === null) return;
+    setDeploying(true);
+    setError(null);
     try {
       const res = await fetch(`/api/devices/${deviceId}/deploy-preset`, {
         method: "POST",
@@ -92,34 +141,65 @@ export function DeployTab({
         const data = await res.json().catch(() => null);
         throw new Error(data?.message || data?.error || "Deploy failed");
       }
-      setJustDeployed(preset.id);
-      // Celebration runs ~1.6s before auto-switching to Tab 1 so the
-      // user feels the success: card ring lights up, then the
-      // floating toast slides in saying "Worker added to your device".
-      setTimeout(() => {
-        onDeployed?.();
-      }, 1600);
+      celebrate(openBay, preset.emoji, preset.name);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Deploy failed");
-      setDeploying(null);
+      setDeploying(false);
     }
   }
 
-  // The deployed preset's display name for the celebration toast.
-  const justDeployedPreset = justDeployed
-    ? PRESETS.find((p) => p.id === justDeployed)
-    : null;
+  async function deployByo() {
+    if (!deviceId || deploying || openBay === null) return;
+    if (!byo.name.trim() || !byo.jobPrompt.trim()) {
+      setError("name + job description required");
+      return;
+    }
+    setDeploying(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/agents/spawn`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          deviceId,
+          template: "custom",
+          name: byo.name.trim(),
+          emoji: byo.emoji,
+          jobPrompt: byo.jobPrompt.trim(),
+          frequencySeconds: byo.cadence,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.message || data?.error || "Deploy failed");
+      }
+      celebrate(openBay, byo.emoji, byo.name.trim());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Deploy failed");
+      setDeploying(false);
+    }
+  }
+
+  function celebrate(bayIdx: number, emoji: string, name: string) {
+    setJustFilledBay(bayIdx);
+    setJustFilledEmoji(emoji);
+    setJustFilledName(name);
+    // Slot-fill animation runs on the bay row, toast slides above the
+    // bays, then we auto-switch tabs. ~1.8s total ceremony.
+    setTimeout(() => {
+      setOpenBay(null);
+      setDeploying(false);
+      onDeployed?.();
+    }, 1800);
+  }
 
   return (
     <div className="relative flex flex-col gap-5">
-      {/* CELEBRATION TOAST — slides in when a preset deploy lands.
-          The card ring + check animation plays inside the preset card;
-          this is the higher-level "Worker added to your device" win
-          confirmation. Fades out as the tab auto-switches to Tab 1. */}
+      {/* CELEBRATION TOAST */}
       <AnimatePresence>
-        {justDeployedPreset && (
+        {justFilledBay !== null && justFilledName && (
           <motion.div
-            key="deploy-toast"
+            key="bay-toast"
             initial={{ opacity: 0, y: -10, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -8, scale: 0.96 }}
@@ -138,293 +218,687 @@ export function DeployTab({
               strokeWidth={2}
               style={{ color: "#86EFAC" }}
             />
-            <span
-              className="text-[12px] font-semibold tracking-[-0.005em]"
-            >
-              {justDeployedPreset.emoji}{" "}
-              {justDeployedPreset.name} added to your device
+            <span className="text-[12px] font-semibold tracking-[-0.005em]">
+              {justFilledEmoji} Bay {justFilledBay + 1} online ·{" "}
+              {justFilledName} added
             </span>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* HEADER — ownership-first language. The user OWNS this device;
-          workers are tenants they ADD to it, not people they HIRE. */}
+      {/* HEADER */}
       <div>
         <div
           className="font-mono uppercase tracking-[0.18em] mb-1"
           style={{ color: "#9CA3AF", fontSize: 10 }}
         >
-          Deploy worker
+          Add a worker
         </div>
         <h3
           className="text-[20px] font-semibold tracking-[-0.015em] mb-1"
           style={{ color: "#0A0A0A" }}
         >
-          Add a worker to this device.
+          {emptyCount > 0
+            ? `Your device has ${emptyCount} open bay${emptyCount === 1 ? "" : "s"}.`
+            : "All bays occupied."}
         </h3>
         <p
           className="text-[12.5px] leading-[1.55]"
           style={{ color: "#6B7280" }}
         >
           {isGuest
-            ? "Sign in to deploy. Every worker runs inside this device under the same policy program."
-            : "Every worker you add runs inside this device — under the same Anchor policy program. Pick a preset or wrap your own agent."}
+            ? "Sign in to slot a worker into an empty bay. Every worker runs inside this device under the same Anchor policy program."
+            : "Tap an empty bay to slot in a tenant. Pick a preset or wrap your own agent."}
         </p>
       </div>
 
-      {/* PRESETS — three visual hero cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        {PRESETS.map((p) => {
-          const isDeploying = deploying === p.id;
-          const isDone = justDeployed === p.id;
+      {/* BAY ROW — 5 slots, occupied + empty + pulsing */}
+      <div
+        className="grid gap-2.5"
+        style={{
+          gridTemplateColumns: `repeat(${TOTAL_BAYS}, minmax(0, 1fr))`,
+        }}
+      >
+        {Array.from({ length: TOTAL_BAYS }).map((_, idx) => {
+          const tenant = occupied[idx];
+          const isFilledByCelebration = justFilledBay === idx;
+          if (tenant) {
+            return (
+              <BayOccupied
+                key={tenant.id}
+                emoji={tenant.emoji}
+                name={tenant.name}
+              />
+            );
+          }
+          if (isFilledByCelebration && justFilledEmoji && justFilledName) {
+            return (
+              <BayFilling
+                key={`filling-${idx}`}
+                emoji={justFilledEmoji}
+                name={justFilledName}
+                bayIdx={idx}
+              />
+            );
+          }
           return (
+            <BayEmpty
+              key={`empty-${idx}`}
+              bayIdx={idx}
+              isOpen={openBay === idx}
+              onClick={() => openBayPanel(idx)}
+              isGuest={isGuest}
+            />
+          );
+        })}
+      </div>
+
+      {/* DEPLOY PANEL — slides in below the bay row */}
+      <AnimatePresence>
+        {openBay !== null && justFilledBay === null && (
+          <motion.div
+            initial={{ opacity: 0, height: 0, y: -4 }}
+            animate={{ opacity: 1, height: "auto", y: 0 }}
+            exit={{ opacity: 0, height: 0, y: -4 }}
+            transition={{ duration: 0.4, ease: EASE }}
+            className="overflow-hidden"
+          >
+            <DeployPanel
+              bayIdx={openBay}
+              mode={mode}
+              setMode={setMode}
+              byo={byo}
+              setByo={setByo}
+              deploying={deploying}
+              error={error}
+              onClose={() => {
+                setOpenBay(null);
+                setError(null);
+              }}
+              onDeployPreset={deployPreset}
+              onDeployByo={deployByo}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* SDK SHORTCUT — quiet footer card pointing to Tab 3 Integrate */}
+      <button
+        type="button"
+        onClick={onOpenSdk}
+        className="rounded-[14px] p-4 flex items-center justify-between gap-3 text-left transition active:scale-[0.99]"
+        style={{
+          background:
+            "linear-gradient(180deg, #0A0A0A 0%, #1A1A1A 100%)",
+          border: "1px solid rgba(15,23,42,0.10)",
+          boxShadow: "0 1px 2px rgba(15,23,42,0.04)",
+        }}
+      >
+        <div className="flex items-center gap-3 min-w-0">
+          <div
+            className="rounded-[10px] flex items-center justify-center flex-shrink-0 font-mono"
+            style={{
+              width: 40,
+              height: 40,
+              fontSize: 16,
+              background: "rgba(255,255,255,0.06)",
+              border: "1px solid rgba(255,255,255,0.10)",
+              color: "#86EFAC",
+            }}
+          >
+            {"</>"}
+          </div>
+          <div className="min-w-0">
+            <div
+              className="text-[13.5px] font-semibold tracking-[-0.005em]"
+              style={{ color: "#FFFFFF" }}
+            >
+              Already have an agent running elsewhere?
+            </div>
+            <div
+              className="text-[11.5px]"
+              style={{ color: "rgba(255,255,255,0.55)" }}
+            >
+              Wrap it in 5 lines · SDK + Pay.sh
+            </div>
+          </div>
+        </div>
+        <ArrowRight
+          className="w-4 h-4 flex-shrink-0"
+          style={{ color: "rgba(255,255,255,0.65)" }}
+          strokeWidth={2}
+        />
+      </button>
+    </div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────────
+   Bay components
+   ──────────────────────────────────────────────────────────────────── */
+
+function BayOccupied({ emoji, name }: { emoji: string; name: string }) {
+  return (
+    <div
+      className="rounded-[14px] aspect-square flex flex-col items-center justify-center p-1"
+      style={{
+        background: "#FFFFFF",
+        border: "1px solid rgba(15,23,42,0.08)",
+        boxShadow:
+          "inset 0 1px 0 rgba(255,255,255,1), 0 1px 2px rgba(15,23,42,0.04)",
+      }}
+    >
+      <div
+        className="rounded-[10px] flex items-center justify-center mb-1"
+        style={{
+          width: 38,
+          height: 38,
+          fontSize: 24,
+          background:
+            "linear-gradient(180deg, #F8FAFC 0%, #FFFFFF 100%)",
+          border: "1px solid rgba(15,23,42,0.06)",
+        }}
+      >
+        {emoji}
+      </div>
+      <span
+        className="text-[10px] font-semibold tracking-[-0.005em] truncate w-full text-center px-1"
+        style={{ color: "#0A0A0A" }}
+      >
+        {name}
+      </span>
+      <span
+        className="font-mono uppercase tracking-[0.14em]"
+        style={{ fontSize: 7.5, color: "#15803D" }}
+      >
+        Online
+      </span>
+    </div>
+  );
+}
+
+function BayEmpty({
+  bayIdx,
+  isOpen,
+  onClick,
+  isGuest,
+}: {
+  bayIdx: number;
+  isOpen: boolean;
+  onClick: () => void;
+  isGuest?: boolean;
+}) {
+  return (
+    <motion.button
+      type="button"
+      onClick={onClick}
+      whileTap={{ scale: 0.97 }}
+      className="rounded-[14px] aspect-square flex flex-col items-center justify-center p-1 transition"
+      style={{
+        background: isOpen ? "rgba(34,197,94,0.04)" : "transparent",
+        border: isOpen
+          ? "1.5px dashed rgba(34,197,94,0.45)"
+          : "1.5px dashed rgba(15,23,42,0.18)",
+      }}
+      animate={
+        isOpen
+          ? { boxShadow: "0 0 0 3px rgba(34,197,94,0.10)" }
+          : {
+              boxShadow: [
+                "0 0 0 0 rgba(34,197,94,0.0)",
+                "0 0 0 3px rgba(34,197,94,0.06)",
+                "0 0 0 0 rgba(34,197,94,0.0)",
+              ],
+            }
+      }
+      transition={
+        isOpen
+          ? { duration: 0.3 }
+          : { duration: 2.4, repeat: Infinity, ease: "easeInOut" }
+      }
+    >
+      <div
+        className="rounded-[10px] flex items-center justify-center mb-1"
+        style={{
+          width: 38,
+          height: 38,
+          background: "transparent",
+          border: "1px dashed rgba(15,23,42,0.18)",
+        }}
+      >
+        <Plus
+          className="w-4 h-4"
+          strokeWidth={1.6}
+          style={{ color: "rgba(15,23,42,0.45)" }}
+        />
+      </div>
+      <span
+        className="font-mono uppercase tracking-[0.14em] mb-0.5"
+        style={{ fontSize: 8, color: "rgba(15,23,42,0.40)" }}
+      >
+        Bay {bayIdx + 1}
+      </span>
+      <span
+        className="font-mono uppercase tracking-[0.12em]"
+        style={{
+          fontSize: 7.5,
+          color: isGuest ? "#B45309" : "rgba(15,23,42,0.55)",
+        }}
+      >
+        {isGuest ? "Sign in" : "Empty"}
+      </span>
+    </motion.button>
+  );
+}
+
+function BayFilling({
+  emoji,
+  name,
+  bayIdx,
+}: {
+  emoji: string;
+  name: string;
+  bayIdx: number;
+}) {
+  return (
+    <motion.div
+      initial={{ scale: 0.6, opacity: 0, rotate: -8 }}
+      animate={{ scale: 1, opacity: 1, rotate: 0 }}
+      transition={{
+        duration: 0.55,
+        ease: EASE,
+        type: "spring",
+        damping: 14,
+      }}
+      className="rounded-[14px] aspect-square flex flex-col items-center justify-center p-1 relative overflow-hidden"
+      style={{
+        background: "#FFFFFF",
+        border: "1px solid rgba(34,197,94,0.40)",
+        boxShadow:
+          "inset 0 0 0 2px rgba(34,197,94,0.20), 0 8px 24px -8px rgba(34,197,94,0.40)",
+      }}
+    >
+      <motion.div
+        aria-hidden
+        className="absolute inset-0 pointer-events-none"
+        initial={{ opacity: 1 }}
+        animate={{ opacity: 0 }}
+        transition={{ duration: 1.2, ease: EASE }}
+        style={{
+          background:
+            "radial-gradient(closest-side, rgba(34,197,94,0.18) 0%, transparent 80%)",
+        }}
+      />
+      <div
+        className="rounded-[10px] flex items-center justify-center mb-1"
+        style={{
+          width: 38,
+          height: 38,
+          fontSize: 24,
+          background:
+            "linear-gradient(180deg, #F8FAFC 0%, #FFFFFF 100%)",
+          border: "1px solid rgba(34,197,94,0.30)",
+        }}
+      >
+        {emoji}
+      </div>
+      <span
+        className="text-[10px] font-semibold tracking-[-0.005em] truncate w-full text-center px-1"
+        style={{ color: "#0A0A0A" }}
+      >
+        {name}
+      </span>
+      <span
+        className="font-mono uppercase tracking-[0.14em]"
+        style={{ fontSize: 7.5, color: "#15803D" }}
+      >
+        Bay {bayIdx + 1} online
+      </span>
+    </motion.div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────────
+   Deploy panel — preset + BYO toggle
+   ──────────────────────────────────────────────────────────────────── */
+
+function DeployPanel({
+  bayIdx,
+  mode,
+  setMode,
+  byo,
+  setByo,
+  deploying,
+  error,
+  onClose,
+  onDeployPreset,
+  onDeployByo,
+}: {
+  bayIdx: number;
+  mode: DeployMode;
+  setMode: (m: DeployMode) => void;
+  byo: ByoForm;
+  setByo: (b: ByoForm) => void;
+  deploying: boolean;
+  error: string | null;
+  onClose: () => void;
+  onDeployPreset: (p: (typeof PRESETS)[number]) => void;
+  onDeployByo: () => void;
+}) {
+  return (
+    <div
+      className="rounded-[16px] p-4"
+      style={{
+        background: "#FFFFFF",
+        border: "1px solid rgba(15,23,42,0.06)",
+        boxShadow:
+          "0 1px 2px rgba(15,23,42,0.04), 0 8px 24px -12px rgba(15,23,42,0.08)",
+      }}
+    >
+      {/* HEADER */}
+      <div className="flex items-baseline justify-between gap-3 mb-3">
+        <div>
+          <div
+            className="font-mono uppercase tracking-[0.16em] mb-1"
+            style={{ color: "#9CA3AF", fontSize: 10 }}
+          >
+            Bay {bayIdx + 1}
+          </div>
+          <h4
+            className="text-[16px] font-semibold tracking-[-0.005em]"
+            style={{ color: "#0A0A0A" }}
+          >
+            Put a tenant in this slot.
+          </h4>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded-full p-1 hover:bg-black/5 transition"
+        >
+          <X
+            className="w-4 h-4"
+            strokeWidth={1.8}
+            style={{ color: "rgba(15,23,42,0.55)" }}
+          />
+        </button>
+      </div>
+
+      {/* MODE TOGGLE — co-equal preset / BYO */}
+      <div
+        className="inline-flex items-center gap-1 rounded-[10px] p-1 mb-4"
+        style={{
+          background: "rgba(15,23,42,0.04)",
+          border: "1px solid rgba(15,23,42,0.06)",
+        }}
+      >
+        <ModeButton
+          active={mode === "preset"}
+          onClick={() => setMode("preset")}
+          label="Pick a preset"
+          sub="3 starters"
+        />
+        <ModeButton
+          active={mode === "byo"}
+          onClick={() => setMode("byo")}
+          label="Wrap my own agent"
+          sub="bring your code"
+        />
+      </div>
+
+      {/* PRESET MODE */}
+      {mode === "preset" && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+          {PRESETS.map((p) => (
             <motion.button
               key={p.id}
               type="button"
-              onClick={() => deployPreset(p)}
-              disabled={!!deploying}
+              onClick={() => onDeployPreset(p)}
+              disabled={deploying}
               whileTap={{ scale: 0.98 }}
-              className="relative rounded-[16px] p-4 flex flex-col items-start text-left transition disabled:opacity-60"
+              className="rounded-[12px] p-3.5 flex flex-col items-start text-left transition disabled:opacity-60"
               style={{
                 background: "#FFFFFF",
-                border: isDone
-                  ? "1px solid rgba(34,197,94,0.40)"
-                  : "1px solid rgba(15,23,42,0.08)",
-                boxShadow: isDone
-                  ? "0 1px 2px rgba(15,23,42,0.04), 0 12px 28px -10px rgba(34,197,94,0.30)"
-                  : "0 1px 2px rgba(15,23,42,0.04), 0 8px 24px -12px rgba(15,23,42,0.10)",
+                border: "1px solid rgba(15,23,42,0.08)",
+                boxShadow: "0 1px 2px rgba(15,23,42,0.03)",
               }}
             >
-              {/* HERO ICON — 72×72 — the visual anchor of the card.
-                  Reads as "installing an app on your device", not
-                  "browsing a marketplace." */}
               <div
-                className="rounded-[18px] flex items-center justify-center mb-4"
+                className="rounded-[10px] flex items-center justify-center mb-2"
                 style={{
-                  width: 72,
-                  height: 72,
-                  fontSize: 40,
+                  width: 44,
+                  height: 44,
+                  fontSize: 26,
                   background:
                     "linear-gradient(180deg, #F8FAFC 0%, #FFFFFF 100%)",
                   border: "1px solid rgba(15,23,42,0.06)",
-                  boxShadow:
-                    "inset 0 1px 0 rgba(255,255,255,1), 0 1px 2px rgba(15,23,42,0.04), 0 8px 22px -10px rgba(15,23,42,0.10)",
                 }}
               >
                 {p.emoji}
               </div>
-
               <div
-                className="text-[17px] font-semibold tracking-[-0.01em] mb-1"
+                className="text-[14px] font-semibold tracking-[-0.005em] mb-0.5"
                 style={{ color: "#0A0A0A" }}
               >
                 {p.name}
               </div>
               <p
-                className="text-[12px] leading-[1.45] mb-2"
+                className="text-[11.5px] leading-[1.4] mb-2 flex-1"
                 style={{ color: "#6B7280" }}
               >
                 {p.oneLine}
               </p>
-
-              {/* OWNERSHIP LINE — kills the marketplace feel. Every
-                  card says the same thing: this lives inside the
-                  user's device, not in some shared catalog. */}
-              <p
-                className="font-mono mb-3 flex-1"
-                style={{
-                  color: "rgba(15,23,42,0.45)",
-                  fontSize: 10,
-                  letterSpacing: "0.02em",
-                }}
+              <div
+                className="w-full inline-flex items-center justify-between font-mono uppercase tracking-[0.14em] mt-auto"
+                style={{ fontSize: 9, color: "#15803D" }}
               >
-                Runs inside your device · enforced by the chain
-              </p>
+                <span>Slot into bay {bayIdx + 1}</span>
+                <ArrowRight className="w-3 h-3" strokeWidth={2} />
+              </div>
+            </motion.button>
+          ))}
+        </div>
+      )}
 
-              {/* ACTION ROW */}
-              <div className="w-full flex items-center justify-between mt-auto">
-                <span
-                  className="font-mono uppercase tracking-[0.14em]"
+      {/* BYO MODE */}
+      {mode === "byo" && (
+        <div className="flex flex-col gap-3">
+          <div className="grid grid-cols-[60px_1fr] gap-2">
+            <Field label="Emoji">
+              <input
+                type="text"
+                value={byo.emoji}
+                onChange={(e) =>
+                  setByo({ ...byo, emoji: e.target.value.slice(0, 4) })
+                }
+                className="w-full px-3 py-2 rounded-[8px] outline-none text-center"
+                style={{
+                  fontSize: 18,
+                  background: "#FAFAFA",
+                  border: "1px solid rgba(15,23,42,0.08)",
+                }}
+              />
+            </Field>
+            <Field label="Name">
+              <input
+                type="text"
+                value={byo.name}
+                onChange={(e) => setByo({ ...byo, name: e.target.value })}
+                placeholder="My Agent"
+                className="w-full px-3 py-2 rounded-[8px] outline-none"
+                style={{
+                  fontSize: 13,
+                  color: "#0A0A0A",
+                  background: "#FAFAFA",
+                  border: "1px solid rgba(15,23,42,0.08)",
+                }}
+              />
+            </Field>
+          </div>
+
+          <Field
+            label="Job · what should it do?"
+            hint="plain English"
+          >
+            <textarea
+              value={byo.jobPrompt}
+              onChange={(e) =>
+                setByo({ ...byo, jobPrompt: e.target.value })
+              }
+              rows={3}
+              className="w-full px-3 py-2 rounded-[8px] outline-none resize-none"
+              style={{
+                fontSize: 12.5,
+                color: "#0A0A0A",
+                background: "#FAFAFA",
+                border: "1px solid rgba(15,23,42,0.08)",
+                lineHeight: 1.5,
+              }}
+            />
+          </Field>
+
+          <Field label="Cadence" hint={`every ${byo.cadence}s`}>
+            <div className="flex gap-1.5">
+              {[60, 180, 600, 1800].map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setByo({ ...byo, cadence: c })}
+                  className="flex-1 font-mono uppercase tracking-[0.14em] rounded-[8px] py-1.5 transition"
                   style={{
                     fontSize: 9.5,
-                    color: isDone
-                      ? "#15803D"
-                      : isDeploying
-                        ? "#15803D"
-                        : isGuest
-                          ? "#B45309"
-                          : "rgba(15,23,42,0.65)",
+                    color:
+                      byo.cadence === c ? "#0A0A0A" : "rgba(15,23,42,0.55)",
+                    background:
+                      byo.cadence === c ? "#FFFFFF" : "transparent",
+                    border:
+                      byo.cadence === c
+                        ? "1px solid rgba(15,23,42,0.12)"
+                        : "1px solid rgba(15,23,42,0.06)",
                   }}
                 >
-                  {isDone
-                    ? "Joined the device"
-                    : isDeploying
-                      ? "Deploying"
-                      : isGuest
-                        ? "Sign in to deploy"
-                        : "Deploy to this device"}
-                </span>
-                <span
-                  className="rounded-full flex items-center justify-center"
-                  style={{
-                    width: 28,
-                    height: 28,
-                    background: isDone
-                      ? "#22C55E"
-                      : isDeploying
-                        ? "rgba(34,197,94,0.10)"
-                        : "#0A0A0A",
-                    color: "#FFFFFF",
-                    border: isDeploying
-                      ? "1px solid rgba(34,197,94,0.30)"
-                      : "1px solid rgba(0,0,0,0.8)",
-                    transition: "all 0.3s ease",
-                  }}
-                >
-                  {isDone ? (
-                    <Check className="w-3.5 h-3.5" strokeWidth={2.5} />
-                  ) : isDeploying ? (
-                    <Loader2
-                      className="w-3.5 h-3.5 animate-spin"
-                      strokeWidth={2}
-                      style={{ color: "#15803D" }}
-                    />
-                  ) : (
-                    <ArrowRight className="w-3.5 h-3.5" strokeWidth={2} />
-                  )}
-                </span>
-              </div>
+                  {c < 120 ? `${c}s` : `${Math.round(c / 60)}m`}
+                </button>
+              ))}
+            </div>
+          </Field>
 
-              {/* Deploy ring overlay — animated celebration */}
-              <AnimatePresence>
-                {isDone && (
-                  <motion.div
-                    aria-hidden
-                    className="absolute inset-0 rounded-[16px] pointer-events-none"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: [0, 1, 0] }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 1.0, ease: EASE }}
-                    style={{
-                      boxShadow:
-                        "inset 0 0 0 2px rgba(34,197,94,0.45), 0 0 28px rgba(34,197,94,0.32)",
-                    }}
-                  />
-                )}
-              </AnimatePresence>
-            </motion.button>
-          );
-        })}
-      </div>
+          <motion.button
+            type="button"
+            onClick={onDeployByo}
+            disabled={deploying}
+            whileTap={{ scale: 0.98 }}
+            className="w-full inline-flex items-center justify-center gap-2 h-11 rounded-[10px] text-[13px] font-semibold tracking-[-0.005em] transition disabled:opacity-60"
+            style={{
+              background: "#0A0A0A",
+              color: "#FFFFFF",
+              border: "1px solid rgba(0,0,0,0.8)",
+              boxShadow:
+                "0 1px 2px rgba(0,0,0,0.06), 0 4px 14px rgba(0,0,0,0.10)",
+            }}
+          >
+            {deploying ? (
+              <>
+                <Loader2
+                  className="w-4 h-4 animate-spin"
+                  strokeWidth={2}
+                />
+                Slotting into bay {bayIdx + 1}…
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4" strokeWidth={2} />
+                Slot into bay {bayIdx + 1}
+              </>
+            )}
+          </motion.button>
+        </div>
+      )}
 
       {error && (
         <p
-          className="font-mono px-1"
+          className="font-mono mt-3 px-1"
           style={{ color: "#B45309", fontSize: 11 }}
         >
           {error}
         </p>
       )}
+    </div>
+  );
+}
 
-      {/* SECONDARY OPTIONS — bring your own (custom flow) + SDK teaser.
-          Same visual register but tighter — the headline is the three
-          presets; these are for builders who want more. */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {/* Or bring your own agent — full template picker */}
-        <Link
-          href="/app/agents/spawn"
-          className="rounded-[14px] p-4 flex items-center justify-between gap-3 transition active:scale-[0.99]"
-          style={{
-            background: "#FFFFFF",
-            border: "1px solid rgba(15,23,42,0.06)",
-            boxShadow: "0 1px 2px rgba(15,23,42,0.03)",
-          }}
-        >
-          <div className="flex items-center gap-3 min-w-0">
-            <div
-              className="rounded-[10px] flex items-center justify-center flex-shrink-0"
-              style={{
-                width: 40,
-                height: 40,
-                background:
-                  "linear-gradient(180deg, #F8FAFC 0%, #FFFFFF 100%)",
-                border: "1px solid rgba(15,23,42,0.06)",
-              }}
-            >
-              <Sliders
-                className="w-4 h-4"
-                strokeWidth={1.6}
-                style={{ color: "rgba(15,23,42,0.55)" }}
-              />
-            </div>
-            <div className="min-w-0">
-              <div
-                className="text-[13.5px] font-semibold tracking-[-0.005em]"
-                style={{ color: "#0A0A0A" }}
-              >
-                Or bring your own agent
-              </div>
-              <div className="text-[11.5px]" style={{ color: "#6B7280" }}>
-                Pick a template, tweak prompt + tools + budget.
-              </div>
-            </div>
-          </div>
-          <ArrowRight
-            className="w-4 h-4 flex-shrink-0"
-            style={{ color: "rgba(15,23,42,0.45)" }}
-            strokeWidth={2}
-          />
-        </Link>
-
-        {/* SDK teaser — points to Tab 3's Integrate card */}
-        <button
-          type="button"
-          onClick={onOpenSdk}
-          className="rounded-[14px] p-4 flex items-center justify-between gap-3 text-left transition active:scale-[0.99]"
-          style={{
-            background:
-              "linear-gradient(180deg, #0A0A0A 0%, #1A1A1A 100%)",
-            border: "1px solid rgba(15,23,42,0.10)",
-            boxShadow: "0 1px 2px rgba(15,23,42,0.04)",
-          }}
-        >
-          <div className="flex items-center gap-3 min-w-0">
-            <div
-              className="rounded-[10px] flex items-center justify-center flex-shrink-0 font-mono"
-              style={{
-                width: 40,
-                height: 40,
-                fontSize: 16,
-                background: "rgba(255,255,255,0.06)",
-                border: "1px solid rgba(255,255,255,0.10)",
-                color: "#86EFAC",
-              }}
-            >
-              {"</>"}
-            </div>
-            <div className="min-w-0">
-              <div
-                className="text-[13.5px] font-semibold tracking-[-0.005em]"
-                style={{ color: "#FFFFFF" }}
-              >
-                Already have an agent?
-              </div>
-              <div
-                className="text-[11.5px]"
-                style={{ color: "rgba(255,255,255,0.55)" }}
-              >
-                Wrap it in 5 lines · SDK + Pay.sh
-              </div>
-            </div>
-          </div>
-          <ArrowRight
-            className="w-4 h-4 flex-shrink-0"
-            style={{ color: "rgba(255,255,255,0.65)" }}
-            strokeWidth={2}
-          />
-        </button>
+function ModeButton({
+  active,
+  onClick,
+  label,
+  sub,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  sub: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded-[8px] px-3 py-1.5 transition active:scale-[0.97]"
+      style={{
+        background: active ? "#FFFFFF" : "transparent",
+        boxShadow: active
+          ? "0 1px 2px rgba(15,23,42,0.06), 0 4px 10px -4px rgba(15,23,42,0.08)"
+          : "none",
+      }}
+    >
+      <div
+        className="text-[12px] font-semibold tracking-[-0.005em]"
+        style={{
+          color: active ? "#0A0A0A" : "rgba(15,23,42,0.55)",
+        }}
+      >
+        {label}
       </div>
+      <div
+        className="font-mono uppercase tracking-[0.12em]"
+        style={{
+          fontSize: 8.5,
+          color: active ? "rgba(15,23,42,0.50)" : "rgba(15,23,42,0.40)",
+        }}
+      >
+        {sub}
+      </div>
+    </button>
+  );
+}
+
+function Field({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-1 min-w-0">
+      <div className="flex items-baseline justify-between">
+        <span
+          className="font-mono uppercase tracking-[0.14em]"
+          style={{ color: "#9CA3AF", fontSize: 9.5 }}
+        >
+          {label}
+        </span>
+        {hint && (
+          <span
+            className="font-mono"
+            style={{ color: "rgba(15,23,42,0.45)", fontSize: 9.5 }}
+          >
+            {hint}
+          </span>
+        )}
+      </div>
+      {children}
     </div>
   );
 }

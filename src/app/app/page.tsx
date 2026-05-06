@@ -316,6 +316,7 @@ export default function DeviceHome() {
             {tab === "deploy" && (
               <DeployTab
                 deviceId={deviceId}
+                workers={status?.workers ?? []}
                 onDeployed={() => setTab("live")}
                 isGuest={isGuest}
                 onSignIn={signIn}
