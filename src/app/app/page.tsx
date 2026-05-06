@@ -39,7 +39,7 @@ import { useDeviceStore } from "@/hooks/use-device-store";
 import { DeviceChassis } from "@/components/device/home/chassis";
 import { TopRail } from "@/components/device/home/top-rail";
 import { BottomRail } from "@/components/device/home/bottom-rail";
-import { WorkerTile } from "@/components/device/home/worker-tile";
+import { WorkerCanvas } from "@/components/device/home/worker-canvas";
 import { ActivitySheet } from "@/components/device/home/activity-sheet";
 import { DeviceTabs, type DeviceTab } from "@/components/device/home/device-tabs";
 import { DeployTab } from "@/components/device/home/deploy-tab";
@@ -271,14 +271,10 @@ export default function DeviceHome() {
           network={status?.network ?? "devnet"}
         >
           <div className="flex flex-col gap-3.5 sm:gap-4">
-            {/* TOP RAIL — device frame. Always visible across tabs. */}
-            <TopRail
-              serial={status?.serial ?? null}
-              bornAt={status?.bornAt ?? null}
-              usdcBalance={status?.usdcBalance ?? 0}
-              network={status?.network ?? "devnet"}
-              paused={status?.paused ?? false}
-            />
+            {/* TOP RAIL — vault balance + Squads attribution. Identity
+                (ONLINE / serial / network / uptime) is owned by the
+                chassis bezel, not duplicated here. */}
+            <TopRail usdcBalance={status?.usdcBalance ?? 0} />
 
             {/* TABS — Live Inside · Deploy Worker · Pay & Enforce.
                 The device has three modes: watch demos, drop your
@@ -286,27 +282,23 @@ export default function DeviceHome() {
                 area legible without sacrificing the device metaphor. */}
             <DeviceTabs active={tab} onChange={setTab} />
 
-            {/* TAB 1 — LIVE INSIDE. The Live Engine: banner declares
-                the workers are demos, three tiles show real chain
-                tension, breadcrumb under banner makes Tabs 2 & 3
-                visible to a 60-second judge without a tab click. */}
+            {/* TAB 1 — LIVE INSIDE. The Live Engine: workers connected
+                to the vault by live wires that encode every cycle's
+                state in colour + flow. The dashboard becomes a scene. */}
             {tab === "live" && (
               <>
                 <LiveInsideBanner onSwitchTab={setTab} />
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-3.5">
-                  {(status?.workers ?? []).map((w) => (
-                    <WorkerTile
-                      key={w.id}
-                      worker={w}
-                      action={lastActionByWorker[w.id] ?? null}
-                      network={status?.network ?? "devnet"}
-                      isDemo
-                    />
-                  ))}
-                  {(!status || status.workers.length === 0) && (
-                    <NoWorkersState />
-                  )}
-                </div>
+                {status && status.workers.length > 0 ? (
+                  <WorkerCanvas
+                    workers={status.workers}
+                    lastActionByWorker={lastActionByWorker}
+                    usdcBalance={status.usdcBalance}
+                    network={status.network}
+                    paused={status.paused}
+                  />
+                ) : (
+                  <NoWorkersState />
+                )}
               </>
             )}
 
