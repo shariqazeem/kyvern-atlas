@@ -41,6 +41,16 @@ const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 /** Decode a base58 string and check it's a valid 64-byte ed25519
  *  secret. Returns the derived Solana pubkey on success, null on
  *  failure. Pure-local — bytes never leave the browser. */
+/** Privy's User has an `isGuest` boolean when the session was created
+ *  via createGuestAccount(). We use it to decide whether we need to
+ *  log out before opening the standard login modal — guests can't
+ *  link an auth method that's already on a different user's account.
+ *  Typed loosely because Privy hides the User type behind d.ts files
+ *  that vary across SDK versions. */
+function isPrivyGuest(u: unknown): boolean {
+  return !!(u && typeof u === "object" && (u as { isGuest?: boolean }).isGuest);
+}
+
 function decodeDeviceKey(pasted: string): { publicKey: string } | null {
   try {
     const trimmed = pasted.trim();
@@ -67,7 +77,7 @@ type Phase =
 export default function RecoverPage() {
   const router = useRouter();
   const { isAuthenticated, isLoading } = useAuth();
-  const { login, authenticated } = usePrivy();
+  const { login, logout, authenticated, user } = usePrivy();
   const { createGuestAccount } = useGuestAccounts();
   const { importWallet } = useImportWallet();
 
@@ -156,12 +166,23 @@ export default function RecoverPage() {
     };
   }, [authenticated, pendingImportKey, importWallet]);
 
-  const handleAccountFallback = useCallback(() => {
-    // Standard Privy login — restores existing embedded wallet via
-    // account → wallet binding. /login's redirect logic will land
-    // them on /app since we don't set onboard-mode=fresh here.
+  const handleAccountFallback = useCallback(async () => {
+    // If a failed /recover attempt already created a guest account,
+    // we're sitting in a guest session. Calling login() now would try
+    // to LINK the new auth method onto the guest account — and Privy
+    // refuses with "This account has already been linked to another
+    // user" when that email/wallet already belongs to the user's
+    // original account. Log out first so login() opens the standard
+    // sign-in flow on a clean slate.
+    if (authenticated && isPrivyGuest(user)) {
+      try {
+        await logout();
+      } catch {
+        /* best-effort — even if logout fails we still try to login */
+      }
+    }
     login();
-  }, [login]);
+  }, [authenticated, login, logout, user]);
 
   const handleContinue = useCallback(() => {
     router.push("/app");
