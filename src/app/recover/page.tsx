@@ -135,8 +135,19 @@ export default function RecoverPage() {
       } catch (e) {
         if (cancelled) return;
         setPendingImportKey(null);
-        const msg = e instanceof Error ? e.message : "Recovery failed.";
-        setError(msg);
+        const raw = e instanceof Error ? e.message : "Recovery failed.";
+        // Privy's "Wallet already exists" error is the most common
+        // recovery failure: the user's pasted key is already bound to
+        // an existing Privy account (the one they originally created
+        // when they signed up with Email/Google/Wallet). Privy doesn't
+        // allow the same wallet on two accounts. The right move is to
+        // just sign back into that original account — Privy will
+        // restore the same embedded wallet automatically.
+        const isWalletAlreadyExists = /wallet already exists/i.test(raw);
+        const friendly = isWalletAlreadyExists
+          ? "This wallet is already linked to your original Privy account. Sign back in below with the email, Google, or wallet you used when you created the device — Privy will restore it automatically."
+          : raw;
+        setError(friendly);
         setPhase("error");
       }
     })();
