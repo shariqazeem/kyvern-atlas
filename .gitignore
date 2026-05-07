@@ -59,3 +59,4 @@ anchor/target/
 # deploy context. NEVER COMMIT.
 DEPLOY_MEMORY.md
 DEPLOY_MEMORY.local.md
+secrets/

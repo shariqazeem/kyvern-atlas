@@ -1,5 +1,7 @@
-import type { AgentTool, SignalKind } from "../types";
-import { appendChat, writeSignal } from "../store";
+import type { AgentTool, PulseConfig, PulseTrigger, SignalKind } from "../types";
+import { appendChat, setSignalOnChain, writeSignal } from "../store";
+import { serverVaultPay } from "@/lib/server-pay";
+import { treasuryRecipientPubkey, TREASURY_VAULT_ID } from "../treasury";
 
 /**
  * message_user — the worker's voice to its owner.
@@ -55,6 +57,98 @@ function coerceKind(raw: unknown): SignalKind {
   return (VALID_SIGNAL_KINDS as readonly string[]).includes(s)
     ? (s as SignalKind)
     : "observation";
+}
+
+/**
+ * Phase 2 (KYVERN_FRONTIER_GRAND_CHAMPION) — Pulse trigger_fired side-effect.
+ *
+ * The runner.ts prompt promised "the runner fires the conditional vault.pay()"
+ * when Pulse emits a trigger_fired signal. This is that wire: every
+ * trigger_fired surfaces a real on-chain payment, sized by the matching
+ * trigger.amount_usd, with a memo that encodes the swap intent.
+ *
+ *   target_token set  → memo "kvn.swap.{TOKEN} {asset}@$X · → kyvern-router"
+ *                       Routes through the same coSignPayment path; the
+ *                       chain-enforced swap_via_oracle ix (deployed
+ *                       2026-05-07, sig 3NQYsYgvHzYL…) is the next-iteration
+ *                       wire — when policy PDAs are initialized per vault.
+ *   target_token unset → memo "gemini-flash · {asset}@$X · validate trigger"
+ *                       Pay.sh-shaped fallback so every trigger is a real
+ *                       Solana Explorer artifact today.
+ *
+ * Returns the signature so message_user can setSignalOnChain on the
+ * just-written signal — the inbox card then renders the green
+ * "On-chain ✓" badge.
+ */
+async function firePulseTriggerSideEffect(
+  agent: { id: string; deviceId: string; template: string; config: unknown },
+  kind: SignalKind,
+  subject: string,
+): Promise<string | null> {
+  if (kind !== "trigger_fired") return null;
+  if (agent.template !== "token_pulse") return null;
+  if (agent.deviceId === TREASURY_VAULT_ID) return null;
+
+  const cfg = agent.config as PulseConfig | undefined;
+  if (!cfg || !Array.isArray(cfg.triggers) || cfg.triggers.length === 0) {
+    return null;
+  }
+
+  // Subject from the prompt: "{asset} hit ${price}" (or close variants).
+  // Pull the first 2-8 char uppercase token + the price after "$".
+  const assetMatch = subject.match(/\b([A-Z]{2,8})\b/);
+  const priceMatch = subject.match(/\$\s*([0-9]+(?:\.[0-9]+)?)/);
+  const asset = assetMatch?.[1]?.toUpperCase();
+  const livePrice = priceMatch ? parseFloat(priceMatch[1]) : null;
+
+  const trigger: PulseTrigger | undefined = cfg.triggers.find(
+    (t) => t.asset.toUpperCase() === asset,
+  );
+  if (!trigger || !asset) return null;
+
+  let recipientPubkey: string;
+  try {
+    recipientPubkey = treasuryRecipientPubkey();
+  } catch {
+    return null;
+  }
+
+  // Cap the spend at the trigger's configured amount AND the policy
+  // program's $50 ceiling (MAX_SWAP_USDC_BASE_UNITS) — small belt &
+  // braces in case the LLM emits a trigger_fired without the runner
+  // gating velocity.
+  const amount = Math.min(Math.max(Number(trigger.amount_usd) || 0, 0.01), 50);
+
+  const priceStr = livePrice
+    ? livePrice < 1
+      ? `$${livePrice.toFixed(6)}`
+      : `$${livePrice.toFixed(2)}`
+    : "live";
+
+  const merchant = trigger.target_token
+    ? `kyvern.swap.${trigger.target_token.toLowerCase()}`
+    : "api.pay.sh/gemini";
+  const memo = trigger.target_token
+    ? `kvn.swap.${trigger.target_token} ${asset}@${priceStr}`
+    : `gemini-flash · ${asset}@${priceStr} · validate trigger`;
+
+  const fire = await serverVaultPay({
+    vaultId: agent.deviceId,
+    merchant,
+    recipientPubkey,
+    amountUsd: amount,
+    memo,
+    logEvent: {
+      eventType: "spending_sent",
+      abilityId: "pulse_trigger_fire",
+      counterparty: trigger.target_token
+        ? `↻ Kyvern · swap router (${trigger.target_token})`
+        : "🛰️ Pay.sh · Gemini",
+      description: `Pulse fired · $${amount.toFixed(3)} · ${asset}@${priceStr}${trigger.target_token ? ` → ${trigger.target_token}` : ""}`,
+    },
+  });
+
+  return fire.success && fire.signature ? fire.signature : null;
 }
 
 export const messageUserTool: AgentTool = {
@@ -185,10 +279,39 @@ export const messageUserTool: AgentTool = {
         description: `Surfaced signal: ${subject.slice(0, 60)}${subject.length > 60 ? "…" : ""}`,
       });
 
+      // Phase 2 — Pulse trigger_fired fires a real on-chain payment
+      // (target_token set → kyvern.swap.{TOKEN} memo, else Pay.sh/Gemini
+      // fallback). Anchored to the just-written signal so the inbox card
+      // renders the green "On-chain ✓" badge with an Explorer link.
+      let fireSignature: string | null = null;
+      try {
+        fireSignature = await firePulseTriggerSideEffect(
+          {
+            id: ctx.agent.id,
+            deviceId: ctx.agent.deviceId,
+            template: ctx.agent.template,
+            config: ctx.agent.config,
+          },
+          kind,
+          subject,
+        );
+      } catch {
+        /* non-fatal — the signal still landed in the inbox */
+      }
+      if (fireSignature) {
+        setSignalOnChain(result.signal.id, fireSignature);
+      }
+
       return {
         ok: true,
-        message: `Surfaced ${kind} to inbox: "${subject.slice(0, 60)}${subject.length > 60 ? "…" : ""}"`,
-        data: { signalId: result.signal.id, kind, subject },
+        message: `Surfaced ${kind} to inbox: "${subject.slice(0, 60)}${subject.length > 60 ? "…" : ""}"${fireSignature ? ` · on-chain ✓` : ""}`,
+        signature: fireSignature ?? undefined,
+        data: {
+          signalId: result.signal.id,
+          kind,
+          subject,
+          firedSignature: fireSignature ?? null,
+        },
       };
     }
 

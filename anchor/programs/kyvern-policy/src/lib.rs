@@ -60,10 +60,10 @@ pub const MIN_VELOCITY_WINDOW_SECONDS: u32 = 5;
 /// `oracle_signer` account check is replaced with a Pyth Receiver PDA
 /// owner check — same instruction shape, no client breakage.
 ///
-/// **Default oracle pubkey is the canonical placeholder** — replace
-/// this with the team's actual signer pubkey before `anchor deploy`.
+/// Oracle signer for Phase 1 swap_via_oracle. Keypair lives at
+/// `secrets/oracle-signer-keypair.json` (gitignored). Generated 2026-05-07.
 pub const ORACLE_SIGNER: Pubkey =
-    anchor_lang::solana_program::pubkey!("11111111111111111111111111111111");
+    anchor_lang::solana_program::pubkey!("Aa4MMPqeTxg3M11RdiRngX9QDBuKmgB5MjRdp9TmxDc");
 
 /// Hard ceiling on per-swap USDC input. Prevents runaway swaps even
 /// before per-tx caps come in.
