@@ -13,9 +13,12 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+import { Check, Repeat } from "lucide-react";
 import type { Signal } from "@/lib/agents/types";
 import { severityForSignal, severityVisuals } from "@/lib/agents/signal-severity";
+
+const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
 interface SignalWithWorker extends Signal {
   worker: { name: string; emoji: string };
@@ -96,16 +99,22 @@ export function FindingsList({
         boxShadow: "0 1px 3px rgba(15,23,42,0.04)",
       }}
     >
-      {signals.map((s, i) => (
-        <Row
-          key={s.id}
-          signal={s}
-          last={i === signals.length - 1}
-          selected={s.id === selectedId}
-          isDesktop={isDesktop}
-          onSelectDesktop={onSelectDesktop}
-        />
-      ))}
+      {/* Phase 7 — slide-in animation when new findings land. The
+          parent re-fetches every 5s; AnimatePresence diff-tracks by
+          key=signal.id so freshly arriving rows fade + translate
+          rather than just appearing. */}
+      <AnimatePresence initial={false}>
+        {signals.map((s, i) => (
+          <Row
+            key={s.id}
+            signal={s}
+            last={i === signals.length - 1}
+            selected={s.id === selectedId}
+            isDesktop={isDesktop}
+            onSelectDesktop={onSelectDesktop}
+          />
+        ))}
+      </AnimatePresence>
     </ul>
   );
 }
@@ -127,6 +136,14 @@ function Row({
   const vis = severityVisuals(sev, !!signal.signature);
   const isUnread = signal.status === "unread";
   const label = KIND_LABEL[signal.kind] ?? signal.kind.toUpperCase();
+
+  // Phase 7 — terminal-status badges. Sentinel drafted_application that
+  // the user has tapped Submit on shows ✓ Submitted; Wren wallet_alert
+  // mirrored to a Pulse trigger shows ↻ Mirrored. These move the row
+  // from "unread" framing to "acted on" without losing it from the list.
+  const submitted = !!signal.submittedAt;
+  const mirrored = !!signal.mirroredPulseTriggerId;
+  const onChain = !!signal.onChainSignature || !!signal.signature;
 
   const inner = (
     <>
@@ -159,11 +176,51 @@ function Row({
           {signal.subject}
         </div>
         <div
-          className="text-[10.5px] truncate font-mono uppercase tracking-[0.10em]"
+          className="text-[10.5px] truncate font-mono uppercase tracking-[0.10em] flex items-center gap-1.5"
           style={{ color: "rgba(15,23,42,0.55)" }}
         >
-          {label} · {signal.worker.emoji} {signal.worker.name} ·{" "}
-          {fmtAgo(signal.createdAt)}
+          <span className="truncate">
+            {label} · {signal.worker.emoji} {signal.worker.name} ·{" "}
+            {fmtAgo(signal.createdAt)}
+          </span>
+          {submitted && (
+            <span
+              className="inline-flex items-center gap-0.5 rounded-full px-1.5 py-px tracking-[0.06em] flex-shrink-0"
+              style={{
+                background: "rgba(34,197,94,0.10)",
+                color: "#15803D",
+                fontSize: 9,
+              }}
+            >
+              <Check className="w-2.5 h-2.5" strokeWidth={2.6} />
+              Submitted
+            </span>
+          )}
+          {mirrored && (
+            <span
+              className="inline-flex items-center gap-0.5 rounded-full px-1.5 py-px tracking-[0.06em] flex-shrink-0"
+              style={{
+                background: "rgba(59,130,246,0.10)",
+                color: "#1D4ED8",
+                fontSize: 9,
+              }}
+            >
+              <Repeat className="w-2.5 h-2.5" strokeWidth={2.6} />
+              Mirrored
+            </span>
+          )}
+          {!submitted && !mirrored && onChain && (
+            <span
+              className="inline-flex items-center gap-0.5 rounded-full px-1.5 py-px tracking-[0.06em] flex-shrink-0"
+              style={{
+                background: "rgba(34,197,94,0.08)",
+                color: "#15803D",
+                fontSize: 9,
+              }}
+            >
+              On-chain
+            </span>
+          )}
         </div>
       </div>
       {isUnread && (
@@ -187,7 +244,13 @@ function Row({
 
   if (isDesktop) {
     return (
-      <li>
+      <motion.li
+        layout
+        initial={{ opacity: 0, y: -6 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -4, height: 0 }}
+        transition={{ duration: 0.32, ease: EASE }}
+      >
         <motion.button
           type="button"
           onClick={() => onSelectDesktop(signal.id)}
@@ -197,12 +260,18 @@ function Row({
         >
           {inner}
         </motion.button>
-      </li>
+      </motion.li>
     );
   }
 
   return (
-    <li>
+    <motion.li
+      layout
+      initial={{ opacity: 0, y: -6 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -4, height: 0 }}
+      transition={{ duration: 0.32, ease: EASE }}
+    >
       <Link
         href={`/app/inbox/${signal.id}`}
         className="relative flex items-center gap-2.5 px-4 py-3 transition hover:bg-black/[0.02]"
@@ -210,6 +279,6 @@ function Row({
       >
         {inner}
       </Link>
-    </li>
+    </motion.li>
   );
 }
