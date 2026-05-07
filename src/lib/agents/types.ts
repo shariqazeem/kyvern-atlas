@@ -55,6 +55,11 @@ export interface PulseTrigger {
   amount_usd: number;
   merchant: string;
   memo: string;
+  /** Phase 2 (KYVERN_FRONTIER_GRAND_CHAMPION) — when set, the trigger
+   *  fires a chain-enforced swap instead of a generic vault.pay().
+   *  Routes through swap_via_oracle once Phase 1 deploys; until then
+   *  the runner falls back to the merchant + memo path. */
+  target_token?: "SOL" | "kBONK" | "kJUP";
 }
 
 export interface PulseConfig {

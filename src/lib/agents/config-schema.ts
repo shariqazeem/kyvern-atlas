@@ -52,6 +52,10 @@ export const PulseConfigSchema = z.object({
         amount_usd: z.number().min(0.001).max(50),
         merchant: z.string().min(3).max(120),
         memo: z.string().max(200),
+        // Phase 2 (KYVERN_FRONTIER_GRAND_CHAMPION) — optional swap target.
+        target_token: z
+          .enum(["SOL", "kBONK", "kJUP"])
+          .optional(),
       }),
     )
     .max(10),

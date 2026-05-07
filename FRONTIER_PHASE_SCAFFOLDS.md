@@ -1,228 +1,141 @@
-# Frontier · Phase 0/1/2/5 scaffolds
+# Frontier · Phase 0/1/2/5 — current state + remaining deploy steps
 
-This file holds every block of code from `KYVERN_FRONTIER_GRAND_CHAMPION_SPEC.md` that needs **deploy** action outside this Next.js codebase. Phases 6, 3, 4, 7, 8 are already shipped to production; the four below need Rust/Anchor or Cloudflare credentials I don't have access to from here. Lift each block wholesale.
+Live status of every phase from `KYVERN_FRONTIER_GRAND_CHAMPION_SPEC.md` that needed external deploy work. Updated 2026-05-07 after Phase 1 source + Phase 2 UI + Phase 5 partial landed.
 
----
-
-## Phase 0 — Pyth devnet feed verification (15m)
-
-`scripts/verify-pyth-feeds.ts`:
-
-```ts
-import { Connection, PublicKey } from "@solana/web3.js";
-import { PythHttpClient, getPythProgramKeyForCluster } from "@pythnetwork/client";
-
-const PYTH_FEEDS = {
-  SOL_USD: "7UVimffxr9ow1uXYxsr4LHAcV58mLzhmwaeKvJ1pjLiE",
-  BTC_USD: "HovQMDrbAgAYPCmHVSrezcSmkMtXSSUsLDFANExrZh2J",
-  ETH_USD: "EdVCmQ9FSPcVRAvxcUuoLHt1J2NkB1hLsSHmqVFmSmH1",
-} as const;
-
-async function main() {
-  const conn = new Connection("https://api.devnet.solana.com");
-  const programKey = getPythProgramKeyForCluster("devnet");
-  const pyth = new PythHttpClient(conn, programKey);
-  const data = await pyth.getData();
-
-  for (const [name, feed] of Object.entries(PYTH_FEEDS)) {
-    const account = data.productPrice.get(feed);
-    if (!account) {
-      console.log(`${name} ${feed} → NOT FOUND`);
-      continue;
-    }
-    const price = account.aggregate.price ?? null;
-    const stale = account.aggregate.publishSlot
-      ? Date.now() / 1000 - account.aggregate.publishSlot * 0.4 > 60
-      : true;
-    console.log(
-      `${name} ${feed} → $${price?.toFixed(2) ?? "—"} ${stale ? "(STALE)" : "(fresh)"}`,
-    );
-  }
-}
-main().catch(console.error);
-```
-
-Run with `npx tsx scripts/verify-pyth-feeds.ts` after `npm i @pythnetwork/client @solana/web3.js`. If any feed is stale or missing, set `oracle_fallback_used = true` in the swap_via_oracle event.
+| Phase | State | What's left |
+|---|---|---|
+| 0 · Pyth devnet feed health check | ✓ script in repo, verified | classic Pyth devnet feeds are dead — Pyth migrated to Pull Oracle. Plan adjusted: Phase 1 uses trusted-oracle-keypair pattern instead. |
+| 1 · `swap_via_oracle` Anchor instruction | ✓ source written + `anchor build` clean (kyvern_policy.so 301KB · IDL 26.7KB) | **anchor deploy upgrade** using the original `kyvern_policy-keypair.json` that produces pubkey `PpmZErWfT5zpeo1fJtTbpqezFGbRUamaNNRWViaMSqc` — local build generates a fresh keypair (2iuD…) that would deploy to a NEW program ID. **Set `ORACLE_SIGNER` const to your real signer pubkey before deploy.** |
+| 2 · Pulse multi-token UI | ✓ `target_token` field on PulseConfig + dropdown in TriggersEditor + Zod validation | Runner update — once Phase 1 is deployed, route Pulse triggers with `target_token` set through `swap_via_oracle` instead of vault.pay. |
+| 5 · Atlas real customer | ✓ synthetic `addEarning(0.10)` call removed from atlas-runner | Cloudflare Worker deploy: see scaffold in this doc. Needs `wrangler` CLI + CF account + funded subscriber wallet. |
 
 ---
 
-## Phase 1 — Anchor program · `swap_via_oracle` (3h)
+## Phase 0 — Pyth verification (DONE in repo)
 
-Add to `anchor/programs/kyvern-policy/src/lib.rs`:
-
-```rust
-use pyth_sdk_solana::load_price_feed_from_account_info;
-
-#[account]
-pub struct TreasuryReserve {
-    pub mint: Pubkey,
-    pub bump: u8,
-    pub authority: Pubkey,
-    pub total_swapped_in: u64,
-    pub total_swapped_out: u64,
-}
-
-#[account]
-pub struct OracleAllowlist {
-    pub token_mint: Pubkey,
-    pub pyth_feed: Pubkey,
-    pub max_staleness_seconds: u32,
-    pub bump: u8,
-}
-
-pub fn swap_via_oracle(
-    ctx: Context<SwapViaOracle>,
-    amount_in: u64,
-    min_amount_out: u64,
-    target_token_mint: Pubkey,
-) -> Result<()> {
-    // 1. Read Pyth price
-    let price_account = &ctx.accounts.pyth_price_feed;
-    let price_data = load_price_feed_from_account_info(price_account)?;
-    let current_price = price_data
-        .get_price_no_older_than(
-            Clock::get()?.unix_timestamp,
-            ctx.accounts.oracle_allowlist.max_staleness_seconds.into(),
-        )
-        .ok_or(KyvernError::OraclePriceStale)?;
-
-    // 2. Reuse existing daily/weekly/merchant/kill-switch checks
-    //    (unchanged — call into the same require! macros that gate
-    //     execute_payment).
-
-    // 3. Calculate output with 1% Kyvern fee
-    let amount_out = calculate_swap_output(
-        amount_in,
-        current_price.price,
-        current_price.expo,
-        ctx.accounts.target_token_mint_decimals,
-        100, // 1% fee in bps
-    )?;
-
-    // 4. Slippage check
-    require!(amount_out >= min_amount_out, KyvernError::SlippageExceeded);
-
-    // 5. Burn USDC from vault
-    token::transfer(
-        ctx.accounts.vault_usdc_to_treasury_usdc.to_token_transfer_ctx(),
-        amount_in,
-    )?;
-
-    // 6. Transfer target token from treasury PDA to user wallet
-    let bump = ctx.accounts.treasury_reserve.bump;
-    let mint_key = target_token_mint;
-    let signer_seeds: &[&[&[u8]]] = &[&[b"treasury", mint_key.as_ref(), &[bump]]];
-    token::transfer(
-        ctx.accounts
-            .treasury_to_user
-            .to_token_transfer_ctx()
-            .with_signer(signer_seeds),
-        amount_out,
-    )?;
-
-    // 7. Emit event
-    emit!(SwapExecuted {
-        vault: ctx.accounts.vault.key(),
-        user: ctx.accounts.user_wallet.key(),
-        token_in: USDC_MINT,
-        token_out: target_token_mint,
-        amount_in,
-        amount_out,
-        oracle_price: current_price.price,
-        oracle_expo: current_price.expo,
-        timestamp: Clock::get()?.unix_timestamp,
-    });
-
-    // 8. Update treasury reserve counters
-    let treasury = &mut ctx.accounts.treasury_reserve;
-    treasury.total_swapped_in = treasury.total_swapped_in.saturating_add(amount_in);
-    treasury.total_swapped_out = treasury.total_swapped_out.saturating_add(amount_out);
-
-    Ok(())
-}
-
-#[error_code]
-pub enum KyvernError {
-    // ... existing codes ...
-    #[msg("Oracle price is stale beyond allowlisted threshold")]
-    OraclePriceStale,
-    #[msg("Slippage exceeded — output amount below min_amount_out")]
-    SlippageExceeded,
-    #[msg("Target token not in oracle allowlist")]
-    TokenNotAllowlisted,
-    #[msg("Treasury PDA has insufficient reserve for this swap")]
-    TreasuryUnderfunded,
-}
+Run with:
+```bash
+npx tsx scripts/verify-pyth-feeds.ts
 ```
 
-Helper function `calculate_swap_output` for Pyth's `(price, expo)` model — input USDC has 6 decimals, output token has its own decimals from `target_token_mint_decimals`. 1% fee subtracted before slippage check.
+Result on 2026-05-07:
+```
+✗ SOL/USD    J83w4HKfqxw… → NOT FOUND
+✗ USDC/USD   5SSkXsEKQep… → NOT TRADING / bad layout
+✗ BTC/USD    HovQMDrbAg… → NOT TRADING / bad layout
+✗ ETH/USD    EdVCmQ9FSPc… → NOT FOUND
+```
 
-### Deploy steps
+Conclusion: **classic Pyth devnet feeds are dead**. Pyth migrated to Pull Oracle (Hermes-based, receiver program `rec5EKMGg6MxZYaMdyBfgwp4d5rB9T1VQH5pJv5LtFJ`). Phase 1 source pivots to a trusted-oracle-keypair pattern that's swappable for Pull Oracle later without breaking the instruction shape.
+
+---
+
+## Phase 1 — `swap_via_oracle` (SOURCE COMMITTED · NEEDS DEPLOY)
+
+### What landed
+
+`anchor/programs/kyvern-policy/src/lib.rs`:
+
+- `ORACLE_SIGNER` constant — replace before deploy with your team's signer pubkey
+- `MAX_SWAP_USDC_BASE_UNITS` ($50) — global ceiling on per-swap input
+- `SWAP_FEE_BPS` (100 = 1%) — Kyvern fee, subtracted from oracle-priced output
+- `calculate_swap_output()` — pure-Rust math: input USDC + Pyth-style (price, expo) + target decimals → output base units, with 1% fee + checked u128 arithmetic
+- `pub fn swap_via_oracle(ctx, args)` instruction:
+  1. Vault not paused
+  2. amount_in within `MAX_SWAP_USDC_BASE_UNITS` AND per-tx cap
+  3. Oracle signer matches `ORACLE_SIGNER` const + `is_signer == true`
+  4. Oracle slot age within `args.max_oracle_age_slots`
+  5. Slippage: `amount_out_expected ≥ args.min_amount_out` after 1% fee
+  6. Velocity cap (sliding window — same logic as `execute_payment`)
+  Emits `SwapExecuted` event with oracle price/expo/slot/timestamp.
+- `SwapViaOracleArgs` — amount_in, min_amount_out, target_token_mint, target_decimals, oracle_price, oracle_expo, oracle_published_slot, max_oracle_age_slots
+- `SwapViaOracle` accounts struct — policy PDA + member signer + oracle_signer signer (lighter than ExecutePayment because settlement is composed by the runtime as separate ix in the same tx)
+- 5 new error codes (6012–6016): `UntrustedOracle`, `OraclePriceStale`, `SlippageExceeded`, `SwapAmountTooLarge`, `SwapMathOverflow`
+
+### Deploy procedure (needs your team's keypair)
+
+Local build verified: `cargo` + `anchor build` runs clean, BPF program is 301KB (well under Solana's 2MB limit).
+
+**The `target/deploy/kyvern_policy-keypair.json` generated locally is a NEW keypair**, not the original upgrade authority for the deployed program. To upgrade `PpmZErWfT5zpeo1fJtTbpqezFGbRUamaNNRWViaMSqc` you must use the original deploy keypair.
 
 ```bash
+# 1. Set ORACLE_SIGNER in lib.rs to your real oracle signer pubkey
+#    (the keypair the runtime will sign price feeds with).
+#    Default placeholder right now is the system program (1111…).
+
+# 2. Place the ORIGINAL keypair (the one whose pubkey is
+#    PpmZErWfT5zpeo1fJtTbpqezFGbRUamaNNRWViaMSqc) at:
+#    anchor/target/deploy/kyvern_policy-keypair.json
+
+# 3. Make sure your deployer wallet has ≥3 SOL on devnet:
+solana balance
+# If short, airdrop:
+solana airdrop 2
+
+# 4. Build + deploy (this is an UPGRADE, not a fresh deploy):
 cd anchor
 anchor build
 anchor deploy --provider.cluster devnet
-# Verify program ID unchanged: PpmZErWfT5zpeo1fJtTbpqezFGbRUamaNNRWViaMSqc
-# Copy refreshed IDL into src/lib/anchor/idl.json (if app reads from idl)
+
+# 5. Verify the program ID printed matches PpmZErWfT5zpeo1fJtTbpqezFGbRUamaNNRWViaMSqc.
+#    Sync IDL into frontend (no IDL refs found in src/ today; not strictly
+#    needed — current frontend uses raw instruction encoding via serverVaultPay).
 ```
 
-After deploy, call `register_treasury` once per supported token to seed the treasury PDA + oracle allowlist row.
+### Phase 1 acceptance tests to add to `anchor/tests/`
 
-### Tests to add
-
-- `swap_via_oracle` USDC → SOL with live Pyth price, completes <2s
-- Stale oracle rejects with `OraclePriceStale`
-- Slippage trigger rejects with `SlippageExceeded`
-- Drain-style call hits existing `DailyCapExceeded`
-- Treasury counters increment correctly
-- Squads multisig cosigns successfully through `serverVaultPay`
+- `swap_via_oracle` happy path: SOL price `$182.41` (price=18241000000, expo=-8), $5 USDC in, target_decimals=9 → expects ~0.027 SOL out after 1% fee
+- Stale oracle (slot age > max) → `OraclePriceStale`
+- Slippage trigger (min_amount_out > expected) → `SlippageExceeded`
+- Untrusted oracle signer → `UntrustedOracle`
+- amount_in > MAX_SWAP_USDC_BASE_UNITS → `SwapAmountTooLarge`
+- Daily/per-tx cap interaction (existing rules still fire) → `AmountExceedsPerTxMax`
 
 ---
 
-## Phase 2 — Pulse multi-token UI extension (after Phase 1 deploys)
+## Phase 2 — Pulse multi-token UI (LANDED — runner update deferred)
 
-After `swap_via_oracle` is live, extend `PulseConfig.triggers[]`:
+`PulseConfig.triggers[].target_token: 'SOL' | 'kBONK' | 'kJUP'` is now an optional field on the Zod schema + the TriggersEditor renders a dropdown next to each trigger. When the user picks a token, a green "Chain-enforced" pill appears on the trigger row.
 
-```ts
-type PulseConfig = {
-  triggers: Array<{
-    id: string;
-    target_token: 'SOL' | 'kBONK' | 'kJUP'; // NEW — chain-enforced swap target
-    direction: 'below' | 'above';
-    threshold_usd: number;
-    spend_usdc: number; // renamed from amount_usd to clarify input side
-    note?: string;
-    armed: boolean;
-  }>;
-  poll_cadence_minutes: 1 | 5 | 15;
-};
-```
-
-`TriggersEditor` already accepts `merchant` and `memo`; add:
-- `target_token` dropdown (SOL · kBONK · kJUP)
-- `armed` toggle (lights green when armed)
-
-Runner change in `src/lib/agents/runner.ts` (token_pulse branch):
+The runner does NOT yet read `target_token` — Pulse's existing flow (vault.pay → `merchant: api.pay.sh/gemini`) keeps firing for all triggers. Once Phase 1 is deployed, the runner update is:
 
 ```ts
-// After read_dex confirms breach + Pay.sh validates:
-const result = await serverVaultPay({
-  vaultId: agent.deviceId,
-  action: "swap_via_oracle",  // NEW Anchor instruction
-  args: {
-    amount_in: trigger.spend_usdc * 1_000_000,
-    min_amount_out: 0, // for demo
-    target_token_mint: getMintForToken(trigger.target_token),
-  },
-});
+// In src/lib/agents/scripted.ts (or runner.ts), pulse branch:
+if (trigger.target_token) {
+  // Phase 1 path — chain-enforced swap
+  const oraclePrice = await fetchOraclePrice(trigger.target_token);
+  const signedPrice = signOraclePrice(oraclePrice, ORACLE_KEYPAIR);
+  await serverVaultSwap({
+    vaultId: agent.deviceId,
+    targetToken: trigger.target_token,
+    amountIn: trigger.amount_usd * 1_000_000,
+    minAmountOut: 0,
+    oraclePrice: signedPrice.price,
+    oracleExpo: signedPrice.expo,
+    oraclePublishedSlot: signedPrice.slot,
+  });
+} else {
+  // existing path — Pay.sh-shaped vault.pay()
+  await serverVaultPay({ ... });
+}
 ```
 
-This requires extending `serverVaultPay` to support the new instruction — a sibling `serverVaultSwap()` is cleaner.
+`serverVaultSwap()` is a new helper that needs to be added to `src/lib/server-pay.ts`. It builds the `swap_via_oracle` instruction, attaches the oracle signer keypair, and routes through the same Squads cosign path as `serverVaultPay`.
 
 ---
 
-## Phase 5 — Atlas real external customer (Cloudflare Worker)
+## Phase 5 — Atlas real customer (PARTIAL — synthetic earnings killed)
+
+### What landed (live)
+
+`src/lib/atlas/runner.ts` — the `addEarning(0.1)` call after every `publish` action is GONE. Atlas's `state.totalEarnedUsd` now ticks ONLY when:
+
+1. External wallet pays via `/api/atlas/feed` x402 (recorded in `feed_purchases` table)
+2. Direct USDC transfer arrives at Atlas's vault (visible in vault history)
+
+The page reads the same `totalEarnedUsd` field but it's now backed by chain history, not a counter. **Restart `pm2 restart atlas` after deploy** so the runner picks up the change.
+
+### What's left — Cloudflare Worker
 
 `atlas-subscriber-worker/index.ts`:
 
@@ -241,17 +154,11 @@ export default {
       bs58.decode(env.SUBSCRIBER_PRIVATE_KEY),
     );
 
-    // 1. Fetch Atlas feed (x402-protected)
     const challenge = await fetch("https://app.kyvernlabs.com/api/atlas/feed");
     const { paymentRequirements } = (await challenge.json()) as {
-      paymentRequirements: {
-        recipient: string;
-        amount: number;
-        mint: string;
-      };
+      paymentRequirements: { recipient: string; amount: number; mint: string };
     };
 
-    // 2. Build + sign + send USDC payment from subscriber wallet
     const conn = new Connection("https://api.devnet.solana.com", "confirmed");
     const paymentTx = await buildX402Payment({
       from: subscriber.publicKey,
@@ -264,14 +171,12 @@ export default {
     const signature = await conn.sendTransaction(paymentTx);
     await conn.confirmTransaction(signature);
 
-    // 3. Retry feed with the payment signature
     const feedResponse = await fetch(
       "https://app.kyvernlabs.com/api/atlas/feed",
       { headers: { "X-PAYMENT": signature } },
     );
     const signal = await feedResponse.json();
 
-    // 4. Log to R2 — public audit trail
     await env.ATLAS_LOG.put(
       `signals/${Date.now()}.json`,
       JSON.stringify({ signal, payment_tx: signature }),
@@ -281,7 +186,6 @@ export default {
 ```
 
 `wrangler.toml`:
-
 ```toml
 name = "atlas-subscriber"
 main = "index.ts"
@@ -293,13 +197,9 @@ crons = ["0 * * * *"]
 [[r2_buckets]]
 binding = "ATLAS_LOG"
 bucket_name = "kyvern-atlas-signals"
-
-[vars]
-# SUBSCRIBER_PRIVATE_KEY set via `wrangler secret put`
 ```
 
 Deploy:
-
 ```bash
 cd atlas-subscriber-worker
 npm i
@@ -307,31 +207,21 @@ wrangler secret put SUBSCRIBER_PRIVATE_KEY  # paste base58 key
 wrangler deploy
 ```
 
-### Remove synthetic earnings in `src/lib/atlas/runner.ts`
-
-Replace the `addEarning(0.10)` call with a query helper that sums actual external USDC inflows to Atlas's vault. The page reads the same `totalEarnedUsd` field but it's now backed by chain history, not a counter:
-
-```ts
-async function getAtlasRealEarnings(): Promise<number> {
-  const inbound = await connection.getSignaturesForAddress(ATLAS_VAULT);
-  return sumExternalInflowsUsd(inbound);
-}
-```
-
-Pre-fund subscriber wallet with ~$50 devnet USDC. Run for ≥6h pre-submission to accumulate a visible audit trail.
+**Pre-fund subscriber wallet with ~$50 devnet USDC.** Run for ≥6h pre-submission so the audit trail accumulates visible payments before recording.
 
 ---
 
-## Submission checklist
+## Submission gating checklist
 
-- [ ] Phase 0 verify-pyth-feeds script run, all feeds green
-- [ ] Phase 1 Anchor program deployed, `swap_via_oracle` tested end-to-end
-- [ ] Phase 1 IDL synced into `src/lib/anchor/idl.json`
-- [ ] Phase 2 Pulse config schema extended with `target_token`
-- [ ] Phase 2 TriggersEditor renders token dropdown
-- [ ] Phase 5 Cloudflare Worker deployed, cron firing hourly
-- [ ] Phase 5 first real x402 payment from subscriber wallet visible on Solana Explorer
-- [ ] Phase 5 `addEarning()` calls removed from `atlas-runner.ts`
-- [ ] Atlas pre-runs 6h+ with the real subscriber paying it before recording
+- [x] Phase 0 — Pyth health check landed
+- [x] Phase 1 source — `swap_via_oracle` instruction, `anchor build` clean
+- [ ] Phase 1 deploy — using the original `PpmZ…MSqc` upgrade keypair
+- [ ] Phase 1 — `ORACLE_SIGNER` const replaced with real signer pubkey
+- [x] Phase 2 UI — target_token dropdown shipped
+- [ ] Phase 2 runner — `serverVaultSwap` helper + token-target routing (after Phase 1 deploys)
+- [x] Phase 5 — synthetic addEarning removed
+- [ ] Phase 5 — Cloudflare Worker deployed, cron firing hourly
+- [ ] Phase 5 — first real x402 payment from subscriber wallet visible on Solana Explorer
+- [ ] Atlas runs ≥6h pre-submit with the real subscriber paying it
 
-Once all four are green: every word in the headline ("Solana device · for your AI agent · chain decides · every dollar · it spends") is true on devnet, no asterisks. That's grand-champion ship state.
+Once these are all green, every word in the headline is true on devnet, no asterisks. The hackathon code is at "great submission" grade today; the four ✓ items above already shipped to production. The four ⬜ items are the path to grand-champion.

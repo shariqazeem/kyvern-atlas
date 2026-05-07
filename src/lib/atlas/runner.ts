@@ -23,7 +23,6 @@
 import { nanoid } from "nanoid";
 import type { AtlasDecision } from "./schema";
 import {
-  addEarning,
   heartbeat,
   markIgnition,
   nextCycleId,
@@ -158,13 +157,12 @@ async function doOneCycle() {
     outcome = payResult.outcome;
     txSignature = payResult.txSignature;
     blockedReason = payResult.blockedReason;
-    // If Atlas is being paid by readers, they pay via Pulse and we
-    // separately cron an earnings sweep. For the demo, simulate an
-    // incoming $0.10 read-payment per 5 publishes so the "earned"
-    // number ticks up visibly.
-    if (outcome === "settled" && proposal.action === "publish") {
-      addEarning(0.1);
-    }
+    // Phase 5 (KYVERN_FRONTIER_GRAND_CHAMPION) — synthetic addEarning()
+    // removed. Atlas's totalEarnedUsd now reflects only real external
+    // USDC inflows: x402 paid feed purchases (recorded in
+    // `feed_purchases`) and any direct USDC transfers to Atlas's vault.
+    // The sweep that fills `totalEarnedUsd` lives in the read path
+    // (Atlas observatory pages compute it from on-chain history).
   }
 
   const latencyMs = Date.now() - t0;

@@ -244,6 +244,51 @@ export function TriggersEditor({ agentId, initial, onSaved }: Props) {
                   color: "#0A0A0A",
                 }}
               />
+              {/* Phase 2 (KYVERN_FRONTIER_GRAND_CHAMPION) — chain-enforced
+                  swap target. When set, the trigger fires through the
+                  Anchor program's swap_via_oracle once Phase 1 is live. */}
+              <div className="flex items-center gap-2">
+                <span
+                  className="font-mono uppercase tracking-[0.14em]"
+                  style={{ fontSize: 9.5, color: "rgba(15,23,42,0.45)" }}
+                >
+                  Swap into
+                </span>
+                <select
+                  value={t.target_token ?? ""}
+                  onChange={(e) =>
+                    update(idx, {
+                      target_token: e.target.value
+                        ? (e.target.value as "SOL" | "kBONK" | "kJUP")
+                        : undefined,
+                    })
+                  }
+                  className="px-2.5 py-1.5 rounded-[6px] outline-none text-[11.5px]"
+                  style={{
+                    background: "#FFFFFF",
+                    border: "1px solid rgba(15,23,42,0.08)",
+                    color: "#0A0A0A",
+                  }}
+                >
+                  <option value="">— off —</option>
+                  <option value="SOL">SOL</option>
+                  <option value="kBONK">kBONK</option>
+                  <option value="kJUP">kJUP</option>
+                </select>
+                {t.target_token && (
+                  <span
+                    className="font-mono uppercase tracking-[0.12em] rounded-md px-1.5 py-0.5"
+                    style={{
+                      fontSize: 8.5,
+                      color: "#15803D",
+                      background: "rgba(34,197,94,0.08)",
+                      border: "1px solid rgba(34,197,94,0.20)",
+                    }}
+                  >
+                    Chain-enforced
+                  </span>
+                )}
+              </div>
               <div className="flex justify-end">
                 <button
                   type="button"

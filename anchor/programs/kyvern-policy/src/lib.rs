@@ -49,6 +49,30 @@ pub const MAX_MEMO_LEN: usize = 200;
 /// without turning the vault into a toy.
 pub const MIN_VELOCITY_WINDOW_SECONDS: u32 = 5;
 
+/// Phase 1 (KYVERN_FRONTIER_GRAND_CHAMPION) — trusted oracle authority
+/// for `swap_via_oracle`. The off-chain runtime fetches a USD price
+/// (CoinGecko / Pyth Hermes / wherever), signs `(target_token, price,
+/// expo, slot)` with this keypair, and submits the signature alongside
+/// the swap call. The program checks the signature on-chain, applies
+/// slippage + cap rules, and emits the SwapExecuted event.
+///
+/// This is pluggable: when Pyth Pull Oracle integration ships, the
+/// `oracle_signer` account check is replaced with a Pyth Receiver PDA
+/// owner check — same instruction shape, no client breakage.
+///
+/// **Default oracle pubkey is the canonical placeholder** — replace
+/// this with the team's actual signer pubkey before `anchor deploy`.
+pub const ORACLE_SIGNER: Pubkey =
+    anchor_lang::solana_program::pubkey!("11111111111111111111111111111111");
+
+/// Hard ceiling on per-swap USDC input. Prevents runaway swaps even
+/// before per-tx caps come in.
+pub const MAX_SWAP_USDC_BASE_UNITS: u64 = 50_000_000; // $50
+
+/// 1% Kyvern fee on swap (in basis points). Subtracted from the
+/// oracle-priced output before slippage check.
+pub const SWAP_FEE_BPS: u64 = 100;
+
 #[program]
 pub mod kyvern_policy {
     use super::*;
@@ -232,6 +256,111 @@ pub mod kyvern_policy {
 
         Ok(())
     }
+
+    /// Phase 1 (KYVERN_FRONTIER_GRAND_CHAMPION) — chain-enforced swap.
+    ///
+    /// Fires a USDC → target-token swap from the vault, priced against
+    /// an off-chain oracle that signs (target_mint, price, expo, slot).
+    /// The program enforces:
+    ///   1. Vault not paused
+    ///   2. amount_in > 0 AND ≤ MAX_SWAP_USDC_BASE_UNITS AND ≤ per-tx cap
+    ///   3. Oracle signer matches ORACLE_SIGNER
+    ///   4. Oracle slot age within `max_oracle_age_slots` (staleness)
+    ///   5. Slippage: amount_out ≥ min_amount_out (after 1% Kyvern fee)
+    ///   6. Velocity cap (sliding window — same path as execute_payment)
+    ///
+    /// Settlement happens in two transfers (caller composes them as a
+    /// single atomic tx — the program emits the receipt after both):
+    ///   a. Vault USDC → treasury USDC sink (CPI to Squads spending_limit_use)
+    ///   b. Treasury target-token PDA → user wallet ATA (signed by treasury PDA)
+    ///
+    /// For Phase 1 ship: the program only validates + emits + advances
+    /// the velocity counter. The two transfers are composed by the
+    /// runtime side. Future-hardening: fold the second transfer into
+    /// this instruction so the whole swap is atomic.
+    pub fn swap_via_oracle(
+        ctx: Context<SwapViaOracle>,
+        args: SwapViaOracleArgs,
+    ) -> Result<()> {
+        let clock = Clock::get()?;
+        let policy = &mut ctx.accounts.policy;
+
+        // ── 1. Pause ──
+        require!(!policy.paused, KyvernError::VaultPaused);
+
+        // ── 2. Amount bounds ──
+        require!(args.amount_in > 0, KyvernError::InvalidAmount);
+        require!(
+            args.amount_in <= MAX_SWAP_USDC_BASE_UNITS,
+            KyvernError::SwapAmountTooLarge
+        );
+        require!(
+            args.amount_in <= policy.per_tx_max_base_units,
+            KyvernError::AmountExceedsPerTxMax
+        );
+
+        // ── 3. Oracle signer check ──
+        require_keys_eq!(
+            ctx.accounts.oracle_signer.key(),
+            ORACLE_SIGNER,
+            KyvernError::UntrustedOracle
+        );
+        require!(
+            ctx.accounts.oracle_signer.is_signer,
+            KyvernError::UntrustedOracle
+        );
+
+        // ── 4. Oracle staleness ──
+        let oracle_age = clock
+            .slot
+            .saturating_sub(args.oracle_published_slot);
+        require!(
+            oracle_age <= args.max_oracle_age_slots as u64,
+            KyvernError::OraclePriceStale
+        );
+
+        // ── 5. Slippage — amount_out_expected after 1% fee ──
+        // Caller passes price (raw) + expo. amount_out_base_units =
+        // amount_in_usdc * (1 / price) accounting for decimals.
+        let amount_out_expected =
+            calculate_swap_output(args.amount_in, args.oracle_price, args.oracle_expo, args.target_decimals)?;
+        require!(
+            amount_out_expected >= args.min_amount_out,
+            KyvernError::SlippageExceeded
+        );
+
+        // ── 6. Velocity (sliding window — reuse the same logic) ──
+        let elapsed = clock
+            .unix_timestamp
+            .saturating_sub(policy.velocity_window_start);
+        if elapsed >= policy.velocity_window_seconds as i64 {
+            policy.velocity_window_start = clock.unix_timestamp;
+            policy.velocity_calls_in_window = 0;
+        }
+        require!(
+            policy.velocity_calls_in_window < policy.velocity_max_calls,
+            KyvernError::VelocityCapExceeded
+        );
+        policy.velocity_calls_in_window = policy
+            .velocity_calls_in_window
+            .checked_add(1)
+            .ok_or(KyvernError::VelocityCapExceeded)?;
+
+        emit!(SwapExecuted {
+            policy: policy.key(),
+            multisig: policy.multisig,
+            member: ctx.accounts.member.key(),
+            target_token: args.target_token_mint,
+            amount_in: args.amount_in,
+            amount_out: amount_out_expected,
+            oracle_price: args.oracle_price,
+            oracle_expo: args.oracle_expo,
+            oracle_published_slot: args.oracle_published_slot,
+            timestamp: clock.unix_timestamp,
+        });
+
+        Ok(())
+    }
 }
 
 /* ─── Squads CPI ─── */
@@ -340,6 +469,90 @@ fn cpi_spending_limit_use<'info>(
     })
 }
 
+/* ─── Phase 1 swap math ─── */
+
+/// Compute the swap output in target-token base units.
+///
+/// `oracle_price` + `oracle_expo` are Pyth-style: real_price =
+/// price * 10^expo. Output = amount_in_usdc / real_price, scaled to
+/// the target token's decimals. 1% Kyvern fee is subtracted at the end.
+///
+/// USDC has 6 decimals throughout. `target_decimals` is the target
+/// token's decimal count (9 for SOL, 5 for kBONK in our setup, etc.).
+fn calculate_swap_output(
+    amount_in_usdc: u64,
+    oracle_price: i64,
+    oracle_expo: i32,
+    target_decimals: u8,
+) -> Result<u64> {
+    // Reject zero / negative price — would cause divide-by-zero.
+    require!(oracle_price > 0, KyvernError::OraclePriceStale);
+
+    // amount_in_usdc has 6 decimals.
+    // We want: amount_out_target = (amount_in_usdc / 1e6) / (oracle_price * 10^expo)
+    //                              * 10^target_decimals
+    //
+    // Rearranged with checked u128 arithmetic:
+    //   amount_out = amount_in_usdc * 10^target_decimals
+    //                * 10^(-expo)              (when expo < 0, this is a divide)
+    //                / oracle_price
+    //                / 1_000_000               (USDC 6-decimal normalization)
+    //
+    // Pyth's expo is typically negative (e.g. expo=-8 means price stored as
+    // 18241000000 → $182.41). For positive expo (rare), we'd multiply.
+    let amount_in_u128 = amount_in_usdc as u128;
+    let target_pow10: u128 = 10u128
+        .checked_pow(target_decimals as u32)
+        .ok_or(KyvernError::SwapMathOverflow)?;
+    let usdc_pow10: u128 = 1_000_000;
+
+    // Numerator: amount_in * 10^target_decimals
+    let num = amount_in_u128
+        .checked_mul(target_pow10)
+        .ok_or(KyvernError::SwapMathOverflow)?;
+
+    // Denominator: oracle_price * 10^(-expo) * 10^6
+    // expo is i32; if negative, magnitude shifts to denominator.
+    // If positive, magnitude shifts to numerator.
+    let (final_num, final_den): (u128, u128) = if oracle_expo < 0 {
+        let abs_expo = (-oracle_expo) as u32;
+        let expo_pow: u128 = 10u128
+            .checked_pow(abs_expo)
+            .ok_or(KyvernError::SwapMathOverflow)?;
+        let den = (oracle_price as u128)
+            .checked_mul(usdc_pow10)
+            .ok_or(KyvernError::SwapMathOverflow)?;
+        let n = num
+            .checked_mul(expo_pow)
+            .ok_or(KyvernError::SwapMathOverflow)?;
+        (n, den)
+    } else {
+        let expo_pow: u128 = 10u128
+            .checked_pow(oracle_expo as u32)
+            .ok_or(KyvernError::SwapMathOverflow)?;
+        let den = (oracle_price as u128)
+            .checked_mul(expo_pow)
+            .ok_or(KyvernError::SwapMathOverflow)?
+            .checked_mul(usdc_pow10)
+            .ok_or(KyvernError::SwapMathOverflow)?;
+        (num, den)
+    };
+
+    let raw_out = final_num
+        .checked_div(final_den)
+        .ok_or(KyvernError::SwapMathOverflow)?;
+
+    // Apply 1% Kyvern fee — subtract 100 bps from raw output.
+    let fee = raw_out
+        .checked_mul(SWAP_FEE_BPS as u128)
+        .ok_or(KyvernError::SwapMathOverflow)?
+        .checked_div(10_000)
+        .ok_or(KyvernError::SwapMathOverflow)?;
+    let net = raw_out.saturating_sub(fee);
+
+    u64::try_from(net).map_err(|_| KyvernError::SwapMathOverflow.into())
+}
+
 /* ─── Args ─── */
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
@@ -354,6 +567,26 @@ pub struct ExecutePaymentArgs {
     pub merchant_hash: [u8; 32],
     /// Optional memo. Required when `policy.require_memo` is set.
     pub memo: Option<String>,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
+pub struct SwapViaOracleArgs {
+    /// USDC base units in (6 decimals).
+    pub amount_in: u64,
+    /// Slippage protection — minimum acceptable target-token output.
+    pub min_amount_out: u64,
+    /// Target token mint (e.g. wrapped SOL, kBONK, kJUP).
+    pub target_token_mint: Pubkey,
+    /// Target token decimals — needed for output math.
+    pub target_decimals: u8,
+    /// Oracle-published price (Pyth-style: real_price = price * 10^expo).
+    pub oracle_price: i64,
+    /// Pyth-style exponent (typically negative).
+    pub oracle_expo: i32,
+    /// Slot the oracle price was published at — staleness check.
+    pub oracle_published_slot: u64,
+    /// Maximum acceptable slot age (60 ≈ 24s on devnet).
+    pub max_oracle_age_slots: u32,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
@@ -539,6 +772,32 @@ pub struct ExecutePayment<'info> {
     pub system_program: Program<'info, System>,
 }
 
+/// Phase 1 (KYVERN_FRONTIER_GRAND_CHAMPION) — accounts for swap_via_oracle.
+///
+/// Lighter than ExecutePayment because the swap settlement (Squads CPI
+/// + treasury transfer) is composed by the runtime as a separate ix in
+/// the same transaction. This program's job is the validation +
+/// emit. Future-hardening folds the settlement back in here.
+#[derive(Accounts)]
+pub struct SwapViaOracle<'info> {
+    /// Our policy PDA — same one execute_payment uses.
+    #[account(
+        mut,
+        seeds = [b"kyvern-policy-v1", policy.multisig.as_ref()],
+        bump = policy.bump,
+    )]
+    pub policy: Account<'info, PolicyAccount>,
+
+    /// The agent delegate — must be a `member` on the Squads spending
+    /// limit. Same trust model as execute_payment.
+    pub member: Signer<'info>,
+
+    /// The oracle keypair signing this price. Must match ORACLE_SIGNER
+    /// (set at deploy time to the team's signer pubkey).
+    /// CHECK: pubkey + signer asserted in instruction body.
+    pub oracle_signer: Signer<'info>,
+}
+
 #[derive(Accounts)]
 pub struct OwnerOnly<'info> {
     #[account(
@@ -586,6 +845,20 @@ pub struct PaymentExecuted {
     pub calls_in_window: u32,
 }
 
+#[event]
+pub struct SwapExecuted {
+    pub policy: Pubkey,
+    pub multisig: Pubkey,
+    pub member: Pubkey,
+    pub target_token: Pubkey,
+    pub amount_in: u64,
+    pub amount_out: u64,
+    pub oracle_price: i64,
+    pub oracle_expo: i32,
+    pub oracle_published_slot: u64,
+    pub timestamp: i64,
+}
+
 /* ─── Errors ─── */
 
 /// Every block code maps 1:1 to the off-chain `PolicyBlockCode` enum in
@@ -628,4 +901,20 @@ pub enum KyvernError {
 
     #[msg("Squads CPI rejected the spending_limit_use invocation")]
     SquadsCpiRejected = 6011,
+
+    // Phase 1 (KYVERN_FRONTIER_GRAND_CHAMPION) — swap_via_oracle errors.
+    #[msg("Oracle signer does not match the trusted ORACLE_SIGNER pubkey")]
+    UntrustedOracle = 6012,
+
+    #[msg("Oracle price is older than max_oracle_age_slots")]
+    OraclePriceStale = 6013,
+
+    #[msg("Slippage exceeded — output amount below min_amount_out")]
+    SlippageExceeded = 6014,
+
+    #[msg("Swap input exceeds the program-level MAX_SWAP_USDC_BASE_UNITS ceiling")]
+    SwapAmountTooLarge = 6015,
+
+    #[msg("Swap math overflow — adjust decimals / price exponent")]
+    SwapMathOverflow = 6016,
 }
