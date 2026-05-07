@@ -1,12 +1,34 @@
-# Kyvern — Let your AI agents run free.
+# Kyvern
 
-> **Kyvern is the on-chain policy layer that gives AI agents real economic autonomy on Solana.**
-> Replace the private key with a budget the chain enforces. Deploy an agent. Set the rules. Let it run for days. If it tries anything outside the policy, Solana itself refuses — before the tx ever lands.
+A Solana device for your AI agent. The chain decides every dollar it spends.
+
+**Live demo:** https://app.kyvernlabs.com
+**Try without signup:** https://app.kyvernlabs.com/try
+**Public agent observatory:** https://app.kyvernlabs.com/atlas
+**Anchor program:** [`PpmZErWfT5zpeo1fJtTbpqezFGbRUamaNNRWViaMSqc`](https://explorer.solana.com/address/PpmZErWfT5zpeo1fJtTbpqezFGbRUamaNNRWViaMSqc?cluster=devnet) (devnet)
 
 [![Live](https://img.shields.io/badge/live-app.kyvernlabs.com-22c55e)](https://app.kyvernlabs.com)
 [![Solana devnet](https://img.shields.io/badge/Solana-devnet_live-14F195)](https://explorer.solana.com/address/PpmZErWfT5zpeo1fJtTbpqezFGbRUamaNNRWViaMSqc?cluster=devnet)
 [![Built on Squads v4](https://img.shields.io/badge/Built_on-Squads_v4-4F46E5)](https://squads.so)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
+---
+
+## What we built
+
+The first chain-enforced agent commerce device on Solana.
+
+Three workers — **Bounty Scout**, **Position Watchtower**, **Conditional Trigger** — do real jobs for you. They draft bounty applications, watch wallets, and fire chain-enforced swaps when your price conditions hit. Every dollar they spend is decided by an on-chain Anchor program with budget caps, merchant allowlist, daily limits, and kill switch — all enforced inside Squads multisigs.
+
+Pay.sh × Google Cloud's Gemini reasoning is alive in every cycle.
+
+Our reference agent **Atlas** has been running autonomously for 17+ days. 1,100+ settled transactions. 6,500+ blocked drain attempts. **$0 lost.**
+
+## Why this matters
+
+Most teams built smarter agents. We built the device the agents live inside.
+
+The chain isn't our backend — it's our referee.
 
 ---
 
