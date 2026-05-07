@@ -32,6 +32,26 @@ const SYMBOL_TO_COINGECKO_ID: Record<string, string> = {
   POPCAT: "popcat",
 };
 
+/** Mainnet Solana mint addresses keyed by ticker. Used as a fallback
+ *  when CoinGecko 429s — DexScreener queries by mint, not by symbol,
+ *  so without this map a symbol-shaped read_dex call would return
+ *  "Could not resolve price for SOL" the moment the public CoinGecko
+ *  endpoint rate-limited us. (Discovered 2026-05-08 — Pulse triggers
+ *  were silently idling on every cycle for this reason.) */
+const SYMBOL_TO_MINT: Record<string, string> = {
+  SOL: "So11111111111111111111111111111111111111112",
+  USDC: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+  USDT: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+  BONK: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
+  WIF: "EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm",
+  JUP: "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
+  PYTH: "HZ1JovNiVvGrGNiiYvEozEVgZ58xaU3RKwX8eACQBCt3",
+  JTO: "jtojtomepa8beP8AuQc6eXt5FriJwfFMwQx2v2f9mCL",
+  RAY: "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R",
+  ORCA: "orcaEKTdK7LKz57vaAYr9QeNsVEPfiu6QeMU1kektZE",
+  POPCAT: "7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr",
+};
+
 interface PriceResult {
   symbol: string;
   priceUsd: number;
@@ -199,10 +219,24 @@ export const readDexTool: AgentTool = {
           data: { ...cg, ...band },
         };
       }
-      // CoinGecko miss for a known symbol — uncommon; fall through to dex
+      // CoinGecko 429'd or missed — fall back to DexScreener via the
+      // symbol's known mainnet mint. Without this fallback Pulse goes
+      // dark every time the public CoinGecko endpoint rate-limits.
+      const mint = SYMBOL_TO_MINT[upper];
+      if (mint) {
+        const ds = await fetchDexScreener(mint);
+        if (ds) {
+          const band = computeBand(ds.priceUsd, lowerBand, upperBand);
+          return {
+            ok: true,
+            message: formatMsg(upper, ds.priceUsd, "DexScreener", band),
+            data: { ...ds, symbol: upper, ...band },
+          };
+        }
+      }
     }
 
-    // Mint-address-or-unknown path: try DexScreener
+    // Mint-address-or-unknown path: try DexScreener directly
     const ds = await fetchDexScreener(raw);
     if (ds) {
       const band = computeBand(ds.priceUsd, lowerBand, upperBand);
