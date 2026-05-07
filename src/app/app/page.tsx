@@ -32,6 +32,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight, ChevronUp } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
@@ -41,9 +42,11 @@ import { TopRail } from "@/components/device/home/top-rail";
 import { BottomRail } from "@/components/device/home/bottom-rail";
 import { WorkerCanvas } from "@/components/device/home/worker-canvas";
 import { ActivitySheet } from "@/components/device/home/activity-sheet";
-import { DeviceTabs, type DeviceTab } from "@/components/device/home/device-tabs";
-import { DeployTab } from "@/components/device/home/deploy-tab";
-import { PayEnforceTab } from "@/components/device/home/pay-enforce-tab";
+import {
+  AffordanceRow,
+  type PanelKind,
+} from "@/components/device/home/affordance-row";
+import { DevicePanel } from "@/components/device/panels/device-panel";
 import { SandboxBanner } from "@/components/device/home/sandbox-banner";
 import { BalanceOrbit } from "@/components/device/home/balance-orbit";
 import { TodayStrip } from "@/components/device/home/today-strip";
@@ -129,7 +132,7 @@ function devWallet(): string {
 }
 
 export default function DeviceHome() {
-  const { wallet, isAuthenticated, isLoading, signIn } = useAuth();
+  const { wallet, isAuthenticated, isLoading } = useAuth();
   const { init } = useDeviceStore();
   // Guest mode = synthetic dev-wallet in localStorage AND no Privy
   // session. Determines the SANDBOX banner + the gates on Tab 2/3.
@@ -145,7 +148,29 @@ export default function DeviceHome() {
   const [status, setStatus] = useState<LiveStatus | null>(null);
   const [topUpOpen, setTopUpOpen] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
-  const [tab, setTab] = useState<DeviceTab>("live");
+
+  // Panel state — synced to ?panel= so deep-links work and refresh
+  // restores the open panel. NEVER stash this in localStorage; URL is
+  // the single source of truth.
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const rawPanel = searchParams?.get("panel");
+  const panel: PanelKind | null =
+    rawPanel === "bay" || rawPanel === "use" || rawPanel === "builder"
+      ? rawPanel
+      : null;
+  const setPanel = useCallback(
+    (next: PanelKind | null) => {
+      const params = new URLSearchParams(
+        Array.from(searchParams?.entries() ?? []),
+      );
+      if (next) params.set("panel", next);
+      else params.delete("panel");
+      const qs = params.toString();
+      router.replace(qs ? `/app?${qs}` : "/app", { scroll: false });
+    },
+    [router, searchParams],
+  );
 
   // Resolve the user's primary device once
   useEffect(() => {
@@ -276,71 +301,25 @@ export default function DeviceHome() {
                 chassis bezel, not duplicated here. */}
             <TopRail usdcBalance={status?.usdcBalance ?? 0} />
 
-            {/* TABS — Live Inside · Deploy Worker · Pay & Enforce.
-                The device has three modes: watch demos, drop your
-                own agent, use it right now. Tabs make the surface
-                area legible without sacrificing the device metaphor. */}
-            <DeviceTabs active={tab} onChange={setTab} />
-
-            {/* TAB 1 — LIVE INSIDE. The Live Engine: workers connected
-                to the vault by live wires that encode every cycle's
-                state in colour + flow. Live ticker pairs every wire
-                pulse with a clickable signature so the on-chain claim
-                is self-evident. The whisper line above the canvas
-                replaces the multi-paragraph banner — let the canvas
-                speak. */}
-            {tab === "live" && (
-              <>
-                {status && status.workers.length > 0 ? (
-                  <WorkerCanvas
-                    workers={status.workers}
-                    lastActionByWorker={lastActionByWorker}
-                    actionFeed={status.actionFeed ?? []}
-                    usdcBalance={status.usdcBalance}
-                    network={status.network}
-                    paused={status.paused}
-                    dailyLimitUsd={status.policySummary?.dailyLimitUsd}
-                    dailySpentUsd={status.policySummary?.dailySpentUsd}
-                  />
-                ) : (
-                  <NoWorkersState />
-                )}
-              </>
-            )}
-
-            {/* TAB 2 — DEPLOY YOUR WORKER. 1-click presets, custom
-                template flow, SDK snippet. Gated for guests — they
-                see the UI but the buttons trigger sign-in. */}
-            {tab === "deploy" && (
-              <DeployTab
-                deviceId={deviceId}
-                workers={status?.workers ?? []}
-                onDeployed={() => setTab("live")}
-                isGuest={isGuest}
-                onSignIn={signIn}
-                onOpenSdk={() => setTab("use")}
+            {/* CANVAS — workers wired to the vault, live ticker streams
+                below. Always visible. The device IS the page. */}
+            {status && status.workers.length > 0 ? (
+              <WorkerCanvas
+                workers={status.workers}
+                lastActionByWorker={lastActionByWorker}
+                actionFeed={status.actionFeed ?? []}
+                usdcBalance={status.usdcBalance}
+                network={status.network}
+                paused={status.paused}
+                dailyLimitUsd={status.policySummary?.dailyLimitUsd}
+                dailySpentUsd={status.policySummary?.dailySpentUsd}
               />
-            )}
-
-            {/* TAB 3 — PAY & ENFORCE. Real x402 buy from Atlas, real
-                drain attempt, working cURL. Mint-key gated for guests;
-                buy + drain stay interactive (the moat demo). */}
-            {tab === "use" && (
-              <PayEnforceTab
-                deviceId={deviceId}
-                network={status?.network ?? "devnet"}
-                vaultEmpty={(status?.usdcBalance ?? 0) < 0.01}
-                onTopUp={onTopUp}
-                isGuest={isGuest}
-                onSignIn={signIn}
-                policySummary={status?.policySummary ?? null}
-                perTxMaxUsd={0.5}
-              />
+            ) : (
+              <NoWorkersState />
             )}
 
             {/* BOTTOM RAIL — daily-cap gauge · calls · blocked · last
-                tx. Always visible across tabs so the scoreboard never
-                disappears. */}
+                tx. Always visible. */}
             <BottomRail
               summary={status?.policySummary ?? null}
               network={status?.network ?? "devnet"}
@@ -348,8 +327,7 @@ export default function DeviceHome() {
               onTopUp={onTopUp}
             />
 
-            {/* MANIFESTO LINE — the device's promise, in human words.
-                Always visible. Sets the brand on every tab. */}
+            {/* MANIFESTO LINE — the device's promise, in human words. */}
             <div
               className="text-center font-mono uppercase tracking-[0.16em]"
               style={{
@@ -360,6 +338,11 @@ export default function DeviceHome() {
             >
               $5/day cap · chain decides every dollar · everything else gets stopped
             </div>
+
+            {/* AFFORDANCE ROW — three contextual buttons that open
+                instrument drawers OVER the device. The user is always
+                at home; never loses sight of the workers. */}
+            <AffordanceRow active={panel} onOpen={setPanel} />
 
             {/* The single seam to the demoted dashboard. One tap. */}
             <button
@@ -377,6 +360,34 @@ export default function DeviceHome() {
           </div>
         </DeviceChassis>
       </div>
+
+      {/* THREE INSTRUMENT-DRAWER PANELS — Phase 1 ships them as
+          placeholder shells; Phase 2 fills them with the migrated
+          deploy / use / builder logic. */}
+      <DevicePanel
+        open={panel === "bay"}
+        onClose={() => setPanel(null)}
+        title="Open a bay"
+        subtitle="Slot a worker into your device"
+      >
+        <PanelPlaceholder kind="bay" />
+      </DevicePanel>
+      <DevicePanel
+        open={panel === "use"}
+        onClose={() => setPanel(null)}
+        title="Use the device"
+        subtitle="Buy a signal · try to drain"
+      >
+        <PanelPlaceholder kind="use" />
+      </DevicePanel>
+      <DevicePanel
+        open={panel === "builder"}
+        onClose={() => setPanel(null)}
+        title="Builder"
+        subtitle="Playground · SDK · Agent key"
+      >
+        <PanelPlaceholder kind="builder" />
+      </DevicePanel>
 
       <DeviceFAB onTopUp={onTopUp} hireHref="/app/agents/spawn" />
 
@@ -449,6 +460,28 @@ function NoWorkersState() {
       </div>
       <p className="text-[13px]" style={{ color: "#475569" }}>
         Spawn your first worker to see the engine come alive.
+      </p>
+    </div>
+  );
+}
+
+function PanelPlaceholder({ kind }: { kind: PanelKind }) {
+  const label =
+    kind === "bay"
+      ? "Open-a-bay panel — coming in Phase 2"
+      : kind === "use"
+        ? "Use-the-device panel — coming in Phase 2"
+        : "Builder panel — coming in Phase 2";
+  return (
+    <div
+      className="rounded-[14px] flex items-center justify-center text-center px-6 py-12"
+      style={{
+        background: "rgba(15,23,42,0.02)",
+        border: "1px dashed rgba(15,23,42,0.10)",
+      }}
+    >
+      <p className="text-[12.5px]" style={{ color: "#6B7280" }}>
+        {label}
       </p>
     </div>
   );
