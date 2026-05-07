@@ -1,0 +1,189 @@
+"use client";
+
+/**
+ * StateStrip — Phase 6 (Frontier Grand Champion).
+ *
+ * One-line activation banner that reads the derived `deviceState` and
+ * shows context + at most one CTA. Sits between the whisper line and
+ * the canvas on /app. Vanishes entirely when state === 'active' so
+ * the device home stays clean once the owner is up and running.
+ */
+
+import Link from "next/link";
+import { motion, AnimatePresence } from "framer-motion";
+import { ArrowRight, Plus } from "lucide-react";
+import type { DeviceState } from "@/lib/device-state";
+
+interface Props {
+  state: DeviceState;
+  /** Override the default funded-default CTA when the user has a worker
+   *  to personalize first. Defaults to /app/agents/spawn or the first
+   *  default-config worker's detail page. */
+  firstUntunedHref?: string | null;
+  onTopUp?: () => void;
+  className?: string;
+}
+
+const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
+
+export function StateStrip({
+  state,
+  firstUntunedHref,
+  onTopUp,
+  className,
+}: Props) {
+  if (state === "active") return null;
+
+  const copy = lineFor(state);
+  const cta = ctaFor(state, firstUntunedHref);
+
+  return (
+    <AnimatePresence mode="wait">
+      <motion.div
+        key={state}
+        initial={{ opacity: 0, y: -4 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -4 }}
+        transition={{ duration: 0.35, ease: EASE }}
+        className={`rounded-[12px] px-4 py-2.5 flex items-center justify-between gap-3 flex-wrap ${className ?? ""}`}
+        style={{
+          background: stateBg(state),
+          border: `1px solid ${stateBorder(state)}`,
+        }}
+      >
+        <span
+          className="text-[12.5px] leading-[1.5]"
+          style={{ color: stateText(state) }}
+        >
+          {copy}
+        </span>
+        {cta && (
+          <CTA
+            label={cta.label}
+            href={cta.href}
+            variant={state === "empty" ? "primary" : "ghost"}
+            onClick={cta.onClick ? () => onTopUp?.() : undefined}
+          />
+        )}
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
+function lineFor(state: DeviceState): string {
+  switch (state) {
+    case "empty":
+      return "Your device is online. The vault is empty.";
+    case "funded_default":
+      return "Workers are running on starter settings. Make them yours.";
+    case "partial":
+      return "Some workers are tuned. Personalize the rest.";
+    case "active":
+    default:
+      return "";
+  }
+}
+
+function ctaFor(
+  state: DeviceState,
+  firstUntunedHref: string | null | undefined,
+): { label: string; href?: string; onClick?: boolean } | null {
+  switch (state) {
+    case "empty":
+      return { label: "+ Top up vault", onClick: true };
+    case "funded_default":
+      return {
+        label: "→ Personalize a worker",
+        href: firstUntunedHref ?? "/app",
+      };
+    case "partial":
+      return {
+        label: "→ Continue tuning",
+        href: firstUntunedHref ?? "/app",
+      };
+    case "active":
+    default:
+      return null;
+  }
+}
+
+function stateBg(s: DeviceState): string {
+  if (s === "empty") return "rgba(245,158,11,0.08)";
+  return "rgba(15,23,42,0.03)";
+}
+
+function stateBorder(s: DeviceState): string {
+  if (s === "empty") return "rgba(245,158,11,0.25)";
+  return "rgba(15,23,42,0.08)";
+}
+
+function stateText(s: DeviceState): string {
+  if (s === "empty") return "#92400E";
+  return "#0A0A0A";
+}
+
+function CTA({
+  label,
+  href,
+  variant,
+  onClick,
+}: {
+  label: string;
+  href?: string;
+  variant: "primary" | "ghost";
+  onClick?: () => void;
+}) {
+  const styles =
+    variant === "primary"
+      ? {
+          background: "#0A0A0A",
+          color: "#FFFFFF",
+          border: "1px solid rgba(0,0,0,0.85)",
+        }
+      : {
+          background: "transparent",
+          color: "#0A0A0A",
+          border: "1px solid rgba(15,23,42,0.18)",
+        };
+  const inner = (
+    <>
+      <span
+        className="font-mono uppercase tracking-[0.14em]"
+        style={{ fontSize: 9.5 }}
+      >
+        {label}
+      </span>
+    </>
+  );
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 transition active:scale-[0.97]"
+        style={styles}
+      >
+        {label.startsWith("+") ? (
+          <Plus className="w-3 h-3" strokeWidth={2.5} />
+        ) : (
+          <ArrowRight className="w-3 h-3" strokeWidth={2} />
+        )}
+        {inner}
+      </button>
+    );
+  }
+  return (
+    <Link
+      href={href ?? "#"}
+      className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 transition active:scale-[0.97]"
+      style={styles}
+    >
+      {label.startsWith("+") ? (
+        <Plus className="w-3 h-3" strokeWidth={2.5} />
+      ) : (
+        <ArrowRight className="w-3 h-3" strokeWidth={2} />
+      )}
+      {inner}
+    </Link>
+  );
+}

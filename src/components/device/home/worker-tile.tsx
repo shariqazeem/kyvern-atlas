@@ -50,6 +50,10 @@ export interface WorkerTileWorker {
    *  "2 drafts ready" / "3 alerts · last 14m ago" / "1 trigger armed",
    *  not internal verbs. */
   userOutcome?: string | null;
+  /** Phase 6 (Frontier Grand Champion) — TUNE badge gates on this.
+   *  False = worker is on starter defaults; the chip shows a TUNE pill
+   *  until the owner saves any config change. */
+  personalized?: boolean;
 }
 
 export interface WorkerTileAction {

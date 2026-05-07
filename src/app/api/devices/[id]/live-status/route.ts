@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { Connection, PublicKey } from "@solana/web3.js";
 import { getVault } from "@/lib/vault-store";
 import { getDb } from "@/lib/db";
+import { parseConfig } from "@/lib/agents/config-schema";
+import { deriveDeviceState, isPersonalized } from "@/lib/device-state";
+import type { AgentTemplate } from "@/lib/agents/types";
 
 /**
  * GET /api/devices/[id]/live-status
@@ -39,6 +42,7 @@ interface AgentRow {
   total_earned_usd: number;
   total_spent_usd: number;
   last_thought_at: number | null;
+  config_json: string | null;
 }
 
 interface ThoughtRow {
@@ -252,7 +256,7 @@ export async function GET(
   // Workers on this device
   const agents = db
     .prepare(
-      `SELECT id, name, emoji, status, template, total_thoughts, total_earned_usd, total_spent_usd, last_thought_at
+      `SELECT id, name, emoji, status, template, total_thoughts, total_earned_usd, total_spent_usd, last_thought_at, config_json
        FROM agents
        WHERE device_id = ? AND status != 'retired'`,
     )
@@ -377,6 +381,11 @@ export async function GET(
           ts: sig.created_at,
         }
       : null;
+    const config = parseConfig(a.template as AgentTemplate, a.config_json);
+    const personalized = isPersonalized({
+      template: a.template,
+      config,
+    });
     return {
       id: a.id,
       name: a.name,
@@ -392,6 +401,8 @@ export async function GET(
       totalThoughts: a.total_thoughts,
       totalEarnedUsd: a.total_earned_usd,
       lastFinding,
+      // Phase 6 — TUNE badge when worker is on starter defaults.
+      personalized,
       // Phase 4 — chip subtitle reads as user benefit, not internal verb.
       userOutcome: userOutcomeFor(a.template, a.id),
     };
@@ -816,6 +827,20 @@ export async function GET(
 
   const serial = `KVN-${params.id.replace("vlt_", "").slice(0, 8).toUpperCase()}`;
 
+  // Phase 6 (Frontier Grand Champion) — Device State for the
+  // activation flow strip + state-aware whisper line.
+  const deviceState = deriveDeviceState(
+    { usdcBalance: balances.usdc },
+    workers.map((w) => ({
+      template: w.template,
+      config: parseConfig(
+        w.template as AgentTemplate,
+        agents.find((a) => a.id === w.id)?.config_json ?? null,
+      ),
+      status: agents.find((a) => a.id === w.id)?.status,
+    })),
+  );
+
   return NextResponse.json({
     serial,
     network: vault.network,
@@ -843,5 +868,7 @@ export async function GET(
     policySummary,
     // Phase 4 — "Working for you this week" strip
     weeklyBenefit,
+    // Phase 6 (Frontier Grand Champion) — activation-flow state.
+    deviceState,
   });
 }

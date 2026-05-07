@@ -529,6 +529,8 @@ function WorkerNode({
   const chipDuration =
     state === "blocked" ? 1.0 : state === "settled" ? 1.6 : 2.4;
 
+  const showTuneBadge = worker.personalized === false;
+
   return (
     <Link
       href={`/app/agents/${worker.id}`}
@@ -544,8 +546,26 @@ function WorkerNode({
         animate={{ scale: 1, opacity: 1 }}
         transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
         whileTap={{ scale: 0.96 }}
-        className="flex flex-col items-center"
+        className="flex flex-col items-center relative"
       >
+        {/* TUNE badge — Phase 6. Worker is on starter defaults. Clears
+            the moment the owner saves any config change. */}
+        {showTuneBadge && (
+          <span
+            className="absolute font-mono uppercase tracking-[0.10em] rounded-md px-1 py-0.5 z-10"
+            style={{
+              top: -4,
+              right: 6,
+              fontSize: 7.5,
+              color: "rgba(15,23,42,0.55)",
+              background: "#FFFFFF",
+              border: "1px solid rgba(15,23,42,0.10)",
+              boxShadow: "0 1px 2px rgba(15,23,42,0.04)",
+            }}
+          >
+            TUNE
+          </span>
+        )}
         {/* The chip IS the state — no LED dot. Whole element animates. */}
         <motion.div
           className="rounded-full flex items-center justify-center"

@@ -25,6 +25,7 @@
 import { motion } from "framer-motion";
 import { Pause, Play, X, Send, ExternalLink } from "lucide-react";
 import { PageHeader } from "../shell/page-header";
+import { isPersonalized } from "@/lib/device-state";
 import { SkillsField } from "@/components/agents/configure/skills-field";
 import { WatchlistEditor } from "@/components/agents/configure/watchlist-editor";
 import { TriggersEditor } from "@/components/agents/configure/triggers-editor";
@@ -389,6 +390,18 @@ export function AgentPageShell({
 
         {/* COL 2 — Configure */}
         <section className="flex flex-col gap-3 sm:gap-4 min-w-0">
+          {!isPersonalized({
+            template: agent.template,
+            config: agent.config,
+          }) && (
+            <p
+              className="text-[12px] italic px-1"
+              style={{ color: "rgba(15,23,42,0.55)" }}
+            >
+              This worker is using starter settings. Tell it about you below
+              — your saves take effect immediately.
+            </p>
+          )}
           <Card>
             <Eyebrow>Configure</Eyebrow>
             {agent.template === "bounty_hunter" && (

@@ -18,6 +18,7 @@
 import { WorkerCanvas } from "../home/worker-canvas";
 import type { WorkerTileWorker, WorkerTileAction } from "../home/worker-tile";
 import type { ActionFeedItem } from "../home/action-feed";
+import type { DeviceState } from "@/lib/device-state";
 
 interface Props {
   workers: WorkerTileWorker[];
@@ -29,6 +30,22 @@ interface Props {
   dailyLimitUsd?: number;
   dailySpentUsd?: number;
   className?: string;
+  /** Phase 6 — drive whisper line copy. */
+  deviceState?: DeviceState;
+}
+
+function whisperFor(state: DeviceState | undefined): string {
+  switch (state) {
+    case "empty":
+      return "Three workers ready. Fund the vault to start them.";
+    case "funded_default":
+      return "Three workers running on starter settings. Personalize each to make them yours.";
+    case "partial":
+      return "Workers are getting personal. Keep going.";
+    case "active":
+    default:
+      return "Three workers. One vault. The chain decides every wire.";
+  }
 }
 
 export function CanvasZone({
@@ -41,16 +58,17 @@ export function CanvasZone({
   dailyLimitUsd,
   dailySpentUsd,
   className,
+  deviceState,
 }: Props) {
   return (
     <section className={`flex flex-col gap-3 min-h-0 ${className ?? ""}`}>
-      {/* Whisper — the device's promise, spoken once per page */}
+      {/* Whisper — state-adaptive (Phase 6). */}
       <div className="text-center px-4 pt-2 sm:pt-3 flex-shrink-0">
         <p
           className="text-[12.5px] sm:text-[13px] tracking-[-0.005em]"
           style={{ color: "rgba(15,23,42,0.55)" }}
         >
-          Three workers. One vault. The chain decides every wire.
+          {whisperFor(deviceState)}
         </p>
       </div>
 

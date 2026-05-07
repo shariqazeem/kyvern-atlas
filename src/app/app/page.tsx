@@ -49,6 +49,9 @@ import { IdentityStrip } from "@/components/device/shell/identity-strip";
 import { CanvasZone } from "@/components/device/shell/canvas-zone";
 import { ControlZone } from "@/components/device/shell/control-zone";
 import { ManifestoStrip } from "@/components/device/shell/manifesto-strip";
+import { StateStrip } from "@/components/device/state-strip";
+import { FirstFindingToast } from "@/components/device/first-finding-toast";
+import type { DeviceState } from "@/lib/device-state";
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
@@ -65,6 +68,8 @@ interface LiveWorker {
   lastThoughtAt: number | null;
   totalThoughts: number;
   totalEarnedUsd: number;
+  /** Phase 6 — TUNE badge gates on this. */
+  personalized?: boolean;
 }
 
 interface LiveStatus {
@@ -116,6 +121,8 @@ interface LiveStatus {
     aiSpendUsd: number;
     dailyCapUsd: number;
   };
+  // Phase 6 (Frontier Grand Champion) — activation-flow state.
+  deviceState?: DeviceState;
 }
 
 function devWallet(): string {
@@ -307,6 +314,25 @@ export default function DeviceHome() {
         <main
           className="flex-1 min-h-0 grid gap-4 sm:gap-6 p-4 sm:p-6 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_380px]"
         >
+          {/* STATE STRIP — Phase 6 Frontier-grand-champion activation
+              flow. Vanishes when state === 'active'. */}
+          {status?.deviceState && status.deviceState !== "active" && (
+            <div className="px-4 sm:px-6 -mb-1">
+              <StateStrip
+                state={status.deviceState}
+                onTopUp={onTopUp}
+                firstUntunedHref={
+                  (status.workers.find((w) => w.personalized === false)?.id
+                    && `/app/agents/${
+                      status.workers.find((w) => w.personalized === false)
+                        ?.id
+                    }`) ||
+                  null
+                }
+              />
+            </div>
+          )}
+
           {status && status.workers.length > 0 ? (
             <CanvasZone
               workers={status.workers}
@@ -317,6 +343,7 @@ export default function DeviceHome() {
               paused={status.paused}
               dailyLimitUsd={status.policySummary?.dailyLimitUsd}
               dailySpentUsd={status.policySummary?.dailySpentUsd}
+              deviceState={status.deviceState}
               className="min-h-0"
             />
           ) : (
@@ -377,6 +404,17 @@ export default function DeviceHome() {
         network={status?.network ?? "devnet"}
         solBalance={status?.solBalance ?? 0}
         usdcBalance={status?.usdcBalance ?? 0}
+      />
+
+      {/* Phase 6 — first-finding toast fires once per device when the
+          first user-facing Phase 3 SignalKind lands in actionFeed. */}
+      <FirstFindingToast
+        deviceId={deviceId}
+        signals={(status?.actionFeed ?? []).map((it) => ({
+          id: it.id,
+          kind: it.tool === "stake_on_finding" ? "trigger_fired" : it.tool,
+          worker: it.worker,
+        }))}
       />
     </>
   );
