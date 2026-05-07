@@ -34,24 +34,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowRight, ChevronUp } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useDeviceStore } from "@/hooks/use-device-store";
-import { ActivitySheet } from "@/components/device/home/activity-sheet";
 import type { PanelKind } from "@/components/device/home/affordance-row";
 import { OpenBayPanel } from "@/components/device/panels/open-bay-panel";
 import { UseDevicePanel } from "@/components/device/panels/use-device-panel";
 import { BuilderPanel } from "@/components/device/panels/builder-panel";
 import { SandboxBanner } from "@/components/device/home/sandbox-banner";
-import { BalanceOrbit } from "@/components/device/home/balance-orbit";
-import { TodayStrip } from "@/components/device/home/today-strip";
-import { DiscoveryHero } from "@/components/device/home/discovery-hero";
-import { RevenueTerminal } from "@/components/device/home/revenue-terminal";
-import { LatestOpportunities } from "@/components/device/home/latest-opportunities";
-import { ActionFeed } from "@/components/device/home/action-feed";
 import type { ActionFeedItem } from "@/components/device/home/action-feed";
-import { PolicyShield } from "@/components/device/home/policy-shield";
-import { DeviceFAB } from "@/components/device/home/device-fab";
 import { TopUpDrawer } from "@/components/device/top-up-drawer";
 // Phase 1–5 (Device Shell Redesign) — device-shell composition.
 import { IdentityStrip } from "@/components/device/shell/identity-strip";
@@ -155,7 +146,6 @@ export default function DeviceHome() {
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<LiveStatus | null>(null);
   const [topUpOpen, setTopUpOpen] = useState(false);
-  const [activityOpen, setActivityOpen] = useState(false);
 
   // Panel state — synced to ?panel= so deep-links work and refresh
   // restores the open panel. NEVER stash this in localStorage; URL is
@@ -347,22 +337,6 @@ export default function DeviceHome() {
         </main>
 
         <ManifestoStrip className="h-8 flex-shrink-0" />
-
-        {/* The single seam to the demoted dashboard. One tap. */}
-        <div className="flex justify-center pb-2 flex-shrink-0">
-          <button
-            type="button"
-            onClick={() => setActivityOpen(true)}
-            className="inline-flex items-center gap-1.5 font-mono uppercase tracking-[0.16em] hover:opacity-80 transition py-2"
-            style={{
-              fontSize: 10.5,
-              color: "rgba(15,23,42,0.55)",
-            }}
-          >
-            View full activity
-            <ChevronUp className="w-3.5 h-3.5" strokeWidth={2} />
-          </button>
-        </div>
       </div>
 
       {/* THREE INSTRUMENT-DRAWER PANELS — phase 2 wires the real logic.
@@ -394,47 +368,6 @@ export default function DeviceHome() {
         policySummary={status?.policySummary ?? null}
         perTxMaxUsd={0.5}
       />
-
-      <DeviceFAB onTopUp={onTopUp} hireHref="/app/agents/spawn" />
-
-      {/* The deeper dashboard, kept whole but moved one tap away. */}
-      <ActivitySheet
-        open={activityOpen}
-        onClose={() => setActivityOpen(false)}
-      >
-        <DiscoveryHero
-          opportunitiesToday={status?.discoveryToday?.opportunities ?? 0}
-          surfacedValueUsd={status?.discoveryToday?.surfacedValueUsd ?? 0}
-          validatedToday={status?.discoveryToday?.validated ?? 0}
-          actionableToday={status?.discoveryToday?.actionable ?? 0}
-          earnedToday={status?.pnlToday.earned ?? 0}
-          onChainToday={status?.onChainToday ?? 0}
-          workersActive={status?.workersActive ?? 0}
-        />
-        <RevenueTerminal />
-        {deviceId && <LatestOpportunities deviceId={deviceId} />}
-        <ActionFeed
-          items={status?.actionFeed ?? []}
-          network={status?.network ?? "devnet"}
-        />
-        {deviceId && <PolicyShield deviceId={deviceId} />}
-        <BalanceOrbit
-          usdcBalance={status?.usdcBalance ?? 0}
-          pnlNet={status?.pnlToday.net ?? 0}
-          earningPerMinUsd={status?.earningPerMinUsd ?? 0}
-          workers={status?.workers ?? []}
-          workerHref={(id) => `/app/agents/${id}`}
-          hireHref="/app/agents/spawn"
-        />
-        <TodayStrip
-          earnedToday={status?.pnlToday.earned ?? 0}
-          spentToday={status?.pnlToday.spent ?? 0}
-          signalsToday={status?.signalsToday?.total ?? 0}
-          workersActive={status?.workersActive ?? 0}
-          workersTotal={(status?.workers ?? []).length}
-          onChainToday={status?.onChainToday ?? 0}
-        />
-      </ActivitySheet>
 
       <TopUpDrawer
         open={topUpOpen}

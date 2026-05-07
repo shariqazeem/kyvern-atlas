@@ -10,6 +10,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
 import { useAuth } from "@/hooks/use-auth";
 import { KyvernMark } from "@/components/brand/kyvern-mark";
@@ -26,6 +27,12 @@ function devWallet(): string {
 
 export function StatusBar({ network: forcedNetwork }: { network?: string }) {
   const { wallet, isLoading } = useAuth();
+  const pathname = usePathname() ?? "";
+  // Drop the network/serial pill on /app exact path — IdentityStrip
+  // owns those and we don't want duplicate identity. Sub-pages
+  // (/app/agents/[id], /app/inbox, /app/settings) keep the pill so the
+  // OS bar still anchors which device they're inside.
+  const hideDevicePill = pathname === "/app";
   const [serial, setSerial] = useState<string | null>(null);
   const [networkFromVault, setNetworkFromVault] = useState<string | null>(null);
 
@@ -61,29 +68,33 @@ export function StatusBar({ network: forcedNetwork }: { network?: string }) {
         </span>
       </Link>
 
-      <div className="flex items-center gap-2">
-        <motion.span
-          className="w-[6px] h-[6px] rounded-full"
-          style={{ background: "#22C55E" }}
-          animate={{ opacity: [0.5, 1, 0.5] }}
-          transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
-        />
-        <span
-          className="text-[11px] font-medium px-2 py-0.5 rounded-full"
-          style={{
-            background: "rgba(0,0,0,0.04)",
-            color: "#6B7280",
-          }}
-        >
-          Solana {network}
-        </span>
-        {serial && (
-          <span className="hidden sm:inline-flex items-center text-[12px] text-[#9CA3AF]">
-            <span className="mx-1.5 text-[#D1D5DB]">·</span>
-            <span className="font-mono text-[11px] text-[#6B7280]">{serial}</span>
+      {!hideDevicePill && (
+        <div className="flex items-center gap-2">
+          <motion.span
+            className="w-[6px] h-[6px] rounded-full"
+            style={{ background: "#22C55E" }}
+            animate={{ opacity: [0.5, 1, 0.5] }}
+            transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+          />
+          <span
+            className="text-[11px] font-medium px-2 py-0.5 rounded-full"
+            style={{
+              background: "rgba(0,0,0,0.04)",
+              color: "#6B7280",
+            }}
+          >
+            Solana {network}
           </span>
-        )}
-      </div>
+          {serial && (
+            <span className="hidden sm:inline-flex items-center text-[12px] text-[#9CA3AF]">
+              <span className="mx-1.5 text-[#D1D5DB]">·</span>
+              <span className="font-mono text-[11px] text-[#6B7280]">
+                {serial}
+              </span>
+            </span>
+          )}
+        </div>
+      )}
     </div>
   );
 }

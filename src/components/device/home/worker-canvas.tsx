@@ -340,7 +340,9 @@ function VaultCard({
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
-        className="relative w-full h-full rounded-[16px] flex flex-col justify-center px-4"
+        className={`relative w-full h-full rounded-[16px] flex flex-col px-4 ${
+          compact ? "justify-start pt-2" : "justify-center"
+        }`}
         style={{
           background: "linear-gradient(180deg, #FFFFFF 0%, #F7F8FA 100%)",
           border: "1px solid rgba(15,23,42,0.10)",

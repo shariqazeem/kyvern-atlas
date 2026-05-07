@@ -26,13 +26,13 @@ export function AffordancesBlock({ active, onOpen, className }: Props) {
     <div className={`grid grid-cols-2 gap-2 ${className ?? ""}`}>
       <Pill
         icon={<Plus className="w-3.5 h-3.5" strokeWidth={2} />}
-        label="Bay"
+        label="Open a bay"
         active={active === "bay"}
         onClick={() => onOpen("bay")}
       />
       <Pill
         icon={<ArrowUpRight className="w-3.5 h-3.5" strokeWidth={2} />}
-        label="Use"
+        label="Use the device"
         active={active === "use"}
         onClick={() => onOpen("use")}
       />
