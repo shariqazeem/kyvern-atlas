@@ -1,23 +1,19 @@
 "use client";
 
 /**
- * DeployTab — Tab 2. The device-bay metaphor: this device has 5 bays.
- * Workers occupy them. Empty bays pulse. Tap an empty bay to slot in
- * a tenant.
+ * OpenBayPanel — the +Open-a-bay instrument drawer.
  *
- *   ┌────┐ ┌────┐ ┌────┐ ┌╌╌╌╌┐ ┌╌╌╌╌┐
- *   │ 🎯 │ │ 🐋 │ │ 📈 │ │ +  │ │ +  │
- *   │ ON │ │ ON │ │ ON │ │EMPT│ │EMPT│
- *   └────┘ └────┘ └────┘ └╌╌╌╌┘ └╌╌╌╌┘
+ * Five bays in a row (3 occupied + N empty pulsing). Tap an empty bay
+ * to open the inline deploy panel: co-equal toggle between "Pick a
+ * preset" (3 starter cards) and "Wrap my own agent" (BYO form). On
+ * confirm: slot-fill spring + bay-online toast + auto-close (parent
+ * decides when via onDeployed).
  *
- * Click an empty bay → inline panel below with two co-equal tabs:
- *   1. Pick a preset (3 preset cards)
- *   2. Wrap my own agent (BYO form: name + emoji + job + cadence)
- *
- * On submit → slot fill animation → toast → auto-switch to Tab 1.
- *
- * Replaces the previous "card grid" layout. The chassis metaphor is
- * preserved at the deploy moment, not just in copy.
+ * Phase 2 — extracted from src/components/device/home/deploy-tab.tsx.
+ * Logic preserved verbatim except for:
+ *   • Wrapped in <DevicePanel> (mobile sheet · desktop drawer)
+ *   • SDK shortcut card removed — Builder panel owns SDK now
+ *   • Footer hint "More bays unlock as the network grows."
  */
 
 import { useState } from "react";
@@ -30,9 +26,9 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
+import { DevicePanel } from "./device-panel";
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
-
 const TOTAL_BAYS = 5;
 
 const PRESETS: Array<{
@@ -46,21 +42,22 @@ const PRESETS: Array<{
     id: "sentinel",
     emoji: "🎯",
     name: "Sentinel",
-    oneLine: "Scans 7 ecosystem feeds. Posts paid jobs on finds ≥$300.",
+    oneLine:
+      "Scans 7 ecosystem feeds. Drafts your application on every match.",
     template: "bounty_hunter",
   },
   {
     id: "wren",
     emoji: "🐋",
     name: "Wren",
-    oneLine: "Tracks whale wallets. Posts intel on $5k+ swaps.",
+    oneLine: "Watches your wallets. Pings on material moves only.",
     template: "whale_tracker",
   },
   {
     id: "pulse",
     emoji: "📈",
     name: "Pulse",
-    oneLine: "Reads live DEX prices. Stakes on band breaches.",
+    oneLine: "Sets a price condition. Fires your pre-approved spend.",
     template: "token_pulse",
   },
 ];
@@ -72,12 +69,13 @@ interface OccupiedWorker {
 }
 
 interface Props {
+  open: boolean;
+  onClose: () => void;
   deviceId: string | null;
   workers?: OccupiedWorker[];
   onDeployed?: () => void;
   isGuest?: boolean;
   onSignIn?: () => void;
-  onOpenSdk?: () => void;
 }
 
 type DeployMode = "preset" | "byo";
@@ -86,7 +84,7 @@ interface ByoForm {
   name: string;
   emoji: string;
   jobPrompt: string;
-  cadence: number; // seconds
+  cadence: number;
 }
 
 const BYO_DEFAULTS: ByoForm = {
@@ -97,13 +95,14 @@ const BYO_DEFAULTS: ByoForm = {
   cadence: 600,
 };
 
-export function DeployTab({
+export function OpenBayPanel({
+  open,
+  onClose,
   deviceId,
   workers = [],
   onDeployed,
   isGuest,
   onSignIn,
-  onOpenSdk,
 }: Props) {
   const [openBay, setOpenBay] = useState<number | null>(null);
   const [mode, setMode] = useState<DeployMode>("preset");
@@ -184,192 +183,143 @@ export function DeployTab({
     setJustFilledBay(bayIdx);
     setJustFilledEmoji(emoji);
     setJustFilledName(name);
-    // Slot-fill animation runs on the bay row, toast slides above the
-    // bays, then we auto-switch tabs. ~1.8s total ceremony.
     setTimeout(() => {
       setOpenBay(null);
       setDeploying(false);
+      setJustFilledBay(null);
+      setJustFilledEmoji(null);
+      setJustFilledName(null);
       onDeployed?.();
+      onClose();
     }, 1800);
   }
 
   return (
-    <div className="relative flex flex-col gap-5">
-      {/* CELEBRATION TOAST */}
-      <AnimatePresence>
-        {justFilledBay !== null && justFilledName && (
-          <motion.div
-            key="bay-toast"
-            initial={{ opacity: 0, y: -10, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -8, scale: 0.96 }}
-            transition={{ duration: 0.35, ease: EASE }}
-            className="absolute left-1/2 -translate-x-1/2 -top-2 z-30 inline-flex items-center gap-2 rounded-full px-3.5 py-2 pointer-events-none"
-            style={{
-              background: "#0A0A0A",
-              color: "#FFFFFF",
-              border: "1px solid rgba(0,0,0,0.8)",
-              boxShadow:
-                "0 8px 28px rgba(15,23,42,0.18), 0 0 0 4px rgba(34,197,94,0.10)",
-            }}
-          >
-            <CheckCircle2
-              className="w-4 h-4"
-              strokeWidth={2}
-              style={{ color: "#86EFAC" }}
-            />
-            <span className="text-[12px] font-semibold tracking-[-0.005em]">
-              {justFilledEmoji} Bay {justFilledBay + 1} online ·{" "}
-              {justFilledName} added
-            </span>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* HEADER */}
-      <div>
+    <DevicePanel
+      open={open}
+      onClose={onClose}
+      title={
+        emptyCount > 0
+          ? `${emptyCount} open bay${emptyCount === 1 ? "" : "s"}`
+          : "All bays occupied"
+      }
+      subtitle={
+        isGuest
+          ? "Sign in to slot a worker into an empty bay."
+          : "Tap an empty bay to slot in a tenant."
+      }
+      footer={
         <div
-          className="font-mono uppercase tracking-[0.18em] mb-1"
-          style={{ color: "#9CA3AF", fontSize: 10 }}
+          className="text-center font-mono uppercase tracking-[0.16em]"
+          style={{ fontSize: 9.5, color: "rgba(15,23,42,0.45)" }}
         >
-          Add a worker
+          More bays unlock as the network grows.
         </div>
-        <h3
-          className="text-[20px] font-semibold tracking-[-0.015em] mb-1"
-          style={{ color: "#0A0A0A" }}
-        >
-          {emptyCount > 0
-            ? `Your device has ${emptyCount} open bay${emptyCount === 1 ? "" : "s"}.`
-            : "All bays occupied."}
-        </h3>
-        <p
-          className="text-[12.5px] leading-[1.55]"
-          style={{ color: "#6B7280" }}
-        >
-          {isGuest
-            ? "Sign in to slot a worker into an empty bay. Every worker runs inside this device under the same Anchor policy program."
-            : "Tap an empty bay to slot in a tenant. Pick a preset or wrap your own agent."}
-        </p>
-      </div>
-
-      {/* BAY ROW — 5 slots, occupied + empty + pulsing */}
-      <div
-        className="grid gap-2.5"
-        style={{
-          gridTemplateColumns: `repeat(${TOTAL_BAYS}, minmax(0, 1fr))`,
-        }}
-      >
-        {Array.from({ length: TOTAL_BAYS }).map((_, idx) => {
-          const tenant = occupied[idx];
-          const isFilledByCelebration = justFilledBay === idx;
-          if (tenant) {
-            return (
-              <BayOccupied
-                key={tenant.id}
-                emoji={tenant.emoji}
-                name={tenant.name}
-              />
-            );
-          }
-          if (isFilledByCelebration && justFilledEmoji && justFilledName) {
-            return (
-              <BayFilling
-                key={`filling-${idx}`}
-                emoji={justFilledEmoji}
-                name={justFilledName}
-                bayIdx={idx}
-              />
-            );
-          }
-          return (
-            <BayEmpty
-              key={`empty-${idx}`}
-              bayIdx={idx}
-              isOpen={openBay === idx}
-              onClick={() => openBayPanel(idx)}
-              isGuest={isGuest}
-            />
-          );
-        })}
-      </div>
-
-      {/* DEPLOY PANEL — slides in below the bay row */}
-      <AnimatePresence>
-        {openBay !== null && justFilledBay === null && (
-          <motion.div
-            initial={{ opacity: 0, height: 0, y: -4 }}
-            animate={{ opacity: 1, height: "auto", y: 0 }}
-            exit={{ opacity: 0, height: 0, y: -4 }}
-            transition={{ duration: 0.4, ease: EASE }}
-            className="overflow-hidden"
-          >
-            <DeployPanel
-              bayIdx={openBay}
-              mode={mode}
-              setMode={setMode}
-              byo={byo}
-              setByo={setByo}
-              deploying={deploying}
-              error={error}
-              onClose={() => {
-                setOpenBay(null);
-                setError(null);
+      }
+    >
+      <div className="relative flex flex-col gap-4">
+        {/* CELEBRATION TOAST */}
+        <AnimatePresence>
+          {justFilledBay !== null && justFilledName && (
+            <motion.div
+              key="bay-toast"
+              initial={{ opacity: 0, y: -10, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -8, scale: 0.96 }}
+              transition={{ duration: 0.35, ease: EASE }}
+              className="absolute left-1/2 -translate-x-1/2 -top-2 z-30 inline-flex items-center gap-2 rounded-full px-3.5 py-2 pointer-events-none"
+              style={{
+                background: "#0A0A0A",
+                color: "#FFFFFF",
+                border: "1px solid rgba(0,0,0,0.8)",
+                boxShadow:
+                  "0 8px 28px rgba(15,23,42,0.18), 0 0 0 4px rgba(34,197,94,0.10)",
               }}
-              onDeployPreset={deployPreset}
-              onDeployByo={deployByo}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
+            >
+              <CheckCircle2
+                className="w-4 h-4"
+                strokeWidth={2}
+                style={{ color: "#86EFAC" }}
+              />
+              <span className="text-[12px] font-semibold tracking-[-0.005em]">
+                {justFilledEmoji} Bay {justFilledBay + 1} online ·{" "}
+                {justFilledName} added
+              </span>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-      {/* SDK SHORTCUT — quiet footer card pointing to Tab 3 Integrate */}
-      <button
-        type="button"
-        onClick={onOpenSdk}
-        className="rounded-[14px] p-4 flex items-center justify-between gap-3 text-left transition active:scale-[0.99]"
-        style={{
-          background:
-            "linear-gradient(180deg, #0A0A0A 0%, #1A1A1A 100%)",
-          border: "1px solid rgba(15,23,42,0.10)",
-          boxShadow: "0 1px 2px rgba(15,23,42,0.04)",
-        }}
-      >
-        <div className="flex items-center gap-3 min-w-0">
-          <div
-            className="rounded-[10px] flex items-center justify-center flex-shrink-0 font-mono"
-            style={{
-              width: 40,
-              height: 40,
-              fontSize: 16,
-              background: "rgba(255,255,255,0.06)",
-              border: "1px solid rgba(255,255,255,0.10)",
-              color: "#86EFAC",
-            }}
-          >
-            {"</>"}
-          </div>
-          <div className="min-w-0">
-            <div
-              className="text-[13.5px] font-semibold tracking-[-0.005em]"
-              style={{ color: "#FFFFFF" }}
-            >
-              Already have an agent running elsewhere?
-            </div>
-            <div
-              className="text-[11.5px]"
-              style={{ color: "rgba(255,255,255,0.55)" }}
-            >
-              Wrap it in 5 lines · SDK + Pay.sh
-            </div>
-          </div>
+        {/* BAY ROW */}
+        <div
+          className="grid gap-2.5"
+          style={{
+            gridTemplateColumns: `repeat(${TOTAL_BAYS}, minmax(0, 1fr))`,
+          }}
+        >
+          {Array.from({ length: TOTAL_BAYS }).map((_, idx) => {
+            const tenant = occupied[idx];
+            const isFilledByCelebration = justFilledBay === idx;
+            if (tenant) {
+              return (
+                <BayOccupied
+                  key={tenant.id}
+                  emoji={tenant.emoji}
+                  name={tenant.name}
+                />
+              );
+            }
+            if (isFilledByCelebration && justFilledEmoji && justFilledName) {
+              return (
+                <BayFilling
+                  key={`filling-${idx}`}
+                  emoji={justFilledEmoji}
+                  name={justFilledName}
+                  bayIdx={idx}
+                />
+              );
+            }
+            return (
+              <BayEmpty
+                key={`empty-${idx}`}
+                bayIdx={idx}
+                isOpen={openBay === idx}
+                onClick={() => openBayPanel(idx)}
+                isGuest={isGuest}
+              />
+            );
+          })}
         </div>
-        <ArrowRight
-          className="w-4 h-4 flex-shrink-0"
-          style={{ color: "rgba(255,255,255,0.65)" }}
-          strokeWidth={2}
-        />
-      </button>
-    </div>
+
+        {/* DEPLOY PANEL */}
+        <AnimatePresence>
+          {openBay !== null && justFilledBay === null && (
+            <motion.div
+              initial={{ opacity: 0, height: 0, y: -4 }}
+              animate={{ opacity: 1, height: "auto", y: 0 }}
+              exit={{ opacity: 0, height: 0, y: -4 }}
+              transition={{ duration: 0.4, ease: EASE }}
+              className="overflow-hidden"
+            >
+              <DeployPanel
+                bayIdx={openBay}
+                mode={mode}
+                setMode={setMode}
+                byo={byo}
+                setByo={setByo}
+                deploying={deploying}
+                error={error}
+                onClose={() => {
+                  setOpenBay(null);
+                  setError(null);
+                }}
+                onDeployPreset={deployPreset}
+                onDeployByo={deployByo}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </DevicePanel>
   );
 }
 
@@ -394,8 +344,7 @@ function BayOccupied({ emoji, name }: { emoji: string; name: string }) {
           width: 38,
           height: 38,
           fontSize: 24,
-          background:
-            "linear-gradient(180deg, #F8FAFC 0%, #FFFFFF 100%)",
+          background: "linear-gradient(180deg, #F8FAFC 0%, #FFFFFF 100%)",
           border: "1px solid rgba(15,23,42,0.06)",
         }}
       >
@@ -535,8 +484,7 @@ function BayFilling({
           width: 38,
           height: 38,
           fontSize: 24,
-          background:
-            "linear-gradient(180deg, #F8FAFC 0%, #FFFFFF 100%)",
+          background: "linear-gradient(180deg, #F8FAFC 0%, #FFFFFF 100%)",
           border: "1px solid rgba(34,197,94,0.30)",
         }}
       >
@@ -595,7 +543,6 @@ function DeployPanel({
           "0 1px 2px rgba(15,23,42,0.04), 0 8px 24px -12px rgba(15,23,42,0.08)",
       }}
     >
-      {/* HEADER */}
       <div className="flex items-baseline justify-between gap-3 mb-3">
         <div>
           <div
@@ -624,7 +571,6 @@ function DeployPanel({
         </button>
       </div>
 
-      {/* MODE TOGGLE — co-equal preset / BYO */}
       <div
         className="inline-flex items-center gap-1 rounded-[10px] p-1 mb-4"
         style={{
@@ -646,7 +592,6 @@ function DeployPanel({
         />
       </div>
 
-      {/* PRESET MODE */}
       {mode === "preset" && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
           {PRESETS.map((p) => (
@@ -700,7 +645,6 @@ function DeployPanel({
         </div>
       )}
 
-      {/* BYO MODE */}
       {mode === "byo" && (
         <div className="flex flex-col gap-3">
           <div className="grid grid-cols-[60px_1fr] gap-2">
@@ -735,11 +679,7 @@ function DeployPanel({
               />
             </Field>
           </div>
-
-          <Field
-            label="Job · what should it do?"
-            hint="plain English"
-          >
+          <Field label="Job · what should it do?" hint="plain English">
             <textarea
               value={byo.jobPrompt}
               onChange={(e) =>
@@ -756,7 +696,6 @@ function DeployPanel({
               }}
             />
           </Field>
-
           <Field label="Cadence" hint={`every ${byo.cadence}s`}>
             <div className="flex gap-1.5">
               {[60, 180, 600, 1800].map((c) => (
@@ -782,7 +721,6 @@ function DeployPanel({
               ))}
             </div>
           </Field>
-
           <motion.button
             type="button"
             onClick={onDeployByo}
@@ -799,10 +737,7 @@ function DeployPanel({
           >
             {deploying ? (
               <>
-                <Loader2
-                  className="w-4 h-4 animate-spin"
-                  strokeWidth={2}
-                />
+                <Loader2 className="w-4 h-4 animate-spin" strokeWidth={2} />
                 Slotting into bay {bayIdx + 1}…
               </>
             ) : (
@@ -852,9 +787,7 @@ function ModeButton({
     >
       <div
         className="text-[12px] font-semibold tracking-[-0.005em]"
-        style={{
-          color: active ? "#0A0A0A" : "rgba(15,23,42,0.55)",
-        }}
+        style={{ color: active ? "#0A0A0A" : "rgba(15,23,42,0.55)" }}
       >
         {label}
       </div>

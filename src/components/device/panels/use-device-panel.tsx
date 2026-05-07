@@ -1,38 +1,22 @@
 "use client";
 
 /**
- * PayEnforceTab — Tab 3 of the device chassis. The "use the device
- * right now" surface, restructured into two beautifully-spaced
- * sections (no nested tabs):
+ * UseDevicePanel — the ↗ Use-the-device instrument drawer.
  *
- *   1. POLICY IN ACTION
- *      Buy signal from Atlas (real x402, ~$0.01) + Try to drain
- *      ($50 → blocked). Side-by-side on desktop, stacked on mobile.
- *      Real on-chain, both outcomes.
+ * Two real on-chain actions, side-by-side on desktop, stacked on
+ * mobile:
+ *   1. Buy a signal from Atlas — ~$0.01 USDC, x402 paid feed, settles.
+ *   2. Try to drain the vault — $50, blocked by chain, real failed sig.
  *
- *   2. POLICY PLAYGROUND
- *      Interactive form — merchant + amount + memo + Run. Real
- *      decision returned. Replaces the static SDK code that used
- *      to live here. The judge can punch in their own values and
- *      watch the chain decide.
- *
- * Mint-key flow lives in a quiet utility row below — visible but
- * not dominant.
+ * Phase 2 — extracted from the top section of pay-enforce-tab.tsx.
+ * Logic preserved verbatim except for the wrapping <DevicePanel> shell
+ * and the panel-footer hint.
  */
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  ArrowUpRight,
-  Check,
-  ChevronDown,
-  Code2,
-  Loader2,
-  ShieldX,
-  X,
-} from "lucide-react";
-import { PolicyPlayground } from "./policy-playground";
-import { IntegrateCard } from "./integrate-card";
+import { ArrowUpRight, Check, Loader2, ShieldX, X } from "lucide-react";
+import { DevicePanel } from "./device-panel";
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
@@ -50,60 +34,29 @@ interface DrainResult {
   chainProof?: { signature: string; reason: string | null } | null;
 }
 
-interface PolicySummary {
-  dailyLimitUsd: number;
-  dailySpentUsd: number;
-  callsToday: number;
-  blockedToday: number;
-  lastSettledTxSignature: string | null;
-}
-
 interface Props {
+  open: boolean;
+  onClose: () => void;
   deviceId: string | null;
   network: "devnet" | "mainnet";
   vaultEmpty: boolean;
   onTopUp: () => void;
   isGuest?: boolean;
-  onSignIn?: () => void;
-  /** When provided, lets the playground show "this device's rules"
-   *  with the real per-tx + daily limits. */
-  policySummary?: PolicySummary | null;
-  perTxMaxUsd?: number;
 }
 
-export function PayEnforceTab({
+export function UseDevicePanel({
+  open,
+  onClose,
   deviceId,
   network,
   vaultEmpty,
   onTopUp,
   isGuest,
-  onSignIn,
-  policySummary,
-  perTxMaxUsd,
 }: Props) {
   const [buying, setBuying] = useState(false);
   const [buyResult, setBuyResult] = useState<BuyResult | null>(null);
-
   const [draining, setDraining] = useState(false);
   const [drainResult, setDrainResult] = useState<DrainResult | null>(null);
-
-  const [keyPrefix, setKeyPrefix] = useState<string | null>(null);
-  const [revealedKey, setRevealedKey] = useState<string | null>(null);
-  const [revealing, setRevealing] = useState(false);
-  // Newbies see only the two hero actions by default. Builders click
-  // the Advanced toggle to reveal the playground form + integrate
-  // SDK / Pay.sh code panes.
-  const [advancedOpen, setAdvancedOpen] = useState(false);
-
-  useEffect(() => {
-    if (!deviceId) return;
-    fetch(`/api/devices/${deviceId}/agent-key`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        if (d?.keyPrefix) setKeyPrefix(d.keyPrefix);
-      })
-      .catch(() => {});
-  }, [deviceId]);
 
   async function buySignal() {
     if (buying || !deviceId) return;
@@ -158,73 +111,56 @@ export function PayEnforceTab({
     }
   }
 
-  async function mintKey() {
-    if (isGuest) {
-      onSignIn?.();
-      return;
-    }
-    if (!deviceId || revealing) return;
-    setRevealing(true);
-    try {
-      const res = await fetch(`/api/devices/${deviceId}/agent-key`, {
-        method: "POST",
-      });
-      const d = await res.json();
-      if (d?.rawKey) {
-        setRevealedKey(d.rawKey);
-        if (d.keyPrefix) setKeyPrefix(d.keyPrefix);
-      }
-    } catch {
-      /* ignore */
-    } finally {
-      setRevealing(false);
-    }
-  }
-
   const explorer = (sig: string) =>
     `https://explorer.solana.com/tx/${sig}?cluster=${network}`;
 
   return (
-    <div className="flex flex-col gap-5">
-      {/* ─── EMPTY VAULT NUDGE ──────────────────────────────────── */}
-      {vaultEmpty && !isGuest && (
+    <DevicePanel
+      open={open}
+      onClose={onClose}
+      title="Use the device"
+      subtitle="Two real on-chain actions. One settles. One gets blocked."
+      footer={
         <div
-          className="rounded-[12px] px-3.5 py-2.5 flex items-center justify-between gap-3 flex-wrap"
-          style={{
-            background: "rgba(245,158,11,0.06)",
-            border: "1px solid rgba(245,158,11,0.20)",
-          }}
+          className="text-center font-mono uppercase tracking-[0.16em]"
+          style={{ fontSize: 9.5, color: "rgba(15,23,42,0.45)" }}
         >
-          <span
-            className="text-[12.5px] leading-[1.5]"
-            style={{ color: "#92400E" }}
-          >
-            Your vault is empty. Top up devnet USDC to fire approved spends.
-          </span>
-          <button
-            type="button"
-            onClick={onTopUp}
-            className="inline-flex items-center gap-1.5 font-mono uppercase tracking-[0.14em] rounded-full px-3 py-1 transition active:scale-[0.97]"
+          Every dollar settled and every block is a real Solana devnet signature.
+        </div>
+      }
+    >
+      <div className="flex flex-col gap-4">
+        {vaultEmpty && !isGuest && (
+          <div
+            className="rounded-[12px] px-3.5 py-2.5 flex items-center justify-between gap-3 flex-wrap"
             style={{
-              fontSize: 9.5,
-              color: "#FFFFFF",
-              background: "#0A0A0A",
-              border: "1px solid rgba(0,0,0,0.8)",
+              background: "rgba(245,158,11,0.06)",
+              border: "1px solid rgba(245,158,11,0.20)",
             }}
           >
-            Top up
-            <ArrowUpRight className="w-3 h-3" strokeWidth={2} />
-          </button>
-        </div>
-      )}
+            <span
+              className="text-[12.5px] leading-[1.5]"
+              style={{ color: "#92400E" }}
+            >
+              Your vault is empty. Top up devnet USDC to fire approved spends.
+            </span>
+            <button
+              type="button"
+              onClick={onTopUp}
+              className="inline-flex items-center gap-1.5 font-mono uppercase tracking-[0.14em] rounded-full px-3 py-1 transition active:scale-[0.97]"
+              style={{
+                fontSize: 9.5,
+                color: "#FFFFFF",
+                background: "#0A0A0A",
+                border: "1px solid rgba(0,0,0,0.8)",
+              }}
+            >
+              Top up
+              <ArrowUpRight className="w-3 h-3" strokeWidth={2} />
+            </button>
+          </div>
+        )}
 
-      {/* ─── SECTION 1: USE YOUR DEVICE RIGHT NOW ─────────────────── */}
-      <section>
-        <SectionHeader
-          eyebrow="Use your device right now"
-          title="See the chain decide."
-          subtitle="Two real on-chain actions. One settles. One gets blocked."
-        />
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <ActionCard
             tone="green"
@@ -252,9 +188,7 @@ export function PayEnforceTab({
           />
         </div>
 
-        {/* Result blocks render below the grid so they don't squeeze
-            the two cards out of the side-by-side layout. */}
-        <div className="mt-3 flex flex-col gap-2">
+        <div className="flex flex-col gap-2">
           <AnimatePresence>
             {buyResult && (
               <motion.div
@@ -277,120 +211,19 @@ export function PayEnforceTab({
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.4, ease: EASE }}
               >
-                <DrainResultBlock
-                  result={drainResult}
-                  explorer={explorer}
-                />
+                <DrainResultBlock result={drainResult} explorer={explorer} />
               </motion.div>
             )}
           </AnimatePresence>
         </div>
-      </section>
-
-      {/* ─── ADVANCED EXPANDER ────────────────────────────────────
-          Newbies see only the two hero actions above. Builders click
-          "For builders" to reveal the playground form + the SDK +
-          Pay.sh integrate card. Progressive disclosure. */}
-      <button
-        type="button"
-        onClick={() => setAdvancedOpen((v) => !v)}
-        className="self-center inline-flex items-center gap-1.5 font-mono uppercase tracking-[0.16em] hover:opacity-80 transition py-2"
-        style={{
-          fontSize: 10.5,
-          color: "rgba(15,23,42,0.55)",
-        }}
-      >
-        <Code2 className="w-3.5 h-3.5" strokeWidth={1.8} />
-        {advancedOpen ? "Hide builder tools" : "For builders · test + integrate"}
-        <ChevronDown
-          className="w-3.5 h-3.5 transition-transform"
-          strokeWidth={2}
-          style={{ transform: advancedOpen ? "rotate(180deg)" : "rotate(0deg)" }}
-        />
-      </button>
-
-      <AnimatePresence>
-        {advancedOpen && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.4, ease: EASE }}
-            className="flex flex-col gap-5 overflow-hidden"
-          >
-            {/* PLAYGROUND */}
-            <section>
-              <SectionHeader
-                eyebrow="Test the policy"
-                title="Punch in any payment. Watch the chain decide."
-                subtitle="No code. No docs. Real on-chain enforcement of the rules below."
-              />
-              <PolicyPlayground
-                deviceId={deviceId}
-                network={network}
-                policySummary={policySummary ?? null}
-                perTxMaxUsd={perTxMaxUsd}
-              />
-            </section>
-
-            {/* INTEGRATE */}
-            <section>
-              <SectionHeader
-                eyebrow="Integrate"
-                title="Wrap your own agent in five lines."
-                subtitle="The same SDK works with Pay.sh — Solana × Google Cloud's agent commerce rail."
-              />
-              <IntegrateCard
-                keyPrefix={keyPrefix}
-                revealedKey={revealedKey}
-                onMint={mintKey}
-                revealing={revealing}
-                isGuest={isGuest}
-              />
-            </section>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+      </div>
+    </DevicePanel>
   );
 }
 
 /* ────────────────────────────────────────────────────────────────────
-   Sub-components — kept inline for cohesion with the tab layout
+   Action card + result blocks
    ──────────────────────────────────────────────────────────────────── */
-
-function SectionHeader({
-  eyebrow,
-  title,
-  subtitle,
-}: {
-  eyebrow: string;
-  title: string;
-  subtitle: string;
-}) {
-  return (
-    <div className="mb-3">
-      <div
-        className="font-mono uppercase tracking-[0.18em] mb-1"
-        style={{ color: "#9CA3AF", fontSize: 10 }}
-      >
-        {eyebrow}
-      </div>
-      <h3
-        className="text-[16px] font-semibold tracking-[-0.005em] mb-0.5"
-        style={{ color: "#0A0A0A" }}
-      >
-        {title}
-      </h3>
-      <p
-        className="text-[12px] leading-[1.5]"
-        style={{ color: "#6B7280" }}
-      >
-        {subtitle}
-      </p>
-    </div>
-  );
-}
 
 function ActionCard({
   tone,
@@ -417,8 +250,16 @@ function ActionCard({
 }) {
   const accent =
     tone === "green"
-      ? { fg: "#15803D", border: "rgba(34,197,94,0.18)", glow: "rgba(34,197,94,0.18)" }
-      : { fg: "#B45309", border: "rgba(245,158,11,0.20)", glow: "rgba(245,158,11,0.18)" };
+      ? {
+          fg: "#15803D",
+          border: "rgba(34,197,94,0.18)",
+          glow: "rgba(34,197,94,0.18)",
+        }
+      : {
+          fg: "#B45309",
+          border: "rgba(245,158,11,0.20)",
+          glow: "rgba(245,158,11,0.18)",
+        };
   return (
     <div
       className="rounded-[16px] p-4 flex flex-col"

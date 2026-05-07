@@ -46,7 +46,9 @@ import {
   AffordanceRow,
   type PanelKind,
 } from "@/components/device/home/affordance-row";
-import { DevicePanel } from "@/components/device/panels/device-panel";
+import { OpenBayPanel } from "@/components/device/panels/open-bay-panel";
+import { UseDevicePanel } from "@/components/device/panels/use-device-panel";
+import { BuilderPanel } from "@/components/device/panels/builder-panel";
 import { SandboxBanner } from "@/components/device/home/sandbox-banner";
 import { BalanceOrbit } from "@/components/device/home/balance-orbit";
 import { TodayStrip } from "@/components/device/home/today-strip";
@@ -132,7 +134,7 @@ function devWallet(): string {
 }
 
 export default function DeviceHome() {
-  const { wallet, isAuthenticated, isLoading } = useAuth();
+  const { wallet, isAuthenticated, isLoading, signIn } = useAuth();
   const { init } = useDeviceStore();
   // Guest mode = synthetic dev-wallet in localStorage AND no Privy
   // session. Determines the SANDBOX banner + the gates on Tab 2/3.
@@ -361,33 +363,35 @@ export default function DeviceHome() {
         </DeviceChassis>
       </div>
 
-      {/* THREE INSTRUMENT-DRAWER PANELS — Phase 1 ships them as
-          placeholder shells; Phase 2 fills them with the migrated
-          deploy / use / builder logic. */}
-      <DevicePanel
+      {/* THREE INSTRUMENT-DRAWER PANELS — phase 2 wires the real logic.
+          Each panel owns its own DevicePanel shell + body. */}
+      <OpenBayPanel
         open={panel === "bay"}
         onClose={() => setPanel(null)}
-        title="Open a bay"
-        subtitle="Slot a worker into your device"
-      >
-        <PanelPlaceholder kind="bay" />
-      </DevicePanel>
-      <DevicePanel
+        deviceId={deviceId}
+        workers={status?.workers ?? []}
+        isGuest={isGuest}
+        onSignIn={signIn}
+      />
+      <UseDevicePanel
         open={panel === "use"}
         onClose={() => setPanel(null)}
-        title="Use the device"
-        subtitle="Buy a signal · try to drain"
-      >
-        <PanelPlaceholder kind="use" />
-      </DevicePanel>
-      <DevicePanel
+        deviceId={deviceId}
+        network={status?.network ?? "devnet"}
+        vaultEmpty={(status?.usdcBalance ?? 0) < 0.01}
+        onTopUp={onTopUp}
+        isGuest={isGuest}
+      />
+      <BuilderPanel
         open={panel === "builder"}
         onClose={() => setPanel(null)}
-        title="Builder"
-        subtitle="Playground · SDK · Agent key"
-      >
-        <PanelPlaceholder kind="builder" />
-      </DevicePanel>
+        deviceId={deviceId}
+        network={status?.network ?? "devnet"}
+        isGuest={isGuest}
+        onSignIn={signIn}
+        policySummary={status?.policySummary ?? null}
+        perTxMaxUsd={0.5}
+      />
 
       <DeviceFAB onTopUp={onTopUp} hireHref="/app/agents/spawn" />
 
@@ -460,28 +464,6 @@ function NoWorkersState() {
       </div>
       <p className="text-[13px]" style={{ color: "#475569" }}>
         Spawn your first worker to see the engine come alive.
-      </p>
-    </div>
-  );
-}
-
-function PanelPlaceholder({ kind }: { kind: PanelKind }) {
-  const label =
-    kind === "bay"
-      ? "Open-a-bay panel — coming in Phase 2"
-      : kind === "use"
-        ? "Use-the-device panel — coming in Phase 2"
-        : "Builder panel — coming in Phase 2";
-  return (
-    <div
-      className="rounded-[14px] flex items-center justify-center text-center px-6 py-12"
-      style={{
-        background: "rgba(15,23,42,0.02)",
-        border: "1px dashed rgba(15,23,42,0.10)",
-      }}
-    >
-      <p className="text-[12.5px]" style={{ color: "#6B7280" }}>
-        {label}
       </p>
     </div>
   );
