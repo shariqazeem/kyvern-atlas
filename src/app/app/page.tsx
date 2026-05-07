@@ -315,9 +315,11 @@ export default function DeviceHome() {
           className="flex-1 min-h-0 grid gap-4 sm:gap-6 p-4 sm:p-6 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_380px]"
         >
           {/* STATE STRIP — Phase 6 Frontier-grand-champion activation
-              flow. Vanishes when state === 'active'. */}
+              flow. Vanishes when state === 'active'. Spans the full
+              grid width — without col-span the strip would push
+              CanvasZone into the 380px sidebar slot. */}
           {status?.deviceState && status.deviceState !== "active" && (
-            <div className="px-4 sm:px-6 -mb-1">
+            <div className="lg:col-span-2 -mb-1">
               <StateStrip
                 state={status.deviceState}
                 onTopUp={onTopUp}

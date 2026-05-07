@@ -22,8 +22,9 @@
  *   8. Economic timeline (compact horizontal)
  */
 
-import { motion } from "framer-motion";
-import { Pause, Play, X, Send, ExternalLink } from "lucide-react";
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { ChevronDown, ChevronUp, Pause, Play, X, Send, ExternalLink } from "lucide-react";
 import { PageHeader } from "../shell/page-header";
 import { isPersonalized } from "@/lib/device-state";
 import { SkillsField } from "@/components/agents/configure/skills-field";
@@ -132,6 +133,55 @@ function uptimeLabel(createdAt: number): string {
   if (d > 0) return `${d}d ${h}h`;
   if (h > 0) return `${h}h ${m}m`;
   return `${m}m`;
+}
+
+/** Phase 6 cleanup — engineer cadence ("every 600s") → human cadence
+ *  ("every 10 minutes"). */
+function humanizeCadence(seconds: number): string {
+  if (!seconds || seconds <= 0) return "every cycle";
+  if (seconds < 60) return `every ${seconds} seconds`;
+  if (seconds < 3600) {
+    const m = Math.round(seconds / 60);
+    return `every ${m} minute${m === 1 ? "" : "s"}`;
+  }
+  const h = Math.round(seconds / 3600);
+  return `every ${h} hour${h === 1 ? "" : "s"}`;
+}
+
+/** Phase 6 cleanup — tool IDs → human-readable abilities. The fallback
+ *  prettifies unknown IDs (post_task → "Post task") so newly added tools
+ *  don't surface as raw underscored strings. */
+function friendlyTool(id: string): string {
+  switch (id) {
+    case "watch_url":
+      return "Scans websites";
+    case "watch_wallet":
+      return "Watches wallets";
+    case "watch_wallet_swaps":
+      return "Watches wallet swaps";
+    case "read_dex":
+      return "Reads DEX prices";
+    case "post_task":
+      return "Drafts tasks";
+    case "claim_task":
+      return "Validates tasks";
+    case "complete_task":
+      return "Delivers tasks";
+    case "stake_on_finding":
+      return "Pays Pay.sh / Gemini";
+    case "subscribe_to_agent":
+      return "Subscribes to feeds";
+    case "message_user":
+      return "Messages you";
+    case "expose_paywall":
+      return "Sells signals via x402";
+    case "read_onchain":
+      return "Reads on-chain state";
+    default:
+      return id
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, (c) => c.toUpperCase());
+  }
 }
 
 function liveStateString(
@@ -309,18 +359,23 @@ export function AgentPageShell({
         </Card>
       </div>
 
-      {/* 3-column grid below the hero — collapses to 1 column on mobile,
-          2 columns on tablet, 3 columns on desktop. */}
-      <main className="flex-1 min-h-0 grid gap-3 sm:gap-4 p-4 sm:p-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr]">
-        {/* COL 1 — About + Observability + Greeting */}
+      {/* Phase 6 recomp (2026-05-08) — two-column grid: About (with
+          Abilities + Greeting folded in) on the left, Configure on the
+          right. Talk + Activity move below to full-width. The previous
+          three-column layout cluttered the page with six visible cards;
+          this composition matches the natural read order: what does
+          this worker do · how do I configure it · what's it telling
+          me · what has it done. */}
+      <main className="flex-1 min-h-0 grid gap-3 sm:gap-4 p-4 sm:p-6 grid-cols-1 lg:grid-cols-[3fr_4fr]">
+        {/* LEFT — About + Abilities + Greeting in one card */}
         <section className="flex flex-col gap-3 sm:gap-4 min-w-0">
           <Card>
-            <Eyebrow>What I do for you</Eyebrow>
+            <Eyebrow>About</Eyebrow>
             <h3
               className="text-[20px] sm:text-[22px] font-semibold tracking-[-0.012em] mb-2"
               style={{ color: "#0A0A0A" }}
             >
-              {templateLabel(agent.template)}
+              {agent.emoji} {templateLabel(agent.template)}
             </h3>
             <p
               className="text-[13.5px] leading-[1.6]"
@@ -328,11 +383,11 @@ export function AgentPageShell({
             >
               {templateBlurb(agent.template)}
             </p>
-          </Card>
 
-          <Card>
-            <Eyebrow>Observability</Eyebrow>
-            <div className="grid grid-cols-3 gap-3">
+            <div
+              className="grid grid-cols-3 gap-3 mt-4 pt-4"
+              style={{ borderTop: "1px solid rgba(15,23,42,0.06)" }}
+            >
               <Stat
                 label="Watching"
                 value={
@@ -353,57 +408,78 @@ export function AgentPageShell({
               />
               <Stat
                 label="State"
-                value={
-                  isPaused ? "Paused" : isAlive ? "Alive" : "Retired"
-                }
+                value={isPaused ? "Paused" : isAlive ? "Alive" : "Retired"}
                 tone={isPaused ? "amber" : isAlive ? "green" : "gray"}
               />
             </div>
             <div
-              className="flex items-baseline gap-3 mt-3 pt-3 font-mono"
-              style={{
-                borderTop: "1px solid rgba(15,23,42,0.06)",
-                fontSize: 10.5,
-                color: "rgba(15,23,42,0.55)",
-              }}
-            >
-              <span>Runs every {agent.frequencySeconds}s</span>
-              <span aria-hidden style={{ color: "rgba(15,23,42,0.20)" }}>
-                ·
-              </span>
-              <span>{agent.allowedTools.length} tools</span>
-            </div>
-          </Card>
-
-          {firstMessageText && (
-            <Card>
-              <Eyebrow>Greeting</Eyebrow>
-              <p
-                className="text-[13.5px] leading-[1.6] italic"
-                style={{ color: "#374151" }}
-              >
-                “{firstMessageText}”
-              </p>
-            </Card>
-          )}
-        </section>
-
-        {/* COL 2 — Configure */}
-        <section className="flex flex-col gap-3 sm:gap-4 min-w-0">
-          {!isPersonalized({
-            template: agent.template,
-            config: agent.config,
-          }) && (
-            <p
-              className="text-[12px] italic px-1"
+              className="text-[11.5px] mt-3"
               style={{ color: "rgba(15,23,42,0.55)" }}
             >
-              This worker is using starter settings. Tell it about you below
-              — your saves take effect immediately.
-            </p>
-          )}
+              Checks {humanizeCadence(agent.frequencySeconds)} · uses{" "}
+              {agent.allowedTools.length}{" "}
+              {agent.allowedTools.length === 1 ? "ability" : "abilities"}
+            </div>
+
+            {agent.allowedTools.length > 0 && (
+              <div
+                className="mt-4 pt-4"
+                style={{ borderTop: "1px solid rgba(15,23,42,0.06)" }}
+              >
+                <Eyebrow>Abilities · {agent.allowedTools.length}</Eyebrow>
+                <ul className="flex flex-col gap-1">
+                  {agent.allowedTools.map((t) => (
+                    <li
+                      key={t}
+                      className="text-[12.5px] flex items-center gap-1.5"
+                      style={{ color: "rgba(15,23,42,0.70)" }}
+                    >
+                      <span
+                        aria-hidden
+                        style={{ color: "rgba(15,23,42,0.30)" }}
+                      >
+                        ·
+                      </span>
+                      {friendlyTool(t)}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {firstMessageText && (
+              <div
+                className="mt-4 pt-4"
+                style={{ borderTop: "1px solid rgba(15,23,42,0.06)" }}
+              >
+                <Eyebrow>Greeting</Eyebrow>
+                <p
+                  className="text-[13.5px] leading-[1.6] italic"
+                  style={{ color: "#374151" }}
+                >
+                  “{firstMessageText}”
+                </p>
+              </div>
+            )}
+          </Card>
+        </section>
+
+        {/* RIGHT — Configure (primary action, taller card) */}
+        <section className="flex flex-col gap-3 sm:gap-4 min-w-0">
           <Card>
             <Eyebrow>Configure</Eyebrow>
+            {!isPersonalized({
+              template: agent.template,
+              config: agent.config,
+            }) && (
+              <p
+                className="text-[12px] italic mb-3 -mt-1"
+                style={{ color: "rgba(15,23,42,0.55)" }}
+              >
+                This worker is using starter settings. Tell it about you
+                below — your saves take effect immediately.
+              </p>
+            )}
             {agent.template === "bounty_hunter" && (
               <SkillsField
                 agentId={agent.id}
@@ -450,114 +526,25 @@ export function AgentPageShell({
             )}
           </Card>
         </section>
-
-        {/* COL 3 — Tools + Chat */}
-        <section className="flex flex-col gap-3 sm:gap-4 min-w-0">
-          <Card>
-            <Eyebrow>Tools · {agent.allowedTools.length}</Eyebrow>
-            <ul className="flex flex-col gap-1">
-              {agent.allowedTools.map((t) => (
-                <li
-                  key={t}
-                  className="font-mono text-[11.5px] flex items-center gap-1.5"
-                  style={{ color: "rgba(15,23,42,0.70)" }}
-                >
-                  <span
-                    aria-hidden
-                    style={{ color: "rgba(15,23,42,0.30)" }}
-                  >
-                    •
-                  </span>
-                  {t}
-                </li>
-              ))}
-            </ul>
-          </Card>
-
-          <Card>
-            <Eyebrow>Talk to {agent.name}</Eyebrow>
-            <div className="flex flex-col gap-2 max-h-[260px] overflow-y-auto mb-3 pr-1">
-              {chat.length === 0 && (
-                <div
-                  className="text-[12px] text-center py-3"
-                  style={{ color: "rgba(15,23,42,0.40)" }}
-                >
-                  No messages yet. Try a suggestion below.
-                </div>
-              )}
-              {chat.map((m) => (
-                <ChatBubble key={m.id} role={m.role} content={m.content} />
-              ))}
-            </div>
-            <div className="flex flex-wrap gap-1.5 mb-2">
-              {QUICK_REPLIES.map((q) => (
-                <button
-                  key={q}
-                  type="button"
-                  onClick={() => onChangeInput(q)}
-                  className="text-[10.5px] rounded-full px-2.5 py-1 transition hover:bg-black/5"
-                  style={{
-                    background: "rgba(15,23,42,0.04)",
-                    color: "rgba(15,23,42,0.65)",
-                    border: "1px solid rgba(15,23,42,0.06)",
-                  }}
-                >
-                  {q}
-                </button>
-              ))}
-            </div>
-            <div className="flex items-end gap-1.5">
-              <textarea
-                value={inputValue}
-                onChange={(e) => onChangeInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    onSend();
-                  }
-                }}
-                placeholder={`Message ${agent.name}…`}
-                rows={2}
-                className="flex-1 px-3 py-2 rounded-[10px] outline-none resize-none"
-                style={{
-                  fontSize: 12.5,
-                  background: "#FAFAFA",
-                  border: "1px solid rgba(15,23,42,0.08)",
-                  color: "#0A0A0A",
-                  lineHeight: 1.5,
-                }}
-              />
-              <button
-                type="button"
-                onClick={onSend}
-                disabled={sending || !inputValue.trim()}
-                className="rounded-[10px] p-2 transition disabled:opacity-50"
-                style={{
-                  background: "#0A0A0A",
-                  color: "#FFFFFF",
-                  border: "1px solid rgba(0,0,0,0.8)",
-                }}
-                aria-label="Send"
-              >
-                <Send className="w-4 h-4" strokeWidth={2} />
-              </button>
-            </div>
-          </Card>
-        </section>
       </main>
 
-      {/* Economic timeline strip */}
-      <div
-        className="flex-shrink-0 px-4 sm:px-6 py-2.5"
-        style={{ borderTop: "1px solid rgba(15,23,42,0.05)" }}
-      >
-        <div
-          className="font-mono uppercase tracking-[0.18em] mb-1"
-          style={{ fontSize: 9.5, color: "rgba(15,23,42,0.45)" }}
-        >
-          Economic timeline
-        </div>
-        <EconomicTimeline agentId={agent.id} isAlive={isAlive} />
+      {/* TALK + ACTIVITY — full-width, below the fold. Talk is
+          collapsible by default so a fresh worker page leads with the
+          configure flow, not an empty chat box. */}
+      <div className="px-4 sm:px-6 pb-4 flex flex-col gap-3 sm:gap-4">
+        <TalkSection
+          agentName={agent.name}
+          chat={chat}
+          inputValue={inputValue}
+          sending={sending}
+          onChangeInput={onChangeInput}
+          onSend={onSend}
+        />
+
+        <Card>
+          <Eyebrow>Activity</Eyebrow>
+          <EconomicTimeline agentId={agent.id} isAlive={isAlive} />
+        </Card>
       </div>
     </motion.div>
   );
@@ -625,6 +612,144 @@ function Stat({
         {value}
       </span>
     </div>
+  );
+}
+
+/** Collapsible Talk-to-{name} block — full-width below the two-column
+ *  grid. Defaults to collapsed so a fresh worker page leads with the
+ *  Configure card, not an empty chat input. */
+function TalkSection({
+  agentName,
+  chat,
+  inputValue,
+  sending,
+  onChangeInput,
+  onSend,
+}: {
+  agentName: string;
+  chat: ChatMessage[];
+  inputValue: string;
+  sending: boolean;
+  onChangeInput: (v: string) => void;
+  onSend: () => void;
+}) {
+  const [open, setOpen] = useState(chat.length > 0);
+  return (
+    <Card>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between gap-3 -my-1 py-1"
+        aria-expanded={open}
+      >
+        <Eyebrow>
+          Talk to {agentName}
+          {chat.length > 0 && (
+            <span
+              className="ml-2 normal-case font-sans"
+              style={{
+                letterSpacing: 0,
+                fontSize: 11,
+                color: "rgba(15,23,42,0.45)",
+              }}
+            >
+              {chat.length} {chat.length === 1 ? "message" : "messages"}
+            </span>
+          )}
+        </Eyebrow>
+        <span
+          className="rounded-full p-1"
+          style={{ color: "rgba(15,23,42,0.45)" }}
+        >
+          {open ? (
+            <ChevronUp className="w-4 h-4" strokeWidth={2} />
+          ) : (
+            <ChevronDown className="w-4 h-4" strokeWidth={2} />
+          )}
+        </span>
+      </button>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            key="talk-body"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.28, ease: EASE }}
+            className="overflow-hidden"
+          >
+            <div className="pt-2">
+              <div className="flex flex-col gap-2 max-h-[260px] overflow-y-auto mb-3 pr-1">
+                {chat.length === 0 && (
+                  <div
+                    className="text-[12px] text-center py-3"
+                    style={{ color: "rgba(15,23,42,0.40)" }}
+                  >
+                    No messages yet. Try a suggestion below.
+                  </div>
+                )}
+                {chat.map((m) => (
+                  <ChatBubble key={m.id} role={m.role} content={m.content} />
+                ))}
+              </div>
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {QUICK_REPLIES.map((q) => (
+                  <button
+                    key={q}
+                    type="button"
+                    onClick={() => onChangeInput(q)}
+                    className="text-[10.5px] rounded-full px-2.5 py-1 transition hover:bg-black/5"
+                    style={{
+                      background: "rgba(15,23,42,0.04)",
+                      color: "rgba(15,23,42,0.65)",
+                      border: "1px solid rgba(15,23,42,0.06)",
+                    }}
+                  >
+                    {q}
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-end gap-1.5">
+                <textarea
+                  value={inputValue}
+                  onChange={(e) => onChangeInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      onSend();
+                    }
+                  }}
+                  placeholder={`Message ${agentName}…`}
+                  rows={2}
+                  className="flex-1 px-3 py-2 rounded-[10px] outline-none resize-none"
+                  style={{
+                    fontSize: 12.5,
+                    background: "#FAFAFA",
+                    border: "1px solid rgba(15,23,42,0.08)",
+                    color: "#0A0A0A",
+                    lineHeight: 1.5,
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={onSend}
+                  disabled={sending || !inputValue.trim()}
+                  className="rounded-[10px] p-2 transition disabled:opacity-50"
+                  style={{
+                    background: "#0A0A0A",
+                    color: "#FFFFFF",
+                    border: "1px solid rgba(0,0,0,0.8)",
+                  }}
+                  aria-label="Send"
+                >
+                  <Send className="w-4 h-4" strokeWidth={2} />
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </Card>
   );
 }
 

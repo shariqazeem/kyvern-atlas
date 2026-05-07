@@ -858,15 +858,17 @@ function verbForTicker(item: ActionFeedItem): string {
 
   switch (item.tool) {
     case "post_task":
-      return failed ? "tried to post task — escrow blocked " : "posted task ";
+      return failed ? "blocked drafting " : "drafted ";
     case "claim_task":
-      return "claimed task ";
+      return "validated ";
     case "complete_task":
-      return settled ? "earned " : "tried to earn ";
+      return settled ? "earned " : "blocked earning ";
     case "stake_on_finding":
-      return "staked on finding ";
+      return "backed a finding ";
     case "subscribe_to_agent":
       return "subscribed ";
+    case "message_user":
+      return "messaged you ";
     default:
       return failed ? "blocked " : "settled ";
   }

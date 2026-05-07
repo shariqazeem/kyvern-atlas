@@ -60,6 +60,7 @@ export function StateStrip({
         {cta && (
           <CTA
             label={cta.label}
+            icon={cta.icon}
             href={cta.href}
             variant={state === "empty" ? "primary" : "ghost"}
             onClick={cta.onClick ? () => onTopUp?.() : undefined}
@@ -84,21 +85,31 @@ function lineFor(state: DeviceState): string {
   }
 }
 
+/** CTA labels are TEXT ONLY — leading icon (Plus / ArrowRight) is
+ *  rendered by <CTA> from `icon`. Don't prefix with → or + here or
+ *  the glyph doubles up (regression flagged 2026-05-08). */
 function ctaFor(
   state: DeviceState,
   firstUntunedHref: string | null | undefined,
-): { label: string; href?: string; onClick?: boolean } | null {
+): {
+  label: string;
+  icon: "topup" | "arrow";
+  href?: string;
+  onClick?: boolean;
+} | null {
   switch (state) {
     case "empty":
-      return { label: "+ Top up vault", onClick: true };
+      return { label: "Top up vault", icon: "topup", onClick: true };
     case "funded_default":
       return {
-        label: "→ Personalize a worker",
+        label: "Personalize a worker",
+        icon: "arrow",
         href: firstUntunedHref ?? "/app",
       };
     case "partial":
       return {
-        label: "→ Continue tuning",
+        label: "Continue tuning",
+        icon: "arrow",
         href: firstUntunedHref ?? "/app",
       };
     case "active":
@@ -124,11 +135,13 @@ function stateText(s: DeviceState): string {
 
 function CTA({
   label,
+  icon,
   href,
   variant,
   onClick,
 }: {
   label: string;
+  icon: "topup" | "arrow";
   href?: string;
   variant: "primary" | "ghost";
   onClick?: () => void;
@@ -145,8 +158,13 @@ function CTA({
           color: "#0A0A0A",
           border: "1px solid rgba(15,23,42,0.18)",
         };
+  const Glyph =
+    icon === "topup"
+      ? <Plus className="w-3 h-3" strokeWidth={2.5} />
+      : <ArrowRight className="w-3 h-3" strokeWidth={2} />;
   const inner = (
     <>
+      {Glyph}
       <span
         className="font-mono uppercase tracking-[0.14em]"
         style={{ fontSize: 9.5 }}
@@ -163,11 +181,6 @@ function CTA({
         className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 transition active:scale-[0.97]"
         style={styles}
       >
-        {label.startsWith("+") ? (
-          <Plus className="w-3 h-3" strokeWidth={2.5} />
-        ) : (
-          <ArrowRight className="w-3 h-3" strokeWidth={2} />
-        )}
         {inner}
       </button>
     );
@@ -178,11 +191,6 @@ function CTA({
       className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 transition active:scale-[0.97]"
       style={styles}
     >
-      {label.startsWith("+") ? (
-        <Plus className="w-3 h-3" strokeWidth={2.5} />
-      ) : (
-        <ArrowRight className="w-3 h-3" strokeWidth={2} />
-      )}
       {inner}
     </Link>
   );

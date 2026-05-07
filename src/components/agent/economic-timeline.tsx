@@ -50,6 +50,10 @@ interface ThoughtItem {
   mode: "llm" | "scripted";
 }
 
+/** Phase 6 cleanup (2026-05-08) — verbs read like a journal entry the
+ *  owner can scan, not engineer strings. The intra-device task economy
+ *  is reframed in user-benefit language: drafting applications,
+ *  delivering work, backing findings. */
 const TOOL_VERB: Record<
   string,
   {
@@ -62,33 +66,39 @@ const TOOL_VERB: Record<
 > = {
   post_task: {
     Icon: Send,
-    success: "posted research task — escrowed",
-    failed: "tried to post task — escrow blocked",
+    success: "drafted application · queued for review",
+    failed: "blocked while drafting an application",
     tone: "spent",
   },
   claim_task: {
     Icon: CheckCircle2,
-    success: "claimed a task",
-    failed: "tried to claim — taken",
-    tone: "earned", // claim doesn't move money but signals incoming work
+    success: "validated a finding for the team",
+    failed: "tried to validate — beat to it",
+    tone: "earned",
   },
   complete_task: {
     Icon: CheckCircle2,
-    success: "completed task — earned",
-    failed: "tried to complete — payout blocked",
+    success: "delivered work — earned",
+    failed: "blocked while delivering",
     tone: "earned",
   },
   stake_on_finding: {
     Icon: Coins,
-    success: "staked on finding",
-    failed: "tried to stake — blocked",
+    success: "paid Pay.sh / Gemini · backed a finding",
+    failed: "blocked paying Pay.sh / Gemini",
     tone: "spent",
   },
   subscribe_to_agent: {
     Icon: Megaphone,
-    success: "subscribed to feed",
-    failed: "tried to subscribe — blocked",
+    success: "subscribed to a feed",
+    failed: "blocked subscribing",
     tone: "spent",
+  },
+  message_user: {
+    Icon: Megaphone,
+    success: "messaged you with a finding",
+    failed: "blocked messaging you",
+    tone: "earned",
   },
 };
 
@@ -166,7 +176,7 @@ export function EconomicTimeline({
             className="font-mono uppercase tracking-[0.14em]"
             style={{ color: "#15803D", fontSize: 9.5, fontWeight: 600 }}
           >
-            Economic activity
+            Activity
           </span>
           <motion.span
             aria-hidden

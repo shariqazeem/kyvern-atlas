@@ -59,54 +59,67 @@ function explorerUrl(sig: string, network: "devnet" | "mainnet"): string {
   return `https://explorer.solana.com/tx/${sig}${cluster}`;
 }
 
-/** Render a tool action as a one-line verb + amount summary. */
+/** Render a tool action as a one-line verb + amount summary.
+ *
+ *  Phase 6 cleanup (2026-05-08) — verbs are user-facing now. The
+ *  intra-device task-economy framing ("posted task", "tried to earn",
+ *  "escrowed") is retired in favor of the human-benefit framing the
+ *  Phase 3 SignalKinds use: drafted application · validated for the
+ *  team · backed a finding · paid Pay.sh.
+ *
+ *  Brand-aware spend rows: when the runner attaches a sponsor brand
+ *  (e.g. "Pay.sh · Gemini" on stake_on_finding) we surface it inline
+ *  so the ticker reads "paid Pay.sh / Gemini · $0.020" — concrete,
+ *  user-recognizable, no engineer strings. */
 function actionText(item: ActionFeedItem): {
   verb: string;
   highlight?: { text: string; tone: "green" | "red" | "amber" };
 } {
   const amount = item.amountUsd ?? 0;
   const failed = item.signatureStatus === "failed";
+  const brandSuffix =
+    item.brand && item.brand.length > 0 ? ` · ${item.brand}` : "";
 
   switch (item.tool) {
     case "post_task":
       if (failed) {
         return {
-          verb: "tried to post task — escrow blocked",
+          verb: "blocked while drafting an application",
           highlight: { text: `$${amount.toFixed(3)}`, tone: "red" },
         };
       }
       return {
-        verb: "posted research task — escrowed",
+        verb: "drafted an application — queued for review",
         highlight: { text: `$${amount.toFixed(3)}`, tone: "amber" },
       };
     case "claim_task":
-      return { verb: "claimed a task" };
+      return { verb: "validated a finding for the team" };
     case "complete_task":
       if (failed) {
         return {
-          verb: "tried to complete task — payout blocked",
+          verb: "blocked while delivering a validation",
           highlight: { text: `$${amount.toFixed(3)}`, tone: "red" },
         };
       }
       return {
-        verb: `completed task — earned`,
+        verb: `delivered work — earned`,
         highlight: { text: `+$${amount.toFixed(3)}`, tone: "green" },
       };
     case "stake_on_finding":
       if (failed) {
         return {
-          verb: "tried to stake — blocked",
+          verb: `blocked paying Pay.sh${brandSuffix}`,
           highlight: { text: `$${amount.toFixed(3)}`, tone: "red" },
         };
       }
       return {
-        verb: "staked on finding",
+        verb: `paid Pay.sh${brandSuffix} to back a finding`,
         highlight: { text: `$${amount.toFixed(3)}`, tone: "amber" },
       };
     case "subscribe_to_agent":
       if (failed) {
         return {
-          verb: "tried to subscribe — blocked",
+          verb: `blocked subscribing to ${item.counterparty ?? "an agent"}`,
           highlight: { text: `$${amount.toFixed(3)}`, tone: "red" },
         };
       }
@@ -114,6 +127,16 @@ function actionText(item: ActionFeedItem): {
         verb: `subscribed to ${item.counterparty ?? "an agent"}`,
         highlight: { text: `$${amount.toFixed(3)}`, tone: "amber" },
       };
+    case "message_user":
+      return { verb: "messaged you with a finding" };
+    case "watch_url":
+    case "watch_wallet":
+    case "watch_wallet_swaps":
+    case "read_dex":
+      // Surveillance tools are silent on the live ticker — they fire
+      // every cadence and produce no economic event. Showing them
+      // would clutter the feed without conveying user value.
+      return { verb: "scanned a feed" };
     default:
       return { verb: item.tool.replace(/_/g, " ") };
   }

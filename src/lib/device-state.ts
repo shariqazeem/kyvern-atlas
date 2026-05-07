@@ -3,13 +3,20 @@
  *
  * Four states drive the Activation Flow on /app:
  *
- *   empty           — vault has < $0.01 USDC. Workers can't act.
- *   funded_default  — vault funded, but every worker is on starter
- *                     defaults. Findings are generic.
- *   partial         — vault funded, some workers personalized, others
- *                     still on defaults.
- *   active          — vault funded AND every worker has been
- *                     personalized at least once. Clean device.
+ *   empty           — vault has < $0.01 USDC AND the device has no
+ *                     history yet (never funded, never thought).
+ *                     The "fund the vault" copy targets fresh devices,
+ *                     not active ones that just dipped low — see the
+ *                     2026-05-08 fix below.
+ *   funded_default  — every worker is on starter defaults. Findings
+ *                     are generic. Reached either by funding a fresh
+ *                     vault OR by being a vault with prior history
+ *                     (we don't roll back to 'empty' once the user
+ *                     has used the device).
+ *   partial         — some workers personalized, others still on
+ *                     defaults.
+ *   active          — every live worker has been personalized at
+ *                     least once. Clean device.
  *
  * The derivation is deterministic and runs server-side (in
  * /api/devices/[id]/live-status) so the page just renders the verdict.
@@ -55,10 +62,19 @@ export function isPersonalized(agent: {
 
 export function deriveDeviceState(
   vault: VaultLike,
-  agents: Array<{ template: string; config: unknown; status?: string }>,
+  agents: Array<{
+    template: string;
+    config: unknown;
+    status?: string;
+    /** Phase 6 fix (2026-05-08) — agents with totalThoughts > 0 prove
+     *  the device has been used. Once used, never roll back to 'empty'
+     *  on a low-balance dip. */
+    totalThoughts?: number;
+  }>,
 ): DeviceState {
-  if ((vault.usdcBalance ?? 0) < 0.01) return "empty";
   const liveAgents = agents.filter((a) => a.status !== "retired");
+  const hasHistory = agents.some((a) => (a.totalThoughts ?? 0) > 0);
+  if ((vault.usdcBalance ?? 0) < 0.01 && !hasHistory) return "empty";
   if (liveAgents.length === 0) return "funded_default";
   const personalizedCount = liveAgents.filter((a) =>
     isPersonalized(a),
@@ -80,6 +96,7 @@ export function deriveDeviceStateFromAgents(
       template: a.template,
       config: a.config,
       status: a.status,
+      totalThoughts: a.totalThoughts,
     })),
   );
 }

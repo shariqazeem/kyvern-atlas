@@ -831,14 +831,15 @@ export async function GET(
   // activation flow strip + state-aware whisper line.
   const deviceState = deriveDeviceState(
     { usdcBalance: balances.usdc },
-    workers.map((w) => ({
-      template: w.template,
-      config: parseConfig(
-        w.template as AgentTemplate,
-        agents.find((a) => a.id === w.id)?.config_json ?? null,
-      ),
-      status: agents.find((a) => a.id === w.id)?.status,
-    })),
+    workers.map((w) => {
+      const a = agents.find((row) => row.id === w.id);
+      return {
+        template: w.template,
+        config: parseConfig(w.template as AgentTemplate, a?.config_json ?? null),
+        status: a?.status,
+        totalThoughts: a?.total_thoughts ?? 0,
+      };
+    }),
   );
 
   return NextResponse.json({
