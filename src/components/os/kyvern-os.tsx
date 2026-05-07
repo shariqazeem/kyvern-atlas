@@ -5,9 +5,15 @@
  *
  * First visit: plays the unboxing cinematic, then reveals the OS.
  * Returning visits: straight into the OS.
+ *
+ * Device-shell exception: on `/app` (exact path) the inner `<main>`
+ * drops its 680px max-width + padding so the new full-bleed device
+ * shell can fill the viewport. Other /app/* routes (worker detail,
+ * inbox, settings) keep the constrained main.
  */
 
 import { useCallback, useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { AnimatePresence } from "framer-motion";
 import { useAuth } from "@/hooks/use-auth";
 import { ConnectGate } from "@/components/dashboard/connect-gate";
@@ -20,6 +26,8 @@ const GUEST_WALLET_KEY = "kyvern:dev-wallet";
 
 export function KyvernOS({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
+  const pathname = usePathname() ?? "";
+  const isDeviceShell = pathname === "/app";
   const [showUnboxing, setShowUnboxing] = useState(false);
   const [unboxChecked, setUnboxChecked] = useState(false);
   const [isGuest, setIsGuest] = useState(false);
@@ -96,7 +104,13 @@ export function KyvernOS({ children }: { children: React.ReactNode }) {
         style={{ background: "#FAFAFA" }}
       >
         <StatusBar />
-        <main className="px-5 sm:px-8 pb-24 max-w-[680px] mx-auto w-full">
+        <main
+          className={
+            isDeviceShell
+              ? "pb-[88px] w-full"
+              : "px-5 sm:px-8 pb-24 max-w-[680px] mx-auto w-full"
+          }
+        >
           {children}
         </main>
         <TabBar />

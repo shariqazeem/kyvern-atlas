@@ -37,20 +37,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight, ChevronUp } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useDeviceStore } from "@/hooks/use-device-store";
-import { DeviceChassis } from "@/components/device/home/chassis";
-import { TopRail } from "@/components/device/home/top-rail";
-import { BottomRail } from "@/components/device/home/bottom-rail";
-import { WorkerCanvas } from "@/components/device/home/worker-canvas";
 import { ActivitySheet } from "@/components/device/home/activity-sheet";
-import {
-  AffordanceRow,
-  type PanelKind,
-} from "@/components/device/home/affordance-row";
+import type { PanelKind } from "@/components/device/home/affordance-row";
 import { OpenBayPanel } from "@/components/device/panels/open-bay-panel";
 import { UseDevicePanel } from "@/components/device/panels/use-device-panel";
 import { BuilderPanel } from "@/components/device/panels/builder-panel";
-import { WorkingForYouStrip } from "@/components/device/home/working-for-you-strip";
-import { GenesisStrip } from "@/components/device/home/genesis-strip";
 import { SandboxBanner } from "@/components/device/home/sandbox-banner";
 import { BalanceOrbit } from "@/components/device/home/balance-orbit";
 import { TodayStrip } from "@/components/device/home/today-strip";
@@ -62,6 +53,11 @@ import type { ActionFeedItem } from "@/components/device/home/action-feed";
 import { PolicyShield } from "@/components/device/home/policy-shield";
 import { DeviceFAB } from "@/components/device/home/device-fab";
 import { TopUpDrawer } from "@/components/device/top-up-drawer";
+// Phase 1–5 (Device Shell Redesign) — device-shell composition.
+import { IdentityStrip } from "@/components/device/shell/identity-strip";
+import { CanvasZone } from "@/components/device/shell/canvas-zone";
+import { ControlZone } from "@/components/device/shell/control-zone";
+import { ManifestoStrip } from "@/components/device/shell/manifesto-strip";
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
@@ -291,95 +287,82 @@ export default function DeviceHome() {
         )}
       </AnimatePresence>
 
-      {/* SANDBOX BANNER — guests see this above the chassis. The CTA
-          triggers Privy login so they can convert their ephemeral
-          device into a real account. */}
+      {/* SANDBOX BANNER — guests see this above the device shell. */}
       {isGuest && (
-        <div className="px-2 pt-2">
+        <div className="px-3 pt-2">
           <SandboxBanner />
         </div>
       )}
 
-      <div className="py-2">
-        <DeviceChassis
+      {/* DEVICE SHELL — the new full-bleed layout. No chassis bezel.
+          Identity strip top · canvas + control grid middle · manifesto
+          bottom (TabBar continues to render via KyvernOS). */}
+      <div
+        className="device-shell flex flex-col mx-auto w-full"
+        style={{
+          maxWidth: 1440,
+          minHeight:
+            "calc(100dvh - 88px)" /* TabBar height + safe-area padding */,
+        }}
+      >
+        <IdentityStrip
           serial={status?.serial ?? null}
           bornAt={status?.bornAt ?? null}
-          paused={status?.paused ?? false}
           network={status?.network ?? "devnet"}
+          paused={status?.paused ?? false}
+          usdcBalance={status?.usdcBalance ?? 0}
+          className="h-14 flex-shrink-0"
+        />
+
+        <main
+          className="flex-1 min-h-0 grid gap-4 sm:gap-6 p-4 sm:p-6 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_380px]"
         >
-          <div className="flex flex-col gap-3.5 sm:gap-4">
-            {/* TOP RAIL — vault balance + Squads attribution. Identity
-                (ONLINE / serial / network / uptime) is owned by the
-                chassis bezel, not duplicated here. */}
-            <TopRail usdcBalance={status?.usdcBalance ?? 0} />
-
-            {/* CANVAS — workers wired to the vault, live ticker streams
-                below. Always visible. The device IS the page. */}
-            {status && status.workers.length > 0 ? (
-              <WorkerCanvas
-                workers={status.workers}
-                lastActionByWorker={lastActionByWorker}
-                actionFeed={status.actionFeed ?? []}
-                usdcBalance={status.usdcBalance}
-                network={status.network}
-                paused={status.paused}
-                dailyLimitUsd={status.policySummary?.dailyLimitUsd}
-                dailySpentUsd={status.policySummary?.dailySpentUsd}
-              />
-            ) : (
-              <NoWorkersState />
-            )}
-
-            {/* WORKING FOR YOU THIS WEEK — Phase 4 user-benefit strip.
-                Counts drafts queued, alerts received, triggers fired,
-                Pay.sh AI spend, daily cap. Hides when fresh device. */}
-            <WorkingForYouStrip benefit={status?.weeklyBenefit ?? null} />
-
-            {/* BOTTOM RAIL — daily-cap gauge · calls · blocked · last
-                tx. Always visible. */}
-            <BottomRail
-              summary={status?.policySummary ?? null}
-              network={status?.network ?? "devnet"}
-              vaultEmpty={(status?.usdcBalance ?? 0) < 0.01}
-              onTopUp={onTopUp}
+          {status && status.workers.length > 0 ? (
+            <CanvasZone
+              workers={status.workers}
+              lastActionByWorker={lastActionByWorker}
+              actionFeed={status.actionFeed ?? []}
+              usdcBalance={status.usdcBalance}
+              network={status.network}
+              paused={status.paused}
+              dailyLimitUsd={status.policySummary?.dailyLimitUsd}
+              dailySpentUsd={status.policySummary?.dailySpentUsd}
+              className="min-h-0"
             />
+          ) : (
+            <NoWorkersState />
+          )}
 
-            {/* MANIFESTO LINE — the device's promise, in human words. */}
-            <div
-              className="text-center font-mono uppercase tracking-[0.16em]"
-              style={{
-                color: "rgba(15,23,42,0.40)",
-                fontSize: 9.5,
-                letterSpacing: "0.18em",
-              }}
-            >
-              $5/day cap · chain decides every dollar · everything else gets stopped
-            </div>
+          <ControlZone
+            actionFeed={status?.actionFeed ?? []}
+            network={status?.network ?? "devnet"}
+            weeklyBenefit={status?.weeklyBenefit ?? null}
+            policySummary={status?.policySummary ?? null}
+            vaultEmpty={(status?.usdcBalance ?? 0) < 0.01}
+            onTopUp={onTopUp}
+            panel={panel}
+            onOpenPanel={setPanel}
+            className="min-h-0"
+          />
+        </main>
 
-            {/* AFFORDANCE ROW — three contextual buttons that open
-                instrument drawers OVER the device. The user is always
-                at home; never loses sight of the workers. */}
-            <AffordanceRow active={panel} onOpen={setPanel} />
+        <ManifestoStrip className="h-8 flex-shrink-0" />
 
-            {/* GENESIS STRIP — single line. "GENESIS DEVICE · v0.1 ·
-                ROADMAP →". This is the start, not the end. */}
-            <GenesisStrip />
-
-            {/* The single seam to the demoted dashboard. One tap. */}
-            <button
-              type="button"
-              onClick={() => setActivityOpen(true)}
-              className="self-center inline-flex items-center gap-1.5 font-mono uppercase tracking-[0.16em] hover:opacity-80 transition py-2"
-              style={{
-                fontSize: 10.5,
-                color: "rgba(15,23,42,0.55)",
-              }}
-            >
-              View full activity
-              <ChevronUp className="w-3.5 h-3.5" strokeWidth={2} />
-            </button>
-          </div>
-        </DeviceChassis>
+        {/* The single seam to the demoted dashboard. One tap. */}
+        <div className="flex justify-center pb-2 flex-shrink-0">
+          <button
+            type="button"
+            onClick={() => setActivityOpen(true)}
+            className="inline-flex items-center gap-1.5 font-mono uppercase tracking-[0.16em] hover:opacity-80 transition py-2"
+            style={{
+              fontSize: 10.5,
+              color: "rgba(15,23,42,0.55)",
+            }}
+          >
+            View full activity
+            <ChevronUp className="w-3.5 h-3.5" strokeWidth={2} />
+          </button>
+        </div>
       </div>
 
       {/* THREE INSTRUMENT-DRAWER PANELS — phase 2 wires the real logic.

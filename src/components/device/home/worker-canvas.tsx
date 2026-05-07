@@ -49,7 +49,9 @@ import type { ActionFeedItem } from "./action-feed";
 interface Props {
   workers: WorkerTileWorker[];
   lastActionByWorker: Record<string, WorkerTileAction | null>;
-  /** Full recent action feed — fed into the live ticker below the canvas. */
+  /** Full recent action feed — fed into the live ticker below the canvas.
+   *  When `hideTicker` is true (canvas inside the new device shell)
+   *  it's rendered separately as a control-zone card instead. */
   actionFeed: ActionFeedItem[];
   usdcBalance: number;
   network: "devnet" | "mainnet";
@@ -57,6 +59,15 @@ interface Props {
   /** Daily cap — used inside the vault card to render the progress bar. */
   dailyLimitUsd?: number;
   dailySpentUsd?: number;
+  /** Device-shell mode: drop the in-canvas balance + Squads label
+   *  (identity strip owns those now), keep daily-cap progress + halo. */
+  compact?: boolean;
+  /** Device-shell mode: hide the embedded ticker so the control zone
+   *  can render it as its own card. */
+  hideTicker?: boolean;
+  /** Device-shell mode: drop the whisper line so the canvas zone owns
+   *  it externally. */
+  hideWhisper?: boolean;
 }
 
 type WireState = "idle" | "thinking" | "settled" | "blocked";
@@ -86,24 +97,29 @@ export function WorkerCanvas({
   paused,
   dailyLimitUsd,
   dailySpentUsd,
+  compact,
+  hideTicker,
+  hideWhisper,
 }: Props) {
   const slots = layoutSlots(workers.length);
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-3 h-full">
       {/* Whisper line — replaces the old multi-paragraph banner */}
-      <div className="text-center px-4">
-        <p
-          className="text-[12.5px] tracking-[-0.005em]"
-          style={{ color: "rgba(15,23,42,0.55)" }}
-        >
-          Three workers. One vault. The chain decides every wire.
-        </p>
-      </div>
+      {!hideWhisper && (
+        <div className="text-center px-4">
+          <p
+            className="text-[12.5px] tracking-[-0.005em]"
+            style={{ color: "rgba(15,23,42,0.55)" }}
+          >
+            Three workers. One vault. The chain decides every wire.
+          </p>
+        </div>
+      )}
 
       {/* Canvas — workers on a short arc, vault as the anchor */}
       <div
-        className="relative w-full overflow-hidden"
+        className="relative w-full overflow-hidden flex-shrink-0"
         style={{
           aspectRatio: `${VBW} / ${VBH}`,
           background:
@@ -156,6 +172,7 @@ export function WorkerCanvas({
           network={network}
           dailyLimitUsd={dailyLimitUsd ?? 0}
           dailySpentUsd={dailySpentUsd ?? 0}
+          compact={!!compact}
         />
 
         {/* Workers — chip-as-state, taps route to detail page */}
@@ -177,8 +194,9 @@ export function WorkerCanvas({
         })}
       </div>
 
-      {/* Live ticker — every wire pulse paired with a clickable signature */}
-      <LiveTicker items={actionFeed} network={network} />
+      {/* Live ticker — every wire pulse paired with a clickable signature.
+          Hidden when the device shell renders the ticker as a control-zone card. */}
+      {!hideTicker && <LiveTicker items={actionFeed} network={network} />}
     </div>
   );
 }
@@ -293,12 +311,14 @@ function VaultCard({
   network,
   dailyLimitUsd,
   dailySpentUsd,
+  compact,
 }: {
   usdcBalance: number;
   paused: boolean;
   network: "devnet" | "mainnet";
   dailyLimitUsd: number;
   dailySpentUsd: number;
+  compact: boolean;
 }) {
   const dailyPct =
     dailyLimitUsd > 0
@@ -356,37 +376,52 @@ function VaultCard({
           transition={{ duration: 2.6, repeat: Infinity, ease: "easeOut" }}
         />
 
-        {/* Row 1 — VAULT label + USDC balance */}
-        <div className="flex items-baseline justify-between gap-2">
-          <span
-            className="font-mono uppercase tracking-[0.18em]"
+        {/* Row 1 — VAULT label + USDC balance.
+            Hidden in compact mode: identity strip owns balance. */}
+        {!compact && (
+          <>
+            <div className="flex items-baseline justify-between gap-2">
+              <span
+                className="font-mono uppercase tracking-[0.18em]"
+                style={{ fontSize: 9, color: "rgba(15,23,42,0.45)" }}
+              >
+                Vault
+              </span>
+              <span
+                className="font-mono uppercase tracking-[0.14em]"
+                style={{ fontSize: 8.5, color: "rgba(15,23,42,0.45)" }}
+              >
+                USDC
+              </span>
+            </div>
+            <div
+              className="font-mono tabular-nums leading-none"
+              style={{
+                fontSize: 26,
+                color: "#0A0A0A",
+                letterSpacing: "-0.02em",
+                fontWeight: 500,
+                marginTop: 2,
+              }}
+            >
+              ${usdcBalance.toFixed(2)}
+            </div>
+          </>
+        )}
+
+        {/* Compact mode — just a small DAILY label so the card isn't blank above the bar */}
+        {compact && dailyLimitUsd > 0 && (
+          <div
+            className="font-mono uppercase tracking-[0.18em] text-center"
             style={{ fontSize: 9, color: "rgba(15,23,42,0.45)" }}
           >
-            Vault
-          </span>
-          <span
-            className="font-mono uppercase tracking-[0.14em]"
-            style={{ fontSize: 8.5, color: "rgba(15,23,42,0.45)" }}
-          >
-            USDC
-          </span>
-        </div>
-        <div
-          className="font-mono tabular-nums leading-none"
-          style={{
-            fontSize: 26,
-            color: "#0A0A0A",
-            letterSpacing: "-0.02em",
-            fontWeight: 500,
-            marginTop: 2,
-          }}
-        >
-          ${usdcBalance.toFixed(2)}
-        </div>
+            Daily cap
+          </div>
+        )}
 
         {/* Row 2 — daily-cap progress bar */}
         {dailyLimitUsd > 0 && (
-          <div className="mt-2">
+          <div className={compact ? "mt-1" : "mt-2"}>
             <div
               className="rounded-full overflow-hidden"
               style={{
@@ -414,13 +449,16 @@ function VaultCard({
               >
                 ${dailySpentUsd.toFixed(2)} / ${dailyLimitUsd.toFixed(0)} today
               </span>
-              <span
-                className="inline-flex items-center gap-0.5 font-mono uppercase tracking-[0.14em]"
-                style={{ fontSize: 8.5, color: "rgba(15,23,42,0.55)" }}
-              >
-                <ShieldCheck className="w-2.5 h-2.5" strokeWidth={2} />
-                Squads · {network}
-              </span>
+              {/* Squads · {network} hidden in compact mode — identity strip owns it */}
+              {!compact && (
+                <span
+                  className="inline-flex items-center gap-0.5 font-mono uppercase tracking-[0.14em]"
+                  style={{ fontSize: 8.5, color: "rgba(15,23,42,0.55)" }}
+                >
+                  <ShieldCheck className="w-2.5 h-2.5" strokeWidth={2} />
+                  Squads · {network}
+                </span>
+              )}
             </div>
           </div>
         )}
@@ -571,7 +609,7 @@ function WorkerNode({
    claim is self-evident, not aspirational.
    ──────────────────────────────────────────────────────────────────── */
 
-function LiveTicker({
+export function LiveTicker({
   items,
   network,
 }: {
