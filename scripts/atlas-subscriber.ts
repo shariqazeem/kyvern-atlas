@@ -64,8 +64,11 @@ const RPC_URL = process.env.SOLANA_RPC_DEVNET ?? "https://api.devnet.solana.com"
 const KEYPAIR_PATH =
   process.env.ATLAS_SUBSCRIBER_KEYPAIR ??
   resolve(process.cwd(), "secrets/atlas-subscriber-keypair.json");
+// 5-minute default — denser cadence than the spec's hourly cron so
+// the demo window (≥6h pre-submit) accumulates ~72 visible Atlas
+// earnings rows on Solana Explorer instead of just 6. Override via env.
 const INTERVAL_MS = Number(
-  process.env.ATLAS_SUBSCRIBER_INTERVAL_MS ?? 60 * 60 * 1000,
+  process.env.ATLAS_SUBSCRIBER_INTERVAL_MS ?? 5 * 60 * 1000,
 );
 const USDC_MINT_DEVNET = new PublicKey(
   "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
@@ -201,15 +204,17 @@ async function preflight(payer: Keypair, conn: Connection): Promise<boolean> {
   );
   const ata = await conn.getAccountInfo(fromAta);
   if (!ata) {
-    log("USDC ATA not yet created (will be created on first payment).");
-    return true;
+    log(
+      `WARN: subscriber USDC ATA not created yet — fund pubkey ${payer.publicKey.toBase58()} via https://faucet.circle.com (devnet). Skipping cycle.`,
+    );
+    return false;
   }
   const tokRes = await conn.getTokenAccountBalance(fromAta).catch(() => null);
   const usdc = tokRes?.value?.uiAmount ?? 0;
   log(`subscriber USDC: ${usdc.toFixed(3)}`);
   if (usdc < 0.011) {
     log(
-      "WARN: USDC below 0.011 — top up at https://faucet.circle.com (devnet).",
+      `WARN: USDC below 0.011 — top up at https://faucet.circle.com (devnet) · pubkey ${payer.publicKey.toBase58()}.`,
     );
     return false;
   }
