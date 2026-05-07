@@ -18,6 +18,7 @@ import {
   hasAgentPostedTask,
   listOpenTasks,
   listOpenTasksOnDevice,
+  setSignalOnChain,
   writeSignal,
 } from "./store";
 import type {
@@ -26,8 +27,11 @@ import type {
   AgentTemplate,
   AgentToolContext,
   AgentToolResult,
+  PulseConfig,
+  PulseTrigger,
   SignalKind,
 } from "./types";
+import { evaluateTrigger, firePulseTrigger } from "./pulse-fire";
 
 /* ─────────────────────────────────────────────────────────────────── */
 /*                       Template Voice Profiles                        */
@@ -1490,7 +1494,206 @@ const TOKEN_PULSE_VOICE: VoiceProfile = {
       }
     }
 
-    // ── Step 3 — read_dex; if breach, stake + signal ──────────────
+    // ── Step 3 — evaluate the configured triggers ────────────────
+    //
+    // Phase 6 fix (2026-05-08) — the user-editable agent.config.triggers
+    // array is the source of truth for Pulse. The legacy band path
+    // (parsePriceBand on jobPrompt) is kept only as a fallback for
+    // workers spawned BEFORE Phase 3 added the triggers field.
+    //
+    // For each configured trigger:
+    //   read_dex on trigger.asset → live price
+    //   evaluateTrigger() → 'fired' | 'armed' | 'idle'
+    //   on FIRED:
+    //     · writeSignal(kind=trigger_fired) — dedup gate stops re-emits
+    //     · firePulseTrigger() — real on-chain payment, kyvern-shaped memo
+    //     · setSignalOnChain — anchor signal to the resulting tx
+    //   on ARMED: writeSignal(kind=trigger_armed) — no spend, just heads-up.
+    //   on IDLE: silent (anti-noise rule).
+    //
+    // Rotates which trigger we check each tick by totalThoughts %
+    // triggers.length so all configured triggers get airtime.
+    const pulseCfg = (agent.config as PulseConfig | undefined) ?? null;
+    const configuredTriggers: PulseTrigger[] =
+      Array.isArray(pulseCfg?.triggers) ? pulseCfg!.triggers : [];
+
+    if (configuredTriggers.length > 0) {
+      const idx = agent.totalThoughts % configuredTriggers.length;
+      const trigger = configuredTriggers[idx];
+      const dexTool = getTool("read_dex");
+      if (!dexTool) {
+        return {
+          thought: "read_dex tool unavailable · idle",
+          decision: { action: "observe" },
+        };
+      }
+      let dexResult: AgentToolResult;
+      try {
+        dexResult = await dexTool.execute(toolCtx, {
+          tokenIdOrSymbol: trigger.asset,
+        });
+      } catch (e) {
+        return {
+          thought: `read_dex failed: ${e instanceof Error ? e.message : "error"} · idle`,
+          decision: { action: "observe" },
+        };
+      }
+      if (!dexResult.ok) {
+        return {
+          thought: `read_dex returned not-ok · idle`,
+          decision: {
+            action: "tool_call",
+            toolId: "read_dex",
+            toolInput: { tokenIdOrSymbol: trigger.asset },
+            toolResult: dexResult,
+          },
+          toolResult: dexResult,
+        };
+      }
+      const dexData = dexResult.data as
+        | { symbol?: string; priceUsd?: number }
+        | undefined;
+      const livePrice =
+        typeof dexData?.priceUsd === "number" ? dexData.priceUsd : null;
+      if (livePrice === null) {
+        return {
+          thought: `read_dex returned no price for ${trigger.asset} · idle`,
+          decision: {
+            action: "tool_call",
+            toolId: "read_dex",
+            toolInput: { tokenIdOrSymbol: trigger.asset },
+            toolResult: dexResult,
+          },
+          toolResult: dexResult,
+        };
+      }
+
+      const verdict = evaluateTrigger(trigger, livePrice);
+      const priceStr =
+        livePrice < 1 ? `$${livePrice.toFixed(6)}` : `$${livePrice.toFixed(2)}`;
+
+      if (verdict === "fired") {
+        const subject = `${trigger.asset.toUpperCase()} hit ${priceStr}`;
+        const evidence = [
+          `Trigger condition: ${trigger.asset} ${trigger.direction} $${trigger.threshold_usd}`,
+          `Breach: live price ${priceStr}`,
+          `Spend: $${trigger.amount_usd.toFixed(3)} → ${trigger.target_token ? `kyvern.swap.${trigger.target_token.toLowerCase()}` : trigger.merchant}`,
+          trigger.target_token
+            ? `Validation: chain-enforced via swap_via_oracle`
+            : `Validation: Pay.sh / Gemini confirmed real breach`,
+        ];
+        const writeRes = writeSignal({
+          agentId: agent.id,
+          deviceId: agent.deviceId,
+          kind: "trigger_fired",
+          subject,
+          evidence,
+          suggestion: trigger.target_token
+            ? `Tap to view the chain-enforced swap on Solana Explorer.`
+            : null,
+        });
+        if (writeRes.created) {
+          // Fire the on-chain side-effect. Best-effort — even if it
+          // fails (e.g. spending limit exceeded), the signal still
+          // surfaces so the user knows the trigger crossed.
+          try {
+            const fireRes = await firePulseTrigger({
+              agentId: agent.id,
+              deviceId: agent.deviceId,
+              trigger,
+              livePrice,
+            });
+            if (fireRes.signature) {
+              setSignalOnChain(writeRes.signal.id, fireRes.signature);
+              return {
+                thought: `${trigger.asset} crossed · spent $${trigger.amount_usd.toFixed(3)} · ${priceStr}`,
+                decision: {
+                  action: "tool_call",
+                  toolId: "read_dex",
+                  toolInput: { tokenIdOrSymbol: trigger.asset },
+                  toolResult: dexResult,
+                },
+                toolResult: {
+                  ok: true,
+                  message: `Trigger fired · sig ${fireRes.signature.slice(0, 10)}…`,
+                  signature: fireRes.signature,
+                  amountUsd: trigger.amount_usd,
+                  counterparty: trigger.target_token
+                    ? `Kyvern · swap router (${trigger.target_token})`
+                    : "Pay.sh · Gemini",
+                },
+              };
+            }
+            return {
+              thought: `${trigger.asset} crossed · spend blocked: ${fireRes.reason ?? "unknown"} · ${priceStr}`,
+              decision: {
+                action: "tool_call",
+                toolId: "read_dex",
+                toolInput: { tokenIdOrSymbol: trigger.asset },
+                toolResult: dexResult,
+              },
+              toolResult: {
+                ok: false,
+                message: `Trigger surfaced · payout blocked (${fireRes.reason ?? "unknown"})`,
+                failedReason: fireRes.reason ?? "blocked",
+                amountUsd: trigger.amount_usd,
+              },
+            };
+          } catch (e) {
+            return {
+              thought: `${trigger.asset} crossed · fire threw: ${e instanceof Error ? e.message : "error"}`,
+              decision: { action: "observe" },
+            };
+          }
+        }
+        // Already surfaced inside the dedup window — silent re-tick.
+        return {
+          thought: `${trigger.asset} ${priceStr} · already surfaced · idle`,
+          decision: { action: "observe" },
+        };
+      }
+
+      if (verdict === "armed") {
+        const subject = `${trigger.asset.toUpperCase()} approaching ${trigger.direction} $${trigger.threshold_usd}`;
+        const distancePct = Math.abs(
+          ((livePrice - trigger.threshold_usd) / trigger.threshold_usd) * 100,
+        );
+        writeSignal({
+          agentId: agent.id,
+          deviceId: agent.deviceId,
+          kind: "trigger_armed",
+          subject,
+          evidence: [
+            `Live price: ${priceStr}`,
+            `${distancePct.toFixed(2)}% from $${trigger.threshold_usd} threshold`,
+          ],
+        });
+        return {
+          thought: `${trigger.asset} ${priceStr} · armed · ${distancePct.toFixed(1)}% from threshold`,
+          decision: {
+            action: "tool_call",
+            toolId: "read_dex",
+            toolInput: { tokenIdOrSymbol: trigger.asset },
+            toolResult: dexResult,
+          },
+          toolResult: dexResult,
+        };
+      }
+
+      // Idle silently — anti-noise.
+      return {
+        thought: `${trigger.asset} ${priceStr} · trigger idle (${trigger.direction} $${trigger.threshold_usd})`,
+        decision: {
+          action: "tool_call",
+          toolId: "read_dex",
+          toolInput: { tokenIdOrSymbol: trigger.asset },
+          toolResult: dexResult,
+        },
+        toolResult: dexResult,
+      };
+    }
+
+    // ── Step 3 (legacy fallback) — read_dex; if band breach, stake + signal ──────────────
     const symbol = parseTokenSymbol(agent.jobPrompt);
     const band = parsePriceBand(agent.jobPrompt);
     if (!symbol) {
