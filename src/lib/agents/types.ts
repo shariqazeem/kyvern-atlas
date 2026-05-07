@@ -198,6 +198,16 @@ export interface Signal {
   onChainSignature: string | null;
   status: SignalStatus;
   createdAt: number;
+  /** Phase 3 (KYVERN_FRONTIER_GRAND_CHAMPION) — Sentinel submission
+   *  receipts. Set by POST /api/findings/[id]/submit. */
+  submittedAt?: number | null;
+  submissionMemoTx?: string | null;
+  submissionEmailId?: string | null;
+  /** Phase 4 (KYVERN_FRONTIER_GRAND_CHAMPION) — Wren → Pulse mirror.
+   *  When the owner taps "Mirror this swap" on a wallet_alert, this
+   *  records the resulting Pulse trigger id so the inbox can render
+   *  "✓ Mirrored to Pulse" on the originating finding. */
+  mirroredPulseTriggerId?: string | null;
 }
 
 /* ── Tasks (agent-to-agent task economy) ── */

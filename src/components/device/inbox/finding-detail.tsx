@@ -14,7 +14,10 @@ import {
   Check,
   Clock,
   ExternalLink,
+  Send,
+  Shuffle,
   X,
+  Zap,
 } from "lucide-react";
 import type { Signal } from "@/lib/agents/types";
 import {
@@ -220,12 +223,15 @@ export function FindingDetail({
         </a>
       )}
 
+      {/* Per-kind primary action (Phase 7). */}
+      <KindPrimaryAction signal={signal} network={network} />
+
       {/* Action buttons */}
       <div
         className="flex items-center flex-wrap gap-1.5 pt-3 mt-2"
         style={{ borderTop: "1px solid rgba(15,23,42,0.06)" }}
       >
-        {signal.sourceUrl && (
+        {signal.sourceUrl && signal.kind !== "drafted_application" && (
           <a
             href={signal.sourceUrl}
             target="_blank"
@@ -270,6 +276,381 @@ export function FindingDetail({
         />
       </div>
     </article>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────────
+   KindPrimaryAction (Phase 7) — Submit on drafted_application,
+   Mirror on wallet_alert, View tx on trigger_fired.
+   ──────────────────────────────────────────────────────────────────── */
+
+function KindPrimaryAction({
+  signal,
+  network,
+}: {
+  signal: SignalWithWorker;
+  network: "devnet" | "mainnet";
+}) {
+  if (signal.kind === "drafted_application") {
+    return <SubmitBlock signal={signal} network={network} />;
+  }
+  if (signal.kind === "wallet_alert") {
+    return <MirrorBlock signal={signal} />;
+  }
+  if (signal.kind === "trigger_fired" && signal.onChainSignature) {
+    return (
+      <a
+        href={`https://explorer.solana.com/tx/${signal.onChainSignature}?cluster=${network}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="mt-3 inline-flex items-center gap-1 h-9 px-4 rounded-full text-[12px] font-medium transition active:scale-[0.97]"
+        style={{
+          background: "#15803D",
+          color: "#FFFFFF",
+          border: "1px solid rgba(21,128,61,0.85)",
+        }}
+      >
+        <Zap className="w-3.5 h-3.5" strokeWidth={2} />
+        View on-chain swap
+        <ExternalLink className="w-3 h-3" strokeWidth={2} />
+      </a>
+    );
+  }
+  return null;
+}
+
+function SubmitBlock({
+  signal,
+  network,
+}: {
+  signal: SignalWithWorker;
+  network: "devnet" | "mainnet";
+}) {
+  const [busy, setBusy] = useState(false);
+  const [memoTx, setMemoTx] = useState<string | null>(
+    signal.submissionMemoTx ?? null,
+  );
+  const [submittedAt, setSubmittedAt] = useState<number | null>(
+    signal.submittedAt ?? null,
+  );
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit() {
+    if (busy || submittedAt) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/findings/${signal.id}/submit`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        setError(data?.reason || data?.blocked?.reason || "submit failed");
+        return;
+      }
+      setMemoTx(data.memoTx ?? null);
+      setSubmittedAt(Date.now());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "submit failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (submittedAt) {
+    return (
+      <div
+        className="rounded-[10px] p-3 mt-3"
+        style={{
+          background: "rgba(34,197,94,0.06)",
+          border: "1px solid rgba(34,197,94,0.22)",
+        }}
+      >
+        <div
+          className="flex items-center gap-1.5 font-mono uppercase tracking-[0.14em] mb-1"
+          style={{ color: "#15803D", fontSize: 9.5 }}
+        >
+          <Check className="w-3 h-3" strokeWidth={2.5} />
+          Submitted · receipt anchored
+        </div>
+        <div className="text-[12px]" style={{ color: "#0A0A0A" }}>
+          Submission memo on-chain. Email relayed if configured.
+        </div>
+        {memoTx && (
+          <a
+            href={`https://explorer.solana.com/tx/${memoTx}?cluster=${network}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 font-mono mt-1"
+            style={{ color: "#15803D", fontSize: 11 }}
+          >
+            {memoTx.slice(0, 8)}…{memoTx.slice(-6)}
+            <ExternalLink className="w-3 h-3" strokeWidth={2} />
+          </a>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-3 flex items-center flex-wrap gap-2">
+      <motion.button
+        type="button"
+        onClick={submit}
+        disabled={busy}
+        whileTap={{ scale: 0.97 }}
+        className="inline-flex items-center gap-1.5 h-9 px-4 rounded-full text-[12px] font-medium transition disabled:opacity-60"
+        style={{
+          background: "#0A0A0A",
+          color: "#FFFFFF",
+          border: "1px solid rgba(0,0,0,0.85)",
+          boxShadow: "0 1px 2px rgba(0,0,0,0.06), 0 4px 14px rgba(0,0,0,0.10)",
+        }}
+      >
+        {busy ? (
+          <>
+            <span
+              className="w-3 h-3 rounded-full animate-spin"
+              style={{
+                border: "1.5px solid rgba(255,255,255,0.30)",
+                borderTopColor: "#FFFFFF",
+              }}
+            />
+            Sending…
+          </>
+        ) : (
+          <>
+            <Send className="w-3.5 h-3.5" strokeWidth={2} />
+            Submit application
+          </>
+        )}
+      </motion.button>
+      {signal.sourceUrl && (
+        <a
+          href={signal.sourceUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 h-9 px-3 rounded-full text-[11.5px] font-medium transition active:scale-[0.97]"
+          style={{
+            background: "#FFFFFF",
+            color: "#0A0A0A",
+            border: "1px solid rgba(15,23,42,0.10)",
+          }}
+        >
+          ↗ Read bounty
+        </a>
+      )}
+      {error && (
+        <span
+          className="font-mono text-[10.5px]"
+          style={{ color: "#B45309" }}
+        >
+          {error}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function MirrorBlock({ signal }: { signal: SignalWithWorker }) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [mirrored, setMirrored] = useState<string | null>(
+    signal.mirroredPulseTriggerId ?? null,
+  );
+  const [error, setError] = useState<string | null>(null);
+  const [threshold, setThreshold] = useState<number>(180);
+  const [spend, setSpend] = useState<number>(5);
+  const [direction, setDirection] = useState<"below" | "above">("below");
+
+  async function mirror() {
+    if (busy || mirrored) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/findings/${signal.id}/mirror`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          asset: "SOL",
+          direction,
+          threshold_usd: threshold,
+          spend_usdc: spend,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        setError(data?.reason || "mirror failed");
+        return;
+      }
+      setMirrored(data.triggerId ?? null);
+      setOpen(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "mirror failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (mirrored) {
+    return (
+      <div
+        className="rounded-[10px] p-3 mt-3"
+        style={{
+          background: "rgba(34,197,94,0.06)",
+          border: "1px solid rgba(34,197,94,0.22)",
+        }}
+      >
+        <div
+          className="flex items-center gap-1.5 font-mono uppercase tracking-[0.14em] mb-1"
+          style={{ color: "#15803D", fontSize: 9.5 }}
+        >
+          <Check className="w-3 h-3" strokeWidth={2.5} />
+          Mirrored to Pulse
+        </div>
+        <div className="text-[12px]" style={{ color: "#0A0A0A" }}>
+          A new trigger is armed on your Pulse worker.
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-3">
+      {!open ? (
+        <motion.button
+          type="button"
+          onClick={() => setOpen(true)}
+          whileTap={{ scale: 0.97 }}
+          className="inline-flex items-center gap-1.5 h-9 px-4 rounded-full text-[12px] font-medium transition"
+          style={{
+            background: "#0A0A0A",
+            color: "#FFFFFF",
+            border: "1px solid rgba(0,0,0,0.85)",
+          }}
+        >
+          <Shuffle className="w-3.5 h-3.5" strokeWidth={2} />
+          Mirror this swap
+        </motion.button>
+      ) : (
+        <div
+          className="rounded-[12px] p-4 flex flex-col gap-3"
+          style={{
+            background: "#FAFAFA",
+            border: "1px solid rgba(15,23,42,0.08)",
+          }}
+        >
+          <div
+            className="font-mono uppercase tracking-[0.14em]"
+            style={{ fontSize: 9.5, color: "rgba(15,23,42,0.55)" }}
+          >
+            Mirror this swap into a Pulse trigger
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <select
+              value={direction}
+              onChange={(e) =>
+                setDirection(e.target.value as "below" | "above")
+              }
+              className="px-2.5 py-1.5 rounded-[6px] outline-none text-[12px]"
+              style={{
+                background: "#FFFFFF",
+                border: "1px solid rgba(15,23,42,0.08)",
+                color: "#0A0A0A",
+              }}
+            >
+              <option value="below">below</option>
+              <option value="above">above</option>
+            </select>
+            <input
+              type="number"
+              value={threshold}
+              onChange={(e) =>
+                setThreshold(parseFloat(e.target.value || "0"))
+              }
+              className="px-2.5 py-1.5 rounded-[6px] outline-none font-mono tabular-nums"
+              style={{
+                width: 100,
+                fontSize: 12,
+                background: "#FFFFFF",
+                border: "1px solid rgba(15,23,42,0.08)",
+                color: "#0A0A0A",
+              }}
+            />
+            <span
+              className="font-mono"
+              style={{ fontSize: 10, color: "rgba(15,23,42,0.45)" }}
+            >
+              USD
+            </span>
+            <span aria-hidden style={{ color: "rgba(15,23,42,0.20)" }}>
+              ·
+            </span>
+            <span
+              className="font-mono uppercase tracking-[0.14em]"
+              style={{ fontSize: 9.5, color: "rgba(15,23,42,0.45)" }}
+            >
+              spend
+            </span>
+            <input
+              type="number"
+              value={spend}
+              onChange={(e) => setSpend(parseFloat(e.target.value || "0"))}
+              className="px-2.5 py-1.5 rounded-[6px] outline-none font-mono tabular-nums"
+              style={{
+                width: 80,
+                fontSize: 12,
+                background: "#FFFFFF",
+                border: "1px solid rgba(15,23,42,0.08)",
+                color: "#0A0A0A",
+              }}
+            />
+            <span
+              className="font-mono"
+              style={{ fontSize: 10, color: "rgba(15,23,42,0.45)" }}
+            >
+              USDC
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <motion.button
+              type="button"
+              onClick={mirror}
+              disabled={busy}
+              whileTap={{ scale: 0.97 }}
+              className="inline-flex items-center gap-1.5 h-9 px-4 rounded-full text-[12px] font-medium transition disabled:opacity-60"
+              style={{
+                background: "#0A0A0A",
+                color: "#FFFFFF",
+                border: "1px solid rgba(0,0,0,0.85)",
+              }}
+            >
+              {busy ? "Creating…" : "Create trigger"}
+            </motion.button>
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              className="inline-flex items-center h-9 px-3 rounded-full text-[12px] transition"
+              style={{
+                background: "transparent",
+                color: "rgba(15,23,42,0.55)",
+                border: "1px solid rgba(15,23,42,0.10)",
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+          {error && (
+            <span
+              className="font-mono text-[10.5px]"
+              style={{ color: "#B45309" }}
+            >
+              {error}
+            </span>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 

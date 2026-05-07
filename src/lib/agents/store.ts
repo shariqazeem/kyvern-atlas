@@ -417,6 +417,11 @@ interface SignalRow {
   on_chain_signature: string | null;
   status: string;
   created_at: number;
+  // Phase 3 (KYVERN_FRONTIER_GRAND_CHAMPION) — submission receipts.
+  submitted_at: number | null;
+  submission_memo_tx: string | null;
+  submission_email_id: string | null;
+  mirrored_pulse_trigger_id: string | null;
 }
 
 const VALID_KINDS: SignalKind[] = [
@@ -453,7 +458,45 @@ function rowToSignal(r: SignalRow): Signal {
     onChainSignature: r.on_chain_signature,
     status: (["unread", "read", "archived"].includes(r.status) ? r.status : "unread") as SignalStatus,
     createdAt: r.created_at,
+    submittedAt: r.submitted_at,
+    submissionMemoTx: r.submission_memo_tx,
+    submissionEmailId: r.submission_email_id,
+    mirroredPulseTriggerId: r.mirrored_pulse_trigger_id,
   };
+}
+
+/** Phase 3 (KYVERN_FRONTIER_GRAND_CHAMPION) — record submission
+ *  receipt on a drafted_application signal. Idempotent: a second
+ *  call returns false without overwriting. */
+export function recordSignalSubmission(
+  signalId: string,
+  receipt: { memoTx: string | null; emailId: string | null },
+): boolean {
+  const result = getDb()
+    .prepare(
+      `UPDATE signals
+          SET submitted_at = ?, submission_memo_tx = ?, submission_email_id = ?, status = 'read'
+        WHERE id = ? AND submitted_at IS NULL`,
+    )
+    .run(Date.now(), receipt.memoTx, receipt.emailId, signalId);
+  return result.changes > 0;
+}
+
+/** Phase 4 (KYVERN_FRONTIER_GRAND_CHAMPION) — record a Wren →
+ *  Pulse mirror. Stamps the originating wallet_alert with the new
+ *  Pulse trigger id. */
+export function recordSignalMirrored(
+  signalId: string,
+  triggerId: string,
+): boolean {
+  const result = getDb()
+    .prepare(
+      `UPDATE signals
+          SET mirrored_pulse_trigger_id = ?, status = 'read'
+        WHERE id = ? AND mirrored_pulse_trigger_id IS NULL`,
+    )
+    .run(triggerId, signalId);
+  return result.changes > 0;
 }
 
 /** Subject hash for dedup — moved to ./signal-hash so the migration

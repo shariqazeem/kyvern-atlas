@@ -718,6 +718,15 @@ function migrate(db: Database.Database) {
   tryAlter(`ALTER TABLE agent_thoughts ADD COLUMN signature_status TEXT`);
   tryAlter(`ALTER TABLE signals ADD COLUMN on_chain_signature TEXT`);
 
+  // Phase 3 (KYVERN_FRONTIER_GRAND_CHAMPION) — submission receipts on
+  // drafted_application signals. The Submit button on the inbox
+  // captures (a) on-chain memo tx that anchors the application, and
+  // optionally (b) email send id once Resend/SendGrid is wired.
+  tryAlter(`ALTER TABLE signals ADD COLUMN submitted_at INTEGER`);
+  tryAlter(`ALTER TABLE signals ADD COLUMN submission_memo_tx TEXT`);
+  tryAlter(`ALTER TABLE signals ADD COLUMN submission_email_id TEXT`);
+  tryAlter(`ALTER TABLE signals ADD COLUMN mirrored_pulse_trigger_id TEXT`);
+
   // Phase 3 (KYVERN_APP_TRANSFORMATION) — per-agent config blob.
   //   Sentinel: { skills, min_payout_usd, cadence_minutes }
   //   Wren:     { watchlist[{address,label,threshold_usd}], cadence_minutes }
