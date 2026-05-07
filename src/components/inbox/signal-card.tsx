@@ -31,11 +31,21 @@ import {
   BarChart3,
   ExternalLink,
   Check,
+  FileEdit,
+  AlertTriangle,
+  Zap,
+  Crosshair,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { Signal, SignalKind } from "@/lib/agents/types";
 
 const KIND_ICON: Record<SignalKind, LucideIcon> = {
+  // Phase 3 — user-benefit-first kinds
+  drafted_application: FileEdit,
+  wallet_alert: AlertTriangle,
+  trigger_armed: Crosshair,
+  trigger_fired: Zap,
+  // Legacy
   bounty: Award,
   ecosystem_announcement: Megaphone,
   wallet_move: Wallet,
@@ -48,6 +58,12 @@ const KIND_ICON: Record<SignalKind, LucideIcon> = {
 };
 
 const KIND_COLOR: Record<SignalKind, string> = {
+  // Phase 3
+  drafted_application: "#15803D",
+  wallet_alert: "#B45309",
+  trigger_armed: "#9333EA",
+  trigger_fired: "#15803D",
+  // Legacy
   bounty: "#16A34A",
   ecosystem_announcement: "#2563EB",
   wallet_move: "#EA580C",
@@ -60,6 +76,12 @@ const KIND_COLOR: Record<SignalKind, string> = {
 };
 
 const KIND_LABEL: Record<SignalKind, string> = {
+  // Phase 3
+  drafted_application: "DRAFTED APPLICATION",
+  wallet_alert: "WALLET ALERT",
+  trigger_armed: "TRIGGER ARMED",
+  trigger_fired: "TRIGGER FIRED",
+  // Legacy
   bounty: "BOUNTY",
   ecosystem_announcement: "ANNOUNCEMENT",
   wallet_move: "WALLET MOVE",

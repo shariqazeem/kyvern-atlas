@@ -71,7 +71,21 @@ export function severityForSignal(s: SignalLike): Severity {
   const text = [s.subject, ...s.evidence].join(" · ");
   const maxDollars = parseLargestDollar(text);
 
-  // Critical conditions — short-circuit first.
+  // ── Phase 3 kinds — short-circuit first ────────────────────────────
+  if (s.kind === "drafted_application") {
+    if (maxDollars >= 1000) return "critical";
+    if (maxDollars >= 500) return "important";
+    return "info";
+  }
+  if (s.kind === "wallet_alert") {
+    if (maxDollars >= 500_000) return "critical";
+    if (maxDollars >= 100_000) return "important";
+    return "info";
+  }
+  if (s.kind === "trigger_fired") return "important";
+  if (s.kind === "trigger_armed") return "routine";
+
+  // ── Legacy kinds ──────────────────────────────────────────────────
   if (s.kind === "bounty" || s.kind === "opportunity") {
     if (maxDollars >= 500 && isNearDeadline(text)) return "critical";
     if (maxDollars >= 500) return "important";

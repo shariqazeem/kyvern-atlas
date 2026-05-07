@@ -32,6 +32,14 @@ import {
   type LiveStateAction,
   type LiveStateFinding,
 } from "@/components/agent/live-state-strip";
+import { SkillsField } from "@/components/agents/configure/skills-field";
+import { WatchlistEditor } from "@/components/agents/configure/watchlist-editor";
+import { TriggersEditor } from "@/components/agents/configure/triggers-editor";
+import type {
+  PulseConfig,
+  SentinelConfig,
+  WrenConfig,
+} from "@/lib/agents/types";
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
@@ -52,6 +60,43 @@ interface Agent {
   totalEarnedUsd: number;
   totalSpentUsd: number;
   metadata?: { firstMessage?: string; watchingTarget?: string } | Record<string, unknown>;
+  /** Phase 3 — per-template config blob. */
+  config?: SentinelConfig | WrenConfig | PulseConfig | Record<string, unknown>;
+}
+
+interface JobBriefBundle {
+  eyebrow: string;
+  headline: string;
+  body: string;
+}
+
+function jobBriefFor(template: string): JobBriefBundle {
+  switch (template) {
+    case "bounty_hunter":
+      return {
+        eyebrow: "What this worker does for you",
+        headline: "Bounty Scout",
+        body: "I find paid Solana bounties matching your skills, draft your application with Pay.sh / Gemini, and queue it for one-tap submit.",
+      };
+    case "whale_tracker":
+      return {
+        eyebrow: "What this worker does for you",
+        headline: "Position Watchtower",
+        body: "Pick wallets or contracts to watch. I ping you when something material moves. Chain caps how often I check.",
+      };
+    case "token_pulse":
+      return {
+        eyebrow: "What this worker does for you",
+        headline: "Conditional Trigger",
+        body: "Set a price condition. I poll the market with Pay.sh / Gemini reasoning. The moment it triggers, I fire your pre-approved spend — and the chain checks every dollar.",
+      };
+    default:
+      return {
+        eyebrow: "What this worker does",
+        headline: "Custom worker",
+        body: "Custom job — see Spec below.",
+      };
+  }
 }
 
 const QUICK_REPLIES = [
@@ -653,6 +698,14 @@ export default function AgentDetailPage({ params }: { params: { id: string } }) 
         </div>
       )}
 
+      {/* Phase 3 — "What this worker does for you" + Configure form.
+          Renders above the Economic Timeline so the owner sees the
+          new user-benefit framing first. The configure form switches
+          on agent.template — Sentinel gets SkillsField, Wren gets
+          WatchlistEditor, Pulse gets TriggersEditor. Save hits
+          POST /api/agents/[id]/config. */}
+      <ConfigureSection agent={agent} />
+
       {/* Phase 6 — Economic Activity Timeline replaces the raw
           internal-log thought feed. The previous feed surfaced every
           tick (anti-noise included), which made the page feel like
@@ -681,6 +734,97 @@ export default function AgentDetailPage({ params }: { params: { id: string } }) 
         onDismiss={() => setShowToast(false)}
       />
     </div>
+  );
+}
+
+/* ── ConfigureSection (Phase 3) ────────────────────────────────────── */
+
+function ConfigureSection({ agent }: { agent: Agent }) {
+  const brief = jobBriefFor(agent.template);
+  const showConfigure =
+    agent.template === "bounty_hunter" ||
+    agent.template === "whale_tracker" ||
+    agent.template === "token_pulse";
+
+  return (
+    <motion.section
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.45, ease: EASE }}
+      className="mb-4 rounded-[14px] p-5"
+      style={{
+        background: "#FFFFFF",
+        border: "1px solid rgba(15,23,42,0.06)",
+        boxShadow: "0 1px 2px rgba(15,23,42,0.04)",
+      }}
+    >
+      <p
+        className="font-mono uppercase tracking-[0.14em] mb-1.5"
+        style={{ color: "#9CA3AF", fontSize: 9.5 }}
+      >
+        {brief.eyebrow}
+      </p>
+      <h2
+        className="text-[18px] font-semibold tracking-[-0.005em] mb-1"
+        style={{ color: "#0A0A0A" }}
+      >
+        {brief.headline}
+      </h2>
+      <p
+        className="text-[13px] leading-[1.55] mb-4"
+        style={{ color: "#6B7280" }}
+      >
+        {brief.body}
+      </p>
+
+      {showConfigure && (
+        <div
+          className="pt-4"
+          style={{ borderTop: "1px solid rgba(15,23,42,0.06)" }}
+        >
+          <p
+            className="font-mono uppercase tracking-[0.14em] mb-3"
+            style={{ color: "#9CA3AF", fontSize: 9.5 }}
+          >
+            Configure
+          </p>
+          {agent.template === "bounty_hunter" && (
+            <SkillsField
+              agentId={agent.id}
+              initial={
+                ((agent.config as SentinelConfig) ?? {
+                  skills: "Solana developer · Rust · TypeScript",
+                  min_payout_usd: 300,
+                  cadence_minutes: 10,
+                }) as SentinelConfig
+              }
+            />
+          )}
+          {agent.template === "whale_tracker" && (
+            <WatchlistEditor
+              agentId={agent.id}
+              initial={
+                ((agent.config as WrenConfig) ?? {
+                  watchlist: [],
+                  cadence_minutes: 5,
+                }) as WrenConfig
+              }
+            />
+          )}
+          {agent.template === "token_pulse" && (
+            <TriggersEditor
+              agentId={agent.id}
+              initial={
+                ((agent.config as PulseConfig) ?? {
+                  triggers: [],
+                  cadence_minutes: 1,
+                }) as PulseConfig
+              }
+            />
+          )}
+        </div>
+      )}
+    </motion.section>
   );
 }
 

@@ -717,6 +717,14 @@ function migrate(db: Database.Database) {
   tryAlter(`ALTER TABLE agent_tasks ADD COLUMN escrow_signature TEXT`);
   tryAlter(`ALTER TABLE agent_thoughts ADD COLUMN signature_status TEXT`);
   tryAlter(`ALTER TABLE signals ADD COLUMN on_chain_signature TEXT`);
+
+  // Phase 3 (KYVERN_APP_TRANSFORMATION) — per-agent config blob.
+  //   Sentinel: { skills, min_payout_usd, cadence_minutes }
+  //   Wren:     { watchlist[{address,label,threshold_usd}], cadence_minutes }
+  //   Pulse:    { triggers[{asset,direction,threshold_usd,amount_usd,merchant,memo}], cadence_minutes }
+  // Default-empty JSON object so legacy rows are valid; runner backfills
+  // template-shaped defaults the first time it sees an empty config.
+  tryAlter(`ALTER TABLE agents ADD COLUMN config_json TEXT NOT NULL DEFAULT '{}'`);
   // Re-backfill EVERY row (not just NULL ones) — v2 of hashSubject
   // normalizes numeric volatility so "$83.14" and "$83.27" share a
   // hash. The first migration backfilled with v1 (literal) so we

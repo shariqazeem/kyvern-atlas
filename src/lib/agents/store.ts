@@ -10,6 +10,7 @@ import { getDb } from "../db";
 import type {
   Agent,
   AgentChatMessage,
+  AgentConfig,
   AgentDecision,
   AgentStatus,
   AgentTask,
@@ -21,6 +22,7 @@ import type {
   SignalStatus,
   TaskStatus,
 } from "./types";
+import { defaultConfigFor, parseConfig } from "./config-schema";
 
 /* ─────────────────────────────────────────────────────────────────── */
 /*                              Agents                                  */
@@ -44,9 +46,11 @@ interface AgentRow {
   total_spent_usd: number;
   is_public: number;
   metadata_json: string;
+  config_json: string | null;
 }
 
 function rowToAgent(r: AgentRow): Agent {
+  const template = r.template as AgentTemplate;
   return {
     id: r.id,
     deviceId: r.device_id,
@@ -55,7 +59,7 @@ function rowToAgent(r: AgentRow): Agent {
     personalityPrompt: r.personality_prompt,
     jobPrompt: r.job_prompt,
     allowedTools: JSON.parse(r.allowed_tools) as string[],
-    template: r.template as AgentTemplate,
+    template,
     frequencySeconds: r.frequency_seconds,
     status: r.status as AgentStatus,
     createdAt: r.created_at,
@@ -65,6 +69,7 @@ function rowToAgent(r: AgentRow): Agent {
     totalSpentUsd: r.total_spent_usd,
     isPublic: r.is_public === 1,
     metadata: JSON.parse(r.metadata_json) as Record<string, unknown>,
+    config: parseConfig(template, r.config_json),
   };
 }
 
@@ -79,17 +84,21 @@ export function createAgent(input: {
   frequencySeconds: number;
   isPublic?: boolean;
   metadata?: Record<string, unknown>;
+  /** Optional initial config. Falls back to template defaults. */
+  config?: AgentConfig;
 }): Agent {
   const id = `agt_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
   const now = Date.now();
+  const config = input.config ?? defaultConfigFor(input.template);
 
   getDb()
     .prepare(
       `INSERT INTO agents (
         id, device_id, name, emoji, personality_prompt, job_prompt,
         allowed_tools, template, frequency_seconds, status, created_at,
-        total_thoughts, total_earned_usd, total_spent_usd, is_public, metadata_json
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'alive', ?, 0, 0, 0, ?, ?)`,
+        total_thoughts, total_earned_usd, total_spent_usd, is_public, metadata_json,
+        config_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'alive', ?, 0, 0, 0, ?, ?, ?)`,
     )
     .run(
       id,
@@ -104,6 +113,7 @@ export function createAgent(input: {
       now,
       input.isPublic === false ? 0 : 1,
       JSON.stringify(input.metadata ?? {}),
+      JSON.stringify(config),
     );
 
   return {
@@ -124,7 +134,19 @@ export function createAgent(input: {
     totalSpentUsd: 0,
     isPublic: input.isPublic !== false,
     metadata: input.metadata ?? {},
+    config,
   };
+}
+
+/** Update the per-agent config blob. Called by
+ *  POST /api/agents/[id]/config after Zod validation. */
+export function updateAgentConfig(
+  id: string,
+  config: AgentConfig,
+): void {
+  getDb()
+    .prepare(`UPDATE agents SET config_json = ? WHERE id = ?`)
+    .run(JSON.stringify(config), id);
 }
 
 export function getAgent(id: string): Agent | null {
@@ -447,15 +469,21 @@ import { hashSubject } from "./signal-hash";
  *  meaningful milestone updates within a long-running condition (e.g.
  *  "12h continuous now, longest streak in 2 weeks"). */
 const DEDUPE_WINDOW_MS_BY_KIND: Record<SignalKind, number> = {
-  bounty: 24 * 60 * 60 * 1000,                  // 24h — bounty repostings shouldn't re-surface daily
-  ecosystem_announcement: 24 * 60 * 60 * 1000,  // 24h — same announcement shouldn't loop
-  github_release: 24 * 60 * 60 * 1000,          // 24h — same tag shouldn't re-fire
-  wallet_move: 60 * 60 * 1000,                  // 1h — wallet activity is fast
-  price_trigger: 4 * 60 * 60 * 1000,            // 4h (was 30m) — persistent breaches re-fired every cycle
-  observation: 6 * 60 * 60 * 1000,              // 6h (was 1h) — "wallet quiet" anomalies shouldn't repeat hourly
-  condition_update: 4 * 60 * 60 * 1000,         // 4h — milestone updates inside a persistent condition
-  opportunity: 24 * 60 * 60 * 1000,             // 24h — same opportunity shouldn't re-fire (Phase 1 — Sentinel)
-  market_intel: 60 * 60 * 1000,                 // 1h — Wren intel is movement-fast, mirrors wallet_move (Phase 2)
+  // Phase 3 — user-benefit-first kinds.
+  drafted_application: 24 * 60 * 60 * 1000,     // 24h — same bounty draft shouldn't re-fire
+  wallet_alert: 60 * 60 * 1000,                 // 1h — wallet movements are fast
+  trigger_armed: 30 * 60 * 1000,                // 30m — let armed re-surface after each cool-off
+  trigger_fired: 24 * 60 * 60 * 1000,           // 24h — same trigger fires once a day max
+  // Legacy kinds.
+  bounty: 24 * 60 * 60 * 1000,
+  ecosystem_announcement: 24 * 60 * 60 * 1000,
+  github_release: 24 * 60 * 60 * 1000,
+  wallet_move: 60 * 60 * 1000,
+  price_trigger: 4 * 60 * 60 * 1000,
+  observation: 6 * 60 * 60 * 1000,
+  condition_update: 4 * 60 * 60 * 1000,
+  opportunity: 24 * 60 * 60 * 1000,
+  market_intel: 60 * 60 * 1000,
 };
 
 interface WriteSignalResult {

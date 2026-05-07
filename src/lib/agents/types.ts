@@ -23,6 +23,51 @@ export type AgentTemplate =
   | "token_pulse"
   | "github_watcher";
 
+/* ── Per-template config (Phase 3 reframe) ──
+ *
+ * Each template stores its user-editable settings in `agent.config`.
+ * Validated at runtime via Zod (see config-schema.ts). Empty-object
+ * default is valid — runner backfills template-shaped defaults the
+ * first time it ticks an empty config.
+ */
+export interface SentinelConfig {
+  skills: string;
+  min_payout_usd: number;
+  cadence_minutes: number;
+}
+
+export interface WrenWatchEntry {
+  address: string;
+  label: string;
+  threshold_usd: number;
+}
+
+export interface WrenConfig {
+  watchlist: WrenWatchEntry[];
+  cadence_minutes: number;
+}
+
+export interface PulseTrigger {
+  id: string;
+  asset: string;
+  direction: "below" | "above";
+  threshold_usd: number;
+  amount_usd: number;
+  merchant: string;
+  memo: string;
+}
+
+export interface PulseConfig {
+  triggers: PulseTrigger[];
+  cadence_minutes: number;
+}
+
+export type AgentConfig =
+  | SentinelConfig
+  | WrenConfig
+  | PulseConfig
+  | Record<string, unknown>; // legacy / custom templates
+
 export interface Agent {
   id: string;
   deviceId: string; // FK → vaults.id
@@ -41,8 +86,11 @@ export interface Agent {
   totalEarnedUsd: number;
   totalSpentUsd: number;
   isPublic: boolean;
-  /** Per-agent metadata: API spend, custom config, etc. */
+  /** Per-agent metadata: API spend, etc. */
   metadata: Record<string, unknown>;
+  /** Phase 3 — per-template settings the owner edits on
+   *  /app/agents/[id]. Validated via Zod at API boundary. */
+  config: AgentConfig;
 }
 
 /* ── Thoughts (the agent's reasoning + actions) ── */
@@ -95,6 +143,17 @@ export interface AgentChatMessage {
 /* ── Signals (Path C — Inbox) ── */
 
 export type SignalKind =
+  // Phase 3 (KYVERN_APP_TRANSFORMATION) — user-benefit-first kinds.
+  // Replace the synthetic agent-economy verbs with outputs the human
+  // owner directly wants: applications drafted on their behalf,
+  // wallet alerts on watchlists they care about, conditional spends
+  // armed and fired against price triggers they set.
+  | "drafted_application" // Sentinel: Pay.sh/Gemini draft of a paid bounty application
+  | "wallet_alert" // Wren: material move on a watched address (Pay.sh/Gemini-validated)
+  | "trigger_armed" // Pulse: a price condition is now within range, watching
+  | "trigger_fired" // Pulse: condition crossed, conditional vault.pay settled
+  // Legacy kinds — kept for backward compat with historical rows.
+  // No longer emitted by the trio post-Phase 3.
   | "bounty"
   | "ecosystem_announcement"
   | "wallet_move"
@@ -102,17 +161,7 @@ export type SignalKind =
   | "github_release"
   | "observation"
   | "condition_update"
-  // Phase 1 (billion-dollar edition) — Sentinel as Opportunity Scout
-  // produces unified "opportunity" findings across multiple sources
-  // (bounties, grants, hackathons, launches, freelance gigs). The
-  // source-specific kinds above are still used by other workers and
-  // for legacy rows; "opportunity" is Sentinel's default.
   | "opportunity"
-  // Phase 2 (billion-dollar edition) — Wren as Market Intelligence
-  // Worker produces unified "market_intel" findings: whale moves,
-  // notable wallet rotations, completed validation tasks. Replaces
-  // the older "wallet_move" kind for new Wren output (existing rows
-  // keep wallet_move for back-compat).
   | "market_intel";
 
 export type SignalStatus = "unread" | "read" | "archived";

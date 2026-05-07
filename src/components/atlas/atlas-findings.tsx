@@ -24,12 +24,20 @@ import {
   Target,
   BarChart3,
   ExternalLink,
+  FileEdit,
+  AlertTriangle,
+  Zap,
+  Crosshair,
 } from "lucide-react";
 import type { Signal, SignalKind } from "@/lib/agents/types";
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
 const KIND_ICON: Record<SignalKind, React.ComponentType<{ className?: string; style?: React.CSSProperties }>> = {
+  drafted_application: FileEdit,
+  wallet_alert: AlertTriangle,
+  trigger_armed: Crosshair,
+  trigger_fired: Zap,
   bounty: Award,
   ecosystem_announcement: Megaphone,
   wallet_move: Wallet,
@@ -42,6 +50,10 @@ const KIND_ICON: Record<SignalKind, React.ComponentType<{ className?: string; st
 };
 
 const KIND_LABEL: Record<SignalKind, string> = {
+  drafted_application: "DRAFTED APPLICATION",
+  wallet_alert: "WALLET ALERT",
+  trigger_armed: "TRIGGER ARMED",
+  trigger_fired: "TRIGGER FIRED",
   bounty: "BOUNTY",
   ecosystem_announcement: "ANNOUNCEMENT",
   wallet_move: "WALLET MOVE",

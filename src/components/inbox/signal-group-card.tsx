@@ -45,6 +45,10 @@ import {
   ChevronUp,
   Send,
   Link as LinkIcon,
+  FileEdit,
+  AlertTriangle,
+  Zap,
+  Crosshair,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { Signal, SignalKind } from "@/lib/agents/types";
@@ -55,6 +59,10 @@ import {
 import type { SignalGroup } from "@/lib/agents/signal-group";
 
 const KIND_ICON: Record<SignalKind, LucideIcon> = {
+  drafted_application: FileEdit,
+  wallet_alert: AlertTriangle,
+  trigger_armed: Crosshair,
+  trigger_fired: Zap,
   bounty: Award,
   ecosystem_announcement: Megaphone,
   wallet_move: Wallet,
@@ -67,6 +75,10 @@ const KIND_ICON: Record<SignalKind, LucideIcon> = {
 };
 
 const KIND_LABEL: Record<SignalKind, string> = {
+  drafted_application: "DRAFTED APPLICATION",
+  wallet_alert: "WALLET ALERT",
+  trigger_armed: "TRIGGER ARMED",
+  trigger_fired: "TRIGGER FIRED",
   bounty: "BOUNTY",
   ecosystem_announcement: "ANNOUNCEMENT",
   wallet_move: "WALLET MOVE",

@@ -21,6 +21,12 @@ import { appendChat, writeSignal } from "../store";
  */
 
 const VALID_SIGNAL_KINDS: SignalKind[] = [
+  // Phase 3 — user-benefit-first kinds (the trio's new defaults).
+  "drafted_application",
+  "wallet_alert",
+  "trigger_armed",
+  "trigger_fired",
+  // Legacy kinds — accepted for backwards-compat with historical rows.
   "bounty",
   "ecosystem_announcement",
   "wallet_move",
@@ -66,7 +72,7 @@ export const messageUserTool: AgentTool = {
         type: "string",
         enum: [...VALID_SIGNAL_KINDS],
         description:
-          "Signal kind for Finding mode. opportunity=high-value opportunity from any source (bounty + grant + hackathon + launch + gig) — Sentinel's default kind · market_intel=whale moves, notable wallet rotations, validation outcomes — Wren's default kind · bounty=Superteam/hackathon listing (legacy/source-specific) · ecosystem_announcement=protocol launch/grant · wallet_move=on-chain whale activity (legacy — prefer market_intel for new Wren output) · price_trigger=FIRST time the price crossed your band (or breach in opposite direction) · github_release=new release/commit · observation=genuinely unusual non-event (only fire if anomalous against your recent observations) · condition_update=meaningful milestone within an already-surfaced persistent condition (duration milestone, trend change, volume spike on top of existing breach).",
+          "Signal kind for Finding mode. PREFERRED (Phase 3): drafted_application=Sentinel just drafted a paid bounty application for the owner · wallet_alert=Wren saw a material move on a watched wallet · trigger_armed=Pulse's price condition is within 5% of threshold · trigger_fired=Pulse's price condition crossed and the conditional spend settled. LEGACY (back-compat only — emit only if your template branch above tells you to): opportunity, market_intel, bounty, ecosystem_announcement, wallet_move, price_trigger, github_release, observation, condition_update.",
       },
       subject: {
         type: "string",
