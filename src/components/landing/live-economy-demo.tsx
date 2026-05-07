@@ -33,10 +33,10 @@ interface DemoAction {
 }
 
 const ACTION_TEMPLATES: Omit<DemoAction, "id" | "sigPrefix">[] = [
-  { emoji: "🎯", worker: "Sentinel", verb: "posted research task — escrowed", amount: 0.15, tone: "spent" },
-  { emoji: "🐋", worker: "Wren", verb: "claimed the task", amount: 0.15, tone: "earned" },
-  { emoji: "🐋", worker: "Wren", verb: "completed task — earned", amount: 0.15, tone: "earned" },
-  { emoji: "📈", worker: "Pulse", verb: "staked on SOL band breach", amount: 0.02, tone: "spent" },
+  { emoji: "🎯", worker: "Sentinel", verb: "drafted application · queued for review", amount: 0.15, tone: "spent" },
+  { emoji: "🐋", worker: "Wren", verb: "validated a finding for the team", amount: 0.15, tone: "earned" },
+  { emoji: "🐋", worker: "Wren", verb: "delivered work — earned", amount: 0.15, tone: "earned" },
+  { emoji: "📈", worker: "Pulse", verb: "paid Pay.sh / Gemini · backed a finding", amount: 0.02, tone: "spent" },
   { emoji: "🎯", worker: "Sentinel", verb: "surfaced $10k bounty", amount: 0.0, tone: "earned" },
   { emoji: "📈", worker: "Pulse", verb: "validated · SOL @ $145.21", amount: 0.10, tone: "earned" },
 ];
