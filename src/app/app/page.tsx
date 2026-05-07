@@ -49,6 +49,7 @@ import {
 import { OpenBayPanel } from "@/components/device/panels/open-bay-panel";
 import { UseDevicePanel } from "@/components/device/panels/use-device-panel";
 import { BuilderPanel } from "@/components/device/panels/builder-panel";
+import { WorkingForYouStrip } from "@/components/device/home/working-for-you-strip";
 import { SandboxBanner } from "@/components/device/home/sandbox-banner";
 import { BalanceOrbit } from "@/components/device/home/balance-orbit";
 import { TodayStrip } from "@/components/device/home/today-strip";
@@ -118,6 +119,14 @@ interface LiveStatus {
     callsToday: number;
     blockedToday: number;
     lastSettledTxSignature: string | null;
+  };
+  // Phase 4 — "Working for you this week" strip
+  weeklyBenefit?: {
+    drafts: number;
+    alerts: number;
+    triggersFired: number;
+    aiSpendUsd: number;
+    dailyCapUsd: number;
   };
 }
 
@@ -319,6 +328,11 @@ export default function DeviceHome() {
             ) : (
               <NoWorkersState />
             )}
+
+            {/* WORKING FOR YOU THIS WEEK — Phase 4 user-benefit strip.
+                Counts drafts queued, alerts received, triggers fired,
+                Pay.sh AI spend, daily cap. Hides when fresh device. */}
+            <WorkingForYouStrip benefit={status?.weeklyBenefit ?? null} />
 
             {/* BOTTOM RAIL — daily-cap gauge · calls · blocked · last
                 tx. Always visible. */}

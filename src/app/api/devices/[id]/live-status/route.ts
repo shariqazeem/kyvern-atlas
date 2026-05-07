@@ -292,6 +292,81 @@ export async function GET(
   }
 
   const workersActive = agents.filter((a) => a.status === "alive").length;
+  const agentIds = agents.map((a) => a.id);
+
+  // Phase 4 — userOutcome per worker. Counts the worker's Phase 3
+  // SignalKind emissions in the last 24h so the chip subtitle reads
+  // as user benefit ("2 drafts ready") not internal verb ("watching
+  // feeds"). Falls back to "Standing by" when nothing has surfaced.
+  const dayAgoMs = now - 24 * 60 * 60 * 1000;
+  const outcomeRows = agentIds.length
+    ? (db
+        .prepare(
+          `SELECT agent_id, kind, COUNT(*) AS n, MAX(created_at) AS last_at
+             FROM signals
+            WHERE agent_id IN (${agentIds.map(() => "?").join(",")})
+              AND created_at >= ?
+              AND kind IN ('drafted_application','wallet_alert','trigger_armed','trigger_fired')
+            GROUP BY agent_id, kind`,
+        )
+        .all(...agentIds, dayAgoMs) as Array<{
+        agent_id: string;
+        kind: string;
+        n: number;
+        last_at: number;
+      }>)
+    : [];
+  const outcomeByAgent = new Map<
+    string,
+    Map<string, { n: number; last_at: number }>
+  >();
+  for (const r of outcomeRows) {
+    let inner = outcomeByAgent.get(r.agent_id);
+    if (!inner) {
+      inner = new Map();
+      outcomeByAgent.set(r.agent_id, inner);
+    }
+    inner.set(r.kind, { n: r.n, last_at: r.last_at });
+  }
+
+  function fmtAgo(ms: number): string {
+    const diff = Math.max(0, now - ms) / 1000;
+    if (diff < 60) return `${Math.floor(diff)}s ago`;
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    return `${Math.floor(diff / 86400)}d ago`;
+  }
+
+  function userOutcomeFor(template: string, agentId: string): string {
+    const inner = outcomeByAgent.get(agentId);
+    if (template === "bounty_hunter") {
+      const drafts = inner?.get("drafted_application");
+      if (drafts && drafts.n > 0) {
+        return `${drafts.n} draft${drafts.n === 1 ? "" : "s"} ready`;
+      }
+      return "Watching for bounties";
+    }
+    if (template === "whale_tracker") {
+      const alerts = inner?.get("wallet_alert");
+      if (alerts && alerts.n > 0) {
+        return `${alerts.n} alert${alerts.n === 1 ? "" : "s"} · last ${fmtAgo(alerts.last_at)}`;
+      }
+      return "Watching wallets";
+    }
+    if (template === "token_pulse") {
+      const fired = inner?.get("trigger_fired");
+      const armed = inner?.get("trigger_armed");
+      if (fired && fired.n > 0) {
+        return `${fired.n} fired today · last ${fmtAgo(fired.last_at)}`;
+      }
+      if (armed && armed.n > 0) {
+        return `${armed.n} trigger${armed.n === 1 ? "" : "s"} armed`;
+      }
+      return "Watching prices";
+    }
+    return "Standing by";
+  }
+
   const workers = agents.map((a) => {
     const sig = lastSignalByAgent.get(a.id);
     const lastFinding = sig
@@ -317,6 +392,8 @@ export async function GET(
       totalThoughts: a.total_thoughts,
       totalEarnedUsd: a.total_earned_usd,
       lastFinding,
+      // Phase 4 — chip subtitle reads as user benefit, not internal verb.
+      userOutcome: userOutcomeFor(a.template, a.id),
     };
   });
 
@@ -695,6 +772,43 @@ export async function GET(
     lastSettledTxSignature,
   };
 
+  // Phase 4 — "Working for you this week" aggregate. The strip on /app
+  // surfaces it under the canvas + ticker so the owner sees the
+  // benefit in a single glance: drafts queued, alerts received,
+  // triggers fired, AI spend through Pay.sh.
+  const weekAgoMs = now - 7 * 24 * 60 * 60 * 1000;
+  const weekKindCounts = agentIds.length
+    ? (db
+        .prepare(
+          `SELECT kind, COUNT(*) AS n FROM signals
+            WHERE device_id = ?
+              AND created_at >= ?
+              AND kind IN ('drafted_application','wallet_alert','trigger_fired')
+            GROUP BY kind`,
+        )
+        .all(params.id, weekAgoMs) as Array<{ kind: string; n: number }>)
+    : [];
+  const weekKindMap = new Map<string, number>(
+    weekKindCounts.map((r) => [r.kind, r.n]),
+  );
+  const aiSpendRow = db
+    .prepare(
+      `SELECT COALESCE(SUM(amount_usd), 0) AS total
+         FROM vault_payments
+        WHERE vault_id = ?
+          AND status = 'settled'
+          AND created_at >= ?
+          AND merchant LIKE '%pay.sh%'`,
+    )
+    .get(params.id, weekAgoMs) as { total: number };
+  const weeklyBenefit = {
+    drafts: weekKindMap.get("drafted_application") ?? 0,
+    alerts: weekKindMap.get("wallet_alert") ?? 0,
+    triggersFired: weekKindMap.get("trigger_fired") ?? 0,
+    aiSpendUsd: Number(aiSpendRow?.total ?? 0),
+    dailyCapUsd: vault.dailyLimitUsd,
+  };
+
   // On-chain balances (legacy vaults without a PDA report zero)
   const balances = vault.vaultPda
     ? await fetchVaultBalances(vault.vaultPda, vault.network)
@@ -727,5 +841,7 @@ export async function GET(
     discoveryToday,
     // Live Engine — bottom-rail scoreboard summary
     policySummary,
+    // Phase 4 — "Working for you this week" strip
+    weeklyBenefit,
   });
 }

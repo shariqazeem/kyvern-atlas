@@ -46,6 +46,10 @@ export interface WorkerTileWorker {
     brand: string | null;
     ts: number;
   } | null;
+  /** Phase 4 — server-computed user-benefit subtitle. Reads as
+   *  "2 drafts ready" / "3 alerts · last 14m ago" / "1 trigger armed",
+   *  not internal verbs. */
+  userOutcome?: string | null;
 }
 
 export interface WorkerTileAction {

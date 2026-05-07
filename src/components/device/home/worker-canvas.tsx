@@ -773,6 +773,11 @@ function verbFor(
     const amt = action?.amountUsd != null ? `$${action.amountUsd.toFixed(2)}` : "";
     return amt ? `Blocked ${amt}` : "Blocked";
   }
+  // Phase 4 — server-computed userOutcome wins over template fallback.
+  // "2 drafts ready" / "3 alerts · last 14m ago" / "1 trigger armed".
+  if (worker.userOutcome && worker.userOutcome.trim().length > 0) {
+    return worker.userOutcome;
+  }
   if (worker.template === "bounty_hunter") return "Watching feeds";
   if (worker.template === "whale_tracker") return "Watching wallets";
   if (worker.template === "token_pulse") return "Watching prices";
@@ -783,6 +788,13 @@ function verbForTicker(item: ActionFeedItem): string {
   const failed = item.signatureStatus === "failed";
   const settled = item.signatureStatus === "success";
   const counter = item.counterparty?.replace(/^[^\w]+/, "").trim() ?? "";
+  const message = item.message ?? "";
+
+  // Phase 4 — prefer user-outcome verbs over internal tool names.
+  // Pay.sh routings always read "→ Pay.sh / Gemini · validate …".
+  if (counter.includes("Pay.sh") || message.toLowerCase().includes("gemini")) {
+    return "→ Pay.sh / Gemini · validate ";
+  }
 
   switch (item.tool) {
     case "post_task":
@@ -792,9 +804,7 @@ function verbForTicker(item: ActionFeedItem): string {
     case "complete_task":
       return settled ? "earned " : "tried to earn ";
     case "stake_on_finding":
-      return counter.includes("Pay.sh")
-        ? "→ Pay.sh / Gemini "
-        : "staked on finding ";
+      return "staked on finding ";
     case "subscribe_to_agent":
       return "subscribed ";
     default:
