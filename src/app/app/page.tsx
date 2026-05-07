@@ -50,6 +50,7 @@ import { OpenBayPanel } from "@/components/device/panels/open-bay-panel";
 import { UseDevicePanel } from "@/components/device/panels/use-device-panel";
 import { BuilderPanel } from "@/components/device/panels/builder-panel";
 import { WorkingForYouStrip } from "@/components/device/home/working-for-you-strip";
+import { GenesisStrip } from "@/components/device/home/genesis-strip";
 import { SandboxBanner } from "@/components/device/home/sandbox-banner";
 import { BalanceOrbit } from "@/components/device/home/balance-orbit";
 import { TodayStrip } from "@/components/device/home/today-strip";
@@ -359,6 +360,10 @@ export default function DeviceHome() {
                 instrument drawers OVER the device. The user is always
                 at home; never loses sight of the workers. */}
             <AffordanceRow active={panel} onOpen={setPanel} />
+
+            {/* GENESIS STRIP — single line. "GENESIS DEVICE · v0.1 ·
+                ROADMAP →". This is the start, not the end. */}
+            <GenesisStrip />
 
             {/* The single seam to the demoted dashboard. One tap. */}
             <button

@@ -18,15 +18,16 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Home, Inbox, Briefcase, Settings } from "lucide-react";
+import { Home, Inbox, Settings } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 
+// Phase 5 (KYVERN_APP_TRANSFORMATION) — Jobs tab dropped from the
+// bottom nav. The synthetic agent-economy task board is retired; the
+// trio's new flows produce drafted_application / wallet_alert /
+// trigger_fired signals that all surface in Findings (Inbox). The
+// /app/tasks URL still resolves for any legacy bookmarks.
 const TABS = [
   { href: "/app", label: "Home", icon: Home, exact: true, key: "home" as const },
-  // Phase 7 reorder — Jobs comes immediately after Home; Findings
-  // (legacy "Inbox") is demoted to third position. The icons stay
-  // the same so muscle memory survives.
-  { href: "/app/tasks", label: "Jobs", icon: Briefcase, exact: false, key: "tasks" as const },
   { href: "/app/inbox", label: "Findings", icon: Inbox, exact: false, key: "inbox" as const },
   { href: "/app/settings", label: "Settings", icon: Settings, exact: false, key: "settings" as const },
 ] as const;
