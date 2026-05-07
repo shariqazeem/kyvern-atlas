@@ -27,7 +27,14 @@ const GUEST_WALLET_KEY = "kyvern:dev-wallet";
 export function KyvernOS({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
   const pathname = usePathname() ?? "";
-  const isDeviceShell = pathname === "/app";
+  // Device-shell routes: every page that uses PageShell / IdentityStrip /
+  // the new full-bleed layout. The legacy 680px-capped main only covers
+  // /app/tasks (un-redesigned) + miscellaneous nested routes.
+  const isDeviceShell =
+    pathname === "/app" ||
+    pathname.startsWith("/app/agents/") ||
+    pathname.startsWith("/app/inbox") ||
+    pathname === "/app/settings";
   const [showUnboxing, setShowUnboxing] = useState(false);
   const [unboxChecked, setUnboxChecked] = useState(false);
   const [isGuest, setIsGuest] = useState(false);

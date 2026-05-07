@@ -214,7 +214,7 @@ export function SettingsPageShell({
               <div className="flex-1 min-w-0">
                 <div className="flex items-baseline gap-2 mb-1 flex-wrap">
                   <span
-                    className="text-[13.5px] font-semibold tracking-[-0.005em] truncate"
+                    className="text-[13.5px] font-semibold tracking-[-0.005em]"
                     style={{ color: "#0A0A0A" }}
                   >
                     {d.vault.emoji} {d.vault.name}
