@@ -577,7 +577,7 @@ function SectionDevice() {
           href={`https://explorer.solana.com/address/${POLICY_PROGRAM_ID}?cluster=devnet`}
           target="_blank"
           rel="noreferrer"
-          className="mt-8 mx-auto block w-fit rounded-[14px] overflow-hidden group"
+          className="mt-8 mx-auto block max-w-full w-fit rounded-[14px] overflow-hidden group"
           style={{
             background: "linear-gradient(180deg, #161A26 0%, #0E1320 100%)",
             border: "1px solid rgba(134,239,172,0.30)",
@@ -585,28 +585,41 @@ function SectionDevice() {
               "inset 0 1px 0 rgba(255,255,255,0.06), 0 8px 24px rgba(0,0,0,0.20)",
           }}
         >
-          <div className="flex items-center gap-3 px-5 py-4">
+          {/* Phase 9 (2026-05-08) — responsive callout. The 44-char
+              pubkey overflowed the row on phones; now the layout
+              stacks the label above the address on mobile and the
+              address is allowed to break / shrink-to-fit. */}
+          <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-3 px-4 sm:px-5 py-3 sm:py-4">
             <div
-              className="font-mono uppercase tracking-[0.16em]"
+              className="font-mono uppercase tracking-[0.16em] flex-none"
               style={{ color: "#86EFAC", fontSize: 9.5 }}
             >
               Policy program
             </div>
-            <span style={{ color: "rgba(255,255,255,0.20)" }}>·</span>
             <span
-              className="font-mono"
-              style={{ color: "rgba(255,255,255,0.92)", fontSize: 13 }}
+              className="hidden sm:inline"
+              style={{ color: "rgba(255,255,255,0.20)" }}
+            >
+              ·
+            </span>
+            <span
+              className="font-mono break-all min-w-0 inline-flex items-center gap-1.5"
+              style={{
+                color: "rgba(255,255,255,0.92)",
+                fontSize: "clamp(10.5px, 2.6vw, 13px)",
+                lineHeight: 1.4,
+              }}
             >
               {POLICY_PROGRAM_ID}
+              <ExternalLink
+                className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform flex-none"
+                style={{ color: "rgba(255,255,255,0.55)" }}
+                strokeWidth={2}
+              />
             </span>
-            <ExternalLink
-              className="w-3.5 h-3.5 ml-1 group-hover:translate-x-0.5 transition-transform"
-              style={{ color: "rgba(255,255,255,0.55)" }}
-              strokeWidth={2}
-            />
           </div>
           <div
-            className="px-5 py-2 text-center font-mono uppercase tracking-[0.14em]"
+            className="px-4 sm:px-5 py-2 text-center font-mono uppercase tracking-[0.14em]"
             style={{
               borderTop: "1px solid rgba(255,255,255,0.05)",
               color: "rgba(255,255,255,0.45)",

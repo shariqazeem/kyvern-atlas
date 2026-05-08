@@ -100,16 +100,24 @@ export function LiveEconomyDemo() {
       transition={{ duration: 0.6, ease: EASE }}
       className="relative w-full max-w-[480px] mx-auto"
     >
-      {/* Subtle dark "device chassis" frame around the preview to read
-          as a real phone surface */}
+      {/* Phase 9 (2026-05-08) — light premium chassis. The previous
+          dark navy frame on a #FAFAFA section read as a heavy black
+          slab; this version uses a soft white shell with a quiet
+          inset rim + a green accent halo so the preview floats
+          rather than landing like a brick. */}
       <div
         className="rounded-[28px] p-3 sm:p-4"
         style={{
           background:
-            "linear-gradient(180deg, #0E1320 0%, #161A26 100%)",
-          border: "1px solid rgba(231,233,238,0.10)",
-          boxShadow:
-            "inset 0 1px 0 rgba(255,255,255,0.06), 0 22px 48px -16px rgba(0,0,0,0.55), 0 44px 88px -32px rgba(0,0,0,0.45)",
+            "linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%)",
+          border: "1px solid rgba(15,23,42,0.06)",
+          boxShadow: [
+            "inset 0 1px 0 rgba(255,255,255,1)",
+            "inset 0 -1px 0 rgba(15,23,42,0.04)",
+            "0 0 0 1px rgba(34,197,94,0.06)",
+            "0 18px 38px -16px rgba(15,23,42,0.10)",
+            "0 38px 72px -28px rgba(15,23,42,0.08)",
+          ].join(", "),
         }}
       >
         <div className="flex items-center justify-between px-2 pt-1 pb-2.5">
@@ -126,7 +134,7 @@ export function LiveEconomyDemo() {
             <span
               className="font-mono uppercase"
               style={{
-                color: "rgba(231,233,238,0.55)",
+                color: "rgba(15,23,42,0.55)",
                 fontSize: 9.5,
                 letterSpacing: "0.16em",
               }}
@@ -136,7 +144,7 @@ export function LiveEconomyDemo() {
           </div>
           <span
             className="font-mono"
-            style={{ color: "rgba(231,233,238,0.35)", fontSize: 9.5 }}
+            style={{ color: "rgba(15,23,42,0.40)", fontSize: 9.5 }}
           >
             /app
           </span>

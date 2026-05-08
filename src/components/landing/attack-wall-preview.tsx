@@ -111,27 +111,37 @@ export function AttackWallPreview({ attacks, limit = 10 }: Props) {
 
   return (
     <div className="relative w-full max-w-[640px] mx-auto">
-      {/* Subtle red glow underneath — danger ambiance */}
+      {/* Phase 9 (2026-05-08) — opaque telemetry surface. The previous
+          rgba(20,24,36,0.55) translucent fill picked up whatever
+          section background sat behind it (often #FAFAFA), washing
+          the column into a muddy gray. Now the panel is its own
+          confident dark canvas with a faint red rim glow that reads
+          as "security feed" without the transparency artifact. */}
       <div
         aria-hidden
-        className="absolute -inset-4 pointer-events-none"
+        className="absolute -inset-6 pointer-events-none"
         style={{
           background:
-            "radial-gradient(ellipse at center, rgba(248,113,113,0.10) 0%, rgba(248,113,113,0) 70%)",
-          filter: "blur(20px)",
+            "radial-gradient(ellipse at center, rgba(248,113,113,0.14) 0%, rgba(248,113,113,0) 65%)",
+          filter: "blur(28px)",
         }}
       />
 
       {/* The column */}
       <div
         ref={scrollerRef}
-        className="relative rounded-[14px] overflow-y-auto scrollbar-none"
+        className="relative rounded-[16px] overflow-y-auto scrollbar-none"
         style={{
           height: 280,
-          background: "rgba(20, 24, 36, 0.55)",
-          border: "1px solid rgba(248,113,113,0.18)",
-          boxShadow:
-            "inset 0 1px 0 rgba(255,255,255,0.04), 0 8px 28px rgba(0,0,0,0.45)",
+          background:
+            "linear-gradient(180deg, #0E1320 0%, #161A26 100%)",
+          border: "1px solid rgba(248,113,113,0.22)",
+          boxShadow: [
+            "inset 0 1px 0 rgba(255,255,255,0.05)",
+            "inset 0 0 0 1px rgba(248,113,113,0.06)",
+            "0 0 38px rgba(248,113,113,0.08)",
+            "0 18px 38px -16px rgba(15,23,42,0.30)",
+          ].join(", "),
           scrollbarWidth: "none",
           msOverflowStyle: "none",
         }}
@@ -140,7 +150,7 @@ export function AttackWallPreview({ attacks, limit = 10 }: Props) {
         <div
           className="sticky top-0 z-10 px-4 py-2.5 flex items-center justify-between"
           style={{
-            background: "rgba(20, 24, 36, 0.92)",
+            background: "linear-gradient(180deg, #161A26 0%, rgba(22,26,38,0.92) 100%)",
             borderBottom: "1px solid rgba(255,255,255,0.05)",
             backdropFilter: "blur(8px)",
           }}

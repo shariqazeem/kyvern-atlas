@@ -23,12 +23,23 @@ export function ThreeLayerDiagram() {
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, ease: EASE }}
-      className="relative px-2 sm:px-6 py-10"
+      className="relative px-4 sm:px-8 py-8 sm:py-10 rounded-[20px] overflow-hidden"
+      // Phase 9 (2026-05-08) — own dark canvas so the white-on-white
+      // strokes (LAYER 1/2/3 boxes) don't fade out when the diagram is
+      // dropped into the light /app or os-landing sections. The green
+      // glow on Budget now reads against deep navy instead of off-white.
+      style={{
+        background:
+          "linear-gradient(180deg, #0E1320 0%, #161A26 100%)",
+        border: "1px solid rgba(255,255,255,0.06)",
+        boxShadow:
+          "inset 0 1px 0 rgba(255,255,255,0.04), 0 18px 38px -16px rgba(15,23,42,0.30)",
+      }}
     >
       <div
         className="font-mono uppercase mb-6"
         style={{
-          color: "rgba(255,255,255,0.42)",
+          color: "rgba(255,255,255,0.55)",
           fontSize: "11px",
           letterSpacing: "0.14em",
         }}
