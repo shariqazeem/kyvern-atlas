@@ -326,33 +326,35 @@ function payshSnippet(apiKey: string): string {
 
 const vault = new Vault({ agentKey: ${apiKey} });
 
-// Pay.sh / x402 — any HTTP service that returns 402 + a Payment
-// challenge can be paid by Kyvern's vault. Same flow whether the
-// upstream is Atlas's feed, a Pay.sh-fronted Gemini call, or any
-// other x402 endpoint. The chain enforces YOUR caps before USDC
-// moves; the receipt rides back as the payment-proof header.
+// Pay.sh / x402 — any service that returns 402 with payment
+// requirements can be paid via Kyvern's vault. Demo target: our own
+// Atlas feed (devnet, returns JSON requirements). The same shape
+// works against any x402-paywalled endpoint.
 
-// 1. Hit the x402 endpoint — sandbox example:
-const url = "https://payment-debugger.vercel.app/mpp/quote/AAPL";
+const url = "https://kyvernlabs.com/api/atlas/feed";
 let res = await fetch(url);
 
 if (res.status === 402) {
-  // 2. Server returned a Payment challenge in WWW-Authenticate.
-  //    Use Kyvern to settle it — the chain checks every cap first.
+  // 1. Decode the payment requirements from the body
+  const { payment } = await res.json();
+
+  // 2. Settle through the vault — chain enforces caps first
   const pay = await vault.pay({
     merchant: new URL(url).host,
-    recipientPubkey: parsePaymentChallenge(res).recipient,
-    amount: parsePaymentChallenge(res).amountUsd,
+    recipientPubkey: payment.recipientAta,
+    amount: payment.amountUsd,
     memo: \`x402: \${url}\`,
   });
   if (pay.decision !== "allowed") throw new Error(pay.reason);
 
-  // 3. Retry with the payment-proof header. Some servers want
-  //    "X-PAYMENT", others "Authorization: Payment …" — check the
-  //    challenge body. pay.tx.signature is the Solana receipt.
+  // 3. Retry with the on-chain signature as the payment proof
   res = await fetch(url, {
-    headers: { "X-PAYMENT": pay.tx.signature },
+    headers: { "X-PAYMENT-SIG": pay.tx.signature },
   });
+
+  const signal = await res.json();
+  console.log("paid + got signal:", signal);
+  console.log("explorer:", pay.tx.explorerUrl);
 }
-// → chain enforced your budget · payment proof is on Solana Explorer`;
+// → chain enforced your budget · receipt is on Solana Explorer`;
 }
