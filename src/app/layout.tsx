@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import { Bricolage_Grotesque, Inter, JetBrains_Mono } from "next/font/google";
 import { Providers } from "@/components/providers";
 import { FloatingLiveBadge } from "@/components/atlas/floating-live-badge";
 import "./globals.css";
@@ -14,6 +14,20 @@ const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
   variable: "--font-mono",
   display: "swap",
+});
+
+/**
+ * Display font — Bricolage Grotesque (variable, optical-sized).
+ * Phase 9 (2026-05-08) — replaces Inter on landing headlines / hero
+ * h1 / section titles to give the page a distinct visual character
+ * without breaking the cold "precision instrument" identity. Inter
+ * still owns body + UI text; mono still owns numbers / addresses.
+ */
+const bricolage = Bricolage_Grotesque({
+  subsets: ["latin"],
+  variable: "--font-display",
+  display: "swap",
+  weight: ["400", "500", "600", "700"],
 });
 
 const SITE_URL = "https://kyvernlabs.com";
@@ -94,7 +108,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`}>
+    <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable} ${bricolage.variable}`}>
       <head>
         <script
           type="application/ld+json"

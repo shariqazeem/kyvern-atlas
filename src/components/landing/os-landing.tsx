@@ -39,6 +39,7 @@ import {
 import { LandingTrustBar } from "@/components/landing/landing-trust-bar";
 import { LiveEconomyDemo } from "@/components/landing/live-economy-demo";
 import { MouseGlowCard } from "@/components/landing/mouse-glow-card";
+import { CursorHalo } from "@/components/landing/cursor-halo";
 
 const POLICY_PROGRAM_ID = "PpmZErWfT5zpeo1fJtTbpqezFGbRUamaNNRWViaMSqc";
 
@@ -178,6 +179,11 @@ function SectionHeroDevice({
         }}
       />
 
+      {/* Phase 9 — cursor-follow halo. Adds the "alive" quality you
+          feel on Linear / Frontier-style premium pages. Disabled on
+          touch + reduced-motion. */}
+      <CursorHalo />
+
       <div className="relative z-10 max-w-[1100px] mx-auto px-5 sm:px-8 pt-24 sm:pt-28 pb-16 sm:pb-20">
         {/* Eyebrow */}
         <motion.div
@@ -231,12 +237,12 @@ function SectionHeroDevice({
           initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
-          className="text-center mx-auto max-w-[920px] tracking-tight leading-[1.05] mb-5"
+          className="font-display text-center mx-auto max-w-[920px] tracking-tight leading-[1.02] mb-5"
           style={{
             color: "#0A0A0A",
-            fontSize: "clamp(34px, 6.4vw, 64px)",
-            fontWeight: 700,
-            letterSpacing: "-0.03em",
+            fontSize: "clamp(36px, 6.6vw, 68px)",
+            fontWeight: 600,
+            letterSpacing: "-0.035em",
           }}
         >
           A Solana device for your AI agent.{" "}
@@ -359,7 +365,7 @@ function SectionLiveDemo() {
         <div className="text-center mb-12">
           <SectionLabel>Watch the economy in action</SectionLabel>
           <h2
-            className="mt-3 mx-auto max-w-[820px] tracking-tight"
+            className="font-display mt-3 mx-auto max-w-[820px] tracking-tight"
             style={{
               color: "#0A0A0A",
               fontSize: "clamp(28px, 4.4vw, 44px)",
@@ -414,7 +420,7 @@ function SectionProblem() {
         <div className="text-center mb-12">
           <SectionLabel>The problem</SectionLabel>
           <h2
-            className="mt-3 mx-auto max-w-[820px] tracking-tight"
+            className="font-display mt-3 mx-auto max-w-[820px] tracking-tight"
             style={{
               color: "#0A0A0A",
               fontSize: "clamp(28px, 4.4vw, 44px)",
@@ -488,7 +494,7 @@ function SectionDevice() {
         <div className="text-center mb-10">
           <SectionLabel>The device</SectionLabel>
           <h2
-            className="mt-3 mx-auto max-w-[920px] tracking-tight"
+            className="font-display mt-3 mx-auto max-w-[920px] tracking-tight"
             style={{
               color: "#0A0A0A",
               fontSize: "clamp(28px, 4.4vw, 44px)",
@@ -679,7 +685,7 @@ function SectionWorkers() {
         <div className="text-center mb-12">
           <SectionLabel>Three workers ship in every device</SectionLabel>
           <h2
-            className="mt-3 mx-auto max-w-[820px] tracking-tight"
+            className="font-display mt-3 mx-auto max-w-[820px] tracking-tight"
             style={{
               color: "#0A0A0A",
               fontSize: "clamp(28px, 4.4vw, 44px)",
@@ -1016,7 +1022,7 @@ function SectionBuilders() {
           <div>
             <SectionLabel>For builders</SectionLabel>
             <h2
-              className="mt-3 mb-4 tracking-tight"
+              className="font-display mt-3 mb-4 tracking-tight"
               style={{
                 color: "#0A0A0A",
                 fontSize: "clamp(28px, 4.4vw, 40px)",

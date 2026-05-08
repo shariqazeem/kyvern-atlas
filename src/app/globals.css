@@ -417,6 +417,15 @@ input[type="reset"] {
     font-feature-settings: "tnum" 1;
   }
 
+  /* Display — Bricolage Grotesque for headlines (h1, h2, hero titles).
+     Variable + optical-size axis already set in next/font; this just
+     drops the font on demand at the surface that wants it. Inter still
+     owns body + UI. */
+  .font-display {
+    font-family: var(--font-display), "Inter", "SF Pro Display", -apple-system, system-ui, sans-serif;
+    font-feature-settings: "ss01" 1, "ss02" 1, "calt" 1;
+  }
+
   .hero-number {
     font-size: clamp(48px, 12vw, 80px);
     font-weight: 200;
