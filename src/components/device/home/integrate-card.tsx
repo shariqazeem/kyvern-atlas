@@ -291,45 +291,56 @@ function PaneButton({
   );
 }
 
-function sdkSnippet(apiKey: string): string {
-  return `import { OnChainVault } from "@kyvernlabs/sdk";
+// Snippets ship as-is into the user's clipboard — they MUST mirror
+// the shipped @kyvernlabs/sdk shape (verified 2026-05-08 against the
+// 0.4.0 release). Constructor takes `agentKey`, pay() takes `amount`
+// (not amountUsd) + `recipientPubkey`, and returns a discriminated
+// union with `decision: "allowed" | "blocked"`. Earlier copy used
+// invented field names (apiKey, amountUsd, receipt.approved) that
+// would not compile.
 
-const vault = new OnChainVault({ apiKey: ${apiKey} });
+function sdkSnippet(apiKey: string): string {
+  return `import { Vault } from "@kyvernlabs/sdk";
+
+const vault = new Vault({ agentKey: ${apiKey} });
 
 // Your agent tries to spend. The chain decides.
-const receipt = await vault.pay({
+const res = await vault.pay({
   merchant: "api.openai.com",
-  amountUsd: 0.05,
+  recipientPubkey: "GZCnHuFtswvsJftSDmtoHEve8amqNLzAAPvYy8NU3ZNZ",
+  amount: 0.05,
   memo: "gpt-4 inference",
 });
 
-if (receipt.approved) {
-  // call your downstream API with receipt.signature
+if (res.decision === "allowed") {
+  // settled tx · res.tx.signature · res.tx.explorerUrl
+  console.log("paid:", res.tx.explorerUrl);
 } else {
-  // chain blocked — receipt.reason explains why
+  // chain blocked — res.code + res.reason explain why
+  console.log("blocked:", res.code, res.reason);
 }`;
 }
 
 function payshSnippet(apiKey: string): string {
-  return `import { OnChainVault } from "@kyvernlabs/sdk";
+  return `import { Vault } from "@kyvernlabs/sdk";
 
-const vault = new OnChainVault({ apiKey: ${apiKey} });
+const vault = new Vault({ agentKey: ${apiKey} });
 
-// Wrap a Pay.sh call. Solana × Google Cloud (May 2026).
-// Kyvern enforces YOUR rules before Pay.sh moves USDC.
-const receipt = await vault.pay({
-  merchant: "api.pay.sh/gemini",     // any Pay.sh endpoint
-  amountUsd: 0.05,
+// Pay.sh-shaped merchant — Solana × Google Cloud rail (May 2026).
+// The chain enforces YOUR caps before any USDC moves. The merchant
+// label and memo are the on-chain fingerprint of the inference call.
+const res = await vault.pay({
+  merchant: "api.pay.sh/gemini",
+  recipientPubkey: "GZCnHuFtswvsJftSDmtoHEve8amqNLzAAPvYy8NU3ZNZ",
+  amount: 0.05,
   memo: "gemini-pro: weather lookup",
 });
 
-if (receipt.approved) {
-  // forward receipt.signature as the x402 token
-  const res = await fetch("https://api.pay.sh/gemini/complete", {
-    headers: { "X-PAYMENT-SIG": receipt.signature },
-    method: "POST",
-    body: JSON.stringify({ prompt: "..." }),
-  });
+if (res.decision === "allowed") {
+  // res.tx.signature is the on-chain receipt — forward it to the
+  // Pay.sh endpoint when the API ships. Today the chain settlement
+  // is the truth; the API is the next mile.
+  console.log("paid:", res.tx.signature);
 }
-// → agent pays Pay.sh · chain enforces your budget · zero leakage`;
+// → chain enforces your budget · receipt is on Solana Explorer`;
 }
