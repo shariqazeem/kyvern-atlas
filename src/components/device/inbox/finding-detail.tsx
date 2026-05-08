@@ -8,6 +8,7 @@
  * meta, body content, action buttons at the bottom.
  */
 
+import Link from "next/link";
 import { useState } from "react";
 import { motion } from "framer-motion";
 import {
@@ -16,6 +17,7 @@ import {
   ExternalLink,
   Send,
   Shuffle,
+  Sliders,
   X,
   Zap,
 } from "lucide-react";
@@ -288,6 +290,25 @@ export function FindingDetail({
             Read more
             <ExternalLink className="w-3 h-3" strokeWidth={2} />
           </a>
+        )}
+        {/* Phase 8 — celebratory / contextual secondary CTA: Adjust
+            trigger sends Pulse-related findings back to the Configure
+            form on the worker page where the trigger lives. */}
+        {(signal.kind === "trigger_fired" ||
+          signal.kind === "trigger_armed" ||
+          signal.kind === "trigger_blocked") && (
+          <Link
+            href={`/app/agents/${signal.agentId}`}
+            className="inline-flex items-center gap-1 h-8 px-3 rounded-full text-[11.5px] font-medium transition active:scale-[0.97]"
+            style={{
+              background: "transparent",
+              color: "#0A0A0A",
+              border: "1px solid rgba(15,23,42,0.18)",
+            }}
+          >
+            <Sliders className="w-3 h-3" strokeWidth={2} />
+            Adjust trigger
+          </Link>
         )}
         <ActionButton
           icon={<Check className="w-3 h-3" strokeWidth={2.5} />}
