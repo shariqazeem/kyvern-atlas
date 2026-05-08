@@ -1573,78 +1573,130 @@ const TOKEN_PULSE_VOICE: VoiceProfile = {
         livePrice < 1 ? `$${livePrice.toFixed(6)}` : `$${livePrice.toFixed(2)}`;
 
       if (verdict === "fired") {
-        const subject = `${trigger.asset.toUpperCase()} hit ${priceStr}`;
-        const evidence = [
+        // Phase 8 — fire the on-chain spend FIRST so we know whether
+        // to surface trigger_fired (settled) or trigger_blocked (chain
+        // refused). Previously we wrote trigger_fired before knowing
+        // the outcome, which produced inbox copy like "you got SOL"
+        // even when the spending limit blocked the payout. Splitting
+        // by outcome keeps the body honest.
+        const evidenceBase = [
           `Trigger condition: ${trigger.asset} ${trigger.direction} $${trigger.threshold_usd}`,
           `Breach: live price ${priceStr}`,
           `Spend: $${trigger.amount_usd.toFixed(3)} → ${trigger.target_token ? `kyvern.swap.${trigger.target_token.toLowerCase()}` : trigger.merchant}`,
-          trigger.target_token
-            ? `Validation: chain-enforced via swap_via_oracle`
-            : `Validation: Pay.sh / Gemini confirmed real breach`,
         ];
+        let fireRes: Awaited<ReturnType<typeof firePulseTrigger>> | null =
+          null;
+        try {
+          fireRes = await firePulseTrigger({
+            agentId: agent.id,
+            deviceId: agent.deviceId,
+            trigger,
+            livePrice,
+          });
+        } catch {
+          fireRes = null;
+        }
+        const settled = !!fireRes?.signature;
+        const subject = settled
+          ? `${trigger.asset.toUpperCase()} hit ${priceStr}`
+          : `${trigger.asset.toUpperCase()} hit ${priceStr} — payout blocked`;
+        const evidence = settled
+          ? [
+              ...evidenceBase,
+              trigger.target_token
+                ? `Validation: chain-enforced via swap_via_oracle`
+                : `Validation: Pay.sh / Gemini confirmed real breach`,
+            ]
+          : [
+              ...evidenceBase,
+              `Status: blocked — ${fireRes?.reason ?? "unknown"}`,
+            ];
         const writeRes = writeSignal({
           agentId: agent.id,
           deviceId: agent.deviceId,
-          kind: "trigger_fired",
+          kind: settled ? "trigger_fired" : "trigger_blocked",
           subject,
           evidence,
-          suggestion: trigger.target_token
+          suggestion: settled
             ? `Tap to view the chain-enforced swap on Solana Explorer.`
-            : null,
+            : `Top up the vault or raise the daily cap so this trigger can fire next time.`,
         });
-        if (writeRes.created) {
-          // Fire the on-chain side-effect. Best-effort — even if it
-          // fails (e.g. spending limit exceeded), the signal still
-          // surfaces so the user knows the trigger crossed.
-          try {
-            const fireRes = await firePulseTrigger({
-              agentId: agent.id,
-              deviceId: agent.deviceId,
-              trigger,
-              livePrice,
-            });
-            if (fireRes.signature) {
-              setSignalOnChain(writeRes.signal.id, fireRes.signature);
-              return {
-                thought: `${trigger.asset} crossed · spent $${trigger.amount_usd.toFixed(3)} · ${priceStr}`,
-                decision: {
-                  action: "tool_call",
-                  toolId: "read_dex",
-                  toolInput: { tokenIdOrSymbol: trigger.asset },
-                  toolResult: dexResult,
-                },
-                toolResult: {
-                  ok: true,
-                  message: `Trigger fired · sig ${fireRes.signature.slice(0, 10)}…`,
-                  signature: fireRes.signature,
-                  amountUsd: trigger.amount_usd,
-                  counterparty: trigger.target_token
-                    ? `Kyvern · swap router (${trigger.target_token})`
-                    : "Pay.sh · Gemini",
-                },
-              };
-            }
-            return {
-              thought: `${trigger.asset} crossed · spend blocked: ${fireRes.reason ?? "unknown"} · ${priceStr}`,
-              decision: {
-                action: "tool_call",
-                toolId: "read_dex",
-                toolInput: { tokenIdOrSymbol: trigger.asset },
-                toolResult: dexResult,
+        if (writeRes.created && settled && fireRes?.signature) {
+          setSignalOnChain(writeRes.signal.id, fireRes.signature);
+          return {
+            thought: `${trigger.asset} crossed · spent $${trigger.amount_usd.toFixed(3)} · ${priceStr}`,
+            decision: {
+              action: "tool_call",
+              // Synthetic toolId — drives the "bought {asset} at $X"
+              // row in the worker activity log. Not a real registered
+              // tool, but the runner doesn't look it up after-the-fact
+              // so this is safe.
+              toolId: "pulse_trigger_fire",
+              toolInput: {
+                asset: trigger.asset,
+                direction: trigger.direction,
+                threshold: trigger.threshold_usd,
+                livePrice,
+                targetToken: trigger.target_token ?? null,
+              },
+              toolResult: {
+                ok: true,
+                message: `Trigger fired · sig ${fireRes.signature.slice(0, 10)}…`,
+                signature: fireRes.signature,
+                amountUsd: trigger.amount_usd,
+                counterparty: trigger.target_token
+                  ? `Kyvern · swap router (${trigger.target_token})`
+                  : "Pay.sh · Gemini",
+              },
+            },
+            toolResult: {
+              ok: true,
+              message: `Trigger fired · sig ${fireRes.signature.slice(0, 10)}…`,
+              signature: fireRes.signature,
+              amountUsd: trigger.amount_usd,
+              counterparty: trigger.target_token
+                ? `Kyvern · swap router (${trigger.target_token})`
+                : "Pay.sh · Gemini",
+              data: {
+                asset: trigger.asset,
+                livePrice,
+                targetToken: trigger.target_token ?? null,
+              },
+            },
+          };
+        }
+        if (writeRes.created && !settled) {
+          return {
+            thought: `${trigger.asset} crossed · spend blocked: ${fireRes?.reason ?? "unknown"} · ${priceStr}`,
+            decision: {
+              action: "tool_call",
+              toolId: "pulse_trigger_fire",
+              toolInput: {
+                asset: trigger.asset,
+                direction: trigger.direction,
+                threshold: trigger.threshold_usd,
+                livePrice,
+                targetToken: trigger.target_token ?? null,
               },
               toolResult: {
                 ok: false,
-                message: `Trigger surfaced · payout blocked (${fireRes.reason ?? "unknown"})`,
-                failedReason: fireRes.reason ?? "blocked",
+                message: `Trigger surfaced · payout blocked (${fireRes?.reason ?? "unknown"})`,
+                failedReason: fireRes?.reason ?? "blocked",
                 amountUsd: trigger.amount_usd,
               },
-            };
-          } catch (e) {
-            return {
-              thought: `${trigger.asset} crossed · fire threw: ${e instanceof Error ? e.message : "error"}`,
-              decision: { action: "observe" },
-            };
-          }
+            },
+            toolResult: {
+              ok: false,
+              message: `Trigger surfaced · payout blocked (${fireRes?.reason ?? "unknown"})`,
+              failedReason: fireRes?.reason ?? "blocked",
+              amountUsd: trigger.amount_usd,
+              data: {
+                asset: trigger.asset,
+                livePrice,
+                targetToken: trigger.target_token ?? null,
+              },
+            },
+          };
         }
         // Already surfaced inside the dedup window — silent re-tick.
         return {

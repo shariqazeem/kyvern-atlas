@@ -45,6 +45,7 @@ const KIND_ICON: Record<SignalKind, LucideIcon> = {
   wallet_alert: AlertTriangle,
   trigger_armed: Crosshair,
   trigger_fired: Zap,
+  trigger_blocked: Zap,
   // Legacy
   bounty: Award,
   ecosystem_announcement: Megaphone,
@@ -63,6 +64,7 @@ const KIND_COLOR: Record<SignalKind, string> = {
   wallet_alert: "#B45309",
   trigger_armed: "#9333EA",
   trigger_fired: "#15803D",
+  trigger_blocked: "#B91C1C",
   // Legacy
   bounty: "#16A34A",
   ecosystem_announcement: "#2563EB",
@@ -81,6 +83,7 @@ const KIND_LABEL: Record<SignalKind, string> = {
   wallet_alert: "WALLET ALERT",
   trigger_armed: "TRIGGER ARMED",
   trigger_fired: "TRIGGER FIRED",
+  trigger_blocked: "TRIGGER BLOCKED",
   // Legacy
   bounty: "BOUNTY",
   ecosystem_announcement: "ANNOUNCEMENT",

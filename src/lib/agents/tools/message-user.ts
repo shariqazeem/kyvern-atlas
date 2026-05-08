@@ -27,6 +27,7 @@ const VALID_SIGNAL_KINDS: SignalKind[] = [
   "wallet_alert",
   "trigger_armed",
   "trigger_fired",
+  "trigger_blocked",
   // Legacy kinds — accepted for backwards-compat with historical rows.
   "bounty",
   "ecosystem_announcement",

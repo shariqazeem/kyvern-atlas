@@ -515,8 +515,13 @@ const DEDUPE_WINDOW_MS_BY_KIND: Record<SignalKind, number> = {
   // Phase 3 — user-benefit-first kinds.
   drafted_application: 24 * 60 * 60 * 1000,     // 24h — same bounty draft shouldn't re-fire
   wallet_alert: 60 * 60 * 1000,                 // 1h — wallet movements are fast
-  trigger_armed: 30 * 60 * 1000,                // 30m — let armed re-surface after each cool-off
+  // 2026-05-08: armed used to be 30 min so the user got pinged every
+  // ~3 ticks while the price hovered near the threshold. That's spam.
+  // One armed alert per trigger per 24h is the right cadence — the
+  // user only needs to be told once that the trigger is close.
+  trigger_armed: 24 * 60 * 60 * 1000,
   trigger_fired: 24 * 60 * 60 * 1000,           // 24h — same trigger fires once a day max
+  trigger_blocked: 24 * 60 * 60 * 1000,         // 24h — same blocked condition once per day
   // Legacy kinds.
   bounty: 24 * 60 * 60 * 1000,
   ecosystem_announcement: 24 * 60 * 60 * 1000,
@@ -528,6 +533,28 @@ const DEDUPE_WINDOW_MS_BY_KIND: Record<SignalKind, number> = {
   opportunity: 24 * 60 * 60 * 1000,
   market_intel: 60 * 60 * 1000,
 };
+
+/**
+ * User-facing inbox filter — Phase 8 (2026-05-08).
+ *
+ * The inbox is the user's notifications surface, not the runner's
+ * audit trail. Only signals that the user can act on (drafted
+ * application = TODO; wallet alert = intel; trigger armed = heads-up;
+ * trigger fired = celebration / on-chain receipt) are eligible to
+ * land in the inbox query.
+ *
+ * Legacy runner emissions (release announcements, raw observations,
+ * "ecosystem update", market intel etc.) stay in the signals table
+ * for the worker page's Activity log — but they don't pollute the
+ * inbox stream where the four meaningful kinds live.
+ */
+export const USER_FACING_KINDS: ReadonlySet<SignalKind> = new Set<SignalKind>([
+  "drafted_application",
+  "wallet_alert",
+  "trigger_armed",
+  "trigger_fired",
+  "trigger_blocked",
+]);
 
 interface WriteSignalResult {
   signal: Signal;
@@ -727,33 +754,42 @@ export function listInbox(
     /** When true (default), suppress signals whose snoozed_until is in
      *  the future. Set false to include snoozed rows for admin views. */
     excludeSnoozed?: boolean;
+    /** When true (default), restrict to USER_FACING_KINDS only — the
+     *  inbox is the user's notifications, not the runner audit trail.
+     *  Pass false for admin / debug surfaces that want every signal. */
+    userFacingOnly?: boolean;
   } = {},
 ): Signal[] {
   const limit = Math.max(1, Math.min(opts.limit ?? 50, 200));
   const since = opts.since ?? 0;
   const now = Date.now();
   const excludeSnoozed = opts.excludeSnoozed !== false;
+  const userFacingOnly = opts.userFacingOnly !== false;
   const db = getDb();
   const snoozeClause = excludeSnoozed
     ? `AND (snoozed_until IS NULL OR snoozed_until <= ${now})`
     : "";
+  const kindClause = userFacingOnly
+    ? `AND kind IN (${[...USER_FACING_KINDS].map(() => "?").join(",")})`
+    : "";
+  const kindParams = userFacingOnly ? [...USER_FACING_KINDS] : [];
   const rows = opts.status
     ? (db
         .prepare(
           `SELECT * FROM signals
            WHERE device_id = ? AND status = ? AND created_at >= ?
-             ${snoozeClause}
+             ${snoozeClause} ${kindClause}
            ORDER BY created_at DESC LIMIT ?`,
         )
-        .all(deviceId, opts.status, since, limit) as SignalRow[])
+        .all(deviceId, opts.status, since, ...kindParams, limit) as SignalRow[])
     : (db
         .prepare(
           `SELECT * FROM signals
            WHERE device_id = ? AND created_at >= ?
-             ${snoozeClause}
+             ${snoozeClause} ${kindClause}
            ORDER BY created_at DESC LIMIT ?`,
         )
-        .all(deviceId, since, limit) as SignalRow[]);
+        .all(deviceId, since, ...kindParams, limit) as SignalRow[]);
   return rows.map(rowToSignal);
 }
 
@@ -761,14 +797,26 @@ export function countSignals(
   deviceId: string,
   status?: SignalStatus,
 ): number {
+  // Phase 8 — inbox count mirrors the inbox query: user-facing kinds
+  // only. The full audit count for admin views can read signals
+  // directly without going through this helper.
   const db = getDb();
+  const placeholders = [...USER_FACING_KINDS].map(() => "?").join(",");
   if (status) {
     const r = db
-      .prepare(`SELECT COUNT(*) as n FROM signals WHERE device_id = ? AND status = ?`)
-      .get(deviceId, status) as { n: number };
+      .prepare(
+        `SELECT COUNT(*) as n FROM signals
+          WHERE device_id = ? AND status = ? AND kind IN (${placeholders})`,
+      )
+      .get(deviceId, status, ...USER_FACING_KINDS) as { n: number };
     return r.n;
   }
-  const r = db.prepare(`SELECT COUNT(*) as n FROM signals WHERE device_id = ?`).get(deviceId) as { n: number };
+  const r = db
+    .prepare(
+      `SELECT COUNT(*) as n FROM signals
+        WHERE device_id = ? AND kind IN (${placeholders})`,
+    )
+    .get(deviceId, ...USER_FACING_KINDS) as { n: number };
   return r.n;
 }
 

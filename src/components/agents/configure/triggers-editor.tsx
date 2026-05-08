@@ -184,7 +184,16 @@ export function TriggersEditor({ agentId, initial, onSaved }: Props) {
                   USD
                 </span>
               </div>
-              <div className="flex items-center gap-2">
+              {/* Phase 8 (2026-05-08) — merge Spend + Swap-into into a
+                  single row. The legacy `merchant` field is gone — when
+                  target_token is set the runner routes the spend to
+                  kyvern.swap.{token}, which is what the chain-enforced
+                  payment actually carries in its memo. Showing
+                  api.openai.com as a merchant input made it look like
+                  the user's $0.10 was going to OpenAI, which is wrong.
+                  The merchant is derived; users only choose the swap
+                  target. */}
+              <div className="flex items-center gap-2 flex-wrap">
                 <span
                   className="font-mono uppercase tracking-[0.14em]"
                   style={{ color: "#9CA3AF", fontSize: 9.5 }}
@@ -212,57 +221,31 @@ export function TriggersEditor({ agentId, initial, onSaved }: Props) {
                   }}
                 />
                 <span
-                  className="font-mono"
-                  style={{ fontSize: 10, color: "rgba(15,23,42,0.45)" }}
-                >
-                  →
-                </span>
-                <input
-                  type="text"
-                  value={t.merchant}
-                  onChange={(e) => update(idx, { merchant: e.target.value })}
-                  placeholder="api.openai.com"
-                  className="flex-1 px-2.5 py-1.5 rounded-[6px] outline-none font-mono"
-                  style={{
-                    fontSize: 11.5,
-                    background: "#FFFFFF",
-                    border: "1px solid rgba(15,23,42,0.08)",
-                    color: "#0A0A0A",
-                  }}
-                />
-              </div>
-              <input
-                type="text"
-                value={t.memo}
-                onChange={(e) => update(idx, { memo: e.target.value })}
-                placeholder="Memo (optional)"
-                className="w-full px-2.5 py-1.5 rounded-[6px] outline-none"
-                style={{
-                  fontSize: 11.5,
-                  background: "#FFFFFF",
-                  border: "1px solid rgba(15,23,42,0.08)",
-                  color: "#0A0A0A",
-                }}
-              />
-              {/* Phase 2 (KYVERN_FRONTIER_GRAND_CHAMPION) — chain-enforced
-                  swap target. When set, the trigger fires through the
-                  Anchor program's swap_via_oracle once Phase 1 is live. */}
-              <div className="flex items-center gap-2">
-                <span
                   className="font-mono uppercase tracking-[0.14em]"
                   style={{ fontSize: 9.5, color: "rgba(15,23,42,0.45)" }}
                 >
-                  Swap into
+                  USDC · swap into
                 </span>
                 <select
                   value={t.target_token ?? ""}
-                  onChange={(e) =>
-                    update(idx, {
-                      target_token: e.target.value
-                        ? (e.target.value as "SOL" | "kBONK" | "kJUP")
-                        : undefined,
-                    })
-                  }
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    if (next) {
+                      update(idx, {
+                        target_token: next as "SOL" | "kBONK" | "kJUP",
+                        // Keep the legacy `merchant` field schema-valid
+                        // (it's required by the Zod schema until we
+                        // can drop the column entirely): set it to the
+                        // derived merchant for clarity in the DB.
+                        merchant: `kyvern.swap.${next.toLowerCase()}`,
+                      });
+                    } else {
+                      update(idx, {
+                        target_token: undefined,
+                        merchant: "api.pay.sh/gemini",
+                      });
+                    }
+                  }}
                   className="px-2.5 py-1.5 rounded-[6px] outline-none text-[11.5px]"
                   style={{
                     background: "#FFFFFF",
@@ -270,7 +253,7 @@ export function TriggersEditor({ agentId, initial, onSaved }: Props) {
                     color: "#0A0A0A",
                   }}
                 >
-                  <option value="">— off —</option>
+                  <option value="">— Pay.sh / Gemini —</option>
                   <option value="SOL">SOL</option>
                   <option value="kBONK">kBONK</option>
                   <option value="kJUP">kJUP</option>
@@ -289,6 +272,19 @@ export function TriggersEditor({ agentId, initial, onSaved }: Props) {
                   </span>
                 )}
               </div>
+              <input
+                type="text"
+                value={t.memo}
+                onChange={(e) => update(idx, { memo: e.target.value })}
+                placeholder="Note (optional)"
+                className="w-full px-2.5 py-1.5 rounded-[6px] outline-none"
+                style={{
+                  fontSize: 11.5,
+                  background: "#FFFFFF",
+                  border: "1px solid rgba(15,23,42,0.08)",
+                  color: "#0A0A0A",
+                }}
+              />
               <div className="flex justify-end">
                 <button
                   type="button"

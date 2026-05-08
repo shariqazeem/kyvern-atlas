@@ -32,10 +32,11 @@ interface Props {
 }
 
 const KIND_LABEL: Record<string, string> = {
-  drafted_application: "Draft",
-  wallet_alert: "Wallet Alert",
-  trigger_armed: "Armed",
-  trigger_fired: "Fired",
+  drafted_application: "Draft ready",
+  wallet_alert: "Whale move",
+  trigger_armed: "Heads-up",
+  trigger_fired: "On-chain ✓",
+  trigger_blocked: "Blocked ✕",
   bounty: "Bounty",
   ecosystem_announcement: "Announcement",
   wallet_move: "Wallet Move",

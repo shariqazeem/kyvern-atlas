@@ -157,6 +157,7 @@ export type SignalKind =
   | "wallet_alert" // Wren: material move on a watched address (Pay.sh/Gemini-validated)
   | "trigger_armed" // Pulse: a price condition is now within range, watching
   | "trigger_fired" // Pulse: condition crossed, conditional vault.pay settled
+  | "trigger_blocked" // Pulse: condition crossed but the chain rejected the spend
   // Legacy kinds — kept for backward compat with historical rows.
   // No longer emitted by the trio post-Phase 3.
   | "bounty"

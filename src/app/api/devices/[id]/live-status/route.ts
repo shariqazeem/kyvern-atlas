@@ -279,11 +279,18 @@ export async function GET(
   if (agents.length > 0) {
     const ids = agents.map((a) => a.id);
     const placeholders = ids.map(() => "?").join(",");
+    // Phase 8 (2026-05-08) — restrict per-worker lastFinding to
+    // user-facing kinds. The previous query surfaced any recent
+    // signal, which meant a release-feed scan ("core v0.12.0") could
+    // dominate Sentinel's worker tile and bury the actual valuable
+    // last finding (a drafted application). Mirroring USER_FACING_KINDS
+    // here keeps tiles focused on user-meaningful output.
     const rows = db
       .prepare(
         `SELECT agent_id, kind, subject, source_url, created_at
            FROM signals
           WHERE agent_id IN (${placeholders})
+            AND kind IN ('drafted_application','wallet_alert','trigger_armed','trigger_fired','trigger_blocked')
           ORDER BY created_at DESC
           LIMIT 60`,
       )
@@ -310,7 +317,7 @@ export async function GET(
              FROM signals
             WHERE agent_id IN (${agentIds.map(() => "?").join(",")})
               AND created_at >= ?
-              AND kind IN ('drafted_application','wallet_alert','trigger_armed','trigger_fired')
+              AND kind IN ('drafted_application','wallet_alert','trigger_armed','trigger_fired','trigger_blocked')
             GROUP BY agent_id, kind`,
         )
         .all(...agentIds, dayAgoMs) as Array<{
@@ -420,7 +427,8 @@ export async function GET(
         SUM(CASE WHEN status = 'read' THEN 1 ELSE 0 END) AS read,
         SUM(CASE WHEN status = 'unread' AND source_url IS NOT NULL THEN 1 ELSE 0 END) AS actionable
        FROM signals
-       WHERE device_id = ? AND created_at >= ?`,
+       WHERE device_id = ? AND created_at >= ?
+         AND kind IN ('drafted_application','wallet_alert','trigger_armed','trigger_fired','trigger_blocked')`,
     )
     .get(params.id, todayMs) as {
     total: number;

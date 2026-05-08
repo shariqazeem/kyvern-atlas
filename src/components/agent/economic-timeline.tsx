@@ -100,6 +100,16 @@ const TOOL_VERB: Record<
     failed: "blocked messaging you",
     tone: "earned",
   },
+  pulse_trigger_fire: {
+    Icon: Coins,
+    // Filled in dynamically by the renderer below from toolInput.asset
+    // / livePrice / amountUsd → "bought SOL at $88.06". This entry
+    // exists so the verb-map doesn't fall through to the generic
+    // "used pulse trigger fire" string.
+    success: "trigger fired",
+    failed: "trigger blocked",
+    tone: "earned",
+  },
 };
 
 function fmtAgo(ms: number): string {
@@ -243,13 +253,31 @@ function TimelineRow({
   const failed = item.signatureStatus === "failed";
   const success = item.signatureStatus === "success";
 
-  // Render a generic row when the tool isn't in our economic verb map
-  // (still has a signature — e.g. an edge tool we forgot to register).
-  const verb = cfg
-    ? failed
-      ? cfg.failed
-      : cfg.success
-    : `used ${tool.replace(/_/g, " ")}`;
+  // Phase 8 (2026-05-08) — value-first verbs for pulse_trigger_fire.
+  // Pull asset + price out of the thought string the runner emitted
+  // ("SOL crossed · spent $0.100 · $88.06") so the row reads
+  // "bought SOL at $88.06 · spent $0.100 · on-chain ✓" instead of the
+  // generic "trigger fired" verb. Falls back to the static cfg verb
+  // when parsing fails.
+  let verb: string;
+  if (tool === "pulse_trigger_fire") {
+    const m = item.thought?.match(/^([A-Z]{2,8})\s+crossed.*?\$([0-9.]+)\s*$/);
+    const asset = m?.[1];
+    const price = m?.[2];
+    if (failed) {
+      verb = asset
+        ? `tried to buy ${asset} at $${price ?? "—"} · daily cap blocked`
+        : "trigger fire blocked · daily cap";
+    } else if (success && asset && price) {
+      verb = `bought ${asset} at $${price}`;
+    } else {
+      verb = "trigger fired";
+    }
+  } else if (cfg) {
+    verb = failed ? cfg.failed : cfg.success;
+  } else {
+    verb = `used ${tool.replace(/_/g, " ")}`;
+  }
 
   const Icon = cfg?.Icon ?? Activity;
   const tone = cfg?.tone ?? "spent";

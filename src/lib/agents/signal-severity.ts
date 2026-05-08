@@ -83,6 +83,7 @@ export function severityForSignal(s: SignalLike): Severity {
     return "info";
   }
   if (s.kind === "trigger_fired") return "important";
+  if (s.kind === "trigger_blocked") return "important";
   if (s.kind === "trigger_armed") return "routine";
 
   // ── Legacy kinds ──────────────────────────────────────────────────

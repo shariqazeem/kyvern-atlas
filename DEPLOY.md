@@ -1,201 +1,329 @@
-# Deployment handoff — Kyvern Vault
+# DEPLOY — Kyvern operations runbook
 
-Everything I couldn't do from Claude's sandbox (needs your SSH keys / domains / secrets). Each section ≤ 5 minutes.
-
----
-
-## 1. Vercel deploy (recommended — easier than Oracle VM)
-
-Since Kyvern Vault is a Next.js 14 app with no custom server requirements beyond better-sqlite3, Vercel is the fastest path. The one thing that breaks on Vercel is the SQLite DB — Vercel's filesystem is read-only. Fix: switch from local file to Turso (libsql-compatible, has a free tier).
-
-### Step 1 — one-time Turso setup
-
-```bash
-# install CLI
-curl -sSfL https://get.tur.so/install.sh | bash
-turso auth login
-
-# create a db
-turso db create kyvern-prod
-turso db tokens create kyvern-prod
-turso db show kyvern-prod --url
-```
-
-Save the printed URL and token.
-
-### Step 2 — Vercel env vars
-
-In the Vercel project settings → Environment Variables, add:
-
-| Name | Value |
-|---|---|
-| `TURSO_URL` | from `turso db show` |
-| `TURSO_TOKEN` | from `turso db tokens create` |
-| `KYVERN_FEE_PAYER_SECRET` | base58 secret for a devnet signer with ~5 SOL |
-| `KYVERN_SOLANA_RPC_URL` | `https://api.devnet.solana.com` (or Helius/QuickNode URL) |
-| `KYVERN_SQUADS_MODE` | `real` (default — leave unset in prod) |
-| `PRIVY_APP_ID` | from privy.io dashboard (optional — dev fallback works without) |
-| `PRIVY_APP_SECRET` | from privy.io dashboard |
-
-### Step 3 — swap better-sqlite3 for libsql on Vercel
-
-The code path is already isolated to `src/lib/db.ts`. On Vercel, `better-sqlite3` native bindings fail to build. Two paths:
-
-- **A. Keep better-sqlite3 locally, use Turso only on Vercel.** Wrap the DB init in a runtime branch:
-  ```ts
-  // in src/lib/db.ts
-  export const db = process.env.TURSO_URL
-    ? createTursoAdapter(process.env.TURSO_URL, process.env.TURSO_TOKEN!)
-    : createLocalSqlite();
-  ```
-  Turso's `@libsql/client` has an almost-identical API to better-sqlite3; 50 lines of adapter code.
-
-- **B. Simpler: Deploy to Oracle VM instead.** The existing `better-sqlite3` just works there. See section 2.
-
-If you're shipping to submit the hackathon *tonight*, pick B. If you want kyvernlabs.com live long-term, pick A — we can wire the adapter next session.
-
-### Step 4 — deploy
-
-```bash
-vercel link
-vercel env pull  # sanity-check local pulls match dashboard
-vercel --prod
-```
-
-Point `kyvernlabs.com` at the Vercel deployment via DNS CNAME → `cname.vercel-dns.com` in your DNS provider.
+Single source of truth for shipping changes to production. Re-read before every deploy. Last verified: **2026-05-02**, HEAD `a6bca7a` (Phase 8 Revenue Terminal live).
 
 ---
 
-## 2. Oracle VM deploy (the path your memory has pre-configured)
+## §1 What's running
 
-Your memory file says: `ssh -i ~/Documents/ssh-key3.key ubuntu@80.225.209.190, ~/kyvernlabs, pm2 restart kyvernlabs, --legacy-peer-deps required`.
+One Oracle Cloud VM serves **both** `kyvernlabs.com` and `app.kyvernlabs.com` from the same Next.js process on `:3001`. Five pm2 processes keep the trio economy + Atlas observatory + revenue feed alive 24/7. The old `~/kyvernlabs` directory and dormant `kyvernlabs` pm2 process were deleted on 2026-05-01 — there is **one** product on this VM.
+
+Submission deadline: **2026-05-09** (Colosseum Frontier).
+
+---
+
+## §2 VM access
 
 ```bash
 ssh -i ~/Documents/ssh-key3.key ubuntu@80.225.209.190
-cd ~/kyvernlabs
-git pull origin main
-npm install --legacy-peer-deps
-npm run build
-pm2 restart kyvernlabs
+```
+
+| Path | Role |
+|---|---|
+| `~/kyvernlabs-commerce/` | This repo — serves both domains via nginx → `:3001` |
+| `~/kyvernlabs-commerce/atlas.db` | Atlas state (cycles, signals, ledger) |
+| `~/kyvernlabs-commerce/pulse.db` | Agents/signals/tasks/feed_purchases (the trio loop + revenue) |
+
+DNS: both domains CNAME → this VM. nginx terminates TLS and proxies `/` → `127.0.0.1:3001`.
+
+---
+
+## §3 PM2 process inventory (5 processes — all must stay online)
+
+| id | name | cwd | port | purpose | restart trigger |
+|---|---|---|---|---|---|
+| 8 | `kyvern-commerce` | `~/kyvernlabs-commerce` | 3001 | Next.js web app — both domains | code in `src/**`, `app/**`, API routes |
+| 2 | `atlas` | `~/kyvernlabs-commerce` | — | `scripts/atlas-runner.ts` — 3 min cycle | code in `scripts/atlas-*`, `lib/atlas/**` |
+| 3 | `atlas-attacker` | `~/kyvernlabs-commerce` | — | `scripts/atlas-attacker.ts` — adversarial probes ~8 min | same as atlas |
+| 5 | `agent-pool` | `~/kyvernlabs-commerce` | — | user-spawned worker ticker | code in `lib/agents/**`, `runner.ts`, `tools/**` |
+| ? | `buyer-bot` | `~/kyvernlabs-commerce` | — | `scripts/buyer-bot.ts` — pays Atlas $0.01 USDC every 30s | code in `scripts/buyer-bot.ts`, `lib/x402-verify.ts` |
+
+**Always restart agent-pool when you change worker code.** Its JS is loaded once at process boot — deploys silently look successful but workers run stale code until you `pm2 restart agent-pool`.
+
+**Always restart buyer-bot when you change `/api/atlas/feed` or x402 verification.** Same silent-failure pattern.
+
+```bash
+# full restart (after any non-trivial deploy)
+pm2 restart kyvern-commerce atlas atlas-attacker agent-pool buyer-bot
 pm2 save
-pm2 logs kyvernlabs --lines 50  # watch for errors
-```
-
-Nginx should already be proxying `kyvernlabs.com` to localhost:3000. If not, standard Nginx reverse-proxy config:
-
-```nginx
-server {
-  listen 443 ssl;
-  server_name kyvernlabs.com;
-  # your SSL bits here (certbot, cloudflare, whatever)
-
-  location / {
-    proxy_pass http://127.0.0.1:3000;
-    proxy_set_header Host $host;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-  }
-}
-```
-
-### Environment variables on the VM
-
-On Oracle VM, env vars typically live in `~/.config/systemd/user/kyvernlabs.env` or in a `pm2 ecosystem.config.js` file. Double-check:
-
-```bash
-pm2 env 0   # prints env vars for first process
-```
-
-Must have at minimum: `KYVERN_SOLANA_RPC_URL`, `KYVERN_FEE_PAYER_SECRET`, `PRIVY_APP_ID`, `PRIVY_APP_SECRET`.
-
-### Fund the VM's Kyvern signer
-
-The VM needs its own devnet signer with ~5 SOL to pay fees for vaults created via the web UI. If you don't want to copy `C2rBv9mw…qZCh` over (preferable not to, key hygiene), generate a new one:
-
-```bash
-# on the VM
-mkdir -p ~/.kyvern
-solana-keygen new --outfile ~/.kyvern/server-signer.json
-# or paste KYVERN_FEE_PAYER_SECRET via env var instead
-```
-
-Fund via https://faucet.solana.com.
-
----
-
-## 3. Publishing `@kyvernlabs/sdk` + `create-kyvern-agent` to npm
-
-The SDK is currently at v0.4.0 locally. Publishing the updated version:
-
-```bash
-cd packages/sdk
-npm publish --access public
-```
-
-Then the scaffolder:
-
-```bash
-cd packages/create-kyvern-agent
-npm publish --access public
-```
-
-If `npm whoami` errors, `npm login` first. The KyvernLabs org should already exist on npm from the earlier `@kyvernlabs/pulse` publish.
-
-### Sanity test the shipped scaffolder
-
-From a fresh directory (not the monorepo):
-
-```bash
-cd /tmp
-npx create-kyvern-agent test-agent@0.1.0
-cd test-agent
-cat package.json | grep name   # should show "test-agent"
 ```
 
 ---
 
-## 4. SUBMISSION.md — final edits before you submit
+## §4 Required env vars (per process)
 
-Open SUBMISSION.md one last time before pasting to the hackathon form:
+### kyvern-commerce + atlas + atlas-attacker + agent-pool
 
-1. **Live demo URL** — replace `kyvernlabs.com/vault` with your actual live URL (might be `kyvern-vault.vercel.app` initially if DNS isn't ready)
-2. **Video URL** — insert the MP4 link (YouTube unlisted, Loom, or a Vercel-hosted direct link)
-3. **Twitter handle for tagging** — ensure `@shariqshkt` is correct
-4. **Date of on-chain proof table** — update the "produced on" line to match the most recent `demo-e2e.ts` run
+```
+KYVERN_ATLAS_DB_PATH         = /home/ubuntu/kyvernlabs-commerce/atlas.db
+KYVERN_BASE_URL              = http://127.0.0.1:3001
+KYVERNLABS_AGENT_KEY         = kv_live_b7b2001e8afa5de06c592a217852f2ca8fe78a60d4b3a49cdedb409665336075
+ATLAS_VAULT_ID               = vlt_QcCPbp3XTzHtF5
+ATLAS_CYCLE_MS               = 180000
+ATLAS_ATTACK_MS              = 480000
+PORT                         = 3001          (kyvern-commerce only)
+NEXT_PUBLIC_PRIVY_APP_ID     = (Privy dashboard)
+PRIVY_APP_SECRET             = (Privy dashboard)
+COMMONSTACK_API_KEY          = (Commonstack — gpt-oss-120b)
+SOLANA_MAINNET_RPC           = https://mainnet.helius-rpc.com/?api-key=873c5824-7255-40c9-9a39-4d3d04efe717
+```
 
-The proof table can be regenerated anytime: `cd anchor && npx tsx scripts/demo-e2e.ts` → copy the PROOF section → replace table in SUBMISSION.md.
+**Helius key expires 2026-05-11** (paid plan, 8 days from 2026-05-03 funding). Wren's whale-watching falls back to public RPC if missing — degraded but not broken.
+
+### buyer-bot (additional)
+
+```
+BUYER_BOT_SECRET_B58         = (base58 secret — run scripts/buyer-bot-init.ts to generate)
+KYVERN_BASE_URL              = https://app.kyvernlabs.com   (production target — buys from public feed)
+SOLANA_RPC_URL               = https://api.devnet.solana.com
+```
+
+If `KYVERNLABS_AGENT_KEY` is dropped on `pm2 restart`, the public `/api/atlas/probe` endpoint returns `atlas_offline`. Restore with:
+
+```bash
+ssh ... 'KYVERNLABS_AGENT_KEY=kv_live_... pm2 restart kyvern-commerce --update-env && pm2 save'
+```
 
 ---
 
-## 5. The 90-second video
+## §5 Standard deploy flow
 
-Script is in SUBMISSION.md § *Video script*. Recording tips:
+**CRITICAL:** the VM disk runs at 90%+ and SSH sessions die mid-`npm run build`. Always use the nohup + file-marker pattern. A single long SSH command WILL get killed on bad nights, leaving `.next/BUILD_ID` missing and pm2 in a crash loop.
 
-- **Use a clean browser profile** with just two tabs: Solana Explorer + localhost:3000
-- **Start on the failed-tx Explorer page** — zoom in on `Error Code: MerchantNotAllowlisted` for the first 3 seconds. That's the moat shot.
-- **Don't live-run devnet during the recording.** The demo-e2e.ts outputs are already saved in SUBMISSION.md; just click the Explorer links. A live run risks RPC flakes mid-video.
-- **Record with OBS** (1080p, 30fps). Or use macOS's built-in screen recording (Cmd+Shift+5) if simpler.
-- **No music.** Voiceover or captions only. Judges watch on mute 80% of the time.
-- **Export as MP4**, upload to YouTube unlisted. Paste the URL into the submission form.
+```bash
+# 1. push from local
+git push origin main
+
+# 2. on the VM, kick off install + build under nohup
+ssh -i ~/Documents/ssh-key3.key ubuntu@80.225.209.190 '
+  cd ~/kyvernlabs-commerce &&
+  git pull origin main &&
+  rm -f /tmp/kyvern-build-done /tmp/kyvern-build-fail &&
+  nohup bash -c "npm install --legacy-peer-deps > /tmp/kyvern-install.log 2>&1 && rm -rf .next && npm run build > /tmp/kyvern-build.log 2>&1 && touch /tmp/kyvern-build-done || touch /tmp/kyvern-build-fail" > /dev/null 2>&1 &
+  disown
+'
+
+# 3. poll for the marker (15s intervals; build takes 90-180s)
+ssh -i ~/Documents/ssh-key3.key ubuntu@80.225.209.190 '
+  ls /tmp/kyvern-build-done /tmp/kyvern-build-fail 2>/dev/null
+'
+
+# 4. when done — restart all 5 processes + smoke test
+ssh -i ~/Documents/ssh-key3.key ubuntu@80.225.209.190 '
+  pm2 restart kyvern-commerce atlas atlas-attacker agent-pool buyer-bot &&
+  pm2 save &&
+  curl -sS http://127.0.0.1:3001/api/atlas/status | head -c 200 &&
+  curl -sS http://127.0.0.1:3001/api/atlas/revenue | head -c 200
+'
+```
+
+### Pre-deploy safety check
+
+```bash
+ssh -i ~/Documents/ssh-key3.key ubuntu@80.225.209.190 '
+  echo "disk:"; df -h / | tail -1
+  echo "kyvern HEAD:"; cd ~/kyvernlabs-commerce && git log -1 --oneline
+  pm2 list | grep -E "kyvern-commerce|atlas|agent-pool|buyer-bot" | head -8
+'
+```
+
+### Pre-push local check (avoid stricter-VM-ESLint surprise)
+
+```bash
+rm -rf .next && npm run build
+```
+
+The VM's ESLint is stricter than local with a cached `.next` — clean local build catches issues before push.
+
+### Post-deploy smoke test
+
+```bash
+curl -sS -o /dev/null -w "kyvernlabs.com: %{http_code}\napp.kyvernlabs.com: %{http_code}\n" \
+  https://kyvernlabs.com/ https://app.kyvernlabs.com/
+curl -sS https://app.kyvernlabs.com/api/atlas/revenue | python3 -m json.tool | head -20
+```
 
 ---
 
-## 6. Submission tweet
+## §6 Critical addresses & secrets
 
-`LAUNCH.md` has a 7-tweet thread + 3 single-tweet variants. Go with the thread.
+| Name | Address | Notes |
+|---|---|---|
+| **Atlas vault PDA** | `925nkpVpSR32WhU8mKWMPC8hnMTJj2DRU9idFeRKHixf` | Squads multisig vault — off-curve |
+| **Atlas USDC ATA** | `9RnS21ieUZ2b1UTxYhrvT16n5Vedq74Ppcymhmqq7hAW` | **Use this for Circle faucet** — PDA-owned ATA, but Circle sends to ATA reliably |
+| **Atlas Squads multisig** | `7fTtzef3pnzL4MKyLkYL37rdyTR6CsT66x62bThnWtsP` | governance |
+| **Kyvern Anchor program** | `PpmZErWfT5zpeo1fJtTbpqezFGbRUamaNNRWViaMSqc` | devnet — 12 error codes, 4 instructions |
+| **Server fee-payer** | `GZCnHuFtswvsJftSDmtoHEve8amqNLzAAPvYy8NU3ZNZ` | drains over time → top up at https://faucet.solana.com |
+| **USDC mint (devnet)** | `4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU` | for token-account derivations |
+| **Helius mainnet RPC** | `https://mainnet.helius-rpc.com/?api-key=873c5824-7255-40c9-9a39-4d3d04efe717` | **expires 2026-05-11** |
 
-Timing: post 30-60 minutes after submission-form submission so the form has indexed + your Explorer links are warm.
+### Buyer-bot wallet
+
+The buyer-bot signs with a devnet keypair derived from `BUYER_BOT_SECRET_B58`. Generate fresh with:
+
+```bash
+npx tsx scripts/buyer-bot-init.ts
+# prints public address + base58 secret + USDC ATA
+```
+
+Fund the buyer-bot's USDC ATA (≥ $0.50 of devnet USDC) and SOL (~0.05 for fees) before running. Bot self-throttles when USDC balance < $0.01.
 
 ---
 
-## Troubleshooting
+## §7 Common operational tasks
 
-**`pm2 restart` gets stuck** → `pm2 kill && pm2 start ecosystem.config.js`.
+### Top up Atlas's USDC
 
-**Build OOM on the VM** → Oracle free-tier has 1GB RAM. Add swap: `sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile && echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab`.
+1. Open https://faucet.circle.com → Solana Devnet → USDC
+2. Paste `9RnS21ieUZ2b1UTxYhrvT16n5Vedq74Ppcymhmqq7hAW` (the **USDC ATA**, not the vault PDA — Circle silently fails on off-curve PDAs)
+3. Send $20 (daily cap)
+4. Atlas's next 3-min cycle picks it up
 
-**Privy redirect URL mismatch** → Privy dashboard → App → "Allowed callback URLs" must include your prod domain.
+### Top up the buyer-bot
 
-**Vercel `better-sqlite3` build fails** → This is expected. Either use Vercel + Turso (section 1) or Oracle (section 2). Don't try to make better-sqlite3 work on Vercel.
+Same Circle flow, but the recipient is buyer-bot's USDC ATA (printed by `scripts/buyer-bot-init.ts`).
 
-**Solana RPC rate-limited in prod** → Switch `KYVERN_SOLANA_RPC_URL` to a Helius or QuickNode URL. Public RPC is fine for devnet demo but you'll hit 429s under real traffic.
+### Top up the server fee-payer (SOL)
+
+```bash
+# 1) get the address
+ssh ... 'pm2 env 8 | grep KYVERN_FEE_PAYER_PUBKEY'   # or check known: GZCn…3ZNZ
+# 2) airdrop at https://faucet.solana.com (public airdrop is rate-limited; the VM has no solana CLI)
+```
+
+If every `vault.pay()` fails simulation with `Attempt to debit an account but found no record of a prior credit` even though USDC is present → fee-payer SOL is 0.
+
+### Verify the trio economic loop
+
+```bash
+curl -sS https://app.kyvernlabs.com/api/atlas/status | python3 -m json.tool | grep -E "cycle|state|lastSettled" | head
+curl -sS https://app.kyvernlabs.com/api/atlas/revenue | python3 -m json.tool | grep -E "totalRevenueUsd|totalPurchases" | head
+```
+
+If `totalPurchases` is increasing every ~30s → buyer-bot + feed are healthy.
+
+### Restart only the agent runtime (worker code change)
+
+```bash
+ssh ... 'pm2 restart agent-pool && pm2 save'
+```
+
+### Tail Atlas logs
+
+```bash
+ssh ... 'pm2 logs atlas --lines 80 --nostream'
+```
+
+---
+
+## §8 Land mines (hard-won — don't re-learn)
+
+1. **SSH timeout kills builds.** Always nohup + `/tmp/kyvern-build-done` marker.
+2. **VM ESLint is stricter than local with cached `.next`.** Run `rm -rf .next && npm run build` locally before pushing.
+3. **`@sqds/multisig@2.1.4` + `@solana/web3.js@>=1.98` crash** with "Cannot set property logs of Error which has only a getter". Patched via `patches/@sqds+multisig+2.1.4.patch` + `postinstall: "patch-package"`. Patches BOTH `index.js` AND `index.mjs` because Next.js webpack resolves from `module` field (→ `.mjs`).
+4. **`patch-package` aborts the WHOLE patch on any hunk failure.** If patch context drifts after extending, `rm -rf node_modules/@sqds/multisig && npm install` to get clean source first.
+5. **Server fee-payer drains over time.** Symptom: every `vault.pay()` fails simulation. Fix: top up SOL at faucet.solana.com.
+6. **`atlas.db` migrations silently skip under WAL lock.** If atlas/atlas-attacker are writing while the web app boots, `ALTER TABLE` can be swallowed. Apply manually with `node -e` if a column is missing.
+7. **Worker processes (atlas, atlas-attacker, agent-pool, buyer-bot) need `pm2 restart` after every code change.** Their JS loads once at boot. Deploys appear successful (web app updated, migrations run) but workers behave as if nothing changed. **Always include all 4 in the restart list.**
+8. **Build ENOSPC at 92% disk.** Fix: `rm -rf ~/kyvernlabs-commerce.backup-* ~/kyvernlabs-commerce/.next`.
+9. **Circle faucet silently fails on PDAs.** Vault PDAs are off-curve. Always paste the **USDC ATA** (`9RnS…7hAW`), never the vault PDA, to Circle.
+10. **Next.js statically caches API routes with no request input.** Symptom: `/api/atlas/revenue` returns `$0` even though DB has rows. Fix: `export const dynamic = "force-dynamic"; export const revalidate = 0;` at top of route handler. Already applied to `/api/atlas/revenue`; if you write a new public observability route, do the same.
+
+---
+
+## §9 Public surface URLs
+
+| URL | What it is |
+|---|---|
+| https://app.kyvernlabs.com/ | Landing — single-brand, live Atlas observatory in the hero |
+| https://app.kyvernlabs.com/atlas | Public deep page — timeline, attack button, leaderboard, sponsor card |
+| https://app.kyvernlabs.com/vault/new | "Clone Atlas" 60-second deploy wizard |
+| https://app.kyvernlabs.com/app | Logged-in device home — DiscoveryHero + RevenueTerminal + LatestOpportunities + Live loop |
+| https://app.kyvernlabs.com/app/inbox | Findings — full opportunity stream from all workers |
+| https://app.kyvernlabs.com/docs | SDK docs — install, vault.pay, vault.pause, errors |
+| https://app.kyvernlabs.com/api/atlas/status | Atlas live state JSON (public) |
+| https://app.kyvernlabs.com/api/atlas/revenue | Revenue Terminal rollup (public) |
+| https://app.kyvernlabs.com/api/atlas/feed | x402-paid signal feed — 402 without `X-PAYMENT-SIG` |
+
+301-retired (don't rebuild): `/registry`, `/reports`, `/tools`, `/services`, `/launch`, `/provider`, `/changelog`. See `src/middleware.ts`.
+
+---
+
+## §10 Quick-debug recipes
+
+**"Atlas timeline says offline":**
+```bash
+curl -sS https://app.kyvernlabs.com/api/atlas/probe | head -c 200
+# atlas_offline → KYVERNLABS_AGENT_KEY env var lost on restart
+ssh ... 'KYVERNLABS_AGENT_KEY=kv_live_... pm2 restart kyvern-commerce --update-env && pm2 save'
+```
+
+**"Buyer-bot stopped paying":**
+```bash
+ssh ... 'pm2 logs buyer-bot --lines 50 --nostream'
+# typical causes:
+#   - USDC ATA empty → re-top via Circle
+#   - SOL balance 0 → airdrop devnet SOL to buyer-bot pubkey
+#   - feed returns 502 → kyvern-commerce down → check pm2 list
+```
+
+**"Workers stopped finding opportunities":**
+```bash
+ssh ... 'pm2 logs agent-pool --lines 80 --nostream | grep -iE "error|fail"'
+# typical causes:
+#   - Commonstack 403 → quota exhausted or model deprecated
+#   - All 7 Sentinel sources rate-limited → wait 5 min, ticker auto-resumes
+#   - Code change deployed but agent-pool not restarted → pm2 restart agent-pool
+```
+
+**"Revenue Terminal shows $0 but DB has rows":**
+- Confirmed cause from this session: Next.js static-cached the empty first response.
+- Fix already in `src/app/api/atlas/revenue/route.ts` (`force-dynamic` + `revalidate = 0`). If you regress this on a new route, replicate the pattern.
+
+**"`/api/atlas/feed` always returns 402 even with valid signature":**
+```bash
+# verify the signature on devnet
+solana confirm <SIG> --url https://api.devnet.solana.com
+# check x402-verify.ts logic — it requires:
+#   - tx finalized
+#   - postTokenBalances delta ≥ expectedAmountUsdMin to Atlas's USDC ATA
+#   - signature not already in feed_purchases (idempotency)
+```
+
+---
+
+## §11 Submission day checklist (2026-05-09)
+
+- [ ] Final smoke test of all 4 hero surfaces (`/`, `/atlas`, `/app`, `/vault/new`)
+- [ ] Verify `pm2 list` shows all 5 processes online + `pm2 save`
+- [ ] Top up Atlas USDC + buyer-bot USDC + server fee-payer SOL
+- [ ] Capture 90-second demo video (script: unbox → discovery → delegation → revenue → moat)
+- [ ] Submit to Frontier form
+- [ ] Submit to KAST form (if relevant track)
+- [ ] Pin tweet thread (in `LAUNCH.md`)
+- [ ] Post-submit smoke test (both domains, all 5 processes still alive 30 min later)
+
+---
+
+## §12 Anchor program
+
+`anchor/programs/kyvern-policy/` — devnet program ID `PpmZErWfT5zpeo1fJtTbpqezFGbRUamaNNRWViaMSqc`. 12 error codes, 4 instructions (initialize, update_allowlist, pause/resume, execute_payment).
+
+Currently the live `/api/atlas/probe` and `/api/vault/pay` paths route through Squads `spendingLimitUse` directly, **not** through the Kyvern Anchor program. The Moat section of the landing page demonstrates the program enforcement separately. If we route probes through `execute_payment` later, blocked txs become real failed on-chain transactions with program error codes in Explorer logs (~1-2h work).
+
+---
+
+## §13 SDK publishing
+
+```bash
+cd packages/sdk && npm publish --access public
+cd packages/create-kyvern-agent && npm publish --access public
+```
+
+Sanity test from `/tmp`:
+
+```bash
+cd /tmp && npx create-kyvern-agent test-agent@0.1.0 && cd test-agent && cat package.json
+```
+
+Org `@kyvernlabs` already exists on npm. `npm whoami` → if it errors, `npm login` first.
