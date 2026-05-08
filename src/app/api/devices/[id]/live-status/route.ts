@@ -666,6 +666,12 @@ export async function GET(
     agent_name: string;
     agent_emoji: string;
   }
+  // Phase A.2 (KYVERN_FRONTIER_FINAL_SPRINT, 2026-05-08) — live
+  // ticker filtered to user-facing tool calls only. The intra-device
+  // task economy verbs (post_task / claim_task / complete_task) are
+  // retired from the ticker — the user only sees Pulse trigger fires,
+  // Pay.sh payments via stake_on_finding, message_user findings, and
+  // x402 subscriptions. Internal observations don't belong here.
   const feedRows = db
     .prepare(
       `SELECT t.id, t.timestamp, t.tool_used, t.signature, t.signature_status,
@@ -674,7 +680,12 @@ export async function GET(
          FROM agent_thoughts t
          JOIN agents a ON a.id = t.agent_id
         WHERE a.device_id = ?
-          AND t.tool_used IN ('post_task','claim_task','complete_task','stake_on_finding','subscribe_to_agent')
+          AND t.tool_used IN (
+            'pulse_trigger_fire',
+            'stake_on_finding',
+            'subscribe_to_agent',
+            'message_user'
+          )
         ORDER BY t.timestamp DESC
         LIMIT 12`,
     )

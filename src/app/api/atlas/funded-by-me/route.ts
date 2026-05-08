@@ -12,7 +12,7 @@ import { transferUsdcFromTreasury, TOPUP_AMOUNT_USD } from "@/lib/atlas/auto-dri
  * there's nothing new to provision — just hit the URL.
  *
  *   curl -X POST -H "Authorization: Bearer $KYVERNLABS_AGENT_KEY" \
- *     https://app.kyvernlabs.com/api/atlas/funded-by-me
+ *     https://kyvernlabs.com/api/atlas/funded-by-me
  *
  * Returns: { ok: true, signature, amountUsd } or 4xx/5xx with an error.
  */

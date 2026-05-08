@@ -42,6 +42,8 @@ interface Props {
  */
 function whisperFor(state: DeviceState | undefined): string | null {
   if (state && state !== "active") return null;
+  // Phase A.5 — active state whisper. The "platform / SDK" framing
+  // shows up here too: workers are templates, builders can ship more.
   return "Three workers. One vault. The chain decides every wire.";
 }
 

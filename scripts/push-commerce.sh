@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ═══════════════════════════════════════════════════════════════════
 # push-commerce.sh — one-shot deploy of the local working tree to
-# the Oracle VM (Kyvern Commerce at app.kyvernlabs.com, port 3001).
+# the Oracle VM (Kyvern Commerce at kyvernlabs.com, port 3001).
 #
 # Usage:
 #     ./scripts/push-commerce.sh
@@ -54,4 +54,4 @@ echo "→ Running deploy-commerce.sh on the VM..."
 ssh -i "$SSH_KEY" "$VM_USER@$VM_HOST" "bash ~/deploy-commerce.sh"
 
 echo ""
-echo "✓ Live at: https://app.kyvernlabs.com"
+echo "✓ Live at: https://kyvernlabs.com"

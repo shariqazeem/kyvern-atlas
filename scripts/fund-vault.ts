@@ -23,7 +23,7 @@
    Usage:
      VAULT_ID=vlt_... \
      RECIPIENT=5eyKt4yXtD9Wz8gPWs9fEUv9AQCoTFv9o6xAiBm1Kjv6 \
-     [KYVERN_BASE_URL=https://app.kyvernlabs.com] \
+     [KYVERN_BASE_URL=https://kyvernlabs.com] \
      npx tsx scripts/fund-vault.ts
 
    Safe to run multiple times — skips ATAs that already exist.
@@ -42,7 +42,7 @@ import path from "node:path";
 import os from "node:os";
 
 // ─── Config ───
-const BASE_URL = process.env.KYVERN_BASE_URL ?? "https://app.kyvernlabs.com";
+const BASE_URL = process.env.KYVERN_BASE_URL ?? "https://kyvernlabs.com";
 const VAULT_ID = requireEnv("VAULT_ID");
 const RECIPIENT =
   process.env.RECIPIENT ?? "5eyKt4yXtD9Wz8gPWs9fEUv9AQCoTFv9o6xAiBm1Kjv6";

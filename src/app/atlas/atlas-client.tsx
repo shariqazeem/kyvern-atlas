@@ -37,7 +37,7 @@ import {
   AtlasEconomyStats,
   type AtlasEconomy,
 } from "@/components/atlas/atlas-economy";
-import { AtlasFindings } from "@/components/atlas/atlas-findings";
+import { AtlasEconomicLedger } from "@/components/atlas/atlas-economic-ledger";
 import { AttackWall } from "@/components/atlas/attack-wall";
 import { DrainAtlasCallout } from "@/components/atlas/drain-atlas-callout";
 import { ThreeLayerDiagram } from "@/components/atlas/three-layer-diagram";
@@ -59,15 +59,17 @@ interface AtlasClientProps {
    *  visualisation with a 14-day daily-earnings sparkline pulled live
    *  from /api/atlas/economy, so the value is no longer rendered. */
   initialPnl24h: number[];
-  initialFindings: Signal[];
-  initialFindingsThisWeek: number;
+  /** Phase C — Findings block replaced by AtlasEconomicLedger which
+   *  fetches its own data from /api/atlas/revenue. Props kept in the
+   *  shape so the SSR snapshot caller (`page.tsx`) can pass them
+   *  without breaking; values are unused. */
+  initialFindings?: Signal[];
+  initialFindingsThisWeek?: number;
 }
 
 export default function AtlasClient({
   initialState,
   initialAttacks,
-  initialFindings,
-  initialFindingsThisWeek,
 }: AtlasClientProps) {
   const [state, setState] = useState<AtlasState | null>(initialState);
   const [attacks, setAttacks] = useState<AtlasAttack[]>(initialAttacks);
@@ -194,11 +196,13 @@ export default function AtlasClient({
 
           <AtlasEconomyStats economy={economy} />
 
-          {/* 4. Atlas Findings (Path C — above the Attack Wall) */}
-          <AtlasFindings
-            initialFindings={initialFindings}
-            initialThisWeek={initialFindingsThisWeek}
-          />
+          {/* Phase C (KYVERN_FRONTIER_FINAL_SPRINT, 2026-05-08) —
+              Findings block replaced with the Economic Ledger.
+              Atlas's value isn't content output, it's 17 days of
+              unbroken on-chain economic activity. The new block
+              renders real x402 subscriber payments from
+              feed_purchases, every row a real Solana tx. */}
+          <AtlasEconomicLedger />
 
           {/* 4b. Drain Atlas dare — primes the attack wall below.
                 The chain refuses, the receipt is public. */}

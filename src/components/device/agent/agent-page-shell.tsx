@@ -1,30 +1,61 @@
 "use client";
 
 /**
- * AgentPageShell — Phase 2 (Final Polish + Multi-Surface).
+ * AgentPageShell — Phase B (KYVERN_FRONTIER_FINAL_SPRINT, 2026-05-08).
  *
- * The worker page becomes a "mini /app" for one specific worker.
- * Same architectural rhyme as /app: page header up top, two-zone
- * grid in the middle, bottom strip, shared tab bar.
+ * Apple-Settings-style single-column worker page. The previous design
+ * tried to fit a 2- or 3-column grid (About | Configure | Tools/Talk)
+ * into the same surface; with the new framing — "the device is the
+ * product, workers are templates" — that grid created tension between
+ * three competing primary actions.
  *
- * Primary zone (left, ~60%):
- *   1. Live state card (hero)
- *   2. About card (WHAT I DO FOR YOU)
- *   3. Observability card (WATCHING · CHECKED · STATE + budget)
- *   4. Greeting card
+ * The new structure is a vertical flow at max-width 720px:
  *
- * Secondary zone (right, ~380px):
- *   5. Configure card (template-specific form)
- *   6. Tools card
- *   7. Chat card
+ *   ┌──────────────────────────────┐
+ *   │  Header (thin, page-shell)   │
+ *   ├──────────────────────────────┤
+ *   │  Hero — no card chrome       │
+ *   │    📈 Conditional Trigger    │
+ *   │    purpose copy              │
+ *   │    ● status pill             │
+ *   ├──────────────────────────────┤
+ *   │  LIVE STATE                  │
+ *   │  ─────                       │
+ *   │  Spotted X · sig ↗           │
+ *   ├──────────────────────────────┤
+ *   │  CONFIGURE  (primary action) │
+ *   │  ─────                       │
+ *   │  template-specific editor    │
+ *   ├──────────────────────────────┤
+ *   │  HOW {NAME} WORKS            │
+ *   │  ─────                       │
+ *   │  · plain-language bullets    │
+ *   │  Chain caps the spend at …   │
+ *   ├──────────────────────────────┤
+ *   │  Talk to {name}      [⌃]     │
+ *   ├──────────────────────────────┤
+ *   │  RECENT ACTIVITY             │
+ *   │  ─────                       │
+ *   │  rows                        │
+ *   └──────────────────────────────┘
  *
- * Bottom strip:
- *   8. Economic timeline (compact horizontal)
+ * Section dividers are thin hairlines between blocks; section
+ * headings use small-caps mono with a 12px hairline rule beneath.
+ * No card chrome around individual sections — this is what makes
+ * the page feel native iOS Settings instead of a SaaS dashboard.
  */
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, ChevronUp, Pause, Play, X, Send, ExternalLink } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronUp,
+  ExternalLink,
+  Pause,
+  Play,
+  Send,
+  X,
+} from "lucide-react";
 import { WorkerEmoji } from "@/components/icons/worker-emoji";
 import { PageHeader } from "../shell/page-header";
 import { isPersonalized } from "@/lib/device-state";
@@ -34,12 +65,15 @@ import { TriggersEditor } from "@/components/agents/configure/triggers-editor";
 import { EconomicTimeline } from "@/components/agent/economic-timeline";
 import type { ChatMessage } from "@/components/agent/chat-drawer";
 import type {
+  AgentTemplate,
   PulseConfig,
   SentinelConfig,
   WrenConfig,
 } from "@/lib/agents/types";
+import { WORKER_PAGE_CONTENT } from "@/lib/workers/page-content";
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
+const MAX_W = 720;
 
 interface Agent {
   id: string;
@@ -97,27 +131,6 @@ const QUICK_REPLIES = [
   "Take a break",
 ];
 
-function deriveSerial(deviceId: string): string {
-  return `KVN-${deviceId.replace("vlt_", "").slice(0, 8).toUpperCase()}`;
-}
-
-function templateLabel(t: string): string {
-  if (t === "bounty_hunter") return "Bounty Scout";
-  if (t === "whale_tracker") return "Position Watchtower";
-  if (t === "token_pulse") return "Conditional Trigger";
-  return "Custom worker";
-}
-
-function templateBlurb(t: string): string {
-  if (t === "bounty_hunter")
-    return "I find paid Solana bounties matching your skills, draft your application with Pay.sh / Gemini, and queue it for one-tap submit.";
-  if (t === "whale_tracker")
-    return "Pick wallets or contracts to watch. I ping you when something material moves. Chain caps how often I check.";
-  if (t === "token_pulse")
-    return "Set a price condition. I poll the market with Pay.sh / Gemini reasoning. The moment it triggers, I fire your pre-approved spend — and the chain checks every dollar.";
-  return "Custom worker — see Configure for what you told me to do.";
-}
-
 function fmtAgo(ms: number): string {
   const diff = Math.max(0, Date.now() - ms) / 1000;
   if (diff < 60) return `${Math.floor(diff)}s ago`;
@@ -136,55 +149,6 @@ function uptimeLabel(createdAt: number): string {
   return `${m}m`;
 }
 
-/** Phase 6 cleanup — engineer cadence ("every 600s") → human cadence
- *  ("every 10 minutes"). */
-function humanizeCadence(seconds: number): string {
-  if (!seconds || seconds <= 0) return "every cycle";
-  if (seconds < 60) return `every ${seconds} seconds`;
-  if (seconds < 3600) {
-    const m = Math.round(seconds / 60);
-    return `every ${m} minute${m === 1 ? "" : "s"}`;
-  }
-  const h = Math.round(seconds / 3600);
-  return `every ${h} hour${h === 1 ? "" : "s"}`;
-}
-
-/** Phase 6 cleanup — tool IDs → human-readable abilities. The fallback
- *  prettifies unknown IDs (post_task → "Post task") so newly added tools
- *  don't surface as raw underscored strings. */
-function friendlyTool(id: string): string {
-  switch (id) {
-    case "watch_url":
-      return "Scans websites";
-    case "watch_wallet":
-      return "Watches wallets";
-    case "watch_wallet_swaps":
-      return "Watches wallet swaps";
-    case "read_dex":
-      return "Reads DEX prices";
-    case "post_task":
-      return "Drafts tasks";
-    case "claim_task":
-      return "Validates tasks";
-    case "complete_task":
-      return "Delivers tasks";
-    case "stake_on_finding":
-      return "Pays Pay.sh / Gemini";
-    case "subscribe_to_agent":
-      return "Subscribes to feeds";
-    case "message_user":
-      return "Messages you";
-    case "expose_paywall":
-      return "Sells signals via x402";
-    case "read_onchain":
-      return "Reads on-chain state";
-    default:
-      return id
-        .replace(/_/g, " ")
-        .replace(/\b\w/g, (c) => c.toUpperCase());
-  }
-}
-
 function liveStateString(
   agent: Agent,
   lastFinding: LiveStateFinding | null,
@@ -193,6 +157,27 @@ function liveStateString(
   if (lastFinding) {
     return `Spotted ${lastFinding.subject}`;
   }
+  // Phase A.3 (KYVERN_FRONTIER_FINAL_SPRINT, 2026-05-08) — Wren never
+  // says "earned from treasury" again. The previous live-state copy
+  // surfaced lastAction.message, which was the intra-device task
+  // economy talking ("Completed validation. Earned $0.10 from
+  // treasury …"). Wren's actual job is watching wallets — when it
+  // hasn't surfaced anything material we synthesise an honest
+  // watch-state from the configured watchlist + last check.
+  if (agent.template === "whale_tracker") {
+    const watchlist =
+      (agent.config as WrenConfig | undefined)?.watchlist ?? [];
+    if (watchlist.length === 0) {
+      return "No wallets watched yet — add some in Configure.";
+    }
+    const ago = agent.lastThoughtAt ? fmtAgo(agent.lastThoughtAt) : "no cycles yet";
+    return `Watching ${watchlist.length} ${
+      watchlist.length === 1 ? "wallet" : "wallets"
+    } · nothing material in last ${ago}`;
+  }
+  // Phase A.3 — Pulse and Sentinel keep the lastAction.message path
+  // for now; Pulse's pulse_trigger_fire writes a clean message on
+  // success/blocked, Sentinel's drafted_application is the same.
   if (lastAction?.message) {
     return lastAction.message;
   }
@@ -201,6 +186,13 @@ function liveStateString(
     return `Idle · last check ${fmtAgo(agent.lastThoughtAt)}`;
   }
   return "Standing by";
+}
+
+function getContent(template: string) {
+  return (
+    WORKER_PAGE_CONTENT[template as AgentTemplate] ??
+    WORKER_PAGE_CONTENT.custom
+  );
 }
 
 export function AgentPageShell({
@@ -215,7 +207,6 @@ export function AgentPageShell({
   onPauseResume,
   onRetire,
 }: Props) {
-  const serial = deriveSerial(agent.deviceId);
   const isAlive = agent.status === "alive";
   const isPaused = agent.status === "paused";
   const liveState = liveStateString(agent, lastFinding, lastAction);
@@ -225,17 +216,8 @@ export function AgentPageShell({
       : isPaused
         ? "#F59E0B"
         : "#22C55E";
+  const content = getContent(agent.template);
 
-  const firstMessageText =
-    typeof (agent.metadata as { firstMessage?: string } | undefined)
-      ?.firstMessage === "string"
-      ? ((agent.metadata as { firstMessage?: string }).firstMessage as string)
-      : "";
-
-  // Header trimmed to: ← Device · 🎯 Sentinel · Up Xh Ym · N checks · ⏸ ✕
-  // Template label lives in the About card (giant title); serial lives in
-  // the OS bar top-right. Both dropped here to stop overpacking.
-  void serial; // suppress unused warning — kept for trace + future need
   const header = (
     <PageHeader
       back={{ href: "/app", label: "Device" }}
@@ -297,10 +279,6 @@ export function AgentPageShell({
     />
   );
 
-  // Live State as a full-width hero strip, then 3-column grid below
-  // (About + Observability + Greeting · Configure · Tools + Chat).
-  // The agent page bypasses PageShell's 2-zone grid in favour of a
-  // custom three-column layout.
   return (
     <motion.div
       initial={{ opacity: 0, y: 4 }}
@@ -314,19 +292,52 @@ export function AgentPageShell({
     >
       {header}
 
-      {/* Live State — full-width hero. The hero of the page deserves
-          the width. Spans the entire main below the page header. */}
-      <div className="px-4 sm:px-6 pt-4 sm:pt-5 flex-shrink-0">
-        <Card>
-          <Eyebrow>
+      {/* Single-column flow capped at 720px — generous side gutters
+          on desktop, edge-padded on phones. No card chrome around
+          sections; hairline rules between blocks carry the rhythm. */}
+      <main
+        className="flex-1 min-h-0 mx-auto w-full px-6 sm:px-8"
+        style={{ maxWidth: MAX_W }}
+      >
+        {/* HERO — no card. Emoji + role + purpose + status pill. */}
+        <section className="pt-12 sm:pt-14 pb-2">
+          <div
+            className="flex items-center justify-center mb-4"
+            style={{
+              width: 64,
+              height: 64,
+              borderRadius: 18,
+              background:
+                "linear-gradient(180deg, #FFFFFF 0%, #F5F7FB 100%)",
+              border: "1px solid rgba(15,23,42,0.06)",
+              boxShadow:
+                "inset 0 1px 0 rgba(255,255,255,1), 0 1px 2px rgba(15,23,42,0.04), 0 8px 22px -10px rgba(15,23,42,0.10)",
+              color: "#0A0A0A",
+            }}
+          >
+            <WorkerEmoji emoji={content.icon} size={32} strokeWidth={1.5} />
+          </div>
+          <h1
+            className="font-display text-[28px] sm:text-[32px] font-semibold tracking-[-0.02em] mb-3"
+            style={{ color: "#0A0A0A", lineHeight: 1.05 }}
+          >
+            {content.role}
+          </h1>
+          <p
+            className="text-[15px] sm:text-[16px] leading-[1.55] max-w-[600px]"
+            style={{ color: "#475569" }}
+          >
+            {content.purpose}
+          </p>
+          <div className="mt-5 inline-flex items-center gap-2">
             <motion.span
-              className="rounded-full inline-block mr-1.5"
+              className="rounded-full inline-block"
               style={{
-                width: 6,
-                height: 6,
+                width: 7,
+                height: 7,
                 background: stateColor,
                 boxShadow: isAlive
-                  ? `0 0 0 2px rgba(34,197,94,0.18), 0 0 6px ${stateColor}`
+                  ? `0 0 0 2.5px rgba(34,197,94,0.18), 0 0 6px ${stateColor}`
                   : undefined,
               }}
               animate={isAlive ? { opacity: [0.55, 1, 0.55] } : {}}
@@ -336,10 +347,23 @@ export function AgentPageShell({
                 ease: "easeInOut",
               }}
             />
-            Live state
-          </Eyebrow>
+            <span
+              className="font-mono uppercase tracking-[0.14em]"
+              style={{ fontSize: 10, color: "rgba(15,23,42,0.55)" }}
+            >
+              {isPaused ? "Paused" : isAlive ? "Alive" : "Retired"}
+              {" · "}
+              {agent.lastThoughtAt
+                ? `last check ${fmtAgo(agent.lastThoughtAt)}`
+                : "no cycles yet"}
+            </span>
+          </div>
+        </section>
+
+        {/* LIVE STATE */}
+        <Section label="Live state">
           <p
-            className="text-[18px] sm:text-[20px] leading-[1.45] tracking-[-0.01em]"
+            className="text-[16px] sm:text-[17px] leading-[1.5] tracking-[-0.005em]"
             style={{ color: "#0A0A0A", fontWeight: 500 }}
           >
             {liveState}
@@ -357,269 +381,175 @@ export function AgentPageShell({
               <ExternalLink className="w-3 h-3" strokeWidth={2} />
             </a>
           )}
-        </Card>
-      </div>
+        </Section>
 
-      {/* Phase 6 recomp (2026-05-08) — two-column grid: About (with
-          Abilities + Greeting folded in) on the left, Configure on the
-          right. Talk + Activity move below to full-width. The previous
-          three-column layout cluttered the page with six visible cards;
-          this composition matches the natural read order: what does
-          this worker do · how do I configure it · what's it telling
-          me · what has it done. */}
-      <main className="flex-1 min-h-0 grid gap-3 sm:gap-4 p-4 sm:p-6 grid-cols-1 lg:grid-cols-[3fr_4fr]">
-        {/* LEFT — About + Abilities + Greeting in one card */}
-        <section className="flex flex-col gap-3 sm:gap-4 min-w-0">
-          <Card>
-            <Eyebrow>About</Eyebrow>
-            <h3
-              className="text-[20px] sm:text-[22px] font-semibold tracking-[-0.012em] mb-2 inline-flex items-center gap-2"
-              style={{ color: "#0A0A0A" }}
-            >
-              <WorkerEmoji emoji={agent.emoji} size={22} strokeWidth={1.7} />
-              {templateLabel(agent.template)}
-            </h3>
+        {/* CONFIGURE — primary action */}
+        <Section label="Configure">
+          {!isPersonalized({
+            template: agent.template,
+            config: agent.config,
+          }) && (
             <p
-              className="text-[13.5px] leading-[1.6]"
-              style={{ color: "#6B7280" }}
-            >
-              {templateBlurb(agent.template)}
-            </p>
-
-            <div
-              className="grid grid-cols-3 gap-3 mt-4 pt-4"
-              style={{ borderTop: "1px solid rgba(15,23,42,0.06)" }}
-            >
-              <Stat
-                label="Watching"
-                value={
-                  agent.template === "bounty_hunter"
-                    ? "Ecosystem feeds"
-                    : agent.template === "whale_tracker"
-                      ? "Wallet watchlist"
-                      : agent.template === "token_pulse"
-                        ? "Price triggers"
-                        : "Custom"
-                }
-              />
-              <Stat
-                label="Checked"
-                value={
-                  agent.lastThoughtAt ? fmtAgo(agent.lastThoughtAt) : "—"
-                }
-              />
-              <Stat
-                label="State"
-                value={isPaused ? "Paused" : isAlive ? "Alive" : "Retired"}
-                tone={isPaused ? "amber" : isAlive ? "green" : "gray"}
-              />
-            </div>
-            <div
-              className="text-[11.5px] mt-3"
+              className="text-[12.5px] italic mb-3"
               style={{ color: "rgba(15,23,42,0.55)" }}
             >
-              Checks {humanizeCadence(agent.frequencySeconds)} · uses{" "}
-              {agent.allowedTools.length}{" "}
-              {agent.allowedTools.length === 1 ? "ability" : "abilities"}
-            </div>
+              Starter settings. Tell it about you below — saves take effect
+              immediately.
+            </p>
+          )}
+          {agent.template === "bounty_hunter" && (
+            <SkillsField
+              agentId={agent.id}
+              initial={
+                ((agent.config as SentinelConfig) ?? {
+                  skills: "Solana developer · Rust · TypeScript",
+                  min_payout_usd: 300,
+                  cadence_minutes: 10,
+                }) as SentinelConfig
+              }
+            />
+          )}
+          {agent.template === "whale_tracker" && (
+            <WatchlistEditor
+              agentId={agent.id}
+              initial={
+                ((agent.config as WrenConfig) ?? {
+                  watchlist: [],
+                  cadence_minutes: 5,
+                }) as WrenConfig
+              }
+            />
+          )}
+          {agent.template === "token_pulse" && (
+            <TriggersEditor
+              agentId={agent.id}
+              initial={
+                ((agent.config as PulseConfig) ?? {
+                  triggers: [],
+                  cadence_minutes: 1,
+                }) as PulseConfig
+              }
+            />
+          )}
+          {!["bounty_hunter", "whale_tracker", "token_pulse"].includes(
+            agent.template,
+          ) && (
+            <p className="text-[13px]" style={{ color: "#6B7280" }}>
+              Custom workers configure via spawn-time job prompt.
+            </p>
+          )}
+        </Section>
 
-            {agent.allowedTools.length > 0 && (
-              <div
-                className="mt-4 pt-4"
-                style={{ borderTop: "1px solid rgba(15,23,42,0.06)" }}
+        {/* HOW IT WORKS */}
+        <Section label={`How ${agent.name} works`}>
+          <ul className="flex flex-col gap-2 text-[13.5px] leading-[1.6]">
+            {content.howItWorks.map((b, i) => (
+              <li
+                key={i}
+                className="flex items-start gap-2.5"
+                style={{ color: "#374151" }}
               >
-                <Eyebrow>Abilities · {agent.allowedTools.length}</Eyebrow>
-                <ul className="flex flex-col gap-1">
-                  {agent.allowedTools.map((t) => (
-                    <li
-                      key={t}
-                      className="text-[12.5px] flex items-center gap-1.5"
-                      style={{ color: "rgba(15,23,42,0.70)" }}
-                    >
-                      <span
-                        aria-hidden
-                        style={{ color: "rgba(15,23,42,0.30)" }}
-                      >
-                        ·
-                      </span>
-                      {friendlyTool(t)}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {firstMessageText && (
-              <div
-                className="mt-4 pt-4"
-                style={{ borderTop: "1px solid rgba(15,23,42,0.06)" }}
-              >
-                <Eyebrow>Greeting</Eyebrow>
-                <p
-                  className="text-[13.5px] leading-[1.6] italic"
-                  style={{ color: "#374151" }}
+                <span
+                  aria-hidden
+                  className="flex-none mt-[2px]"
+                  style={{ color: "rgba(15,23,42,0.30)", fontSize: 14 }}
                 >
-                  “{firstMessageText}”
-                </p>
-              </div>
-            )}
-          </Card>
-        </section>
+                  ·
+                </span>
+                <span>{b}</span>
+              </li>
+            ))}
+          </ul>
+          <p
+            className="text-[12px] mt-4 pt-3"
+            style={{
+              borderTop: "1px solid rgba(15,23,42,0.05)",
+              color: "rgba(15,23,42,0.55)",
+            }}
+          >
+            {content.chainNote}
+          </p>
+        </Section>
 
-        {/* RIGHT — Configure (primary action, taller card) */}
-        <section className="flex flex-col gap-3 sm:gap-4 min-w-0">
-          <Card>
-            <Eyebrow>Configure</Eyebrow>
-            {!isPersonalized({
-              template: agent.template,
-              config: agent.config,
-            }) && (
-              <p
-                className="text-[12px] italic mb-3 -mt-1"
-                style={{ color: "rgba(15,23,42,0.55)" }}
-              >
-                This worker is using starter settings. Tell it about you
-                below — your saves take effect immediately.
-              </p>
-            )}
-            {agent.template === "bounty_hunter" && (
-              <SkillsField
-                agentId={agent.id}
-                initial={
-                  ((agent.config as SentinelConfig) ?? {
-                    skills: "Solana developer · Rust · TypeScript",
-                    min_payout_usd: 300,
-                    cadence_minutes: 10,
-                  }) as SentinelConfig
-                }
-              />
-            )}
-            {agent.template === "whale_tracker" && (
-              <WatchlistEditor
-                agentId={agent.id}
-                initial={
-                  ((agent.config as WrenConfig) ?? {
-                    watchlist: [],
-                    cadence_minutes: 5,
-                  }) as WrenConfig
-                }
-              />
-            )}
-            {agent.template === "token_pulse" && (
-              <TriggersEditor
-                agentId={agent.id}
-                initial={
-                  ((agent.config as PulseConfig) ?? {
-                    triggers: [],
-                    cadence_minutes: 1,
-                  }) as PulseConfig
-                }
-              />
-            )}
-            {!["bounty_hunter", "whale_tracker", "token_pulse"].includes(
-              agent.template,
-            ) && (
-              <p
-                className="text-[12.5px]"
-                style={{ color: "#6B7280" }}
-              >
-                Custom workers configure via spawn-time job prompt.
-              </p>
-            )}
-          </Card>
-        </section>
-      </main>
+        {/* TALK — collapsible */}
+        <Section flush>
+          <TalkSection
+            agentName={agent.name}
+            chat={chat}
+            inputValue={inputValue}
+            sending={sending}
+            onChangeInput={onChangeInput}
+            onSend={onSend}
+          />
+        </Section>
 
-      {/* TALK + ACTIVITY — full-width, below the fold. Talk is
-          collapsible by default so a fresh worker page leads with the
-          configure flow, not an empty chat box. */}
-      <div className="px-4 sm:px-6 pb-4 flex flex-col gap-3 sm:gap-4">
-        <TalkSection
-          agentName={agent.name}
-          chat={chat}
-          inputValue={inputValue}
-          sending={sending}
-          onChangeInput={onChangeInput}
-          onSend={onSend}
-        />
-
-        <Card>
-          <Eyebrow>Activity</Eyebrow>
+        {/* RECENT ACTIVITY */}
+        <Section label="Recent activity" lastBlock>
           <EconomicTimeline agentId={agent.id} isAlive={isAlive} />
-        </Card>
-      </div>
+        </Section>
+      </main>
     </motion.div>
   );
 }
 
 /* ────────────────────────────────────────────────────────────────────
-   Card / Eyebrow / Stat / ChatBubble / Sep helpers
+   Section / TalkSection / ChatBubble helpers
    ──────────────────────────────────────────────────────────────────── */
 
-function Card({ children }: { children: React.ReactNode }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 4 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.35, ease: EASE }}
-      className="rounded-2xl bg-white px-5 py-4"
-      style={{
-        border: "1px solid rgba(15,23,42,0.06)",
-        boxShadow: "0 1px 3px rgba(15,23,42,0.04)",
-      }}
-    >
-      {children}
-    </motion.div>
-  );
-}
-
-function Eyebrow({ children }: { children: React.ReactNode }) {
-  return (
-    <div
-      className="font-mono uppercase tracking-[0.18em] mb-2 inline-flex items-center"
-      style={{ fontSize: 9.5, color: "rgba(15,23,42,0.45)" }}
-    >
-      {children}
-    </div>
-  );
-}
-
-function Stat({
+/**
+ * Section — generic single-column block with the small-caps mono
+ * label + 12px hairline rule + content. No card chrome. The
+ * "lastBlock" prop drops the bottom margin so the page doesn't have
+ * dead space above the OS tab bar.
+ */
+function Section({
   label,
-  value,
-  tone,
+  children,
+  flush,
+  lastBlock,
 }: {
-  label: string;
-  value: string;
-  tone?: "green" | "amber" | "gray";
+  label?: string;
+  children: React.ReactNode;
+  /** No header, just spacing — for surfaces that own their own header
+   *  (Talk's collapsible button). */
+  flush?: boolean;
+  lastBlock?: boolean;
 }) {
-  const fg =
-    tone === "green"
-      ? "#15803D"
-      : tone === "amber"
-        ? "#B45309"
-        : "#0A0A0A";
   return (
-    <div className="flex flex-col gap-0.5 min-w-0">
-      <span
-        className="font-mono uppercase tracking-[0.14em]"
-        style={{ fontSize: 8.5, color: "rgba(15,23,42,0.45)" }}
-      >
-        {label}
-      </span>
-      <span
-        className="text-[12px] font-semibold tracking-[-0.005em] truncate"
-        style={{ color: fg }}
-      >
-        {value}
-      </span>
-    </div>
+    <section
+      className={`pt-10 sm:pt-12 ${lastBlock ? "pb-12" : "pb-2"}`}
+      style={
+        flush
+          ? undefined
+          : { borderTop: "1px solid rgba(15,23,42,0.06)" }
+      }
+    >
+      {!flush && label && (
+        <div className="mb-5">
+          <div
+            className="font-mono uppercase tracking-[0.18em] mb-1.5"
+            style={{ fontSize: 9.5, color: "rgba(15,23,42,0.45)" }}
+          >
+            {label}
+          </div>
+          <div
+            aria-hidden
+            style={{
+              height: 1,
+              width: 28,
+              background: "rgba(15,23,42,0.18)",
+            }}
+          />
+        </div>
+      )}
+      {children}
+    </section>
   );
 }
 
-/** Collapsible Talk-to-{name} block — full-width below the two-column
- *  grid. Defaults to collapsed so a fresh worker page leads with the
- *  Configure card, not an empty chat input. */
+/** Collapsible Talk-to-{name}. Defaults closed when there are no
+ *  messages — first-time visitors see Configure as the primary
+ *  action without an empty chat eating screen real estate. */
 function TalkSection({
   agentName,
   chat,
@@ -637,28 +567,44 @@ function TalkSection({
 }) {
   const [open, setOpen] = useState(chat.length > 0);
   return (
-    <Card>
+    <div
+      className="pt-10 sm:pt-12"
+      style={{ borderTop: "1px solid rgba(15,23,42,0.06)" }}
+    >
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-between gap-3 -my-1 py-1"
+        className="w-full flex items-center justify-between gap-3 py-1"
         aria-expanded={open}
       >
-        <Eyebrow>
-          Talk to {agentName}
-          {chat.length > 0 && (
-            <span
-              className="ml-2 normal-case font-sans"
-              style={{
-                letterSpacing: 0,
-                fontSize: 11,
-                color: "rgba(15,23,42,0.45)",
-              }}
-            >
-              {chat.length} {chat.length === 1 ? "message" : "messages"}
-            </span>
-          )}
-        </Eyebrow>
+        <div>
+          <div
+            className="font-mono uppercase tracking-[0.18em] mb-1.5 inline-flex items-center"
+            style={{ fontSize: 9.5, color: "rgba(15,23,42,0.45)" }}
+          >
+            Talk to {agentName}
+            {chat.length > 0 && (
+              <span
+                className="ml-2 normal-case font-sans"
+                style={{
+                  letterSpacing: 0,
+                  fontSize: 11,
+                  color: "rgba(15,23,42,0.45)",
+                }}
+              >
+                {chat.length} {chat.length === 1 ? "message" : "messages"}
+              </span>
+            )}
+          </div>
+          <div
+            aria-hidden
+            style={{
+              height: 1,
+              width: 28,
+              background: "rgba(15,23,42,0.18)",
+            }}
+          />
+        </div>
         <span
           className="rounded-full p-1"
           style={{ color: "rgba(15,23,42,0.45)" }}
@@ -680,11 +626,11 @@ function TalkSection({
             transition={{ duration: 0.28, ease: EASE }}
             className="overflow-hidden"
           >
-            <div className="pt-2">
+            <div className="pt-5">
               <div className="flex flex-col gap-2 max-h-[260px] overflow-y-auto mb-3 pr-1">
                 {chat.length === 0 && (
                   <div
-                    className="text-[12px] text-center py-3"
+                    className="text-[12.5px] text-center py-3"
                     style={{ color: "rgba(15,23,42,0.40)" }}
                   >
                     No messages yet. Try a suggestion below.
@@ -751,7 +697,7 @@ function TalkSection({
           </motion.div>
         )}
       </AnimatePresence>
-    </Card>
+    </div>
   );
 }
 
@@ -781,4 +727,3 @@ function ChatBubble({
     </motion.div>
   );
 }
-

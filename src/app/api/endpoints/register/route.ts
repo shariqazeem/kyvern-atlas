@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
       metadata: { slug: endpoint.slug, priceUsd, targetUrl },
     });
 
-    const baseUrl = process.env.KYVERN_BASE_URL ?? process.env.NEXT_PUBLIC_BASE_URL ?? "https://app.kyvernlabs.com";
+    const baseUrl = process.env.KYVERN_BASE_URL ?? process.env.NEXT_PUBLIC_BASE_URL ?? "https://kyvernlabs.com";
 
     // Trigger the greeter immediately so Atlas pays within seconds
     fetch(`${baseUrl}/api/greeter`, { method: "POST" }).catch(() => {});

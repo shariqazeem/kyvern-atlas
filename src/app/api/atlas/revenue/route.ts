@@ -85,7 +85,7 @@ export async function GET() {
     lastPurchaseAt,
     secondsSinceLastPurchase:
       lastPurchaseAt != null ? Math.floor((now - lastPurchaseAt) / 1000) : null,
-    feedUrl: "https://app.kyvernlabs.com/api/atlas/feed",
+    feedUrl: "https://kyvernlabs.com/api/atlas/feed",
     pricePerRequestUsd: 0.01,
     recent: recent.map((r) => ({
       id: r.id,

@@ -72,13 +72,17 @@ export function StateStrip({
 }
 
 function lineFor(state: DeviceState): string {
+  // Phase A.5 (KYVERN_FRONTIER_FINAL_SPRINT, 2026-05-08) — whisper
+  // copy reframed to seed the platform / SDK story. The starter
+  // workers are templates, the device is the product, builders ship
+  // more from the SDK. Every state surface reinforces that pivot.
   switch (state) {
     case "empty":
-      return "Your device is online. The vault is empty.";
+      return "Your device is online. Fund the vault to power your workers.";
     case "funded_default":
-      return "Workers are running on starter settings. Make them yours.";
+      return "Three starter workers loaded. Personalize each — or build your own.";
     case "partial":
-      return "Some workers are tuned. Personalize the rest.";
+      return "Some workers are tuned. Builders can ship more from the SDK.";
     case "active":
     default:
       return "";

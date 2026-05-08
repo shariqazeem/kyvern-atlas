@@ -13,7 +13,7 @@
  *   │  $0.83 earned today                              ↑           │
  *   │  ──────────────────────────────────────                      │
  *   │  83 purchases · last buyer paid 12s ago                      │
- *   │  Public feed: app.kyvernlabs.com/api/atlas/feed  [Copy]      │
+ *   │  Public feed: kyvernlabs.com/api/atlas/feed  [Copy]      │
  *   │  ──────────────────────────────────────                      │
  *   │  · 8DhjK… paid $0.010 · 12s ago     ↗                        │
  *   │  · 8DhjK… paid $0.010 · 42s ago     ↗                        │
