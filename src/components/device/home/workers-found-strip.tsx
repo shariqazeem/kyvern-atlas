@@ -18,6 +18,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
+import { WorkerEmoji } from "@/components/icons/worker-emoji";
 import { ArrowRight, Sparkles, Link2 } from "lucide-react";
 import type { Signal } from "@/lib/agents/types";
 import {
@@ -214,13 +215,14 @@ function FoundCard({ signal }: { signal: SignalWithWorker }) {
               aria-hidden
             />
             <span
-              className="w-5 h-5 rounded-full flex items-center justify-center text-[12px] flex-none"
+              className="w-5 h-5 rounded-full flex items-center justify-center flex-none"
               style={{
                 background: "linear-gradient(180deg, #FFFFFF 0%, #F4F5F7 100%)",
                 border: "1px solid rgba(15,23,42,0.06)",
+                color: "#374151",
               }}
             >
-              {signal.worker.emoji}
+              <WorkerEmoji emoji={signal.worker.emoji} size={11} strokeWidth={1.9} />
             </span>
             <span
               className="font-mono truncate"

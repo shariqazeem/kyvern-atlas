@@ -17,6 +17,7 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Activity, Check, Link2, ExternalLink, ArrowUpRight } from "lucide-react";
+import { WorkerEmoji } from "@/components/icons/worker-emoji";
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
@@ -261,14 +262,15 @@ function DemoFeedRow({ a }: { a: DemoAction }) {
       className="px-4 py-2.5 flex items-center gap-2 flex-nowrap min-w-0"
     >
       <span
-        className="w-5 h-5 rounded-full flex items-center justify-center text-[12px] flex-none"
+        className="w-5 h-5 rounded-full flex items-center justify-center flex-none"
         style={{
           background: "linear-gradient(180deg, #FFFFFF 0%, #F2F3F5 100%)",
           border: "1px solid rgba(15,23,42,0.06)",
           boxShadow: "inset 0 1px 1px rgba(15,23,42,0.04)",
+          color: "#374151",
         }}
       >
-        {a.emoji}
+        <WorkerEmoji emoji={a.emoji} size={11} strokeWidth={2} />
       </span>
       <span
         className="text-[12.5px] font-medium flex-none"

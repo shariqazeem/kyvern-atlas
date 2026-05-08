@@ -20,6 +20,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
+import { WorkerEmoji } from "@/components/icons/worker-emoji";
 import {
   Award,
   Megaphone,
@@ -209,15 +210,16 @@ export function SignalCard({
             {label}
           </span>
           <span
-            className="w-6 h-6 rounded-full flex items-center justify-center text-[14px] shrink-0"
+            className="w-6 h-6 rounded-full flex items-center justify-center shrink-0"
             style={{
               background: "linear-gradient(180deg, #FFFFFF 0%, #F2F3F5 100%)",
               border: "1px solid rgba(15,23,42,0.06)",
               boxShadow:
                 "inset 0 1px 1px rgba(15,23,42,0.04), 0 1px 1px rgba(15,23,42,0.02)",
+              color: "#0A0A0A",
             }}
           >
-            {signal.worker.emoji}
+            <WorkerEmoji emoji={signal.worker.emoji} size={13} strokeWidth={1.8} />
           </span>
           <span
             className="text-[12px] font-medium"

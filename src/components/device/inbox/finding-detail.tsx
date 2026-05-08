@@ -12,15 +12,22 @@ import Link from "next/link";
 import { useState } from "react";
 import { motion } from "framer-motion";
 import {
+  AlertTriangle,
   Check,
+  CheckCircle2,
   Clock,
   ExternalLink,
+  FileText,
+  Fish,
   Send,
   Shuffle,
   Sliders,
   X,
+  XCircle,
   Zap,
+  type LucideIcon,
 } from "lucide-react";
+import { WorkerEmoji } from "@/components/icons/worker-emoji";
 import type { Signal } from "@/lib/agents/types";
 import {
   severityForSignal,
@@ -50,13 +57,17 @@ interface Props {
  */
 const KIND_BADGE: Record<
   string,
-  { label: string; tone: "green" | "amber" | "blue" | "red" | "gray" }
+  {
+    label: string;
+    tone: "green" | "amber" | "blue" | "red" | "gray";
+    Icon?: LucideIcon;
+  }
 > = {
-  trigger_fired: { label: "✓ ON-CHAIN", tone: "green" },
-  trigger_blocked: { label: "✕ BLOCKED ON-CHAIN", tone: "red" },
-  drafted_application: { label: "✉ READY TO SUBMIT", tone: "blue" },
-  wallet_alert: { label: "🐋 MATERIAL MOVE", tone: "blue" },
-  trigger_armed: { label: "⚠ HEADS-UP", tone: "amber" },
+  trigger_fired: { label: "ON-CHAIN", tone: "green", Icon: CheckCircle2 },
+  trigger_blocked: { label: "BLOCKED ON-CHAIN", tone: "red", Icon: XCircle },
+  drafted_application: { label: "READY TO SUBMIT", tone: "blue", Icon: FileText },
+  wallet_alert: { label: "MATERIAL MOVE", tone: "blue", Icon: Fish },
+  trigger_armed: { label: "HEADS-UP", tone: "amber", Icon: AlertTriangle },
   // Legacy kinds — kept for historical signals viewed from worker
   // pages. Inbox queries filter these out.
   bounty: { label: "BOUNTY", tone: "gray" },
@@ -186,10 +197,11 @@ export function FindingDetail({
         boxShadow: "0 1px 3px rgba(15,23,42,0.04)",
       }}
     >
-      {/* Phase 8 — kind-specific badge. Pill, not eyebrow. */}
+      {/* Phase 8 — kind-specific badge. Pill, not eyebrow. Lucide
+          icon prefix replaces the emoji glyph for crisper rendering. */}
       <div className="mb-3">
         <span
-          className="inline-flex items-center font-mono uppercase tracking-[0.14em] rounded-full px-2.5 py-1"
+          className="inline-flex items-center gap-1.5 font-mono uppercase tracking-[0.14em] rounded-full px-2.5 py-1"
           style={{
             fontSize: 9.5,
             background: badgeColor.bg,
@@ -197,6 +209,9 @@ export function FindingDetail({
             fontWeight: 600,
           }}
         >
+          {badge.Icon && (
+            <badge.Icon className="w-3 h-3" strokeWidth={2.4} />
+          )}
           {badge.label}
         </span>
       </div>
@@ -214,7 +229,7 @@ export function FindingDetail({
         className="flex items-baseline gap-2 mb-4 text-[12px]"
         style={{ color: "#6B7280" }}
       >
-        <span style={{ fontSize: 14 }}>{signal.worker.emoji}</span>
+        <WorkerEmoji emoji={signal.worker.emoji} size={14} />
         <span style={{ fontWeight: 500, color: "#0A0A0A" }}>
           {signal.worker.name}
         </span>

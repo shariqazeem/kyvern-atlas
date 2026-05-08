@@ -26,6 +26,7 @@
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { ArrowUpRight, Check, X } from "lucide-react";
+import { WorkerEmoji } from "@/components/icons/worker-emoji";
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
@@ -134,15 +135,15 @@ export function WorkerTile({ worker, action, network, fallbackBrand, isDemo }: P
           style={{
             width: 56,
             height: 56,
-            fontSize: 34,
             background:
               "linear-gradient(180deg, #F8FAFC 0%, #FFFFFF 100%)",
             border: "1px solid rgba(15,23,42,0.06)",
             boxShadow:
               "inset 0 1px 0 rgba(255,255,255,1), 0 1px 2px rgba(15,23,42,0.04), 0 8px 22px -10px rgba(15,23,42,0.10)",
+            color: "#0A0A0A",
           }}
         >
-          {worker.emoji}
+          <WorkerEmoji emoji={worker.emoji} size={28} strokeWidth={1.6} />
         </div>
         <StatusLED kind={status} />
       </div>

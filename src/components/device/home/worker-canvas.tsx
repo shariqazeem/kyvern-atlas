@@ -43,6 +43,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowUpRight, ShieldCheck } from "lucide-react";
+import { WorkerEmoji } from "@/components/icons/worker-emoji";
 import type { WorkerTileWorker, WorkerTileAction } from "./worker-tile";
 import type { ActionFeedItem } from "./action-feed";
 
@@ -588,7 +589,7 @@ function WorkerNode({
               state === "idle"
                 ? "inset 0 1px 0 rgba(255,255,255,1), 0 4px 14px -6px rgba(15,23,42,0.18)"
                 : undefined,
-            fontSize: 32,
+            color: "#0A0A0A",
           }}
           animate={chipAnimate}
           transition={{
@@ -597,7 +598,7 @@ function WorkerNode({
             ease: "easeInOut",
           }}
         >
-          {worker.emoji}
+          <WorkerEmoji emoji={worker.emoji} size={28} strokeWidth={1.5} />
         </motion.div>
 
         {/* Name */}
@@ -733,7 +734,7 @@ function TickerRow({
   return (
     <>
       {/* Worker emoji */}
-      <span style={{ fontSize: 14 }}>{item.worker.emoji}</span>
+      <WorkerEmoji emoji={item.worker.emoji} size={13} />
 
       {/* Worker name */}
       <span

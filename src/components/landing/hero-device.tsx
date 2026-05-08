@@ -17,6 +17,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { WorkerEmoji } from "@/components/icons/worker-emoji";
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
@@ -362,7 +363,7 @@ function WorkerTile({ emoji, active }: { emoji: string; active: boolean }) {
         initial={{ scale: 0.85, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ duration: 0.5, ease: EASE }}
-        className="relative w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center text-[22px] sm:text-[26px]"
+        className="relative w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center"
         style={{
           background:
             "linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%)",
@@ -370,9 +371,10 @@ function WorkerTile({ emoji, active }: { emoji: string; active: boolean }) {
           boxShadow: active
             ? `0 0 0 2px rgba(34,197,94,0.4), 0 8px 24px rgba(34,197,94,0.15), inset 0 1px 0 rgba(255,255,255,0.8)`
             : "0 6px 14px -4px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.8)",
+          color: "#0A0A0A",
         }}
       >
-        {emoji}
+        <WorkerEmoji emoji={emoji} size={26} strokeWidth={1.5} />
       </motion.div>
       {active && (
         <motion.div

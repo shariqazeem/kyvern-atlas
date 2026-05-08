@@ -14,6 +14,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { ExternalLink } from "lucide-react";
+import { WorkerEmoji } from "@/components/icons/worker-emoji";
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
@@ -175,7 +176,7 @@ export function LiveWorkerCard({ agentId, variant }: LiveWorkerCardProps) {
           boxShadow: "0 1px 2px rgba(15,23,42,0.03)",
         }}
       >
-        <span className="text-[20px]">{data.emoji}</span>
+        <WorkerEmoji emoji={data.emoji} size={18} strokeWidth={1.7} />
         <span
           className="font-mono text-[12.5px] flex-1 min-w-0 truncate"
           style={{ color: "#0A0A0A" }}
@@ -216,7 +217,7 @@ export function LiveWorkerCard({ agentId, variant }: LiveWorkerCardProps) {
         className="flex items-center gap-2 px-4 pt-3 pb-2.5"
         style={{ borderBottom: "1px solid rgba(15,23,42,0.05)" }}
       >
-        <span className="text-[18px]">{data.emoji}</span>
+        <WorkerEmoji emoji={data.emoji} size={16} strokeWidth={1.7} />
         <span
           className="font-mono uppercase tracking-[0.14em]"
           style={{ color: "#0A0A0A", fontSize: 10.5, fontWeight: 600 }}

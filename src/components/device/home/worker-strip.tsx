@@ -19,6 +19,7 @@
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { Sparkles } from "lucide-react";
+import { WorkerEmoji } from "@/components/icons/worker-emoji";
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
@@ -120,7 +121,7 @@ export function WorkerStrip({ workers, lastVerbByAgent }: WorkerStripProps) {
                 className="flex items-center gap-2 px-4 py-2 hover:bg-[rgba(15,23,42,0.02)] transition min-w-0"
               >
                 <span
-                  className="w-6 h-6 rounded-full flex items-center justify-center text-[13px] flex-none relative"
+                  className="w-6 h-6 rounded-full flex items-center justify-center flex-none relative"
                   style={{
                     background:
                       "linear-gradient(180deg, #FFFFFF 0%, #F2F3F5 100%)",
@@ -128,9 +129,10 @@ export function WorkerStrip({ workers, lastVerbByAgent }: WorkerStripProps) {
                     boxShadow: w.isThinking
                       ? "0 0 0 1.5px rgba(34,197,94,0.32), inset 0 1px 1px rgba(15,23,42,0.04)"
                       : "inset 0 1px 1px rgba(15,23,42,0.04)",
+                    color: "#0A0A0A",
                   }}
                 >
-                  {w.emoji}
+                  <WorkerEmoji emoji={w.emoji} size={13} strokeWidth={1.8} />
                 </span>
                 <span
                   className="text-[12.5px] font-medium truncate flex-none max-w-[100px]"

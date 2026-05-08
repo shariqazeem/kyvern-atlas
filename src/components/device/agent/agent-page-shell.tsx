@@ -25,6 +25,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown, ChevronUp, Pause, Play, X, Send, ExternalLink } from "lucide-react";
+import { WorkerEmoji } from "@/components/icons/worker-emoji";
 import { PageHeader } from "../shell/page-header";
 import { isPersonalized } from "@/lib/device-state";
 import { SkillsField } from "@/components/agents/configure/skills-field";
@@ -240,7 +241,7 @@ export function AgentPageShell({
       back={{ href: "/app", label: "Device" }}
       left={
         <>
-          <span style={{ fontSize: 18 }}>{agent.emoji}</span>
+          <WorkerEmoji emoji={agent.emoji} size={18} />
           <span
             className="text-[14px] sm:text-[15px] font-semibold tracking-[-0.005em] truncate"
             style={{ color: "#0A0A0A" }}
@@ -372,10 +373,11 @@ export function AgentPageShell({
           <Card>
             <Eyebrow>About</Eyebrow>
             <h3
-              className="text-[20px] sm:text-[22px] font-semibold tracking-[-0.012em] mb-2"
+              className="text-[20px] sm:text-[22px] font-semibold tracking-[-0.012em] mb-2 inline-flex items-center gap-2"
               style={{ color: "#0A0A0A" }}
             >
-              {agent.emoji} {templateLabel(agent.template)}
+              <WorkerEmoji emoji={agent.emoji} size={22} strokeWidth={1.7} />
+              {templateLabel(agent.template)}
             </h3>
             <p
               className="text-[13.5px] leading-[1.6]"

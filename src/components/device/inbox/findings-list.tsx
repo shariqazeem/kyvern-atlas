@@ -15,6 +15,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Check, Repeat } from "lucide-react";
+import { WorkerEmoji } from "@/components/icons/worker-emoji";
 import type { Signal } from "@/lib/agents/types";
 import { severityForSignal, severityVisuals } from "@/lib/agents/signal-severity";
 
@@ -180,9 +181,12 @@ function Row({
           className="text-[10.5px] truncate font-mono uppercase tracking-[0.10em] flex items-center gap-1.5"
           style={{ color: "rgba(15,23,42,0.55)" }}
         >
-          <span className="truncate">
-            {label} · {signal.worker.emoji} {signal.worker.name} ·{" "}
-            {fmtAgo(signal.createdAt)}
+          <span className="truncate inline-flex items-center gap-1">
+            <span>{label} · </span>
+            <WorkerEmoji emoji={signal.worker.emoji} size={11} />
+            <span>
+              {signal.worker.name} · {fmtAgo(signal.createdAt)}
+            </span>
           </span>
           {submitted && (
             <span

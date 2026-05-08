@@ -15,6 +15,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight } from "lucide-react";
+import { WorkerEmoji } from "@/components/icons/worker-emoji";
 import type { Signal } from "@/lib/agents/types";
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
@@ -114,14 +115,15 @@ export function InboxPreview({ deviceId }: { deviceId: string }) {
                 }}
               >
                 <div
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-[16px] flex-none"
+                  className="w-8 h-8 rounded-full flex items-center justify-center flex-none"
                   style={{
                     background:
                       "linear-gradient(180deg, #FFFFFF 0%, #F4F5F7 100%)",
                     border: "1px solid rgba(15,23,42,0.06)",
+                    color: "#0A0A0A",
                   }}
                 >
-                  {s.worker.emoji}
+                  <WorkerEmoji emoji={s.worker.emoji} size={16} strokeWidth={1.7} />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div

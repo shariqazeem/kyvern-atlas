@@ -14,6 +14,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
+import { WorkerEmoji } from "@/components/icons/worker-emoji";
 import { CheckCircle2, X } from "lucide-react";
 
 interface SignalLike {
@@ -98,11 +99,11 @@ export function FirstFindingToast({ deviceId, signals }: Props) {
             strokeWidth={2}
             style={{ color: "#86EFAC" }}
           />
-          <span className="text-[12.5px] font-medium tracking-[-0.005em]">
+          <span className="text-[12.5px] font-medium tracking-[-0.005em] inline-flex items-center gap-1">
             {match.worker?.emoji && (
-              <span style={{ marginRight: 4 }}>{match.worker.emoji}</span>
+              <WorkerEmoji emoji={match.worker.emoji} size={12} strokeWidth={2} />
             )}
-            {copyFor(match.kind, match.worker?.name)}
+            <span>{copyFor(match.kind, match.worker?.name)}</span>
           </span>
           <Link
             href="/app/inbox"
