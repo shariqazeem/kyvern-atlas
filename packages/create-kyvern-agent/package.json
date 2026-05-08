@@ -1,6 +1,6 @@
 {
   "name": "create-kyvern-agent",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Scaffold a Solana agent wired to a Kyvern vault — one command, working out of the box.",
   "bin": {
     "create-kyvern-agent": "bin/cli.mjs"
