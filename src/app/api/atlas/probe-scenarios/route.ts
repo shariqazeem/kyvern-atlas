@@ -61,7 +61,7 @@ const SCENARIOS: Record<string, ScenarioParams> = {
     merchant: "ranger.com",
     memo: "buy weather data",
     expectFailure: true,
-    expectedErrorCode: 6003,
+    expectedErrorCode: 12003,
     expectedErrorName: "MerchantNotAllowlisted",
     description: "Pay $0.05 to ranger.com — not on Atlas's allowlist",
   },
@@ -70,7 +70,7 @@ const SCENARIOS: Record<string, ScenarioParams> = {
     merchant: "api.openai.com",
     memo: null,
     expectFailure: true,
-    expectedErrorCode: 6004,
+    expectedErrorCode: 12004,
     expectedErrorName: "MissingMemo",
     description: "Pay $0.05 to api.openai.com — no memo on a vault that requires one",
   },
@@ -79,7 +79,7 @@ const SCENARIOS: Record<string, ScenarioParams> = {
     merchant: "api.openai.com",
     memo: "burn budget test",
     expectFailure: true,
-    expectedErrorCode: 6002,
+    expectedErrorCode: 12002,
     expectedErrorName: "AmountExceedsPerTxMax",
     description: "Pay $5 to api.openai.com — per-tx cap is $2",
   },
@@ -94,14 +94,17 @@ const SCENARIOS: Record<string, ScenarioParams> = {
   },
 };
 
+// Kyvern Anchor program error codes — per anchor/programs/kyvern-policy
+// (Anchor numbers user errors at 6000 by default but this program
+// declares them at offset 12000 explicitly).
 const KYVERN_ERROR_CODES: Record<number, string> = {
-  6000: "VaultPaused",
-  6001: "InvalidAmount",
-  6002: "AmountExceedsPerTxMax",
-  6003: "MerchantNotAllowlisted",
-  6004: "MissingMemo",
-  6005: "VelocityCapExceeded",
-  6006: "MemoTooLong",
+  12000: "VaultPaused",
+  12001: "InvalidAmount",
+  12002: "AmountExceedsPerTxMax",
+  12003: "MerchantNotAllowlisted",
+  12004: "MissingMemo",
+  12005: "VelocityCapExceeded",
+  12006: "MemoTooLong",
 };
 
 export async function POST(req: NextRequest) {
