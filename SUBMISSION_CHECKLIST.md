@@ -41,28 +41,14 @@ If anything fails, paste the failure to Claude and ask to fix.
 
 ---
 
-## 2. npm publish (15 min, requires `npm login`)
+## 2. npm publish · ✅ DONE 2026-05-09
 
-Both packages are bumped + built locally. After `npm login`:
+- [`@kyvernlabs/sdk@0.5.0`](https://www.npmjs.com/package/@kyvernlabs/sdk) — published
+- [`create-kyvern-agent@0.2.0`](https://www.npmjs.com/package/create-kyvern-agent) — published
+- `frontier-2026` git tag pushed to origin
 
-```bash
-cd packages/sdk
-npm publish --access public
-
-cd ../create-kyvern-agent
-npm publish
-
-# Tag the repo
-cd ../..
-git tag frontier-2026
-git push origin frontier-2026
-```
-
-Then verify both are live:
-- https://www.npmjs.com/package/@kyvernlabs/sdk → should show 0.5.0
-- https://www.npmjs.com/package/create-kyvern-agent → should show 0.2.0
-
-If either fails, ping Claude — likely a dist/ rebuild is needed.
+`npx create-kyvern-agent my-agent` now scaffolds a project that pulls
+SDK 0.5.0 (with `KastDestination` + `vault.checkAllowance`).
 
 ---
 
