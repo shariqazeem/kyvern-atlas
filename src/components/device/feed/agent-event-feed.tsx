@@ -139,6 +139,30 @@ export function AgentEventFeed({
     };
   }, [vaultId, ownerWallet, onNewEvent]);
 
+  // T4 polish — track which event ids have just landed so the row
+  // can pulse green for ~1.5s. Hypnotic-feel cue: a judge sees their
+  // tx land in real time, glowing.
+  const [freshIds, setFreshIds] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (events.length === 0) return;
+    const newest = events[0];
+    if (!newest) return;
+    setFreshIds((prev) => {
+      if (prev.has(newest.id)) return prev;
+      const next = new Set(prev);
+      next.add(newest.id);
+      return next;
+    });
+    const t = setTimeout(() => {
+      setFreshIds((prev) => {
+        const next = new Set(prev);
+        next.delete(newest.id);
+        return next;
+      });
+    }, 1800);
+    return () => clearTimeout(t);
+  }, [events]);
+
   const filtered = useMemo(() => {
     if (filter === "all") return events;
     if (filter === "settled")
@@ -208,6 +232,7 @@ export function AgentEventFeed({
                   key={e.id}
                   event={e}
                   expanded={expanded === e.id}
+                  fresh={freshIds.has(e.id)}
                   onToggle={() => setExpanded(expanded === e.id ? null : e.id)}
                 />
               ))}
@@ -309,10 +334,12 @@ function FilterChip({
 function EventRow({
   event,
   expanded,
+  fresh,
   onToggle,
 }: {
   event: VaultEvent;
   expanded: boolean;
+  fresh?: boolean;
   onToggle: () => void;
 }) {
   const isBlocked = event.status === "blocked" || event.status === "failed";
@@ -324,9 +351,25 @@ function EventRow({
     <motion.li
       layout
       initial={{ opacity: 0, y: -6 }}
-      animate={{ opacity: 1, y: 0 }}
+      animate={{
+        opacity: 1,
+        y: 0,
+        // Fresh-row pulse: brief tinted backdrop in the row's status
+        // colour when the event first lands. Hypnotic feel — the
+        // judge sees their tx land in real time, glowing.
+        backgroundColor: fresh
+          ? [
+              "rgba(255,255,255,0)",
+              isBlocked
+                ? "rgba(220,38,38,0.18)"
+                : "rgba(34,197,94,0.18)",
+              "rgba(255,255,255,0)",
+            ]
+          : "rgba(255,255,255,0)",
+      }}
       exit={{ opacity: 0 }}
-      transition={{ duration: 0.32, ease: EASE }}
+      transition={{ duration: fresh ? 1.6 : 0.32, ease: EASE }}
+      style={{ position: "relative" }}
     >
       <button
         type="button"
