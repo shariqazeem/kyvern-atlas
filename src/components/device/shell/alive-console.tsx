@@ -17,6 +17,7 @@
  * doesn't 500 even before the real components ship.
  */
 
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import type { PanelKind } from "../home/affordance-row";
 import { AgentEventFeed } from "../feed/agent-event-feed";
@@ -38,18 +39,95 @@ interface Props {
 export function AliveConsole({
   vaultId,
   ownerWallet,
-  agentKeyPrefix,
+  agentKeyPrefix: agentKeyPrefixProp,
   usdcBalance,
   paused,
   network = "devnet",
   className,
 }: Props) {
-  // agentKeyPrefix is reserved for the top-rail live status line
-  // (T4 hour 6–7). The wizard fetches its own prefix per-step.
-  void agentKeyPrefix;
+  // T4 — fetch agent key prefix for the live status line + today
+  // stats from the events endpoint. Both poll alongside the feed
+  // so the chassis stays in sync as the user runs vault.pay() calls.
+  const [keyPrefix, setKeyPrefix] = useState<string | null>(agentKeyPrefixProp);
+  const [stats, setStats] = useState<TodayStatsT>({
+    callsToday: 0,
+    blockedToday: 0,
+    spentTodayUsd: 0,
+    lastEventTs: null,
+  });
+
+  // Hydrate agent key prefix once
+  useEffect(() => {
+    if (!vaultId || keyPrefix) return;
+    let cancelled = false;
+    void fetch(`/api/devices/${vaultId}/agent-key`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (cancelled) return;
+        if (d?.keyPrefix) setKeyPrefix(d.keyPrefix);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [vaultId, keyPrefix]);
+
+  // Poll today's stats every 5s
+  useEffect(() => {
+    if (!vaultId || !ownerWallet) return;
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const r = await fetch(`/api/vault/${vaultId}/events?limit=200`, {
+          headers: { "x-owner-wallet": ownerWallet },
+        });
+        if (!r.ok) return;
+        const data = (await r.json()) as {
+          events: Array<{
+            ts: string;
+            status: string;
+            amountUsd: number;
+          }>;
+          latestTs: string | null;
+        };
+        if (cancelled) return;
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        const todayMs = todayStart.getTime();
+        let calls = 0;
+        let blocked = 0;
+        let spent = 0;
+        for (const ev of data.events) {
+          const evMs = parseTs(ev.ts);
+          if (evMs < todayMs) continue;
+          calls += 1;
+          if (ev.status === "blocked" || ev.status === "failed") blocked += 1;
+          if (ev.status === "settled" || ev.status === "allowed")
+            spent += ev.amountUsd;
+        }
+        setStats({
+          callsToday: calls,
+          blockedToday: blocked,
+          spentTodayUsd: spent,
+          lastEventTs: data.latestTs,
+        });
+      } catch {
+        /* swallow */
+      }
+    };
+    void tick();
+    const t = setInterval(tick, 5000);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
+  }, [vaultId, ownerWallet]);
 
   return (
     <div className={`flex flex-col gap-3 h-full ${className ?? ""}`}>
+      {/* T4 — live agent status line */}
+      <AgentStatusLine keyPrefix={keyPrefix} lastEventTs={stats.lastEventTs} />
+
       {/* Whisper line */}
       <div className="text-center px-4">
         <p
@@ -100,6 +178,9 @@ export function AliveConsole({
             className="min-h-[340px]"
           />
         </div>
+
+        {/* T4 — today's stats row, just above the vault anchor */}
+        <TodayStats stats={stats} />
 
         {/* Vault anchor at the bottom — same as DevTilesCanvas */}
         <motion.div
@@ -171,5 +252,178 @@ export function AliveConsole({
       </div>
     </div>
   );
+}
+
+/* ──────────────────────────────────────────────────────────────────
+   T4 — Agent status line + today stats row
+   ────────────────────────────────────────────────────────────────── */
+
+interface TodayStatsT {
+  callsToday: number;
+  blockedToday: number;
+  spentTodayUsd: number;
+  lastEventTs: string | null;
+}
+
+function AgentStatusLine({
+  keyPrefix,
+  lastEventTs,
+}: {
+  keyPrefix: string | null;
+  lastEventTs: string | null;
+}) {
+  const hasActivity = !!lastEventTs;
+  const display = keyPrefix ? `${keyPrefix}…` : "no key minted yet";
+
+  return (
+    <div
+      className="flex items-center justify-center gap-2.5 px-3 py-1.5 rounded-full mx-auto"
+      style={{
+        background: "rgba(15,23,42,0.04)",
+        border: "1px solid rgba(15,23,42,0.06)",
+        maxWidth: "fit-content",
+      }}
+    >
+      <span className="flex items-center gap-1.5">
+        <motion.span
+          className="rounded-full"
+          style={{
+            width: 6,
+            height: 6,
+            background: hasActivity ? "#22C55E" : "#9CA3AF",
+            boxShadow: hasActivity
+              ? "0 0 0 3px rgba(34,197,94,0.18), 0 0 6px #22C55E"
+              : "none",
+          }}
+          animate={
+            hasActivity
+              ? { opacity: [0.55, 1, 0.55] }
+              : { opacity: 0.55 }
+          }
+          transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
+        />
+        <span
+          className="font-mono uppercase tracking-[0.14em]"
+          style={{ fontSize: 9, color: "#9CA3AF" }}
+        >
+          Your agent
+        </span>
+      </span>
+      <span style={{ width: 1, height: 10, background: "rgba(15,23,42,0.10)" }} />
+      <span
+        className="font-mono truncate"
+        style={{ fontSize: 11, color: keyPrefix ? "#0A0A0A" : "rgba(15,23,42,0.45)", maxWidth: 160 }}
+      >
+        {display}
+      </span>
+      {hasActivity && (
+        <>
+          <span style={{ width: 1, height: 10, background: "rgba(15,23,42,0.10)" }} />
+          <span
+            className="font-mono"
+            style={{ fontSize: 10.5, color: "#15803D" }}
+          >
+            last action {relTimeShort(lastEventTs!)}
+          </span>
+        </>
+      )}
+    </div>
+  );
+}
+
+function TodayStats({ stats }: { stats: TodayStatsT }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, ease: EASE, delay: 0.05 }}
+      className="relative z-10 flex items-center justify-center gap-4 flex-wrap"
+    >
+      <StatCell
+        label="Today"
+        value={`$${stats.spentTodayUsd.toFixed(stats.spentTodayUsd >= 1 ? 2 : 3)}`}
+        sub="spent"
+      />
+      <Sep />
+      <StatCell
+        label=""
+        value={`${stats.callsToday}`}
+        sub="calls"
+      />
+      <Sep />
+      <StatCell
+        label=""
+        value={`${stats.blockedToday}`}
+        sub="blocked"
+        tone={stats.blockedToday > 0 ? "amber" : "neutral"}
+      />
+    </motion.div>
+  );
+}
+
+function StatCell({
+  label,
+  value,
+  sub,
+  tone,
+}: {
+  label: string;
+  value: string;
+  sub: string;
+  tone?: "amber" | "neutral";
+}) {
+  return (
+    <div className="flex items-baseline gap-1.5">
+      {label && (
+        <span
+          className="font-mono uppercase tracking-[0.14em]"
+          style={{ fontSize: 9, color: "#9CA3AF" }}
+        >
+          {label}
+        </span>
+      )}
+      <span
+        className="font-mono tabular-nums font-semibold"
+        style={{
+          fontSize: 13,
+          color: tone === "amber" ? "#B45309" : "#0A0A0A",
+        }}
+      >
+        {value}
+      </span>
+      <span
+        className="font-mono uppercase tracking-[0.14em]"
+        style={{ fontSize: 9, color: "#9CA3AF" }}
+      >
+        {sub}
+      </span>
+    </div>
+  );
+}
+
+function Sep() {
+  return (
+    <span style={{ width: 1, height: 12, background: "rgba(15,23,42,0.10)" }} />
+  );
+}
+
+function parseTs(raw: string): number {
+  // SQLite returns "YYYY-MM-DD HH:MM:SS" without TZ. Treat as UTC.
+  let ms = Date.parse(raw);
+  if (isNaN(ms)) {
+    const norm = raw.includes("T") ? raw : raw.replace(" ", "T") + "Z";
+    ms = Date.parse(norm);
+  }
+  return isNaN(ms) ? 0 : ms;
+}
+
+function relTimeShort(iso: string): string {
+  const ms = parseTs(iso);
+  if (!ms) return "now";
+  const diff = Math.max(0, Date.now() - ms);
+  if (diff < 5_000) return "just now";
+  if (diff < 60_000) return `${Math.floor(diff / 1000)}s ago`;
+  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`;
+  return `${Math.floor(diff / 3_600_000)}h ago`;
 }
 

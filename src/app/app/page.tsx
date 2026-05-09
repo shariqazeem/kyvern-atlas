@@ -169,11 +169,10 @@ export default function DeviceHome() {
     rawPanel === "builder"
       ? rawPanel
       : null;
-  // T0 — alive console feature flag. Per TRANSFORM_24H, when ?alive=1
-  // is set, the worker-stage slot renders the new live integration
-  // console (wizard + event feed) instead of DevTilesCanvas. Hour 8–9
-  // we flip the default once smoke is clean.
-  const aliveConsole = searchParams?.get("alive") === "1";
+  // FLAG-OFF (TRANSFORM_24H hour 8–9). The alive console is the
+  // default now. Add ?classic=1 to fall back to the static
+  // DevTilesCanvas if anything ever needs it for narrative video.
+  const aliveConsole = searchParams?.get("classic") !== "1";
   const setPanel = useCallback(
     (next: PanelKind | null) => {
       const params = new URLSearchParams(
