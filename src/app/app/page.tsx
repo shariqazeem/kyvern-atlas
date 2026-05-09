@@ -38,10 +38,6 @@ import { ArrowRight } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useDeviceStore } from "@/hooks/use-device-store";
 import type { PanelKind } from "@/components/device/home/affordance-row";
-import { WatchChainPanel } from "@/components/device/panels/watch-chain-panel";
-import { PayShPanel } from "@/components/device/panels/paysh-panel";
-import { KastPanel } from "@/components/device/panels/kast-panel";
-import { BuilderPanel } from "@/components/device/panels/builder-panel";
 import { SandboxBanner } from "@/components/device/home/sandbox-banner";
 import type { ActionFeedItem } from "@/components/device/home/action-feed";
 import { TopUpDrawer } from "@/components/device/top-up-drawer";
@@ -140,7 +136,7 @@ function devWallet(): string {
 }
 
 export default function DeviceHome() {
-  const { wallet, isAuthenticated, isLoading, signIn } = useAuth();
+  const { wallet, isAuthenticated, isLoading } = useAuth();
   const { init } = useDeviceStore();
   // Guest mode = synthetic dev-wallet in localStorage AND no Privy
   // session. Determines the SANDBOX banner + the gates on Tab 2/3.
@@ -374,33 +370,12 @@ export default function DeviceHome() {
         <ManifestoStrip className="h-8 flex-shrink-0" />
       </div>
 
-      {/* FOUR INSTRUMENT-DRAWER PANELS per SPEC R4 — the dev playground.
-          Each panel owns its own DevicePanel shell + body. The 4-tab
-          AffordanceRow + worker-stage tile-canvas above feed into them. */}
-      <WatchChainPanel
-        open={panel === "bay"}
-        onClose={() => setPanel(null)}
-      />
-      <PayShPanel
-        open={panel === "use"}
-        onClose={() => setPanel(null)}
-      />
-      <KastPanel
-        open={panel === "kast"}
-        onClose={() => setPanel(null)}
-        vaultId={deviceId}
-        ownerWallet={wallet ?? null}
-      />
-      <BuilderPanel
-        open={panel === "builder"}
-        onClose={() => setPanel(null)}
-        deviceId={deviceId}
-        network={status?.network ?? "devnet"}
-        isGuest={isGuest}
-        onSignIn={signIn}
-        policySummary={status?.policySummary ?? null}
-        perTxMaxUsd={0.5}
-      />
+      {/* The four instrument-drawer panels were retired 2026-05-09 —
+          the alive console wizard owns every interaction now and the
+          panels duplicated content. AffordanceRow stays as chassis
+          decoration with a soft scroll-to-wizard click. The state
+          variable + setPanel still exist so other components don't
+          break, but no panels mount here. */}
 
       <TopUpDrawer
         open={topUpOpen}
