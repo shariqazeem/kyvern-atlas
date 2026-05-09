@@ -11,7 +11,7 @@ before a single lamport moves.
 `Solana · Squads · pay.sh · KAST · npm`
 
 **Live:** [kyvernlabs.com](https://kyvernlabs.com) ·
-**Demo:** [kyvernlabs.com/demo](https://kyvernlabs.com/demo) ·
+**App (live integration console):** [kyvernlabs.com/app](https://kyvernlabs.com/app) ·
 **Docs:** [kyvernlabs.com/docs](https://kyvernlabs.com/docs) ·
 **Evidence:** [kyvernlabs.com/atlas](https://kyvernlabs.com/atlas)
 
@@ -26,19 +26,23 @@ before a single lamport moves.
 
 ## The 60-second judge demo
 
-Open [kyvernlabs.com/demo](https://kyvernlabs.com/demo) and click:
+Sign in at [kyvernlabs.com](https://kyvernlabs.com) → unbox plays
+(2.5s) → land on `/app`, the live integration console.
 
-1. **Try to drain $5** → real failed Solana tx, custom error 12002 `AmountExceedsPerTxMax`
-2. **Pay an unknown wallet** → real failed Solana tx, custom error 12003 `MerchantNotAllowlisted`
-3. **Skip the required memo** → real failed Solana tx, custom error 12004 `MissingMemo`
-4. **Pause + try again** → real failed Solana tx, custom error 12000 `VaultPaused`
-5. **Buy Perplexity via pay.sh — $5** → real failed Solana tx (12002), pay.sh **never invoked** (Kyvern stops it at the policy gate)
-6. **Pay api.openai.com $0.001** → real settled USDC transfer through Kyvern → Squads CPI
-7. **Buy a $0.001 quote via pay.sh** → real `pay --sandbox curl` shell-out returns AAPL quote data + Kyvern settles on-chain
+Inside the device chassis you get **a 5-step integration wizard on
+the left and a live event feed on the right**:
 
-Each "blocked" outcome is a finalized failed Solana transaction. The
-Kyvern policy program at `PpmZ…MSqc` is in every instruction trace.
-Click any Explorer link to verify.
+1. **Mint your key** — copy `kv_live_…` once
+2. **Install** — `npx create-kyvern-agent my-agent` + `npm install @kyvernlabs/sdk`
+3. **Make your first call** — paste-and-run snippet with your key inlined
+4. **Try a violation** — three buttons (over-cap / off-allowlist / missing memo) fire real Solana txs against your own vault. The Kyvern Anchor program at `PpmZ…MSqc` rejects each with a custom error code (12002 / 12003 / 12004). Real failed-tx Explorer links land in your event feed in under 3 seconds.
+5. **Send earnings to KAST** — paste your KAST USDC deposit address; allowlist as `MY_KAST`; agent payouts route there as real on-chain transfers.
+
+Above the wizard: live agent status pill (`Your agent · kv_live_… · last action 12s ago`) with a pulsing dot when an event lands. Below the wizard: today stats (`$X spent · N calls · M blocked`) live-polled from your vault.
+
+The four affordance tabs above the chassis (Watch the chain · Wrap pay.sh · Send to KAST · Wrap your agent) open instrument-drawer panels with deeper interactions, including the `pay --sandbox curl` shell-out that proves Kyvern wraps real x402-paywalled APIs.
+
+Each "blocked" outcome is a finalized failed Solana transaction. The Kyvern policy program is in every instruction trace.
 
 ## Architecture
 

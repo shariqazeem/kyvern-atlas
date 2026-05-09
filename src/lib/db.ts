@@ -363,6 +363,12 @@ function migrate(db: Database.Database) {
       db.exec("ALTER TABLE vaults ADD COLUMN kast_destination_label TEXT DEFAULT 'MY_KAST'");
     if (!v.has("kast_set_at"))
       db.exec("ALTER TABLE vaults ADD COLUMN kast_set_at TEXT");
+    // TRANSFORM_24H §T2 — integration wizard progress, JSON-shaped:
+    //   { mint_key: { completedAt }, install: {...}, first_call: {...},
+    //     try_violation: {...}, kast_payout: {...} }
+    // Each step has { completedAt: ISO } when done. Missing keys = locked.
+    if (!v.has("integration_state"))
+      db.exec("ALTER TABLE vaults ADD COLUMN integration_state TEXT");
 
     const akCols = db.pragma("table_info(vault_agent_keys)") as Array<{ name: string }>;
     const ak = new Set(akCols.map((c) => c.name));

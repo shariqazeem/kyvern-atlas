@@ -38,6 +38,8 @@ import { loadServerSigner } from "@/lib/solana-keystore";
 import {
   callExecutePayment,
   hashMerchantHostname,
+  initializePolicy,
+  isPolicyInitialized,
   KYVERN_POLICY_PROGRAM_ID,
   pausePolicy,
   resumePolicy,
@@ -156,9 +158,9 @@ export async function POST(req: NextRequest) {
   }
 
   // Parse body
-  let body: { scenario?: string };
+  let body: { scenario?: string; vaultId?: string };
   try {
-    body = (await req.json()) as { scenario?: string };
+    body = (await req.json()) as { scenario?: string; vaultId?: string };
   } catch {
     return NextResponse.json({ ok: false, error: "invalid_json" }, { status: 400 });
   }
@@ -183,17 +185,59 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Load Atlas's vault config
-  const vault = getVault(ATLAS_VAULT_ID);
+  // Per TRANSFORM_24H §T3 — vaultId optional. When present + auth
+  // checks out, route the probe through the user's own vault so
+  // their blocked tx lands in their event feed (T1). Default
+  // behavior (no vaultId) hits Atlas, preserving the /atlas
+  // evidence page + the public attack wall.
+  const targetVaultId = body.vaultId?.trim() || ATLAS_VAULT_ID;
+  const isUserVault = targetVaultId !== ATLAS_VAULT_ID;
+
+  if (isUserVault) {
+    // User-vault probes require owner-wallet auth so one user can't
+    // probe another's vault. Same MVP pattern as the rest of
+    // /api/vault/[id]/*.
+    const owner = req.headers.get("x-owner-wallet")?.trim();
+    const target = getVault(targetVaultId);
+    if (!target) {
+      return NextResponse.json(
+        { ok: false, error: "vault_not_found" },
+        { status: 404 },
+      );
+    }
+    if (!owner || owner !== target.ownerWallet) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "unauthorized",
+          message: "x-owner-wallet must match vault.ownerWallet",
+        },
+        { status: 401 },
+      );
+    }
+  }
+
+  // Load target vault config
+  const vault = getVault(targetVaultId);
   if (!vault) {
     return NextResponse.json(
-      { ok: false, error: "atlas_offline", message: "Atlas vault config not found." },
+      {
+        ok: false,
+        error: isUserVault ? "vault_not_found" : "atlas_offline",
+        message: isUserVault ? "vault config not found" : "Atlas vault config not found.",
+      },
       { status: 503 },
     );
   }
   if (!vault.spendingLimitPda) {
     return NextResponse.json(
-      { ok: false, error: "atlas_offline", message: "Atlas spending limit PDA missing." },
+      {
+        ok: false,
+        error: isUserVault ? "vault_not_provisioned" : "atlas_offline",
+        message: isUserVault
+          ? "vault has not finished Squads provisioning yet"
+          : "Atlas spending limit PDA missing.",
+      },
       { status: 503 },
     );
   }
@@ -206,10 +250,16 @@ export async function POST(req: NextRequest) {
        WHERE vault_id = ? AND revoked_at IS NULL
        ORDER BY created_at ASC LIMIT 1`,
     )
-    .get(ATLAS_VAULT_ID) as { solana_secret_b58: string | null } | undefined;
+    .get(targetVaultId) as { solana_secret_b58: string | null } | undefined;
   if (!agentRow?.solana_secret_b58) {
     return NextResponse.json(
-      { ok: false, error: "atlas_offline", message: "Atlas agent secret missing." },
+      {
+        ok: false,
+        error: isUserVault ? "no_agent_key" : "atlas_offline",
+        message: isUserVault
+          ? "this vault has no active agent key — mint one first"
+          : "Atlas agent secret missing.",
+      },
       { status: 503 },
     );
   }
@@ -231,6 +281,56 @@ export async function POST(req: NextRequest) {
   const connection: Connection = signer.connection;
   const feePayer = signer.keypair as Keypair;
 
+  // Lazy policy-PDA init for user vaults — Atlas's PDA was set up by
+  // scripts/init-atlas-policy.ts at deploy time, but a fresh user
+  // vault's PDA doesn't exist until we call initialize_policy. The
+  // probe needs the PDA to exist for execute_payment to even reach
+  // the rule checks (otherwise the tx fails with "AccountNotFound"
+  // before we can surface a clean Kyvern error code).
+  if (isUserVault) {
+    try {
+      const multisigPub = new PublicKey(vault.squadsAddress);
+      const initialized = await isPolicyInitialized(connection, multisigPub);
+      if (!initialized) {
+        // Use the user's vault's policy params for the on-chain
+        // policy. Empty allowlist on chain = any merchant allowed
+        // (matches off-chain semantics in policy-engine.ts), so we
+        // seed a small default allowlist so the merchant_not_allowed
+        // scenario actually violates a chain rule.
+        const merchants =
+          vault.allowedMerchants && vault.allowedMerchants.length > 0
+            ? vault.allowedMerchants
+            : ["api.openai.com", "api.anthropic.com", "api.pay.sh", "kast.xyz"];
+        const velocityWindowSeconds =
+          vault.velocityWindow === "1h"
+            ? 3600
+            : vault.velocityWindow === "1d"
+              ? 86_400
+              : 604_800;
+        await initializePolicy({
+          connection,
+          authority: feePayer,
+          multisig: multisigPub,
+          perTxMaxBaseUnits: BigInt(Math.round(vault.perTxMaxUsd * 1_000_000)),
+          requireMemo: !!vault.requireMemo,
+          velocityWindowSeconds,
+          velocityMaxCalls: vault.maxCallsPerWindow ?? 60,
+          merchantsNormalized: merchants,
+        });
+      }
+    } catch (e) {
+      console.error(
+        "[probe-scenarios] lazy initializePolicy failed:",
+        e instanceof Error ? e.message : e,
+      );
+      // Don't bail — let the execute_payment attempt run anyway. If
+      // the PDA still isn't initialized after this, the cluster
+      // returns a real failed tx with an AccountNotFound error
+      // instead of a Kyvern error, which is still useful info but
+      // less clean than the polished demo against Atlas.
+    }
+  }
+
   // Derive accounts
   const member = Keypair.fromSecretKey(bs58.decode(agentRow.solana_secret_b58));
   const multisig = new PublicKey(vault.squadsAddress);
@@ -238,11 +338,17 @@ export async function POST(req: NextRequest) {
   const vaultPdaStr = (vault as unknown as { vaultPda?: string }).vaultPda
     ?? (db
       .prepare(`SELECT vault_pda FROM vaults WHERE id = ?`)
-      .get(ATLAS_VAULT_ID) as { vault_pda: string } | undefined)
+      .get(targetVaultId) as { vault_pda: string } | undefined)
       ?.vault_pda;
   if (!vaultPdaStr) {
     return NextResponse.json(
-      { ok: false, error: "atlas_offline", message: "Atlas vault PDA missing." },
+      {
+        ok: false,
+        error: isUserVault ? "vault_not_provisioned" : "atlas_offline",
+        message: isUserVault
+          ? "vault has not finished Squads provisioning yet"
+          : "Atlas vault PDA missing.",
+      },
       { status: 503 },
     );
   }

@@ -61,25 +61,31 @@ policy layer above the rails.
 
 ---
 
-## Slide 4 — Live demo (real failed Solana txs)
+## Slide 4 — Live demo: integrate + watch the chain
 
-Visit **kyvernlabs.com/demo**. Click any button. Every result is a
-finalized Solana transaction.
+Sign in at **kyvernlabs.com**. Unbox cinematic plays (~2.5s). Land on
+the device — `/app` — with a 5-step integration wizard on the left
+and a live event feed on the right.
 
-| Button | Result | On-chain |
+| Step | Action | What lands |
 |---|---|---|
-| Try to drain $5 | Refused | Custom error 12002 — AmountExceedsPerTxMax |
-| Pay an unknown wallet | Refused | Custom error 12003 — MerchantNotAllowlisted |
-| Skip the required memo | Refused | Custom error 12004 — MissingMemo |
-| Pause + try again | Refused | Custom error 12000 — VaultPaused |
-| Buy via pay.sh — $5 over cap | Refused | 12002, pay.sh never invoked |
-| Pay $0.001 to api.openai.com | Settled | Real Squads CPI, real USDC transfer |
-| Buy $0.001 quote via pay.sh | Settled | Real x402 response data + Kyvern settle |
+| 1 | Mint your `kv_live_…` key | Copy it once — wizard unlocks |
+| 2 | `npx create-kyvern-agent` + `npm install @kyvernlabs/sdk` | Copy commands |
+| 3 | Paste-and-run the 3-line snippet — `vault.checkAllowance(...)` | Copy snippet |
+| 4 | Click **Try over-cap / off-allowlist / missing memo** | Real failed Solana tx in your event feed in <3s, Kyvern errors 12002/12003/12004, clickable Explorer |
+| 5 | Paste your KAST USDC deposit address | Real on-chain payout from your agent → KAST card |
 
-> **Each refusal includes the Kyvern policy program in the instruction
-> trace, attributable to the on-chain rule that fired.**
+> **The agent's first event lands in the user's own feed within
+> seconds. Every refusal includes the Kyvern policy program in the
+> instruction trace.**
 
-[screenshot of the modal showing custom error 12003 with Explorer link]
+The four affordance tabs above the chassis (Watch the chain · Wrap
+pay.sh · Send to KAST · Wrap your agent) open instrument-drawer
+panels with deeper interactions, including the real `pay --sandbox
+curl` shell-out that proves Kyvern wraps live x402-paywalled APIs.
+
+[screenshot of the wizard at step 4 with the event feed showing a
+fresh blocked tx + Kyvern error 12002]
 
 ---
 
@@ -176,7 +182,7 @@ Two sentences in the hands of any builder:
 - Anchor program deployed with 5 rules + kill switch
 - SDK 0.5.0 on npm, scaffolder 0.2.0 on npm
 - Atlas reference agent live, 19 days unbroken
-- /demo with 7 verifiable Explorer-clickable scenarios
+- /app with live integration wizard + per-user event feed (real failed Solana txs land in <3s)
 
 **Next 30 days (mainnet path):**
 - External audit kickoff (target: completion within 60 days)
@@ -198,7 +204,7 @@ Two sentences in the hands of any builder:
 **Track:** Infrastructure & Developer Tooling (cross-list: AI x Solana)
 **Region:** Pakistan
 **Repo:** github.com/shariqazeem/kyvern-atlas
-**Live:** kyvernlabs.com/demo
+**Live:** kyvernlabs.com/app (sign in to see the integration console)
 **SDK:** npm install @kyvernlabs/sdk
 
 Funding tier: pursuing the Solana Frontier infrastructure award + the
