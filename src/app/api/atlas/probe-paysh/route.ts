@@ -42,6 +42,8 @@ import { loadServerSigner } from "@/lib/solana-keystore";
 import {
   callExecutePayment,
   hashMerchantHostname,
+  initializePolicy,
+  isPolicyInitialized,
   KYVERN_POLICY_PROGRAM_ID,
 } from "@/lib/kyvern-policy/client";
 import { checkRateLimit, getClientIP } from "@/lib/rate-limit";
@@ -155,9 +157,9 @@ export async function POST(req: NextRequest) {
   }
 
   // Parse body
-  let body: { scenario?: string };
+  let body: { scenario?: string; vaultId?: string };
   try {
-    body = (await req.json()) as { scenario?: string };
+    body = (await req.json()) as { scenario?: string; vaultId?: string };
   } catch {
     return NextResponse.json({ ok: false, error: "invalid_json" }, { status: 400 });
   }
@@ -178,10 +180,35 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const vault = getVault(ATLAS_VAULT_ID);
+  // Per TRANSFORM_24H §T3 — accept optional vaultId so the user can
+  // wrap pay.sh through their own device (rather than Atlas).
+  const targetVaultId = body.vaultId?.trim() || ATLAS_VAULT_ID;
+  const isUserVault = targetVaultId !== ATLAS_VAULT_ID;
+
+  if (isUserVault) {
+    const owner = req.headers.get("x-owner-wallet")?.trim();
+    const target = getVault(targetVaultId);
+    if (!target) {
+      return NextResponse.json(
+        { ok: false, error: "vault_not_found" },
+        { status: 404 },
+      );
+    }
+    if (!owner || owner !== target.ownerWallet) {
+      return NextResponse.json(
+        { ok: false, error: "unauthorized" },
+        { status: 401 },
+      );
+    }
+  }
+
+  const vault = getVault(targetVaultId);
   if (!vault?.spendingLimitPda) {
     return NextResponse.json(
-      { ok: false, error: "atlas_offline" },
+      {
+        ok: false,
+        error: isUserVault ? "vault_not_provisioned" : "atlas_offline",
+      },
       { status: 503 },
     );
   }
@@ -193,10 +220,13 @@ export async function POST(req: NextRequest) {
        WHERE vault_id = ? AND revoked_at IS NULL
        ORDER BY created_at ASC LIMIT 1`,
     )
-    .get(ATLAS_VAULT_ID) as { solana_secret_b58: string | null } | undefined;
+    .get(targetVaultId) as { solana_secret_b58: string | null } | undefined;
   if (!agentRow?.solana_secret_b58) {
     return NextResponse.json(
-      { ok: false, error: "atlas_offline" },
+      {
+        ok: false,
+        error: isUserVault ? "no_agent_key" : "atlas_offline",
+      },
       { status: 503 },
     );
   }
@@ -225,15 +255,55 @@ export async function POST(req: NextRequest) {
   }
   const connection: Connection = signer.connection;
   const feePayer = signer.keypair as Keypair;
+
+  // Lazy policy-PDA init for user vaults — same pattern as
+  // probe-scenarios. See that route for the rationale.
+  if (isUserVault) {
+    try {
+      const multisigPub = new PublicKey(vault.squadsAddress);
+      const initialized = await isPolicyInitialized(connection, multisigPub);
+      if (!initialized) {
+        const merchants =
+          vault.allowedMerchants && vault.allowedMerchants.length > 0
+            ? vault.allowedMerchants
+            : ["api.openai.com", "api.anthropic.com", "api.pay.sh", "kast.xyz"];
+        const velocityWindowSeconds =
+          vault.velocityWindow === "1h"
+            ? 3600
+            : vault.velocityWindow === "1d"
+              ? 86_400
+              : 604_800;
+        await initializePolicy({
+          connection,
+          authority: feePayer,
+          multisig: multisigPub,
+          perTxMaxBaseUnits: BigInt(Math.round(vault.perTxMaxUsd * 1_000_000)),
+          requireMemo: !!vault.requireMemo,
+          velocityWindowSeconds,
+          velocityMaxCalls: vault.maxCallsPerWindow ?? 60,
+          merchantsNormalized: merchants,
+        });
+      }
+    } catch (e) {
+      console.error(
+        "[probe-paysh] lazy initializePolicy failed:",
+        e instanceof Error ? e.message : e,
+      );
+    }
+  }
+
   const member = Keypair.fromSecretKey(bs58.decode(agentRow.solana_secret_b58));
   const multisig = new PublicKey(vault.squadsAddress);
   const spendingLimit = new PublicKey(vault.spendingLimitPda);
   const vaultPdaStr = (db
     .prepare(`SELECT vault_pda FROM vaults WHERE id = ?`)
-    .get(ATLAS_VAULT_ID) as { vault_pda: string } | undefined)?.vault_pda;
+    .get(targetVaultId) as { vault_pda: string } | undefined)?.vault_pda;
   if (!vaultPdaStr) {
     return NextResponse.json(
-      { ok: false, error: "atlas_offline" },
+      {
+        ok: false,
+        error: isUserVault ? "vault_not_provisioned" : "atlas_offline",
+      },
       { status: 503 },
     );
   }
