@@ -1,22 +1,19 @@
 "use client";
 
 /**
- * AffordanceRow — three contextual buttons that open card-based slide-in
- * panels OVER the device. Replaces the old DeviceTabs surface.
+ * AffordanceRow — four contextual buttons that open card-based slide-in
+ * panels OVER the device. Per SPEC_TO_WIN R4, the device is a developer
+ * playground; each affordance is one thing a builder does on it.
  *
- * The user is always at home. Each affordance opens an instrument drawer.
+ *   [ Watch the chain ]  [ Wrap pay.sh ]  [ Send to KAST ]  [ Wrap your agent ]
  *
- *   [ + Open a bay ]  [ ↗ Use the device ]  [ </> Builder ]
- *
- * `active` highlights the button whose panel is currently open. Tapping
- * the same button while open is a no-op (parent decides whether to
- * toggle-close — keeps this purely declarative).
+ * `active` highlights the button whose panel is currently open.
  */
 
 import { motion } from "framer-motion";
-import { Plus, ArrowUpRight, Code2 } from "lucide-react";
+import { Code2, CreditCard, ShieldX, Sparkles } from "lucide-react";
 
-export type PanelKind = "bay" | "use" | "builder";
+export type PanelKind = "bay" | "use" | "kast" | "builder";
 
 interface Props {
   active: PanelKind | null;
@@ -27,16 +24,17 @@ const ITEMS: Array<{
   kind: PanelKind;
   label: string;
   sub: string;
-  Icon: typeof Plus;
+  Icon: typeof Code2;
 }> = [
-  { kind: "bay", label: "Open a bay", sub: "deploy a worker", Icon: Plus },
-  { kind: "use", label: "Use the device", sub: "buy · drain", Icon: ArrowUpRight },
-  { kind: "builder", label: "Builder", sub: "playground · sdk · key", Icon: Code2 },
+  { kind: "bay", label: "Watch the chain", sub: "5 violations · real failed tx", Icon: ShieldX },
+  { kind: "use", label: "Wrap pay.sh", sub: "Solana × x402 · shell-out", Icon: Sparkles },
+  { kind: "kast", label: "Send to KAST", sub: "earnings → real card", Icon: CreditCard },
+  { kind: "builder", label: "Wrap your agent", sub: "sdk · scaffolder · key", Icon: Code2 },
 ];
 
 export function AffordanceRow({ active, onOpen }: Props) {
   return (
-    <div className="grid grid-cols-3 gap-2 sm:gap-2.5">
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5">
       {ITEMS.map((it) => {
         const isActive = active === it.kind;
         return (

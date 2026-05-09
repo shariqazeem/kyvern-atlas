@@ -132,14 +132,16 @@ export default function UnboxPage() {
   const openBox = useCallback(() => {
     if (stage !== "closed") return;
     setStage("opening");
-    // Box opens (~1.2s) → device settles → serial begins
-    window.setTimeout(() => setStage("serial"), 1300);
-    // Serial typewriter takes ~serial.length * 80ms; allow ~1.0s buffer
-    window.setTimeout(() => setStage("boot"), 1300 + serial.length * 80 + 200);
-    // LED boot takes ~3 dots × 800ms
+    // Quick unbox per SPEC R2 — total cinematic ~2.5s so the whole
+    // login → unbox → /app journey lands in ~15s with vault provision.
+    // Box opens (~750ms) → device settles → serial begins
+    window.setTimeout(() => setStage("serial"), 750);
+    // Serial typewriter at ~50ms/char; small 100ms buffer
+    window.setTimeout(() => setStage("boot"), 750 + serial.length * 50 + 100);
+    // LED boot — 3 dots × 500ms
     window.setTimeout(
       () => setStage("ready"),
-      1300 + serial.length * 80 + 200 + 2600,
+      750 + serial.length * 50 + 100 + 1500,
     );
   }, [stage, serial.length]);
 
@@ -924,7 +926,7 @@ function BoxAndDevice({
 }
 
 /* ────────────────────────────────────────────────────────────────────
-   SerialStamp — typewriter for KVN-XXXXXXXX. ~80ms per char.
+   SerialStamp — typewriter for KVN-XXXXXXXX. ~50ms per char (quick).
    ──────────────────────────────────────────────────────────────────── */
 
 function SerialStamp({ text }: { text: string }) {
@@ -936,7 +938,7 @@ function SerialStamp({ text }: { text: string }) {
       i += 1;
       setShown(text.slice(0, i));
       if (i >= text.length) clearInterval(iv);
-    }, 80);
+    }, 50);
     return () => clearInterval(iv);
   }, [text]);
 
@@ -994,7 +996,7 @@ function BornLine() {
 }
 
 /* ────────────────────────────────────────────────────────────────────
-   LedBoot — three dots: auth → vault → ready. Each ~800ms.
+   LedBoot — three dots: auth → vault → ready. Each ~500ms (quick).
    ──────────────────────────────────────────────────────────────────── */
 
 function LedBoot({ stageReady }: { stageReady: boolean }) {
@@ -1006,8 +1008,8 @@ function LedBoot({ stageReady }: { stageReady: boolean }) {
       return;
     }
     const t1 = window.setTimeout(() => setStep(1), 0);
-    const t2 = window.setTimeout(() => setStep(2), 850);
-    const t3 = window.setTimeout(() => setStep(3), 1700);
+    const t2 = window.setTimeout(() => setStep(2), 500);
+    const t3 = window.setTimeout(() => setStep(3), 1000);
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);

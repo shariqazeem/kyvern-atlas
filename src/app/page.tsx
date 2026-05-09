@@ -5,9 +5,9 @@ import { readInitialAtlasSnapshot } from "@/lib/atlas/ssr";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Kyvern — Financial safety infrastructure for autonomous agents",
+  title: "Kyvern — A Solana device for your AI agent",
   description:
-    "AI agents shouldn't have private keys. They should have budgets. Kyvern enforces agent spending policies on-chain using Solana smart accounts. Caps, allowlists, kill switch — decided by the chain before a single lamport moves. Atlas reference agent live on devnet, $0 lost.",
+    "Your Kyvern device is a real Solana smart account that decides every dollar your AI agent spends. Caps, allowlists, kill switch — enforced on-chain before a single lamport moves. Atlas, the reference agent, has been live on Solana devnet for 19+ days with $0 lost. Compatible with pay.sh and KAST deposit rails.",
   alternates: { canonical: "https://kyvernlabs.com" },
 };
 
