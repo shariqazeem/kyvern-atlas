@@ -1,168 +1,145 @@
 # Kyvern
 
-A Solana device for your AI agent.
-The chain decides every dollar it spends.
+**Financial safety infrastructure for autonomous agents.**
 
-> Agents shouldn't have keys. They should have budgets.
+> AI agents shouldn't have private keys. They should have budgets.
+
+Kyvern enforces agent spending policies on-chain using Solana smart
+accounts. Caps, allowlists, kill switch — all decided by the chain
+before a single lamport moves.
+
+`Solana · Squads · pay.sh · KAST · npm`
 
 **Live:** [kyvernlabs.com](https://kyvernlabs.com) ·
-**Try without signup:** [/try](https://kyvernlabs.com/try) ·
-**Atlas observatory:** [/atlas](https://kyvernlabs.com/atlas) ·
-**Docs:** [/docs](https://kyvernlabs.com/docs)
-
-**Anchor program:** `PpmZErWfT5zpeo1fJtTbpqezFGbRUamaNNRWViaMSqc` ·
-Solana devnet · 4 instructions · 12 error codes ·
-[Verify on Explorer ↗](https://explorer.solana.com/address/PpmZErWfT5zpeo1fJtTbpqezFGbRUamaNNRWViaMSqc?cluster=devnet)
+**Demo:** [kyvernlabs.com/demo](https://kyvernlabs.com/demo) ·
+**Docs:** [kyvernlabs.com/docs](https://kyvernlabs.com/docs) ·
+**Evidence:** [kyvernlabs.com/atlas](https://kyvernlabs.com/atlas)
 
 ---
 
-## What we built
+## What's live
 
-Kyvern is the first chain-enforced commerce device for AI agents on Solana.
+- **Anchor program** at [`PpmZErWfT5zpeo1fJtTbpqezFGbRUamaNNRWViaMSqc`](https://explorer.solana.com/address/PpmZErWfT5zpeo1fJtTbpqezFGbRUamaNNRWViaMSqc?cluster=devnet) on Solana devnet
+- **`@kyvernlabs/sdk@0.5.0`** on npm — `Vault.pay()`, `Vault.checkAllowance()`, `KastDestination`, `OnChainVault`
+- **`create-kyvern-agent@0.2.0`** on npm — scaffolds a working pay.sh + KAST agent in one command
+- **Atlas reference agent** running continuously since 2026-04-20 (19+ days, 8.8k+ cycles, 1.3k+ settlements, 6.5k+ attacks blocked, **$0 lost**)
 
-Most AI agent products give your agent a credit card and hope. Kyvern gives it
-a vault with rules — budget caps, merchant allowlist, daily limits, kill
-switch — all enforced inside a Solana Anchor program, all wrapped in Squads
-multisig boundaries, all visible on Explorer.
+## The 60-second judge demo
 
-The chain isn't our backend. The chain is our referee.
+Open [kyvernlabs.com/demo](https://kyvernlabs.com/demo) and click:
 
-## The proof: Atlas
+1. **Try to drain $5** → real failed Solana tx, custom error 12002 `AmountExceedsPerTxMax`
+2. **Pay an unknown wallet** → real failed Solana tx, custom error 12003 `MerchantNotAllowlisted`
+3. **Skip the required memo** → real failed Solana tx, custom error 12004 `MissingMemo`
+4. **Pause + try again** → real failed Solana tx, custom error 12000 `VaultPaused`
+5. **Buy Perplexity via pay.sh — $5** → real failed Solana tx (12002), pay.sh **never invoked** (Kyvern stops it at the policy gate)
+6. **Pay api.openai.com $0.001** → real settled USDC transfer through Kyvern → Squads CPI
+7. **Buy a $0.001 quote via pay.sh** → real `pay --sandbox curl` shell-out returns AAPL quote data + Kyvern settles on-chain
 
-Atlas is our reference deployment. It's been running autonomously on Solana
-devnet for 17+ days as of submission:
-
-- **8,355 cycles** completed
-- **3,171 attack attempts** refused on-chain (drains, prompt injections, over-cap requests, rogue merchants)
-- **$0** funds lost
-- **$22.90+ USDC** earned from real subscribers paying its x402 feed
-
-Every transaction is on Solana Explorer. Every refusal is verifiable. Atlas
-isn't a demo. It's a 17-day track record.
-
-## The starter workers
-
-Three pre-installed worker templates ship with every device:
-
-| Worker | Role | What it does |
-|---|---|---|
-| 🎯 Sentinel | Bounty Scout | Finds paid Solana bounties matching your skills, drafts applications via Pay.sh / Gemini, queues for one-tap submit |
-| 🐋 Wren | Position Watchtower | Watches user-defined wallets, alerts on material moves, can mirror trades into Pulse |
-| 📈 Pulse | Conditional Trigger | Fires chain-enforced swaps when price conditions hit — Pyth oracle prices, Anchor program enforces |
-
-These are templates, not the product. The product is the device underneath
-and the SDK above it. Builders ship workers that fit their own life.
+Each "blocked" outcome is a finalized failed Solana transaction. The
+Kyvern policy program at `PpmZ…MSqc` is in every instruction trace.
+Click any Explorer link to verify.
 
 ## Architecture
 
 ```
-                    ┌──────────────────────────────────┐
-                    │         User's Squads Vault       │
-                    │      (USDC + native SOL)          │
-                    └──────────────────────────────────┘
-                                    │
-                                    ▼
-                    ┌──────────────────────────────────┐
-                    │     Anchor Budget Program         │
-                    │  (caps · allowlist · oracle ·     │
-                    │   daily limits · kill switch)     │
-                    └──────────────────────────────────┘
-                          │             │            │
-                  ┌───────▼──┐   ┌─────▼────┐  ┌────▼────┐
-                  │ Sentinel │   │   Wren   │  │  Pulse  │
-                  │ (or your │   │ (or your │  │ (or your│
-                  │  worker) │   │  worker) │  │ worker) │
-                  └──────────┘   └──────────┘  └─────────┘
-                       │              │              │
-                       ▼              ▼              ▼
-                  Pay.sh / Gemini reasoning ── Pyth oracle ──
-                  Solana DEX rails (Jupiter on mainnet)
+              ┌─────────────────────────────────────┐
+              │    Your AI agent                    │
+              └──────────────┬──────────────────────┘
+                             │ vault.checkAllowance()
+                             ▼
+              ┌─────────────────────────────────────┐
+              │  KYVERN — policy layer (this)       │
+              │  Caps, allowlists, kill switch      │
+              │  PpmZErWfT5zpeo1fJtTbpqezFGbRUama…  │
+              └──────────────┬──────────────────────┘
+                             │ allowed
+                             ▼
+      ┌──────────────────┬───────────┬──────────────────┐
+      │   pay.sh         │  Squads   │   KAST           │
+      │   HTTP rails     │  custody  │   off-ramp       │
+      │   x402 / MPP     │  v4       │   Solana USDC →  │
+      │                  │           │   real card      │
+      └──────────────────┴───────────┴──────────────────┘
 ```
 
-## How chain enforcement works
+- Agent calls `vault.checkAllowance()` — Kyvern decides BEFORE any rail fires
+- If allowed: agent invokes pay.sh (or any HTTP-402 service)
+- Kyvern's `vault.pay()` settles the budgeted spend on-chain via the policy program → Squads CPI → SPL Token transfer
+- Earnings can route to a KAST-funded card via `KastDestination` (real on-chain USDC transfer to the user's KAST deposit address)
 
-Every spend the agent attempts goes through `vault.pay()`. The Anchor program
-checks, in order:
+## Quickstart
 
-1. **Kill switch** — owner can freeze the vault from any Squads member
-2. **Daily cap** — total spend across all workers can't exceed user-set limit
-3. **Per-tx cap** — single spend can't exceed configured maximum
-4. **Merchant allowlist** — destination must match a registered merchant
-5. **Oracle bounds** (for `swap_via_oracle`) — Pyth-shaped price must be fresh < 60s
-6. **Slippage check** — output amount must meet user-set minimum
+```bash
+# Install pay.sh CLI (one of)
+brew install pay                 # macOS
+npm install -g @solana/pay       # Linux/Windows
 
-Any failure refuses the transaction on-chain. The user's USDC stays in the vault.
-The agent's intent is logged, and the receipt is preserved.
-
-## The Pay.sh × Solana × Google Cloud story
-
-Every worker cycle calls Pay.sh as the commerce rail and Gemini as the reasoning
-layer. Sentinel's drafting, Wren's materiality scoring, Pulse's breach
-validation — all run as paid AI inference cycles, all settled in USDC, all
-chain-enforced. This is the Pay.sh launch story alive in production, not
-aspirational.
-
-## Try it
-
-1. Open [kyvernlabs.com/try](https://kyvernlabs.com/try) — no signup
-2. Land on /app, fund the vault with devnet USDC (Circle faucet)
-3. Personalize a worker (or leave starter settings — defaults are real)
-4. Watch the live ticker
-5. Try to drain — chain refuses
-
-## SDK
-
-Workers are TypeScript modules. Each implements `WorkerSpec`:
-
-```typescript
-import { defineWorker } from '@kyvern/sdk';
-
-export default defineWorker({
-  id: 'my_worker',
-  abilities: ['read_url', 'message_user', 'vault_pay'],
-  schema: { /* zod schema for config */ },
-  cycle: async ({ config, tools, vault }) => {
-    // your worker logic
-    // tools.vault.pay() is the only spending path
-    // chain enforces every call
-  },
-});
+# Scaffold a working agent
+npx create-kyvern-agent my-agent
+cd my-agent
+cp .env.example .env             # paste KYVERN_AGENT_KEY (mint at /app)
+npm install
+npm run agent
 ```
 
-The vault enforces the rules. The worker writes the work.
+Five-line wrap pattern:
 
-## Stack
+```ts
+import { Vault, KastDestination } from "@kyvernlabs/sdk";
 
-- **Anchor** — Rust program enforcing spend rules on-chain
-- **Squads v4** — multisig boundary wrapping every spend
-- **Pyth Network** — oracle price feeds for swap_via_oracle
-- **Pay.sh** — commerce rail for AI inference payments
-- **Gemini** — reasoning layer for agent decisions
-- **Next.js + tRPC** — device UI
-- **SQLite** — agent state, signal log
-- **PM2** — runner orchestration
-- **Helius** — Solana RPC
+const vault = new Vault({ agentKey: process.env.KYVERN_AGENT_KEY! });
+const myKast = KastDestination.fromAddress(process.env.MY_KAST_ADDRESS!);
+const res = await vault.pay({ ...myKast, amount: 1.50, memo: "weekly yield share" });
+if (res.decision !== "allowed") throw new Error(res.reason);
+```
 
-## Roadmap
+Full docs at [kyvernlabs.com/docs](https://kyvernlabs.com/docs).
 
-**Shipping at Frontier (May 2026):** Chain-enforced device · 3 worker templates ·
-SDK · Atlas reference · /try sandbox · Solana devnet
+## Local development
 
-**Next:** Mainnet deployment with Jupiter swap routing · Multi-vault devices ·
-Open worker template marketplace · Squads-native onboarding ·
-Telegram + Discord notification channels · Workspaces for teams
+```bash
+git clone https://github.com/shariqazeem/kyvern-atlas
+cd kyvern-atlas
+npm install --legacy-peer-deps
+cp .env.example .env             # see CLAUDE.md for the required env vars
+npm run build
+npm start                        # serves on :3001
+```
 
-**Far:** Worker marketplace with on-chain reputation · Cross-chain Pay.sh routing ·
-Hardware device companion · Worker-to-worker negotiation primitives · KYV token
-governance
+The Anchor program source is in `anchor/programs/kyvern-policy/`. To
+re-deploy or initialize the program for a new vault, see the script at
+`scripts/init-atlas-policy.ts` (one-shot, idempotent).
 
-## Team
+## What this is, and what this isn't
 
-Kyvern Labs · Built by [@shariqshkt](https://x.com/shariqshkt) ·
-Lahore, Pakistan ·
-For Colosseum Frontier 2026
+**This is** financial safety infrastructure for autonomous agents on
+Solana — a smart safe, an on-chain policy program enforcing 5 rule
+classes + a kill switch, an SDK, and a scaffolder.
 
----
+**This isn't:**
+- A hardware device. The 3D iconography is metaphor.
+- A KAST partner or pay.sh partner. We're *compatible with* their
+  rails — the integrations speak via the working flow + the affiliate
+  link.
+- Mainnet-deployed. Devnet today, audit in progress.
+- A fully autonomous trading bot. Atlas's decisions are scripted by
+  design. The moat is the financial control layer, not the
+  intelligence — even a deliberately minimal agent demonstrates the
+  thesis. LLM-driven Atlas is post-Frontier.
 
-**License:** MIT for SDK · Proprietary for runtime ·
-**Contact:** [shariq@kyvernlabs.com](mailto:shariq@kyvernlabs.com)
+## Submissions
+
+- **Solana Frontier:** [`decks/frontier.md`](decks/frontier.md) (render to PDF)
+- **Kast Pakistan via Superteam Earn:** [`decks/kast-pakistan.md`](decks/kast-pakistan.md) (render to PDF)
+- **Spec:** [`SPEC_TO_WIN.md`](SPEC_TO_WIN.md) — the 48-hour execution plan we shipped against
+- **Honest audit:** [`KYVERN_RAW_REALITY.md`](KYVERN_RAW_REALITY.md) — pre-execution writeup of real-vs-theatre across every surface
+
+## Built by
+
+[Shariq Azeem](https://x.com/shariqshkt) · solo Pakistani builder · 5
+prior hackathon wins · Made in Pakistan 🇵🇰 for Solana Frontier 2026.
+
+## License
+
+MIT
