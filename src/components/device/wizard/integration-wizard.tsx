@@ -498,13 +498,33 @@ function MintKeyBody({
 
 function InstallBody({ markComplete }: { markComplete: () => void }) {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [copiedSet, setCopiedSet] = useState<Set<string>>(new Set());
 
   function copy(text: string, key: string) {
     void navigator.clipboard.writeText(text);
     setCopiedKey(key);
-    markComplete();
+    setCopiedSet((prev) => {
+      const next = new Set(prev);
+      next.add(key);
+      return next;
+    });
     setTimeout(() => setCopiedKey(null), 1500);
   }
+
+  // Don't auto-advance the wizard on first copy — the user usually
+  // wants to copy BOTH commands. Show a manual Continue once they've
+  // copied at least one. Auto-advance on the second copy is fine.
+  const bothCopied = copiedSet.has("scaffold") && copiedSet.has("sdk");
+  const canContinue = copiedSet.size > 0;
+
+  function continueToNext() {
+    markComplete();
+  }
+
+  // Auto-advance once both are copied (a small UX win — no extra click)
+  useEffect(() => {
+    if (bothCopied) markComplete();
+  }, [bothCopied, markComplete]);
 
   return (
     <div className="flex flex-col gap-1.5 ml-7">
@@ -518,6 +538,17 @@ function InstallBody({ markComplete }: { markComplete: () => void }) {
         copied={copiedKey === "sdk"}
         onCopy={() => copy("npm install @kyvernlabs/sdk", "sdk")}
       />
+      {canContinue && !bothCopied && (
+        <button
+          type="button"
+          onClick={continueToNext}
+          className="self-end inline-flex items-center gap-1 font-mono uppercase tracking-[0.14em] hover:opacity-80 transition mt-1"
+          style={{ fontSize: 9.5, color: "#15803D" }}
+        >
+          Continue
+          <ArrowRight className="w-3 h-3" strokeWidth={2.5} />
+        </button>
+      )}
     </div>
   );
 }
@@ -677,7 +708,7 @@ function ViolationBody({
   const [error, setError] = useState<string | null>(null);
 
   async function fire(scenario: string) {
-    if (!vaultId || running) return;
+    if (!vaultId || !ownerWallet || running) return;
     setRunning(scenario);
     setError(null);
     setLastSig(null);
@@ -686,7 +717,7 @@ function ViolationBody({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(ownerWallet ? { "x-owner-wallet": ownerWallet } : {}),
+          "x-owner-wallet": ownerWallet,
         },
         body: JSON.stringify({ scenario, vaultId }),
       });
@@ -704,26 +735,35 @@ function ViolationBody({
     }
   }
 
+  // Wait for useAuth to hydrate before allowing fires — the wallet
+  // header has to match vault.ownerWallet on the server, and a
+  // pre-hydration request lacks the header entirely (401).
+  const ready = !!vaultId && !!ownerWallet;
+
   return (
     <div className="flex flex-col gap-2 ml-7">
       <p className="text-[12px] leading-[1.5]" style={{ color: "#6B7280" }}>
-        Each button submits a real Solana tx that the chain refuses. Watch
-        the event feed →
+        {ready
+          ? "Each button submits a real Solana tx that the chain refuses. Watch the event feed →"
+          : "Hydrating auth — buttons unlock in a second."}
       </p>
       <div className="flex flex-wrap gap-1.5">
         <ViolationBtn
           label="Over-cap $5"
           running={running === "amount_exceeds_per_tx"}
+          disabled={!ready}
           onClick={() => fire("amount_exceeds_per_tx")}
         />
         <ViolationBtn
           label="Off-allowlist"
           running={running === "merchant_not_allowed"}
+          disabled={!ready}
           onClick={() => fire("merchant_not_allowed")}
         />
         <ViolationBtn
           label="Missing memo"
           running={running === "missing_memo"}
+          disabled={!ready}
           onClick={() => fire("missing_memo")}
         />
       </div>
@@ -750,17 +790,19 @@ function ViolationBody({
 function ViolationBtn({
   label,
   running,
+  disabled,
   onClick,
 }: {
   label: string;
   running: boolean;
+  disabled?: boolean;
   onClick: () => void;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      disabled={running}
+      disabled={running || disabled}
       className="inline-flex items-center gap-1 rounded-[8px] px-2.5 py-1 font-mono uppercase tracking-[0.14em] disabled:opacity-60 transition active:scale-[0.97]"
       style={{
         fontSize: 9.5,
@@ -795,6 +837,11 @@ function KastPayoutBody({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Test-payout state
+  const [paying, setPaying] = useState(false);
+  const [paySig, setPaySig] = useState<string | null>(null);
+  const [payError, setPayError] = useState<string | null>(null);
+
   // Hydrate
   useEffect(() => {
     if (!vaultId || !ownerWallet) return;
@@ -827,7 +874,6 @@ function KastPayoutBody({
       const d = await r.json();
       if (d?.ok) {
         setSaved(true);
-        markComplete();
       } else {
         setError(d?.message ?? d?.error ?? "save failed");
       }
@@ -838,11 +884,45 @@ function KastPayoutBody({
     }
   }
 
+  async function testPayout() {
+    if (!vaultId || !ownerWallet || !saved || paying) return;
+    setPaying(true);
+    setPayError(null);
+    setPaySig(null);
+    try {
+      const r = await fetch(`/api/vault/${vaultId}/test-payout`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-owner-wallet": ownerWallet,
+        },
+        body: JSON.stringify({ ownerWallet, amountUsd: 0.001 }),
+      });
+      const d = await r.json();
+      if (d?.ok && d?.signature) {
+        setPaySig(d.signature);
+        markComplete();
+      } else {
+        setPayError(
+          d?.reason ??
+            d?.message ??
+            d?.error ??
+            "Payout failed. Top up your vault first.",
+        );
+      }
+    } catch (e) {
+      setPayError(e instanceof Error ? e.message : "request failed");
+    } finally {
+      setPaying(false);
+    }
+  }
+
   return (
     <div className="flex flex-col gap-2 ml-7">
       <p className="text-[12px] leading-[1.5]" style={{ color: "#6B7280" }}>
-        Paste your KAST Solana USDC deposit address. Earnings flow to your
-        card automatically.
+        Allowlist your KAST USDC deposit address as <code>MY_KAST</code>.
+        From then on, every <code>vault.pay()</code> your agent makes to
+        that address is a real on-chain transfer that funds your card.
       </p>
       <input
         value={address}
@@ -898,6 +978,73 @@ function KastPayoutBody({
         <p className="text-[10.5px]" style={{ color: "#B45309" }}>
           {error}
         </p>
+      )}
+
+      {/* Test $0.001 payout — only available after allowlist saves. */}
+      {saved && (
+        <div
+          className="mt-2 rounded-[10px] p-2.5 flex flex-col gap-1.5"
+          style={{
+            background: "rgba(34,197,94,0.04)",
+            border: "1px solid rgba(34,197,94,0.18)",
+          }}
+        >
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <span
+              className="font-mono uppercase tracking-[0.14em]"
+              style={{ fontSize: 9.5, color: "#15803D" }}
+            >
+              Verify the rail
+            </span>
+            <button
+              type="button"
+              onClick={testPayout}
+              disabled={paying || !!paySig}
+              className="inline-flex items-center gap-1 rounded-[8px] px-2.5 py-1 font-mono uppercase tracking-[0.14em] disabled:opacity-50 transition active:scale-[0.97]"
+              style={{
+                fontSize: 9.5,
+                color: "#FFFFFF",
+                background: paySig ? "#15803D" : "#0A0A0A",
+                border: "1px solid rgba(0,0,0,0.05)",
+              }}
+            >
+              {paying ? (
+                <Loader2 className="w-2.5 h-2.5 animate-spin" />
+              ) : paySig ? (
+                <>
+                  <Check className="w-2.5 h-2.5" strokeWidth={2.5} />
+                  Payout settled
+                </>
+              ) : (
+                <>
+                  Test $0.001 payout
+                  <ArrowRight className="w-2.5 h-2.5" />
+                </>
+              )}
+            </button>
+          </div>
+          <p className="text-[10.5px]" style={{ color: "#6B7280" }}>
+            Sends <strong>$0.001 USDC</strong> from your vault to{" "}
+            <code className="font-mono">MY_KAST</code>. Real on-chain Squads
+            tx. Needs vault USDC; if blocked you&apos;ll see the reason.
+          </p>
+          {paySig && (
+            <a
+              href={`https://explorer.solana.com/tx/${paySig}?cluster=devnet`}
+              target="_blank"
+              rel="noreferrer"
+              className="font-mono text-[10.5px] hover:underline"
+              style={{ color: "#15803D" }}
+            >
+              ✓ {paySig.slice(0, 8)}…{paySig.slice(-6)} on Explorer
+            </a>
+          )}
+          {payError && (
+            <p className="text-[10.5px]" style={{ color: "#B45309" }}>
+              {payError}
+            </p>
+          )}
+        </div>
       )}
     </div>
   );
