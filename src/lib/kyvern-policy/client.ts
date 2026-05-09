@@ -23,7 +23,7 @@
  */
 
 import { createHash } from "node:crypto";
-import * as anchor from "@coral-xyz/anchor";
+import { AnchorProvider, BN, Program, type Idl } from "@coral-xyz/anchor";
 import {
   Connection,
   PublicKey,
@@ -34,6 +34,33 @@ import {
 } from "@solana/web3.js";
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import idl from "./idl.json";
+
+/**
+ * Minimal `Wallet` shape that AnchorProvider accepts. We avoid
+ * importing `anchor.Wallet` directly because Next.js's webpack bundler
+ * doesn't preserve it as a constructor in the production build (the
+ * server logs blow up with `TypeError: i.Wallet is not a constructor`).
+ * AnchorProvider only uses these three members, so the inline shim is
+ * enough — and it works identically in CLI scripts via tsx.
+ */
+function makeWallet(kp: Keypair) {
+  // We only ever build legacy `Transaction` objects in this client, so
+  // the AnchorProvider's `Wallet` shape (which is wider, allowing
+  // VersionedTransaction) is over-broad for our needs — `as never` lets
+  // TypeScript accept this minimal shim without compromising callers.
+  return {
+    publicKey: kp.publicKey,
+    payer: kp,
+    async signTransaction(tx: Transaction): Promise<Transaction> {
+      tx.partialSign(kp);
+      return tx;
+    },
+    async signAllTransactions(txs: Transaction[]): Promise<Transaction[]> {
+      txs.forEach((t) => t.partialSign(kp));
+      return txs;
+    },
+  };
+}
 
 export const KYVERN_POLICY_PROGRAM_ID = new PublicKey(
   "PpmZErWfT5zpeo1fJtTbpqezFGbRUamaNNRWViaMSqc",
@@ -74,14 +101,15 @@ export function hashMerchantHostname(normalized: string): Buffer {
 function makeProgram(
   connection: Connection,
   walletSigner: Keypair,
-): anchor.Program<anchor.Idl> {
-  const wallet = new anchor.Wallet(walletSigner);
-  const provider = new anchor.AnchorProvider(connection, wallet, {
+): Program<Idl> {
+  // Cast — see comment in makeWallet on why this is sound.
+  const wallet = makeWallet(walletSigner) as unknown as ConstructorParameters<typeof AnchorProvider>[1];
+  const provider = new AnchorProvider(connection, wallet, {
     commitment: "confirmed",
     skipPreflight: false,
     preflightCommitment: "confirmed",
   });
-  return new anchor.Program(idl as unknown as anchor.Idl, provider);
+  return new Program(idl as unknown as Idl, provider);
 }
 
 /* ──────────────────────────────────────────────────────────────────
@@ -126,7 +154,7 @@ export async function initializePolicy(
     };
   })
     .initializePolicy({
-      perTxMaxBaseUnits: new anchor.BN(params.perTxMaxBaseUnits.toString()),
+      perTxMaxBaseUnits: new BN(params.perTxMaxBaseUnits.toString()),
       requireMemo: params.requireMemo,
       velocityWindowSeconds: params.velocityWindowSeconds,
       velocityMaxCalls: params.velocityMaxCalls,
@@ -188,7 +216,7 @@ export async function callExecutePayment(
     };
   })
     .executePayment({
-      amount: new anchor.BN(params.amountBaseUnits.toString()),
+      amount: new BN(params.amountBaseUnits.toString()),
       decimals: params.decimals,
       merchantHash: Array.from(params.merchantHash),
       memo: params.memo,
