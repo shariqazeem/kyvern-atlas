@@ -20,6 +20,7 @@
 import { motion } from "framer-motion";
 import type { PanelKind } from "../home/affordance-row";
 import { AgentEventFeed } from "../feed/agent-event-feed";
+import { IntegrationWizard } from "../wizard/integration-wizard";
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
@@ -43,11 +44,8 @@ export function AliveConsole({
   network = "devnet",
   className,
 }: Props) {
-  // Suppress unused warnings while T1/T2 are pending — these props
-  // are wired by the placeholder copy and become live data once the
-  // wizard and feed land.
-  void vaultId;
-  void ownerWallet;
+  // agentKeyPrefix is reserved for the top-rail live status line
+  // (T4 hour 6–7). The wizard fetches its own prefix per-step.
   void agentKeyPrefix;
 
   return (
@@ -89,11 +87,11 @@ export function AliveConsole({
 
         {/* Two-column body — wizard on the left, feed on the right */}
         <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-3 flex-1 min-h-[340px]">
-          {/* Left: wizard placeholder (T2) */}
-          <PlaceholderSlot
-            title="Integrate"
-            tag="wizard"
-            copy="Five-step wizard lands in T2 — mint key · install · first call · try violation · KAST payout."
+          {/* Left: 5-step integration wizard (T2) */}
+          <IntegrationWizard
+            vaultId={vaultId}
+            ownerWallet={ownerWallet}
+            className="min-h-[340px]"
           />
           {/* Right: live event feed (T1) */}
           <AgentEventFeed
@@ -175,49 +173,3 @@ export function AliveConsole({
   );
 }
 
-function PlaceholderSlot({
-  title,
-  tag,
-  copy,
-}: {
-  title: string;
-  tag: string;
-  copy: string;
-}) {
-  return (
-    <div
-      className="rounded-[14px] p-5 flex flex-col"
-      style={{
-        background: "#FFFFFF",
-        border: "1px solid rgba(15,23,42,0.06)",
-        boxShadow: "0 1px 2px rgba(15,23,42,0.04)",
-      }}
-    >
-      <div className="flex items-baseline justify-between mb-2 gap-2">
-        <h3
-          className="text-[14px] font-semibold tracking-[-0.005em]"
-          style={{ color: "#0A0A0A" }}
-        >
-          {title}
-        </h3>
-        <span
-          className="font-mono uppercase tracking-[0.14em] rounded-full px-2 py-0.5"
-          style={{
-            fontSize: 9,
-            color: "#6B7280",
-            background: "rgba(15,23,42,0.04)",
-            border: "1px solid rgba(15,23,42,0.06)",
-          }}
-        >
-          {tag}
-        </span>
-      </div>
-      <p
-        className="text-[12.5px] leading-[1.55] flex-1"
-        style={{ color: "#6B7280" }}
-      >
-        {copy}
-      </p>
-    </div>
-  );
-}
