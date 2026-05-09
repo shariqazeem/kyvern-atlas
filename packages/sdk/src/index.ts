@@ -410,3 +410,6 @@ export type {
   OnChainBlocked,
   OnChainResult,
 } from "./onchain";
+
+// SPEC_TO_WIN §7.2 — KAST-funded card payout helper.
+export { KastDestination } from "./kast";

@@ -1,7 +1,7 @@
 {
   "name": "@kyvernlabs/sdk",
-  "version": "0.4.0",
-  "description": "Give your AI agent a Visa with a daily cap. One import. Enforced on-chain by the Kyvern policy program + Squads v4 on Solana.",
+  "version": "0.5.0",
+  "description": "Financial safety infrastructure for autonomous agents on Solana. Vault.pay() runs through an on-chain policy program — caps, allowlists, kill switch — before a single lamport moves. Compatible with pay.sh and KAST deposit rails.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": ["dist", "README.md"],
