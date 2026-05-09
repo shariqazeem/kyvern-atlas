@@ -76,25 +76,26 @@ hot-key.
 
 ---
 
-## Slide 4 — Live demo
+## Slide 4 — Live demo: Maryam's first event
 
-Visit **kyvernlabs.com/demo**. Click any button. Every result is a
-finalized Solana transaction.
+Maryam signs in at **kyvernlabs.com**. Unbox plays (~2.5s). Lands on
+her device — `/app` — with the 5-step integration wizard on the left
+and her own live event feed on the right (empty, ready).
 
-| Button | Result | Verified on Explorer |
+| Step | What Maryam does | What lands on her device |
 |---|---|---|
-| Try to drain $5 | Refused on-chain | error 12002 |
-| Pay an unknown wallet | Refused on-chain | error 12003 |
-| Skip the required memo | Refused on-chain | error 12004 |
-| Pause + try again | Refused on-chain | error 12000 |
-| Buy via pay.sh — $5 over cap | Refused on-chain (pay.sh never invoked) | error 12002 |
-| Pay $0.001 to api.openai.com | Settled | Real Squads CPI |
-| Buy $0.001 quote via pay.sh | Settled + real x402 response | Squads + Token transfer |
+| 1 | Mint key | `kv_live_…` shown once, copied |
+| 2 | Install | Two `npm` commands copied |
+| 3 | Run the snippet | `vault.checkAllowance(...)` — first call recorded |
+| 4 | Click "Try over-cap" | **Real failed Solana tx** lands in her event feed in <3s. Custom Kyvern error 12002. Click → Solana Explorer. |
+| 5 | Paste KAST USDC deposit address | "Test $0.001 payout" → real on-chain transfer to her KAST card |
 
-> **Each refusal includes the Kyvern policy program in the instruction
-> trace.** The chain decides. The chain has the receipts.
+> **The chain has the receipts.** Every refusal in Maryam's feed
+> includes the Kyvern policy program at `PpmZ…MSqc` in the
+> instruction trace. The chain decides. Maryam audits.
 
-[screenshot of /demo with the failed-tx Explorer link visible]
+[screenshot of /app with Maryam's wizard at step 4 + a fresh
+blocked-on-chain row in the event feed]
 
 ---
 
@@ -197,7 +198,7 @@ Three commands away from any Pakistani builder's hot path:
 - Anchor program deployed with 5 enforcement rules
 - SDK 0.5.0 on npm, scaffolder 0.2.0 on npm
 - Atlas reference agent live, 19 days unbroken
-- /demo with 7 verifiable Explorer-clickable scenarios
+- /app with live integration wizard + per-user event feed (real failed Solana txs land in <3s)
 - KAST-rail compatibility working in `/app`
 
 **Next 30 days:**
@@ -218,7 +219,7 @@ Three commands away from any Pakistani builder's hot path:
 AI x Solana + Infrastructure)
 **Region:** Pakistan
 **Repo:** github.com/shariqazeem/kyvern-atlas
-**Live:** kyvernlabs.com/demo
+**Live:** kyvernlabs.com/app (sign in to see the integration console)
 **SDK:** npm install @kyvernlabs/sdk
 **KAST signup:** [https://go.kast.xyz/VqVO/STPAK](https://go.kast.xyz/VqVO/STPAK)
 
