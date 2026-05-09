@@ -19,6 +19,7 @@
 
 import { motion } from "framer-motion";
 import type { PanelKind } from "../home/affordance-row";
+import { AgentEventFeed } from "../feed/agent-event-feed";
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
@@ -94,11 +95,11 @@ export function AliveConsole({
             tag="wizard"
             copy="Five-step wizard lands in T2 — mint key · install · first call · try violation · KAST payout."
           />
-          {/* Right: feed placeholder (T1) */}
-          <PlaceholderSlot
-            title="Your agent's events"
-            tag="live"
-            copy="Live feed lands in T1 — polls /api/vault/[id]/events every 3s. Empty state: Mint a key + run the snippet on the left. Your first event lands here in seconds."
+          {/* Right: live event feed (T1) */}
+          <AgentEventFeed
+            vaultId={vaultId}
+            ownerWallet={ownerWallet}
+            className="min-h-[340px]"
           />
         </div>
 
