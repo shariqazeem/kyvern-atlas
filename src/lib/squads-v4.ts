@@ -480,6 +480,81 @@ export async function coSignPayment(
   };
 }
 
+/**
+ * Like coSignPayment, but submits the tx with `skipPreflight: true` so the
+ * cluster accepts it even when execution will fail. The tx errors on-chain
+ * (Squads's policy program rejects with PerTxAmountExceeded / DailyLimit
+ * etc.) and we capture the resulting failed signature — same Explorer link
+ * a user gets for a successful payment, except `Status: failed` on the
+ * tx page with the program error code in the logs.
+ *
+ * Used by the Policy Playground when the user wants to see the chain
+ * actually refuse a violation rather than our off-chain pre-check do it.
+ *
+ * Caller MUST verify the violation is one Squads enforces (per-tx cap,
+ * daily cap, weekly cap, insufficient USDC) — passing in a violation
+ * Squads doesn't know about (e.g. memo missing, merchant not allowed)
+ * would cause the cluster to settle the tx, draining real funds.
+ */
+export async function coSignPaymentExpectingFailure(
+  input: CoSignPaymentInput,
+): Promise<{ txSignature: string | null; explorerUrl: string | null }> {
+  if (mode() === "stub") {
+    // Stub mode has no real chain — return a deterministic stub sig so
+    // the UI still has something to render in dev.
+    const sig = stubSignature();
+    return { txSignature: sig, explorerUrl: explorerUrl(sig, input.network) };
+  }
+
+  const { sqds, web3, spl } = await loadSdk();
+  const signer = await loadServerSigner({ network: input.network });
+  const connection = signer.connection;
+  const feePayer = signer.keypair;
+  const agent = await keypairFromB58(input.agentSecretB58);
+
+  const multisigPda = new web3.PublicKey(input.smartAccountAddress);
+  const mint = new web3.PublicKey(USDC_MINT[input.network]);
+  const spendingLimitPda = new web3.PublicKey(input.spendingLimitPda);
+
+  const amount = Math.round(input.amountUsd * 1_000_000);
+  const destination = new web3.PublicKey(input.recipientPubkey);
+
+  try {
+    const txSignature = await sqds.rpc.spendingLimitUse({
+      connection,
+      feePayer,
+      member: agent,
+      multisigPda,
+      spendingLimit: spendingLimitPda,
+      amount,
+      decimals: 6,
+      mint,
+      vaultIndex: 0,
+      destination,
+      tokenProgram: spl.TOKEN_PROGRAM_ID,
+      memo: input.memo ?? undefined,
+      // Skip preflight so the cluster ingests the tx even though
+      // execution will revert. We get a real signature back; the tx
+      // shows up in Explorer with the program error in its logs.
+      sendOptions: { skipPreflight: true },
+    });
+    return {
+      txSignature,
+      explorerUrl: explorerUrl(txSignature, input.network),
+    };
+  } catch (err) {
+    // Even with skipPreflight the RPC node can still reject (bad
+    // blockhash, signature failure, network blip). In that case we
+    // have no signature to surface — caller falls back to off-chain
+    // block messaging.
+    console.error(
+      "[coSignPaymentExpectingFailure] sendTransaction threw:",
+      err instanceof Error ? err.message : err,
+    );
+    return { txSignature: null, explorerUrl: null };
+  }
+}
+
 export { explorerAddressUrl };
 
 export interface VaultAtaInfo {

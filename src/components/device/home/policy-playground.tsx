@@ -45,6 +45,9 @@ interface Props {
 interface PlaygroundResult {
   ok: boolean;
   signature: string | null;
+  /** Pre-formatted Solana Explorer URL when the chain produced a tx
+   *  (allowed payments + blocked-on-chain Squads-enforced violations). */
+  explorerUrl: string | null;
   reason: string | null;
   decisionMs: number;
   inputs: { merchant: string; amountUsd: number; memo: string };
@@ -108,6 +111,7 @@ export function PolicyPlayground({
       setResult({
         ok: false,
         signature: null,
+        explorerUrl: null,
         reason: e instanceof Error ? e.message : "request failed",
         decisionMs: 0,
         inputs: { merchant, amountUsd: amount, memo },
@@ -396,7 +400,11 @@ function ResultCard({
           ) : (
             <X className="w-3.5 h-3.5" strokeWidth={2.5} />
           )}
-          {tone === "approved" ? "Approved · settled" : "Blocked"}
+          {tone === "approved"
+            ? "Approved · settled"
+            : result.signature
+              ? "Blocked on-chain"
+              : "Blocked"}
         </span>
         <span
           className="font-mono tabular-nums"
@@ -424,7 +432,10 @@ function ResultCard({
       </div>
       {result.signature ? (
         <a
-          href={`https://explorer.solana.com/tx/${result.signature}?cluster=${network}`}
+          href={
+            result.explorerUrl ??
+            `https://explorer.solana.com/tx/${result.signature}?cluster=${network}`
+          }
           target="_blank"
           rel="noreferrer"
           className="inline-flex items-center gap-1 font-mono"
@@ -434,12 +445,16 @@ function ResultCard({
           <ArrowUpRight className="w-3 h-3" strokeWidth={2} />
         </a>
       ) : (
-        <span
-          className="font-mono"
+        <a
+          href={`https://explorer.solana.com/address/PpmZErWfT5zpeo1fJtTbpqezFGbRUamaNNRWViaMSqc?cluster=${network}`}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-1 font-mono hover:underline"
           style={{ color: palette.accent, fontSize: 10.5 }}
         >
-          caught locally · same rules run on-chain at PpmZ…MSqc
-        </span>
+          caught off-chain · same rules deployed at PpmZ…MSqc
+          <ArrowUpRight className="w-3 h-3" strokeWidth={2} />
+        </a>
       )}
     </div>
   );

@@ -16,7 +16,12 @@ import {
   type DeviceEventType,
 } from "./vault-store";
 import { evaluatePayment, normalizeMerchant } from "./policy-engine";
-import { coSignPayment, ensureRecipientUsdcAta, isSquadsReal } from "./squads-v4";
+import {
+  coSignPayment,
+  coSignPaymentExpectingFailure,
+  ensureRecipientUsdcAta,
+  isSquadsReal,
+} from "./squads-v4";
 import { getDb } from "./db";
 
 interface ServerPayInput {
@@ -32,7 +37,33 @@ interface ServerPayInput {
     counterparty?: string;
     description: string;
   };
+  /**
+   * When true, blocked attempts whose violation is one Squads's spending
+   * limit can refuse on-chain (per-tx cap, daily cap, weekly cap) get
+   * submitted to the cluster anyway with skipPreflight, so the chain
+   * produces a real failed tx with a verifiable signature.
+   *
+   * Safety: Only applied to violation codes Squads actually enforces.
+   * Kyvern-only violations (merchant_not_allowed, missing_memo,
+   * vault_paused, velocity_cap) stay off-chain — sending them on-chain
+   * could let funds settle, since Squads doesn't know those rules.
+   *
+   * Costs ~5000 lamports per failed attempt (fee payer pays even on
+   * failure). Caller MUST rate-limit this path.
+   */
+  forceOnChain?: boolean;
 }
+
+/**
+ * Codes from policy-engine that Squads's `spendingLimitUse` refuses on
+ * its own. Anything outside this set, the chain would happily settle —
+ * so we mustn't submit it.
+ */
+const SQUADS_ENFORCED_CODES = new Set([
+  "amount_exceeds_per_tx",
+  "amount_exceeds_daily",
+  "amount_exceeds_weekly",
+]);
 
 interface ServerPayResult {
   success: boolean;
@@ -80,6 +111,73 @@ export async function serverVaultPay(
   );
 
   if (decision.decision === "blocked") {
+    const violationCode = decision.code ?? "";
+    const canForceChain =
+      input.forceOnChain === true &&
+      SQUADS_ENFORCED_CODES.has(violationCode) &&
+      isSquadsReal() &&
+      !!agentKeyRow.solana_secret_b58 &&
+      !!vault.spendingLimitPda;
+
+    if (canForceChain) {
+      // Force the violation onto chain — Squads's spending limit will
+      // refuse and we get back a real failed tx signature.
+      try {
+        await ensureRecipientUsdcAta({
+          recipientPubkey: input.recipientPubkey,
+          network: vault.network,
+        });
+      } catch {
+        // ATA prep failure isn't fatal here — try the cosign anyway.
+        // If the cluster also rejects on missing ATA, we still get a
+        // chain-side error rather than a silent off-chain block.
+      }
+
+      const result = await coSignPaymentExpectingFailure({
+        smartAccountAddress: vault.squadsAddress,
+        spendingLimitPda: vault.spendingLimitPda!,
+        agentSecretB58: agentKeyRow.solana_secret_b58!,
+        merchant: merchantNorm,
+        recipientPubkey: input.recipientPubkey,
+        amountUsd: input.amountUsd,
+        memo: input.memo ?? null,
+        network: vault.network,
+      });
+
+      recordPayment({
+        vaultId: vault.id,
+        agentKeyId: agentKeyRow.id,
+        merchant: merchantNorm,
+        amountUsd: input.amountUsd,
+        memo: input.memo ?? null,
+        status: "blocked",
+        reason: decision.reason ?? decision.code ?? "blocked",
+        txSignature: result.txSignature,
+        latencyMs: 0,
+      });
+
+      if (input.logEvent && result.txSignature) {
+        writeDeviceLog({
+          deviceId: vault.id,
+          eventType: input.logEvent.eventType,
+          abilityId: input.logEvent.abilityId,
+          signature: result.txSignature,
+          amountUsd: input.amountUsd,
+          counterparty: input.logEvent.counterparty,
+          description: input.logEvent.description,
+          metadata: { explorerUrl: result.explorerUrl, blocked: true },
+        });
+      }
+
+      return {
+        success: false,
+        blocked: true,
+        signature: result.txSignature ?? undefined,
+        explorerUrl: result.explorerUrl ?? undefined,
+        reason: decision.reason ?? decision.code,
+      };
+    }
+
     recordPayment({
       vaultId: vault.id,
       agentKeyId: agentKeyRow.id,
