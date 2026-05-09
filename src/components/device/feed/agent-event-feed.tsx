@@ -84,8 +84,15 @@ export function AgentEventFeed({
           },
         );
         if (!r.ok) {
-          if (!cancelled) {
+          // 401s on first paint are common: useAuth hydrates a beat
+          // after vaultId resolves, so the very first poll can race
+          // ahead of the wallet header. Swallow 401s silently — the
+          // 3s retry will succeed once auth catches up. Only surface
+          // genuine errors to the user.
+          if (r.status !== 401 && !cancelled) {
             setError(`HTTP ${r.status}`);
+            setLoading(false);
+          } else if (!cancelled) {
             setLoading(false);
           }
           return;

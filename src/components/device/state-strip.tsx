@@ -72,17 +72,15 @@ export function StateStrip({
 }
 
 function lineFor(state: DeviceState): string {
-  // Phase A.5 (KYVERN_FRONTIER_FINAL_SPRINT, 2026-05-08) — whisper
-  // copy reframed to seed the platform / SDK story. The starter
-  // workers are templates, the device is the product, builders ship
-  // more from the SDK. Every state surface reinforces that pivot.
+  // TRANSFORM_24H — workers retired. The strip now reinforces the
+  // integration-console flow: mint key → run snippet → watch events.
   switch (state) {
     case "empty":
-      return "Your device is online. Fund the vault to power your workers.";
+      return "Your device is online. Mint a key on the right to start integrating.";
     case "funded_default":
-      return "Three starter workers loaded. Personalize each — or build your own.";
+      return "Your device is ready. Walk the 5-step wizard or paste the SDK snippet.";
     case "partial":
-      return "Some workers are tuned. Builders can ship more from the SDK.";
+      return "Integration in progress. Click any step to continue.";
     case "active":
     default:
       return "";
@@ -101,21 +99,14 @@ function ctaFor(
   href?: string;
   onClick?: boolean;
 } | null {
+  // firstUntunedHref no longer used (workers retired) but kept as a
+  // signature for backward-compat with /app/page.tsx callers.
+  void firstUntunedHref;
   switch (state) {
     case "empty":
       return { label: "Top up vault", icon: "topup", onClick: true };
     case "funded_default":
-      return {
-        label: "Personalize a worker",
-        icon: "arrow",
-        href: firstUntunedHref ?? "/app",
-      };
     case "partial":
-      return {
-        label: "Continue tuning",
-        icon: "arrow",
-        href: firstUntunedHref ?? "/app",
-      };
     case "active":
     default:
       return null;

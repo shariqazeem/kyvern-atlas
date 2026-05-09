@@ -403,9 +403,12 @@ function MintKeyBody({
       });
       if (r.ok) {
         const d = await r.json();
-        if (d?.fullKey) {
-          setRevealed(d.fullKey);
-          setPrefix(d.fullKey.slice(0, 14));
+        // Endpoint returns rawKey on POST (per /api/devices/[id]/agent-key).
+        // Tolerate both names defensively in case the contract drifts.
+        const fresh = d?.rawKey ?? d?.fullKey;
+        if (fresh) {
+          setRevealed(fresh);
+          setPrefix(d?.keyPrefix ?? fresh.slice(0, 14));
         }
       }
     } finally {
