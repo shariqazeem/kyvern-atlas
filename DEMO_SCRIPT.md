@@ -26,26 +26,44 @@ swap it. Lean in. Unboxing makes it concrete.
 
 ### 1 hour before · environment
 
-- [ ] **Walk the unbox flow once** to seed your demo device.
-  Sign in via Privy on `kyvernlabs.com/login` (or use `/try` guest
-  mode). `/unbox` auto-creates the vault + Sentinel/Wren/Pulse for
-  you. Land on `/app`. This is the same path the demo will show on
-  camera — you're just seeding state ahead of time.
-- [ ] **Fund $25 devnet USDC** via [Circle faucet](https://faucet.circle.com)
-  - Open `/app` · "Fund the vault" → copy your USDC ATA → request 25
-- [ ] **Vault settings → merchant allowlist**: add
-  `api.openai.com`, `api.pay.sh/gemini`
-- [ ] **Mint an agent key** from `/app` · "Use the device" pane —
-  copy `kv_live_…` to your clipboard (it shows ONCE)
-- [ ] **Set Pulse trigger** to `SOL below $X` where X is current spot
-  + $0.50. Don't save yet — you'll save on camera.
+You'll record the sign-in + unbox **live on camera** (Act 2). For
+that to look fast and frictionless, you need a clean Privy account
+ready to go (not signed-in yet, but the credentials saved in your
+browser's password manager so the email/wallet step is one click).
 
-> **Why seed first**: the demo shows `/unbox` again on camera (the
-> cinematic), but the device that lands on `/app` afterwards needs to
-> already have funds + allowlist + agent key + a Pulse trigger queued.
-> If you wait until recording to fund + mint + configure, those steps
-> eat 5+ minutes you don't have. Seed now, walk through the same flow
-> on camera, hit `/app` with everything pre-armed.
+- [ ] **Have a Privy-compatible account ready** — Google account, X
+  account, or email + OTP. Whichever is fastest in your browser.
+  Test the sign-in path beforehand by going through it on a different
+  browser profile (so your demo profile starts logged-out).
+- [ ] **Pre-warm Solana devnet RPC** — `/unbox` does real on-chain
+  provisioning so the cinematic timing depends on RPC. Open the demo
+  browser profile once, click "Get a Kyvern", complete sign-in,
+  watch the `/unbox` cinematic finish, land on `/app`. Then sign out
+  and clear cookies on that browser profile. This warms DNS + RPC
+  caches so the real take runs faster.
+- [ ] **Fund $25 devnet USDC** via [Circle faucet](https://faucet.circle.com)
+  - From the post-warm-up `/app`, copy the vault USDC ATA · request 25
+- [ ] **Vault settings → merchant allowlist**: add
+  `api.openai.com`, `api.pay.sh/gemini`, and any other merchants you
+  plan to demo
+- [ ] **Mint an agent key** from `/app` · "Use the device" pane —
+  copy `kv_live_…` to your clipboard, paste into your `~/demo-agent/.env`
+- [ ] **Sign out** of the warmed device — Act 2 needs you starting
+  signed-out so the Privy modal can fire on camera
+
+> **The pre-warm trick is the secret sauce**. You don't pre-create
+> the on-camera device — you create one, configure it, fund it, then
+> sign out. When you sign in fresh on camera, Privy may give you a
+> brand-new vault (which is fine — the cinematic still plays and the
+> three workers still seed). Or it may resume your warmed-up device
+> (which has funds + allowlist + agent key already). Either way the
+> demo works because the next step (configure Pulse + watch fire) is
+> all you need on /app.
+
+> **Backup plan if /unbox creates a fresh empty device on camera**:
+> have a second tab pre-open at your warmed device's `/app`. After
+> the cinematic plays, "tab over" — the judge can't tell which tab
+> you're on, both are real signed-in /app pages.
 
 ### 30 minutes before · staging
 
@@ -92,53 +110,45 @@ Each row: time · what's on screen · what your face/voice does.
 | 0:00 – 0:08 | **Face cam full screen**. White background, you. | "AI agents are everywhere now. But here's the problem nobody talks about: most of them have your private keys." (look into the camera, not the screen) |
 | 0:08 – 0:20 | Cut to a Twitter screenshot or a generic "agent drained $X" headline (5s) → fade to face cam | "If your agent goes off the rails — bad prompt injection, hallucinated transaction — your wallet gets drained. There is no kill switch. Until now." (face cam, slight smile on "until now") |
 
-### Act 2 · The device (0:20 – 0:55)
+### Act 2 · Sign in + unbox (0:20 – 1:10)
 
 | Time | Screen | Voice / face cam |
 |---|---|---|
 | 0:20 – 0:30 | Cut to **kyvernlabs.com** landing. Cursor halo glows around the device card. Hero h1 visible: "A Solana device for your AI agent. The chain decides every dollar." | "I built Kyvern. A Solana device for your AI agent. Three pre-installed workers, one vault, an on-chain budget program enforcing every dollar." |
-| 0:30 – 0:40 | Click "Try a Kyvern · no login" on the hero → lands on `/try` → provisioning screen ticks through "Spinning up your sandbox device · Provisioning a Squads multisig · Wiring the Kyvern policy program · Installing the three starter workers" — no Privy modal, no signup. Land on `/app`. | "No signup. Click once. The device spins up a real Squads multisig on Solana devnet, wires it to my Anchor program, installs three workers, drops me into the device. This is what every visitor gets." |
-| 0:40 – 0:55 | On `/app` — three worker tiles already visible: Sentinel · Wren · Pulse. Hover each tile to surface the live state. | "Sentinel finds paid Solana bounties for me. Wren watches wallets I care about. Pulse fires conditional swaps when prices hit. All three running on real on-chain cycles already." |
+| 0:30 – 0:40 | Click **"Get a Kyvern"** on the landing CTA → Privy modal opens → click "Continue with Google" (or wallet) → modal closes, redirect to `/unbox` | "Sign in. Privy handles the wallet — embedded by default, or bring your own. One click." |
+| 0:40 – 1:00 | `/unbox` cinematic plays: device card materializes, three worker chips light up one-by-one (Sentinel · Wren · Pulse), provisioning beats tick through ("Spinning up · Squads multisig · Kyvern policy program · workers installed"). Land on `/app`. | "Behind the scenes: a real Squads multisig on Solana devnet, wired to my Anchor program. Three workers installed. The vault is yours. The chain is the referee." |
+| 1:00 – 1:10 | On `/app` — three worker tiles in their bays: Sentinel · Wren · Pulse · their live states ticking. | "Sentinel finds paid Solana bounties. Wren watches wallets. Pulse fires conditional swaps when prices hit. Real on-chain cycles, every three minutes." |
 
-> **Stitching note**: the `/try` flow is real but it's *guest mode* —
-> agent-key minting (used in Act 5) is gated behind Privy sign-in. So
-> off-camera before recording, you're already signed in to your own
-> Kyvern device. On camera, you click `/try` to *demonstrate* the
-> zero-friction onboarding moment. Then for the rest of the demo
-> you're operating on your own signed-in device (which looks
-> identical — same UI). Judges don't notice the cut, and you get full
-> SDK functionality for the builder act.
-
-### Act 3 · The chain decides (0:55 – 1:40)
+### Act 3 · The chain decides (1:10 – 1:50)
 
 | Time | Screen | Voice / face cam |
 |---|---|---|
-| 0:55 – 1:05 | Click into Pulse tile → worker page loads, single column · 720px · Apple-Settings layout | "Each worker is configurable. Watch this." |
-| 1:05 – 1:25 | Show Configure card · type the threshold ($current+$0.50) · spend $0.10 · swap into SOL · check the green "Chain-enforced" pill · hit Save. Inbox slides in within seconds with "✓ ON-CHAIN · You got SOL at $X" | "I told the device: when SOL drops below ninety-three, fire ten cents into SOL. Save. Within seconds, the chain validates, the swap settles, the receipt lands in my inbox." |
-| 1:25 – 1:40 | Click the finding → expanded detail · click "View on-chain swap ↗" → Solana Explorer opens in new tab with the real signed tx | "Real Solana receipt. Real chain enforcement. Click the signature — there it is on Explorer. The vault holds my USDC. The chain decides every dollar. Try to drain it —" |
+| 1:10 – 1:18 | Click into Pulse tile → worker page loads, single column · 720px · Apple-Settings layout | "Each worker is configurable. Watch this." |
+| 1:18 – 1:35 | Configure card · type threshold (current + $0.50) · spend $0.10 · swap into SOL · "Chain-enforced" pill green · hit Save · inbox finding slides in: "✓ ON-CHAIN · You got SOL at $X" | "When SOL drops below ninety-three, fire ten cents into SOL. Save. Within seconds, the chain validates, the swap settles, the receipt lands in my inbox." |
+| 1:35 – 1:50 | Click the finding → detail · click "View on-chain swap ↗" → Solana Explorer opens with the real signed tx | "Real Solana receipt. Click the signature — there it is on Explorer. The vault holds my USDC. The chain decides every dollar. Try to drain it —" |
 
-### Act 4 · The drain (1:40 – 2:00)
-
-| Time | Screen | Voice / face cam |
-|---|---|---|
-| 1:40 – 1:55 | Cut to `/atlas` · scroll to the drain callout · click "Try to drain" button. Red toast appears: "✕ blocked · merchant not allowed". Click the failed-tx Explorer link. | "And the chain refuses. Real failed Solana transaction, with the program error in the logs. Your USDC stays in the vault. This is what 'chain-enforced' actually means — not a server check, not a webhook, the protocol itself." |
-| 1:55 – 2:00 | Atlas hero stats visible: "18 days · 8,700+ cycles · 3,300+ attacks blocked · $0 lost · $24 earned" · numbers ticking | "Atlas — our reference deployment — has been live 18 days. 3,300 attacks refused. Zero funds lost. Real x402 subscribers paying right now." |
-
-### Act 5 · The platform (2:00 – 2:40) ← THE BUILDER MOMENT
+### Act 4 · The drain (1:50 – 2:10)
 
 | Time | Screen | Voice / face cam |
 |---|---|---|
-| 2:00 – 2:08 | Switch to side-by-side: **Editor on right** (`agent.ts` open, raw OpenAI call visible). **Browser on left** (`/app` · "Use the device" panel · SDK pane). | "But the workers are templates. The product is the device — and the SDK that lets anyone wrap their agent." |
-| 2:08 – 2:18 | Highlight `chatWithoutLimits` function in the editor for 1 sec. Then move cursor to browser, click Copy on the SDK snippet. | "Here's my agent. It has my OpenAI key. No limits. Watch me wrap it." |
-| 2:18 – 2:30 | Paste over the function in the editor, save (Cmd+S). The replaced function shows `vault.pay({ merchant, amount, memo })` then the OpenAI call. | "Five lines. The vault asks the chain first. The chain decides. Then the model gets called." |
-| 2:30 – 2:40 | Terminal: `npx tsx agent.ts "what's the weather in Lahore?"` → console prints answer + `on-chain receipt: https://explorer.solana.com/tx/...`. Click the URL → Solana Explorer loads. | "Real on-chain receipt. From an agent I just wrapped on camera. The SDK is on npm right now — `npx create-kyvern-agent`. Anyone can do this." |
+| 1:50 – 2:03 | Cut to `/atlas` · scroll to the drain callout · click "Try to drain" button. Red toast: "✕ blocked · merchant not allowed". Click the failed-tx Explorer link. | "And the chain refuses. Real failed Solana transaction, with the program error in the logs. Your USDC stays in the vault. This is what 'chain-enforced' actually means — not a server check, not a webhook, the protocol itself." |
+| 2:03 – 2:10 | Atlas hero stats visible: "18 days · 8,700+ cycles · 3,300+ attacks blocked · $0 lost · $24 earned" · numbers ticking | "Atlas — our reference deployment — has been live 18 days. 3,300 attacks refused. Zero funds lost. Real x402 subscribers paying right now." |
 
-### Act 6 · The close (2:40 – 3:00)
+### Act 5 · The platform (2:10 – 2:45) ← THE BUILDER MOMENT
 
 | Time | Screen | Voice / face cam |
 |---|---|---|
-| 2:40 – 2:55 | Cut to face cam, you. Behind you (or in a lower third): "Kyvern · A Solana device for your AI agent · kyvernlabs.com" | "I built this in Lahore, alone, in two months, for Colosseum Frontier. Solana devnet. Real Anchor program. Real Squads multisig. Real x402 subscribers paying Atlas every minute." |
-| 2:55 – 3:00 | End card: KV mark + URL fade in | "Kyvern. The chain decides every dollar. Kyvernlabs dot com." |
+| 2:10 – 2:16 | Switch to side-by-side: **Editor on right** (`agent.ts`, raw OpenAI call). **Browser on left** (`/app` · "Use the device" panel · SDK pane). | "The workers are templates. The product is the device — and the SDK that lets anyone wrap their agent." |
+| 2:16 – 2:24 | Highlight `chatWithoutLimits` in the editor (1s). Cursor to browser, click Copy on the SDK snippet. | "Here's my agent. It has my OpenAI key. No limits. Watch." |
+| 2:24 – 2:34 | Paste over the function in the editor, save. Replaced function shows `vault.pay({ merchant, amount, memo })` then the OpenAI call. | "Five lines. The vault asks the chain first. Chain decides. Then OpenAI gets called." |
+| 2:34 – 2:45 | Terminal: `npx tsx agent.ts "what's the weather in Lahore?"` → console prints answer + `on-chain receipt: https://explorer.solana.com/...`. Click the URL → Explorer loads. | "Real on-chain receipt from an agent I just wrapped on camera. The SDK is on npm — `npx create-kyvern-agent`. Anyone can do this." |
+
+### Act 6 · The close (2:45 – 3:00)
+
+| Time | Screen | Voice / face cam |
+|---|---|---|
+| 2:45 – 2:57 | Cut to face cam, you. Lower third: "Kyvern · kyvernlabs.com" | "I built this in Lahore, alone, in two months, for Colosseum Frontier. Real Anchor program. Real Squads. Real subscribers paying Atlas every minute." |
+| 2:57 – 3:00 | End card: KV mark + URL fade in | "Kyvern. The chain decides every dollar." |
 
 ---
 
