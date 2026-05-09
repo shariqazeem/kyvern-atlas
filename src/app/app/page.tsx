@@ -38,6 +38,10 @@ import { ArrowRight } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useDeviceStore } from "@/hooks/use-device-store";
 import type { PanelKind } from "@/components/device/home/affordance-row";
+import { WatchChainPanel } from "@/components/device/panels/watch-chain-panel";
+import { PayShPanel } from "@/components/device/panels/paysh-panel";
+import { KastPanel } from "@/components/device/panels/kast-panel";
+import { BuilderPanel } from "@/components/device/panels/builder-panel";
 import { SandboxBanner } from "@/components/device/home/sandbox-banner";
 import type { ActionFeedItem } from "@/components/device/home/action-feed";
 import { TopUpDrawer } from "@/components/device/top-up-drawer";
@@ -370,12 +374,36 @@ export default function DeviceHome() {
         <ManifestoStrip className="h-8 flex-shrink-0" />
       </div>
 
-      {/* The four instrument-drawer panels were retired 2026-05-09 —
-          the alive console wizard owns every interaction now and the
-          panels duplicated content. AffordanceRow stays as chassis
-          decoration with a soft scroll-to-wizard click. The state
-          variable + setPanel still exist so other components don't
-          break, but no panels mount here. */}
+      {/* Instrument-drawer panels — accessible via URL deep-link
+          (?panel=bay|use|kast|builder) but no longer opened from
+          the chassis tabs (those soft-scroll back to the wizard,
+          per the user's chassis-decoration request). The wizard
+          remains the primary surface; panels exist for power users
+          + direct links + future video-narration shots. */}
+      <WatchChainPanel
+        open={panel === "bay"}
+        onClose={() => setPanel(null)}
+      />
+      <PayShPanel
+        open={panel === "use"}
+        onClose={() => setPanel(null)}
+      />
+      <KastPanel
+        open={panel === "kast"}
+        onClose={() => setPanel(null)}
+        vaultId={deviceId}
+        ownerWallet={wallet ?? null}
+      />
+      <BuilderPanel
+        open={panel === "builder"}
+        onClose={() => setPanel(null)}
+        deviceId={deviceId}
+        network={status?.network ?? "devnet"}
+        isGuest={isGuest}
+        onSignIn={() => router.push("/login")}
+        policySummary={status?.policySummary ?? null}
+        perTxMaxUsd={0.5}
+      />
 
       <TopUpDrawer
         open={topUpOpen}
