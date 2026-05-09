@@ -33,13 +33,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowRight, Check, Eye, RefreshCw } from "lucide-react";
-import { Keypair } from "@solana/web3.js";
-import bs58 from "bs58";
+import { ArrowRight, Check } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { usePrivy } from "@privy-io/react-auth";
-import { useWallets as useSolanaWallets } from "@privy-io/react-auth/solana";
-import { useExportWallet } from "@privy-io/react-auth/solana";
 import { seedDefaultWorkersIfEmpty } from "@/lib/onboarding/seed-workers";
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
@@ -54,21 +50,9 @@ type Stage =
   | "claimed"
   | "managed";
 
-/** Verifies a pasted base58 string is the secret key for `expectedPubkey`.
- *  Pure local check — bytes never leave the browser. */
-function verifyDeviceKey(pasted: string, expectedPubkey: string): boolean {
-  try {
-    const trimmed = pasted.trim();
-    if (!trimmed) return false;
-    const secret = bs58.decode(trimmed);
-    // Solana ed25519 secret keys are 64 bytes (priv + pub concatenated).
-    if (secret.length !== 64) return false;
-    const kp = Keypair.fromSecretKey(secret);
-    return kp.publicKey.toBase58() === expectedPubkey;
-  } catch {
-    return false;
-  }
-}
+/* verifyDeviceKey + the paste-back ceremony retired 2026-05-09.
+ * One-screen unbox now goes closed → opening → serial → boot →
+ * claimed without ever surfacing the device key. */
 
 function deriveSerial(wallet: string | null): string {
   if (!wallet) return "KVN-________";
@@ -79,12 +63,7 @@ export default function UnboxPage() {
   const router = useRouter();
   const { wallet, isAuthenticated, isLoading } = useAuth();
   const { user } = usePrivy();
-  const { wallets: solanaWallets } = useSolanaWallets();
-  const { exportWallet } = useExportWallet();
   const [stage, setStage] = useState<Stage>("closed");
-  const [pasted, setPasted] = useState("");
-  const [exportError, setExportError] = useState<string | null>(null);
-  const [justPasted, setJustPasted] = useState(false);
   const [provisioning, setProvisioning] = useState(false);
   const [provisionError, setProvisionError] = useState<string | null>(null);
 
@@ -101,11 +80,6 @@ export default function UnboxPage() {
   // details — `walletClientType` lives on the linked account in
   // `user.linkedAccounts`, not on the connected wallet directly. We
   // match by address.
-  const activeWallet = useMemo(() => {
-    if (!wallet || !solanaWallets) return null;
-    return solanaWallets.find((w) => w.address === wallet) ?? null;
-  }, [wallet, solanaWallets]);
-
   const walletClientType = useMemo(() => {
     if (!wallet || !user?.linkedAccounts) return null;
     for (const acct of user.linkedAccounts) {
@@ -121,7 +95,6 @@ export default function UnboxPage() {
     return null;
   }, [wallet, user]);
 
-  const isEmbedded = walletClientType === "privy" || walletClientType === "privy-v2";
   const externalWalletLabel = useMemo(() => {
     if (!walletClientType) return "your wallet";
     return walletClientType.charAt(0).toUpperCase() + walletClientType.slice(1);
@@ -132,78 +105,17 @@ export default function UnboxPage() {
   const openBox = useCallback(() => {
     if (stage !== "closed") return;
     setStage("opening");
-    // Quick unbox per SPEC R2 — total cinematic ~2.5s so the whole
-    // login → unbox → /app journey lands in ~15s with vault provision.
-    // Box opens (~750ms) → device settles → serial begins
-    window.setTimeout(() => setStage("serial"), 750);
-    // Serial typewriter at ~50ms/char; small 100ms buffer
-    window.setTimeout(() => setStage("boot"), 750 + serial.length * 50 + 100);
-    // LED boot — 3 dots × 500ms
+    // One-screen unbox per the new theme — drop the device-key
+    // reveal/paste ceremony and the worker-list "ready" state. Go
+    // closed → opening → serial → boot → claimed (final card with
+    // "Open Kyvern" CTA). Total cinematic ~2.3s + one click → /app.
+    window.setTimeout(() => setStage("serial"), 700);
+    window.setTimeout(() => setStage("boot"), 700 + serial.length * 50 + 80);
     window.setTimeout(
-      () => setStage("ready"),
-      750 + serial.length * 50 + 100 + 1500,
+      () => setStage("claimed"),
+      700 + serial.length * 50 + 80 + 1100,
     );
   }, [stage, serial.length]);
-
-  const handleReveal = useCallback(() => {
-    if (!activeWallet || !isEmbedded) return;
-    setExportError(null);
-    // Fire-and-forget. If we await on exportWallet's promise (which only
-    // resolves when the user dismisses the modal), a stuck/blocked
-    // Privy modal locks the whole page on "Opening Privy…". Instead
-    // we trigger the modal AND advance to the verify card immediately:
-    //   - If the modal opens, user copies the key from Privy's UI, closes
-    //     it, and is already on the verify card ready to paste.
-    //   - If the modal hangs/fails (Privy dashboard misconfig, popup
-    //     blocker, etc.), the user can re-trigger via the verify card's
-    //     "Show me the key again" button or use the bypass link.
-    void exportWallet({ address: activeWallet.address }).catch((e) => {
-      console.warn("[unbox] exportWallet failed:", e);
-    });
-    setStage("verify");
-  }, [activeWallet, isEmbedded, exportWallet]);
-
-  const handleBypassVerify = useCallback(() => {
-    if (typeof window === "undefined") return;
-    const confirmed = window.confirm(
-      "Skip device-key verification?\n\n" +
-        "You can still use Kyvern, but if you ever lose this browser " +
-        "without saving the key, you'll have to recover via your account " +
-        "(email/Google) and the wallet won't be portable to another app.\n\n" +
-        "Continue without saving the key?",
-    );
-    if (confirmed) {
-      setPasted("");
-      setStage("claimed");
-    }
-  }, []);
-
-  // Once the user has pasted a valid key, advance to claimed.
-  const pasteIsValid = useMemo(
-    () => (wallet ? verifyDeviceKey(pasted, wallet) : false),
-    [pasted, wallet],
-  );
-  const pasteShownButWrong = pasted.trim().length > 0 && !pasteIsValid;
-
-  const handleConfirmPaste = useCallback(() => {
-    if (!pasteIsValid) return;
-    setStage("claimed");
-    // Burn the paste from memory so it doesn't sit in React state.
-    setPasted("");
-  }, [pasteIsValid]);
-
-  const handleSkipExternal = useCallback(() => {
-    // External-wallet users skip the reveal+verify ritual — their
-    // device key already lives in their existing wallet app.
-    setStage("managed");
-  }, []);
-
-  const handlePasteEvent = useCallback(() => {
-    // Brief flash so the user gets visible confirmation that paste
-    // was captured. Live validation kicks in immediately after.
-    setJustPasted(true);
-    window.setTimeout(() => setJustPasted(false), 1500);
-  }, []);
 
   // "Open Kyvern" — silently provisions a Squads vault on the user's
   // wallet if they don't already have one. The vault is the device's
@@ -362,43 +274,12 @@ export default function UnboxPage() {
           )}
         </AnimatePresence>
 
-        {/* READY — embedded wallet → reveal-key CTA. External wallet → managed pill. */}
-        <AnimatePresence>
-          {stage === "ready" && isEmbedded && (
-            <RevealCard
-              key="reveal"
-              error={exportError}
-              onReveal={handleReveal}
-            />
-          )}
-          {stage === "ready" && !isEmbedded && activeWallet && (
-            <ManagedCard
-              key="managed-prompt"
-              walletLabel={externalWalletLabel}
-              onContinue={handleSkipExternal}
-            />
-          )}
-        </AnimatePresence>
+        {/* The reveal/paste ritual was retired — boot now lands
+            straight on the claimed card. Embedded vs external wallet
+            still surfaces the right wallet label on the final card,
+            but no key reveal happens. */}
 
-        {/* VERIFY — paste-back input, validated locally. */}
-        <AnimatePresence>
-          {stage === "verify" && (
-            <VerifyCard
-              key="verify"
-              pasted={pasted}
-              onChange={setPasted}
-              onPaste={handlePasteEvent}
-              justPasted={justPasted}
-              valid={pasteIsValid}
-              wrong={pasteShownButWrong}
-              onConfirm={handleConfirmPaste}
-              onShowAgain={handleReveal}
-              onBypass={handleBypassVerify}
-            />
-          )}
-        </AnimatePresence>
-
-        {/* CLAIMED / MANAGED — final success card */}
+        {/* CLAIMED — final success card */}
         <AnimatePresence>
           {(stage === "claimed" || stage === "managed") && (
             <ClaimedCard
@@ -789,17 +670,19 @@ function BoxAndDevice({
                     />
                   </div>
 
-                  {/* Three worker status rows — the "AI labor inside"
-                      tell. Each row: status LED · emoji · name · activity
-                      tick. Real trio: Sentinel · Wren · Pulse. */}
+                  {/* Three status rows — the "device is alive" tell.
+                      No more worker theatre; matches the new
+                      integration-console story (vault · policy ·
+                      network). Each row: pulsing LED · label · ready
+                      pill. */}
                   <div className="flex flex-col gap-[3px] flex-1 justify-center">
                     {[
-                      { emoji: "🎯", name: "Sentinel", delay: 0 },
-                      { emoji: "🐋", name: "Wren", delay: 0.4 },
-                      { emoji: "📈", name: "Pulse", delay: 0.8 },
-                    ].map((w) => (
+                      { label: "vault", delay: 0 },
+                      { label: "policy", delay: 0.35 },
+                      { label: "devnet", delay: 0.7 },
+                    ].map((row) => (
                       <div
-                        key={w.name}
+                        key={row.label}
                         className="flex items-center gap-1.5"
                         style={{ height: 14 }}
                       >
@@ -817,12 +700,9 @@ function BoxAndDevice({
                             duration: 1.4,
                             repeat: Infinity,
                             ease: "easeInOut",
-                            delay: w.delay,
+                            delay: row.delay,
                           }}
                         />
-                        <span style={{ fontSize: 9, lineHeight: 1 }}>
-                          {w.emoji}
-                        </span>
                         <span
                           className="font-mono"
                           style={{
@@ -832,24 +712,24 @@ function BoxAndDevice({
                             flex: 1,
                           }}
                         >
-                          {w.name}
+                          {row.label}
                         </span>
                         <motion.span
-                          className="font-mono"
+                          className="font-mono uppercase"
                           style={{
                             fontSize: 6.5,
-                            letterSpacing: "0.10em",
+                            letterSpacing: "0.14em",
                             color: "rgba(134,239,172,0.75)",
                           }}
-                          animate={{ opacity: [0.3, 1, 0.3] }}
+                          animate={{ opacity: [0.4, 1, 0.4] }}
                           transition={{
                             duration: 1.6,
                             repeat: Infinity,
                             ease: "easeInOut",
-                            delay: w.delay + 0.2,
+                            delay: row.delay + 0.2,
                           }}
                         >
-                          ●●●
+                          ready
                         </motion.span>
                       </div>
                     ))}
@@ -1008,8 +888,8 @@ function LedBoot({ stageReady }: { stageReady: boolean }) {
       return;
     }
     const t1 = window.setTimeout(() => setStep(1), 0);
-    const t2 = window.setTimeout(() => setStep(2), 500);
-    const t3 = window.setTimeout(() => setStep(3), 1000);
+    const t2 = window.setTimeout(() => setStep(2), 370);
+    const t3 = window.setTimeout(() => setStep(3), 740);
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
@@ -1075,329 +955,7 @@ function LedBoot({ stageReady }: { stageReady: boolean }) {
   );
 }
 
-/* ────────────────────────────────────────────────────────────────────
-   RevealCard — stage="ready", embedded wallet path. Frames the
-   moment + triggers Privy's exportWallet modal. Includes an
-   "already saved" escape hatch for users who want to skip directly
-   to the verify screen.
-   ──────────────────────────────────────────────────────────────────── */
-
-function RevealCard({
-  error,
-  onReveal,
-}: {
-  error: string | null;
-  onReveal: () => void;
-}) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -8 }}
-      transition={{ duration: 0.5, ease: EASE, delay: 0.2 }}
-      className="w-full rounded-[16px] px-5 py-5"
-      style={{
-        background: "#FFFFFF",
-        border: "1px solid rgba(15,23,42,0.08)",
-        boxShadow: "0 8px 24px rgba(0,0,0,0.06)",
-      }}
-    >
-      <div className="text-center">
-        <div
-          className="font-mono uppercase mb-2"
-          style={{
-            color: "rgba(15,23,42,0.55)",
-            fontSize: 10.5,
-            letterSpacing: "0.18em",
-          }}
-        >
-          Your device key is ready
-        </div>
-        <p
-          className="text-[13.5px] leading-[1.55] mb-4"
-          style={{ color: "rgba(15,23,42,0.78)" }}
-        >
-          Your Kyvern device is a Solana wallet. The key below is the
-          only way to recover it. <strong style={{ color: "#0A0A0A" }}>We can&apos;t recover it for you.</strong>
-        </p>
-
-        <motion.button
-          type="button"
-          onClick={onReveal}
-          whileHover={{ y: -1 }}
-          whileTap={{ scale: 0.98 }}
-          className="inline-flex items-center gap-2 h-[48px] px-6 rounded-[12px] text-[13.5px] font-semibold tracking-[-0.005em]"
-          style={{
-            background: "#0A0A0A",
-            color: "#FFFFFF",
-            border: "1px solid rgba(0,0,0,0.8)",
-            boxShadow:
-              "0 4px 14px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.08)",
-          }}
-        >
-          <Eye className="w-4 h-4" strokeWidth={1.8} />
-          Reveal device key
-        </motion.button>
-
-        {error && (
-          <div
-            className="mt-3 font-mono"
-            style={{
-              fontSize: 11,
-              color: "#F59E0B",
-              letterSpacing: "0.04em",
-            }}
-          >
-            {error}
-          </div>
-        )}
-
-        <p
-          className="mt-4 font-mono"
-          style={{
-            fontSize: 10,
-            color: "rgba(15,23,42,0.45)",
-            letterSpacing: "0.06em",
-          }}
-        >
-          A Privy modal will open with your key. Copy it, then close
-          the modal to verify.
-        </p>
-      </div>
-    </motion.div>
-  );
-}
-
-/* ────────────────────────────────────────────────────────────────────
-   ManagedCard — stage="ready", external wallet path. The user signed
-   in with Phantom/Solflare/Backpack; their key already lives there.
-   Skip the export+verify ritual entirely.
-   ──────────────────────────────────────────────────────────────────── */
-
-function ManagedCard({
-  walletLabel,
-  onContinue,
-}: {
-  walletLabel: string;
-  onContinue: () => void;
-}) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -8 }}
-      transition={{ duration: 0.5, ease: EASE, delay: 0.2 }}
-      className="w-full rounded-[16px] px-5 py-5 text-center"
-      style={{
-        background: "#FFFFFF",
-        border: "1px solid rgba(15,23,42,0.08)",
-        boxShadow: "0 8px 24px rgba(0,0,0,0.06)",
-      }}
-    >
-      <div
-        className="font-mono uppercase mb-2"
-        style={{
-          color: "rgba(15,23,42,0.55)",
-          fontSize: 10.5,
-          letterSpacing: "0.18em",
-        }}
-      >
-        Managed by {walletLabel}
-      </div>
-      <p
-        className="text-[13.5px] leading-[1.55] mb-4"
-        style={{ color: "rgba(15,23,42,0.78)" }}
-      >
-        Your device key already lives in {walletLabel}. Sign there
-        when your worker spends — Kyvern stays out of the way.
-      </p>
-      <motion.button
-        type="button"
-        onClick={onContinue}
-        whileHover={{ y: -1 }}
-        whileTap={{ scale: 0.98 }}
-        className="inline-flex items-center gap-2 h-[48px] px-6 rounded-[12px] text-[13.5px] font-semibold tracking-[-0.005em]"
-        style={{
-          background: "#0A0A0A",
-          color: "#FFFFFF",
-          border: "1px solid rgba(0,0,0,0.8)",
-          boxShadow:
-            "0 4px 14px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.08)",
-        }}
-      >
-        Open Kyvern
-        <ArrowRight className="w-4 h-4" strokeWidth={1.8} />
-      </motion.button>
-    </motion.div>
-  );
-}
-
-/* ────────────────────────────────────────────────────────────────────
-   VerifyCard — stage="verify". User pastes the base58 device key
-   they (hopefully) saved from Privy's modal. We validate locally
-   with Keypair.fromSecretKey + base58 decode and compare the derived
-   public key to their wallet address. No bytes go to the server.
-   ──────────────────────────────────────────────────────────────────── */
-
-function VerifyCard({
-  pasted,
-  onChange,
-  onPaste,
-  justPasted,
-  valid,
-  wrong,
-  onConfirm,
-  onShowAgain,
-  onBypass,
-}: {
-  pasted: string;
-  onChange: (s: string) => void;
-  onPaste: () => void;
-  justPasted: boolean;
-  valid: boolean;
-  wrong: boolean;
-  onConfirm: () => void;
-  onShowAgain: () => void;
-  onBypass: () => void;
-}) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -8 }}
-      transition={{ duration: 0.45, ease: EASE }}
-      className="w-full rounded-[16px] px-5 py-5"
-      style={{
-        background: "#FFFFFF",
-        border: valid
-          ? "1px solid rgba(34,197,94,0.45)"
-          : wrong
-            ? "1px solid rgba(245,158,11,0.45)"
-            : "1px solid rgba(15,23,42,0.08)",
-        boxShadow: "0 8px 24px rgba(0,0,0,0.06)",
-      }}
-    >
-      <div
-        className="font-mono uppercase mb-2 text-center"
-        style={{
-          color: valid ? "#22C55E" : "rgba(15,23,42,0.55)",
-          fontSize: 10.5,
-          letterSpacing: "0.18em",
-        }}
-      >
-        {valid
-          ? "Match — your device is yours"
-          : justPasted
-            ? "Key captured · checking…"
-            : "Confirm you saved it"}
-      </div>
-      <p
-        className="text-[13.5px] leading-[1.55] mb-3 text-center"
-        style={{ color: "rgba(15,23,42,0.78)" }}
-      >
-        Paste your device key here to prove you&apos;ve got it.
-      </p>
-
-      <textarea
-        value={pasted}
-        onChange={(e) => onChange(e.target.value)}
-        onPaste={onPaste}
-        placeholder="Paste base58 device key…"
-        spellCheck={false}
-        autoCorrect="off"
-        autoCapitalize="off"
-        rows={3}
-        className="w-full font-mono text-[13px] leading-[1.4] outline-none resize-none rounded-[10px] px-3 py-3"
-        style={{
-          background: "#FAFAFA",
-          color: "#0A0A0A",
-          border: justPasted
-            ? "1px solid rgba(34,197,94,0.45)"
-            : "1px solid rgba(15,23,42,0.12)",
-          letterSpacing: "0.01em",
-          transition: "border-color 0.3s ease",
-          // Belt-and-suspenders: explicit text selection so iOS
-          // Safari's long-press paste menu always shows up here,
-          // even if any ancestor sets user-select.
-          userSelect: "text",
-          WebkitUserSelect: "text",
-        }}
-      />
-
-      <div className="flex items-center justify-between mt-3 gap-3 flex-wrap">
-        <button
-          type="button"
-          onClick={onShowAgain}
-          className="inline-flex items-center gap-1.5 font-mono uppercase tracking-[0.16em] hover:underline min-h-[36px] px-1.5"
-          style={{
-            fontSize: 10.5,
-            color: "rgba(15,23,42,0.65)",
-          }}
-        >
-          <RefreshCw className="w-3 h-3" />
-          Show me the key again
-        </button>
-
-        <motion.button
-          type="button"
-          onClick={onConfirm}
-          disabled={!valid}
-          whileHover={valid ? { y: -1 } : undefined}
-          whileTap={valid ? { scale: 0.97 } : undefined}
-          className="inline-flex items-center gap-1.5 h-11 px-5 rounded-[10px] text-[13px] font-semibold tracking-[-0.005em] disabled:cursor-not-allowed"
-          style={{
-            background: valid ? "#22C55E" : "#FFFFFF",
-            color: valid ? "#FFFFFF" : "rgba(15,23,42,0.45)",
-            border: valid ? "none" : "1px solid rgba(15,23,42,0.10)",
-            boxShadow: valid
-              ? "0 6px 16px rgba(34,197,94,0.35)"
-              : "0 1px 2px rgba(0,0,0,0.04)",
-          }}
-        >
-          {valid ? (
-            <>
-              <Check className="w-3.5 h-3.5" strokeWidth={2.5} />
-              Confirm
-            </>
-          ) : (
-            "Confirm"
-          )}
-        </motion.button>
-      </div>
-
-      {wrong && !valid && (
-        <div
-          className="mt-3 text-center font-mono"
-          style={{
-            fontSize: 10.5,
-            color: "#F59E0B",
-            letterSpacing: "0.04em",
-          }}
-        >
-          Hmm — that&apos;s not your device key. Try again, or click <em>Show me the key again</em>.
-        </div>
-      )}
-
-      {/* Last-resort bypass — for the case where Privy's modal won't
-          open at all (dashboard misconfig, popup blocker, etc.) and
-          the user can't get their key into the textarea. They can
-          still use Kyvern; their wallet stays recoverable via account. */}
-      <div className="mt-4 pt-3 text-center" style={{ borderTop: "1px solid rgba(15,23,42,0.08)" }}>
-        <button
-          type="button"
-          onClick={onBypass}
-          className="font-mono uppercase tracking-[0.16em] hover:underline min-h-[40px] px-2 inline-flex items-center justify-center"
-          style={{
-            fontSize: 10.5,
-            color: "rgba(15,23,42,0.55)",
-          }}
-        >
-          Modal not opening? Continue without saving
-        </button>
-      </div>
-    </motion.div>
-  );
-}
+/* RevealCard / ManagedCard / VerifyCard removed — the unbox no longer reveals or verifies a device key. The components stayed historically as backup but were dropped 2026-05-09 when the cinematic was tightened to one screen. */
 
 /* ────────────────────────────────────────────────────────────────────
    ClaimedCard — stage="claimed" (saved + verified) or "managed"
@@ -1456,21 +1014,21 @@ function ClaimedCard({
           letterSpacing: "0.18em",
         }}
       >
-        {isManaged ? "Welcome back" : "Saved · Sealed · Solana-native"}
+        {isManaged ? "Welcome back" : "Vault · Policy · Devnet ready"}
       </div>
       <h2
         className="text-[20px] font-semibold tracking-[-0.015em] mb-3"
         style={{ color: "#0A0A0A" }}
       >
-        Your device is yours.
+        Your device is ready.
       </h2>
       <p
         className="text-[13px] leading-[1.55] mb-4"
         style={{ color: "rgba(15,23,42,0.72)" }}
       >
         {isManaged
-          ? `Signed in via ${walletLabel}. Your workers are waiting.`
-          : "Your key is yours alone. Time to spawn your first worker."}
+          ? `Signed in via ${walletLabel}. Your live integration console is waiting.`
+          : "Squads vault provisioned. Policy program enforcing every dollar. Open the device to mint a key + walk the 5-step integration."}
       </p>
 
       <motion.button
