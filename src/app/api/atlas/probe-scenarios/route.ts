@@ -84,13 +84,17 @@ const SCENARIOS: Record<string, ScenarioParams> = {
     description: "Pay $5 to api.openai.com — per-tx cap is $2",
   },
   settled_allowed: {
-    amountUsd: 0.05,
+    // Atlas's Squads spending limit gets eaten by the live runner
+    // continuously (Atlas burns ~$0.05 per cycle every 2 minutes).
+    // Use $0.001 so the demo settle fits within the remaining
+    // allowance even late in a daily period.
+    amountUsd: 0.001,
     merchant: "api.openai.com",
     memo: "weather lookup",
     expectFailure: false,
     expectedErrorCode: 0,
     expectedErrorName: "",
-    description: "Pay $0.05 to api.openai.com with memo — within policy",
+    description: "Pay $0.001 to api.openai.com with memo — within policy",
   },
 };
 
