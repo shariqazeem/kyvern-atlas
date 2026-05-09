@@ -52,10 +52,11 @@ SDK 0.5.0 (with `KastDestination` + `vault.checkAllowance`).
 
 ---
 
-## 3. Record video (1–2 hours, follow TRANSFORM_24H §"60-second video")
+## 3. Record video (1–2 hours, follow `RECORDING_SCRIPT.md`)
 
-The script is in `TRANSFORM_24H.md` lines ~280–330. Paste it into a
-teleprompter or stick it on a second monitor.
+The full 2:00 script + pre-record checklist + failure-mode contingencies
+live in `RECORDING_SCRIPT.md`. Paste it into a teleprompter or stick it
+on a second monitor.
 
 **Recording state to pre-warm:**
 1. Sign in with a fresh test wallet (so the device starts empty, the
@@ -184,6 +185,12 @@ After submitting both:
 [ ] 4. Top up the server fee payer at https://faucet.solana.com if
        it's below 1 SOL. Current balance ~2.33 SOL = ~466k attempts.
        Fine for now but a daily cap window matters.
+[ ] 4b. Top up the fee payer's USDC balance at https://faucet.circle.com
+       (paste GZCnHuFtswvsJftSDmtoHEve8amqNLzAAPvYy8NU3ZNZ, get 10
+       USDC at a time). Each fresh vault burns 1 USDC of this pool
+       to seed Test Payout. If the balance is <1 USDC, /api/vault/create
+       still succeeds but new vaults arrive empty and Test Payout
+       fails with "no record of prior credit".
 [ ] 5. Verify both submissions appear in the portals (sometimes there's
        a delay before they show up in your account).
 ```
@@ -208,7 +215,7 @@ If a judge asks about any of these in their feedback, the answer is
 ## What's at the top of the checklist if you reset right now
 
 1. **Smoke** (the 14-step list at the top)
-2. **Video** (the script in TRANSFORM_24H + pre-warmed device)
+2. **Video** (the script in `RECORDING_SCRIPT.md` + pre-warmed device)
 3. **Frontier submit** (deck + video URL + repo)
 4. **Kast submit** (same deck shape, KAST signup screenshot)
 5. **npm publish** (after smoke confirms version refs are consistent)

@@ -136,8 +136,9 @@ classes + a kill switch, an SDK, and a scaffolder.
 
 - **Solana Frontier:** [`decks/frontier.md`](decks/frontier.md) (render to PDF)
 - **Kast Pakistan via Superteam Earn:** [`decks/kast-pakistan.md`](decks/kast-pakistan.md) (render to PDF)
-- **Spec:** [`SPEC_TO_WIN.md`](SPEC_TO_WIN.md) — the 48-hour execution plan we shipped against
-- **Honest audit:** [`KYVERN_RAW_REALITY.md`](KYVERN_RAW_REALITY.md) — pre-execution writeup of real-vs-theatre across every surface
+- **Submission portal content:** [`SUBMISSION_CHECKLIST.md`](SUBMISSION_CHECKLIST.md) — paste-ready descriptions for both portals
+- **Demo video script:** [`RECORDING_SCRIPT.md`](RECORDING_SCRIPT.md) — 2:00 hybrid script with pre-record checklist
+- **Product state:** [`KYVERN_PRODUCT_STATE.md`](KYVERN_PRODUCT_STATE.md) — canonical surface + API + on-chain map
 
 ## Built by
 

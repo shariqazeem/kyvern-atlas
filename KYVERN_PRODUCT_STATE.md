@@ -524,13 +524,10 @@ decks/
   kast-pakistan.md                          ← Kast Pakistan deck source
   kast-pakistan.pdf                         ← rendered (5 pages)
 
-# Top-level docs
+# Top-level docs (current)
 KYVERN_PRODUCT_STATE.md                     ← this file
-KYVERN_RAW_REALITY.md                       ← pre-execution audit
-KYVERN_ADVISOR_BRIEF.md                     ← advisor handoff brief
-TRANSFORM_24H.md                            ← final-sprint plan
-SPEC_TO_WIN.md                              ← original 48h spec
 SUBMISSION_CHECKLIST.md                     ← paste-ready portal content
+RECORDING_SCRIPT.md                         ← 2:00 demo video script
 README.md                                   ← repo readme
 CLAUDE.md                                   ← project conventions
 ```
@@ -586,7 +583,7 @@ await onChain.pay({ agent, recipient, amount, merchant, memo });
 ### User-led (still pending)
 - **`npm publish`** SDK 0.5.0 + scaffolder 0.2.0 (~15 min, requires `npm login`)
 - **Smoke pass** in fresh incognito (~30 min, 14 steps in `SUBMISSION_CHECKLIST.md` §1)
-- **Record video** 2:00–2:30 (~1–2 hours, script in `TRANSFORM_24H.md`)
+- **Record video** 2:00–2:30 (~1–2 hours, script in `RECORDING_SCRIPT.md`)
 - **Submit Frontier portal** (~30 min, paste-ready content in `SUBMISSION_CHECKLIST.md` §4)
 - **Submit Superteam Earn / Kast Pakistan** (~30 min, paste-ready content in `SUBMISSION_CHECKLIST.md` §5)
 - **Final smoke** in incognito on a stranger's first 90 seconds (~15 min)
