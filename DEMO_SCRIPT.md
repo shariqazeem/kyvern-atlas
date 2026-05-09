@@ -26,16 +26,26 @@ swap it. Lean in. Unboxing makes it concrete.
 
 ### 1 hour before · environment
 
-- [ ] **Fresh demo vault** at `kyvernlabs.com/vault/new` (60 sec)
-  - Save vault id, multisig pubkey, agent secret base58
+- [ ] **Walk the unbox flow once** to seed your demo device.
+  Sign in via Privy on `kyvernlabs.com/login` (or use `/try` guest
+  mode). `/unbox` auto-creates the vault + Sentinel/Wren/Pulse for
+  you. Land on `/app`. This is the same path the demo will show on
+  camera — you're just seeding state ahead of time.
 - [ ] **Fund $25 devnet USDC** via [Circle faucet](https://faucet.circle.com)
-  - Paste the vault USDC ATA, request 25 USDC
+  - Open `/app` · "Fund the vault" → copy your USDC ATA → request 25
 - [ ] **Vault settings → merchant allowlist**: add
   `api.openai.com`, `api.pay.sh/gemini`
 - [ ] **Mint an agent key** from `/app` · "Use the device" pane —
   copy `kv_live_…` to your clipboard (it shows ONCE)
 - [ ] **Set Pulse trigger** to `SOL below $X` where X is current spot
   + $0.50. Don't save yet — you'll save on camera.
+
+> **Why seed first**: the demo shows `/unbox` again on camera (the
+> cinematic), but the device that lands on `/app` afterwards needs to
+> already have funds + allowlist + agent key + a Pulse trigger queued.
+> If you wait until recording to fund + mint + configure, those steps
+> eat 5+ minutes you don't have. Seed now, walk through the same flow
+> on camera, hit `/app` with everything pre-armed.
 
 ### 30 minutes before · staging
 
@@ -87,8 +97,17 @@ Each row: time · what's on screen · what your face/voice does.
 | Time | Screen | Voice / face cam |
 |---|---|---|
 | 0:20 – 0:30 | Cut to **kyvernlabs.com** landing. Cursor halo glows around the device card. Hero h1 visible: "A Solana device for your AI agent. The chain decides every dollar." | "I built Kyvern. A Solana device for your AI agent. Three pre-installed workers, one vault, an on-chain budget program enforcing every dollar." |
-| 0:30 – 0:40 | Click "Try a Kyvern · no login" → land on `/try` → Privy modal appears, click "I have a wallet" / continue as guest → unboxing animation begins | "Let's open one." (silent during the unboxing animation) |
-| 0:40 – 0:55 | Unboxing screen: device cracks open, three worker chips light up — Sentinel · Wren · Pulse. Land on `/app`. | "Three workers ship in every device. Sentinel finds paid Solana bounties for me. Wren watches wallets I care about. Pulse fires conditional swaps when prices hit." |
+| 0:30 – 0:40 | Click "Try a Kyvern · no login" on the hero → lands on `/try` → provisioning screen ticks through "Spinning up your sandbox device · Provisioning a Squads multisig · Wiring the Kyvern policy program · Installing the three starter workers" — no Privy modal, no signup. Land on `/app`. | "No signup. Click once. The device spins up a real Squads multisig on Solana devnet, wires it to my Anchor program, installs three workers, drops me into the device. This is what every visitor gets." |
+| 0:40 – 0:55 | On `/app` — three worker tiles already visible: Sentinel · Wren · Pulse. Hover each tile to surface the live state. | "Sentinel finds paid Solana bounties for me. Wren watches wallets I care about. Pulse fires conditional swaps when prices hit. All three running on real on-chain cycles already." |
+
+> **Stitching note**: the `/try` flow is real but it's *guest mode* —
+> agent-key minting (used in Act 5) is gated behind Privy sign-in. So
+> off-camera before recording, you're already signed in to your own
+> Kyvern device. On camera, you click `/try` to *demonstrate* the
+> zero-friction onboarding moment. Then for the rest of the demo
+> you're operating on your own signed-in device (which looks
+> identical — same UI). Judges don't notice the cut, and you get full
+> SDK functionality for the builder act.
 
 ### Act 3 · The chain decides (0:55 – 1:40)
 
