@@ -136,7 +136,7 @@ export default function AppPage() {
         <Header status={status} statusError={statusError} togglePause={togglePause} pausing={pausing} />
         <PolicySettings status={status} />
         <Allowlist />
-        <MyKastSetup />
+        <MyKastSetup vaultId={vaultId} ownerWallet={wallet} />
         <AgentKeys vaultId={vaultId} />
         <DecisionLog vaultId={vaultId} />
         <QuickActions />
@@ -396,11 +396,59 @@ function Allowlist() {
 
 /* ──────────────────────────────────────────────────────────────────── */
 
-function MyKastSetup() {
+function MyKastSetup({
+  vaultId,
+  ownerWallet,
+}: {
+  vaultId: string | null;
+  ownerWallet: string | null;
+}) {
   const [address, setAddress] = useState("");
   const [saved, setSaved] = useState(false);
-  // Block A: form is stubbed. Real /api/vault/[id]/set-kast-destination
-  // lands in Block E.
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Hydrate existing value
+  useEffect(() => {
+    if (!vaultId || !ownerWallet) return;
+    void fetch(`/api/vault/${vaultId}/set-kast-destination`, {
+      headers: { "x-owner-wallet": ownerWallet },
+    })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d?.ok && d?.address) {
+          setAddress(d.address);
+          setSaved(true);
+        }
+      })
+      .catch(() => {});
+  }, [vaultId, ownerWallet]);
+
+  async function save() {
+    if (!vaultId || !ownerWallet || !address || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await fetch(`/api/vault/${vaultId}/set-kast-destination`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-owner-wallet": ownerWallet,
+        },
+        body: JSON.stringify({ address, ownerWallet }),
+      });
+      const d = await r.json();
+      if (d?.ok) {
+        setSaved(true);
+      } else {
+        setError(d?.message ?? d?.error ?? "save failed");
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "save failed");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <Section
@@ -435,13 +483,13 @@ function MyKastSetup() {
           </a>
           <button
             type="button"
-            disabled={!address || saved}
-            onClick={() => setSaved(true)}
+            disabled={!address || saved || busy}
+            onClick={save}
             className="inline-flex items-center gap-1.5 rounded-[10px] px-3 py-2 font-mono uppercase tracking-[0.14em] disabled:opacity-50 transition active:scale-[0.97]"
             style={{
               fontSize: 10.5,
               color: "#FFFFFF",
-              background: "#0A0A0A",
+              background: saved ? "#15803D" : "#0A0A0A",
               border: "1px solid rgba(0,0,0,0.8)",
             }}
           >
@@ -450,6 +498,8 @@ function MyKastSetup() {
                 <Check className="w-3 h-3" strokeWidth={2.5} />
                 Allowlisted
               </>
+            ) : busy ? (
+              "Saving…"
             ) : (
               <>
                 Allowlist as MY_KAST
@@ -458,6 +508,11 @@ function MyKastSetup() {
             )}
           </button>
         </div>
+        {error && (
+          <p className="text-[11px]" style={{ color: "#B45309" }}>
+            {error}
+          </p>
+        )}
         <p className="text-[10.5px]" style={{ color: "#9CA3AF" }}>
           Kyvern is <em>compatible with KAST deposit rails</em>. Not affiliated with KAST.
         </p>

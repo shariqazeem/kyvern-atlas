@@ -331,6 +331,44 @@ export function touchAgentKey(keyId: string): void {
 }
 
 /** Persist the on-chain Squads state we need for the pay path. */
+/**
+ * SPEC_TO_WIN §7.3 — store the KAST USDC deposit address that gets
+ * allowlisted as MY_KAST for this vault. Also adds the "kast.xyz"
+ * merchant tag to the vault's allowed_merchants list so subsequent
+ * vault.pay() calls with merchant="kast.xyz" + recipient=<this address>
+ * pass the off-chain policy check.
+ *
+ * The on-chain Anchor program's allowlist is hash-based and doesn't
+ * yet auto-update for user vaults — that's the update_allowlist
+ * instruction, deferred to post-Frontier. For Atlas the allowlist
+ * was set at init.
+ */
+export function setVaultKastDestination(
+  vaultId: string,
+  address: string,
+): VaultRecord | null {
+  const vault = getVault(vaultId);
+  if (!vault) return null;
+
+  // Add "kast.xyz" tag to allowed_merchants (idempotent).
+  const merchants = new Set(vault.allowedMerchants);
+  merchants.add("kast.xyz");
+
+  getDb()
+    .prepare(
+      `UPDATE vaults
+          SET kast_destination_address = ?,
+              kast_destination_label   = COALESCE(kast_destination_label, 'MY_KAST'),
+              kast_set_at              = datetime('now'),
+              allowed_merchants        = ?,
+              updated_at               = datetime('now')
+        WHERE id = ?`,
+    )
+    .run(address, JSON.stringify([...merchants]), vaultId);
+
+  return getVault(vaultId);
+}
+
 export function setVaultSquadsState(
   vaultId: string,
   state: {

@@ -353,6 +353,16 @@ function migrate(db: Database.Database) {
       db.exec("ALTER TABLE vaults ADD COLUMN create_signature TEXT");
     if (!v.has("set_spending_limit_signature"))
       db.exec("ALTER TABLE vaults ADD COLUMN set_spending_limit_signature TEXT");
+    // SPEC_TO_WIN §7.1 — KAST-funded card endpoint. The user pastes
+    // their KAST Solana USDC deposit address; it gets allowlisted as
+    // MY_KAST and stored here. Every payout to that address is a real
+    // on-chain USDC transfer that funds the user's KAST card.
+    if (!v.has("kast_destination_address"))
+      db.exec("ALTER TABLE vaults ADD COLUMN kast_destination_address TEXT");
+    if (!v.has("kast_destination_label"))
+      db.exec("ALTER TABLE vaults ADD COLUMN kast_destination_label TEXT DEFAULT 'MY_KAST'");
+    if (!v.has("kast_set_at"))
+      db.exec("ALTER TABLE vaults ADD COLUMN kast_set_at TEXT");
 
     const akCols = db.pragma("table_info(vault_agent_keys)") as Array<{ name: string }>;
     const ak = new Set(akCols.map((c) => c.name));
