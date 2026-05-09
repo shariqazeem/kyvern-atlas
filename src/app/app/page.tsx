@@ -48,6 +48,7 @@ import { TopUpDrawer } from "@/components/device/top-up-drawer";
 // Phase 1–5 (Device Shell Redesign) — device-shell composition.
 import { IdentityStrip } from "@/components/device/shell/identity-strip";
 import { DevTilesCanvas } from "@/components/device/shell/dev-tiles-canvas";
+import { AliveConsole } from "@/components/device/shell/alive-console";
 import { ControlZone } from "@/components/device/shell/control-zone";
 import { ManifestoStrip } from "@/components/device/shell/manifesto-strip";
 import { StateStrip } from "@/components/device/state-strip";
@@ -168,6 +169,11 @@ export default function DeviceHome() {
     rawPanel === "builder"
       ? rawPanel
       : null;
+  // T0 — alive console feature flag. Per TRANSFORM_24H, when ?alive=1
+  // is set, the worker-stage slot renders the new live integration
+  // console (wizard + event feed) instead of DevTilesCanvas. Hour 8–9
+  // we flip the default once smoke is clean.
+  const aliveConsole = searchParams?.get("alive") === "1";
   const setPanel = useCallback(
     (next: PanelKind | null) => {
       const params = new URLSearchParams(
@@ -328,16 +334,30 @@ export default function DeviceHome() {
             </div>
           )}
 
-          {/* Per SPEC R4 — workers retired. Dev playground tiles live
-              in the worker-stage slot now. Same vault-anchored chassis,
-              4 tiles instead of 3 worker tiles on an arc. */}
-          <DevTilesCanvas
-            onTileClick={setPanel}
-            usdcBalance={status?.usdcBalance ?? 0}
-            paused={status?.paused}
-            network={status?.network ?? "devnet"}
-            className="min-h-0"
-          />
+          {/* Worker-stage slot. ?alive=1 swaps DevTilesCanvas for the
+              new live integration console (TRANSFORM_24H §T0). The
+              chassis (vault-anchored frame, dot-grid backdrop, soft
+              halo) is preserved in both modes. */}
+          {aliveConsole ? (
+            <AliveConsole
+              vaultId={deviceId}
+              ownerWallet={wallet ?? null}
+              agentKeyPrefix={null}
+              usdcBalance={status?.usdcBalance ?? 0}
+              paused={status?.paused}
+              network={status?.network ?? "devnet"}
+              onTileClick={setPanel}
+              className="min-h-0"
+            />
+          ) : (
+            <DevTilesCanvas
+              onTileClick={setPanel}
+              usdcBalance={status?.usdcBalance ?? 0}
+              paused={status?.paused}
+              network={status?.network ?? "devnet"}
+              className="min-h-0"
+            />
+          )}
 
           <ControlZone
             actionFeed={status?.actionFeed ?? []}
