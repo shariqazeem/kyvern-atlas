@@ -229,6 +229,56 @@ export class Vault {
     return (await res.json()) as PayAllowed;
   }
 
+  /**
+   * Run the same off-chain policy check that `pay()` runs, but without
+   * making a payment. Returns the chain's verdict ahead of time so an
+   * agent can decide whether to fire the underlying paid call.
+   *
+   * Why this exists: pay.sh / x402 calls execute end-to-end before our
+   * server sees the spend. With `checkAllowance()` the agent asks the
+   * vault first — Kyvern decides BEFORE pay.sh's local-wallet prompt
+   * fires (or before any other paid HTTP call goes out). The policy
+   * gate sits above the rails.
+   *
+   * Same rules as `pay()`: per-tx cap, daily/weekly cap, merchant
+   * allowlist, memo requirement, velocity cap, kill switch.
+   */
+  async checkAllowance(input: {
+    merchant: string;
+    amount: number;
+    memo?: string;
+  }): Promise<{ decision: "allowed" | "blocked"; reason?: string; code?: string }> {
+    if (!input?.merchant) throw new Error("checkAllowance(): `merchant` is required");
+    if (!(typeof input.amount === "number") || input.amount <= 0)
+      throw new Error("checkAllowance(): `amount` must be a positive number");
+
+    const res = await this.request("/api/vault/check-allowance", {
+      method: "POST",
+      body: {
+        merchant: input.merchant,
+        amountUsd: input.amount,
+        memo: input.memo ?? null,
+      },
+    });
+
+    if (res.status === 401) {
+      throw new KyvernAuthError(await this.tryJson(res));
+    }
+    if (!res.ok) {
+      throw new KyvernError(
+        `checkAllowance() failed: HTTP ${res.status}`,
+        res.status,
+        "http_error",
+        await this.tryJson(res),
+      );
+    }
+    return (await res.json()) as {
+      decision: "allowed" | "blocked";
+      reason?: string;
+      code?: string;
+    };
+  }
+
   /** Fetch the current vault status (budget + velocity + recent payments). */
   async status(opts: { vaultId: string; limit?: number }): Promise<VaultStatus> {
     if (!opts?.vaultId) throw new Error("status(): `vaultId` is required");

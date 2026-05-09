@@ -59,6 +59,13 @@ interface AtlasStatus {
   vaultUsdc?: number;
 }
 
+interface PayShPayload {
+  url: string;
+  output: string;
+  parsed: unknown | null;
+  durationMs: number;
+}
+
 interface ProbeResult {
   ok: boolean;
   scenario?: string;
@@ -69,6 +76,9 @@ interface ProbeResult {
   signature?: string | null;
   explorerUrl?: string | null;
   durationMs?: number;
+  chainDurationMs?: number;
+  paySh?: PayShPayload | null;
+  payShError?: string | null;
   error?: string;
   message?: string;
   retryAfterSeconds?: number;
@@ -105,12 +115,12 @@ export default function DemoPage() {
     };
   }, []);
 
-  const fireScenario = useCallback(async (scenario: string) => {
+  const fireProbe = useCallback(async (endpoint: string, scenario: string) => {
     setResult(null);
     setModalOpen(true);
     setModalState("submitting");
     try {
-      const r = await fetch("/api/atlas/probe-scenarios", {
+      const r = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ scenario }),
@@ -127,6 +137,15 @@ export default function DemoPage() {
       setModalState("result");
     }
   }, []);
+
+  const fireScenario = useCallback(
+    (scenario: string) => fireProbe("/api/atlas/probe-scenarios", scenario),
+    [fireProbe],
+  );
+  const firePaySh = useCallback(
+    (scenario: string) => fireProbe("/api/atlas/probe-paysh", scenario),
+    [fireProbe],
+  );
 
   const closeModal = useCallback(() => {
     setModalOpen(false);
@@ -148,8 +167,8 @@ export default function DemoPage() {
         <TitleBar />
         <ThreeStepHeader />
         <VaultTile status={status} daysLive={daysLive} />
-        <Step1 fireScenario={fireScenario} />
-        <Step2 fireScenario={fireScenario} />
+        <Step1 fireScenario={fireScenario} firePaySh={firePaySh} />
+        <Step2 fireScenario={fireScenario} firePaySh={firePaySh} />
         <Step3 />
         <KastHook />
         <Footer />
@@ -380,7 +399,13 @@ const BLOCK_SCENARIOS = [
   },
 ];
 
-function Step1({ fireScenario }: { fireScenario: (s: string) => void }) {
+function Step1({
+  fireScenario,
+  firePaySh,
+}: {
+  fireScenario: (s: string) => void;
+  firePaySh: (s: string) => void;
+}) {
   return (
     <section
       className="rounded-[16px] p-5"
@@ -407,6 +432,14 @@ function Step1({ fireScenario }: { fireScenario: (s: string) => void }) {
             onClick={() => fireScenario(s.key)}
           />
         ))}
+        <ScenarioButton
+          tone="red"
+          title="Buy Perplexity via pay.sh — $5"
+          description="Solana Foundation's pay.sh layer wrapped in Kyvern. $5 exceeds the $2 per-tx cap. Refused on-chain BEFORE pay.sh is called."
+          errorCode={12002}
+          chip="pay.sh"
+          onClick={() => firePaySh("paysh_over_cap")}
+        />
       </div>
     </section>
   );
@@ -416,7 +449,13 @@ function Step1({ fireScenario }: { fireScenario: (s: string) => void }) {
    Step 2 — settle
    ────────────────────────────────────────────────────────────────── */
 
-function Step2({ fireScenario }: { fireScenario: (s: string) => void }) {
+function Step2({
+  fireScenario,
+  firePaySh,
+}: {
+  fireScenario: (s: string) => void;
+  firePaySh: (s: string) => void;
+}) {
   return (
     <section
       className="rounded-[16px] p-5"
@@ -432,12 +471,19 @@ function Step2({ fireScenario }: { fireScenario: (s: string) => void }) {
         title="Watch a real allowed payment settle."
         sub="Same plumbing, allowed merchant. ~3–5 seconds to confirmation."
       />
-      <div className="mt-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mt-4">
         <ScenarioButton
           tone="green"
           title="Pay api.openai.com $0.001"
           description="Allowlisted merchant, valid memo, within per-tx cap. Kyvern → Squads CPI → SPL Token transfer."
           onClick={() => fireScenario("settled_allowed")}
+        />
+        <ScenarioButton
+          tone="green"
+          title="Buy a $0.001 quote via pay.sh"
+          description="Real x402-paywalled call through Solana Foundation's pay.sh CLI. Kyvern allows, pay.sh executes — response data lands in the modal."
+          chip="pay.sh"
+          onClick={() => firePaySh("paysh_settled")}
         />
       </div>
     </section>
@@ -699,12 +745,14 @@ function ScenarioButton({
   title,
   description,
   errorCode,
+  chip,
   onClick,
 }: {
   tone: "red" | "green";
   title: string;
   description: string;
   errorCode?: number;
+  chip?: string;
   onClick: () => void;
 }) {
   const palette =
@@ -755,19 +803,34 @@ function ScenarioButton({
       >
         {description}
       </p>
-      {errorCode !== undefined && (
-        <span
-          className="inline-flex items-center font-mono uppercase tracking-[0.14em] rounded-full px-2 py-0.5"
-          style={{
-            fontSize: 9,
-            color: palette.fg,
-            background: palette.chip,
-            border: `1px solid ${palette.border}`,
-          }}
-        >
-          Expected: {errorCode}
-        </span>
-      )}
+      <div className="flex items-center gap-1.5 flex-wrap">
+        {errorCode !== undefined && (
+          <span
+            className="inline-flex items-center font-mono uppercase tracking-[0.14em] rounded-full px-2 py-0.5"
+            style={{
+              fontSize: 9,
+              color: palette.fg,
+              background: palette.chip,
+              border: `1px solid ${palette.border}`,
+            }}
+          >
+            Expected: {errorCode}
+          </span>
+        )}
+        {chip && (
+          <span
+            className="inline-flex items-center font-mono uppercase tracking-[0.14em] rounded-full px-2 py-0.5"
+            style={{
+              fontSize: 9,
+              color: "#0A0A0A",
+              background: "rgba(15,23,42,0.05)",
+              border: "1px solid rgba(15,23,42,0.10)",
+            }}
+          >
+            {chip}
+          </span>
+        )}
+      </div>
     </button>
   );
 }
@@ -913,6 +976,53 @@ function ResultBody({
           </div>
         )}
       </div>
+
+      {/* pay.sh response data — when the scenario actually invoked
+          pay.sh after Kyvern allowed the spend. */}
+      {result?.paySh && (
+        <div
+          className="rounded-[10px] mb-3 overflow-hidden"
+          style={{
+            background: "#0A0A0A",
+            border: "1px solid rgba(15,23,42,0.20)",
+          }}
+        >
+          <div
+            className="flex items-center justify-between px-3 py-1.5"
+            style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}
+          >
+            <span
+              className="font-mono uppercase tracking-[0.14em]"
+              style={{ fontSize: 9, color: "rgba(255,255,255,0.55)" }}
+            >
+              pay.sh response · {result.paySh.durationMs}ms
+            </span>
+            <a
+              href={result.paySh.url}
+              target="_blank"
+              rel="noreferrer"
+              className="font-mono"
+              style={{ fontSize: 9, color: "rgba(255,255,255,0.45)" }}
+            >
+              {result.paySh.url.replace(/^https?:\/\//, "")}
+            </a>
+          </div>
+          <pre
+            className="px-3 py-2 font-mono whitespace-pre-wrap"
+            style={{
+              color: "rgba(255,255,255,0.92)",
+              fontSize: 11,
+              lineHeight: 1.5,
+              maxHeight: 120,
+              overflow: "auto",
+            }}
+          >
+            {result.paySh.parsed
+              ? JSON.stringify(result.paySh.parsed, null, 2)
+              : result.paySh.output}
+          </pre>
+        </div>
+      )}
 
       {/* Signature + Explorer link */}
       {result?.signature && (
