@@ -35,8 +35,23 @@ const RETIRED_PREFIXES = [
   "/changelog",
 ];
 
+/**
+ * Surfaces moved off the main funnel (per SPEC_TO_WIN §1, §6.7, §6.8).
+ * The code still ships under /legacy/* so it can power narrative video
+ * shots, but a visitor hitting the old URL gets routed to the archive.
+ */
+const MOVED_TO_LEGACY: Record<string, string> = {
+  "/unbox": "/legacy/unbox",
+};
+
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+
+  if (MOVED_TO_LEGACY[pathname]) {
+    const url = req.nextUrl.clone();
+    url.pathname = MOVED_TO_LEGACY[pathname];
+    return NextResponse.redirect(url, 301);
+  }
 
   for (const prefix of RETIRED_PREFIXES) {
     if (pathname === prefix || pathname.startsWith(`${prefix}/`)) {
@@ -70,5 +85,6 @@ export const config = {
     "/provider/:path*",
     "/changelog",
     "/changelog/:path*",
+    "/unbox",
   ],
 };
