@@ -32,10 +32,14 @@ const SECTIONS: Section[] = [
   { id: "install", label: "Install" },
   { id: "quickstart", label: "Quickstart" },
   { id: "pay", label: "vault.pay()" },
+  { id: "check-allowance", label: "vault.checkAllowance()" },
   { id: "status", label: "vault.status()" },
   { id: "pause", label: "Kill switch" },
   { id: "errors", label: "Errors & decisions" },
+  { id: "paysh", label: "Wrap pay.sh" },
+  { id: "kast", label: "Pay out to KAST" },
   { id: "api", label: "REST API" },
+  { id: "honesty", label: "What this isn't" },
   { id: "next", label: "What's next" },
 ];
 
@@ -92,10 +96,14 @@ export default function DocsPage() {
           <Install />
           <Quickstart />
           <PayRef />
+          <CheckAllowanceRef />
           <StatusRef />
           <PauseRef />
           <ErrorsRef />
+          <PayShWrap />
+          <KastPayout />
           <ApiRef />
+          <Honesty />
           <Next />
         </main>
       </div>
@@ -183,43 +191,37 @@ function Quickstart() {
   return (
     <Section id="quickstart" title="Quickstart" eyebrow="0 → first payment">
       <Steps>
-        <Step n={1} title="Create a vault">
-          Head to{" "}
-          <Link href="/vault/new" className="text-[#3B82F6] hover:underline">
-            /vault/new
+        <Step n={1} title="Mint an agent key">
+          Sign in at{" "}
+          <Link href="/app" className="text-[#3B82F6] hover:underline">
+            /app
           </Link>{" "}
-          and walk through the 5-step onboarding. You&apos;ll receive a one-time{" "}
-          <code>kv_live_…</code> agent key — copy it somewhere safe.
+          → <em>Agent keys</em> → <em>Mint a key</em>. The{" "}
+          <code>kv_live_…</code> key is shown once — paste it into your env.
         </Step>
-        <Step n={2} title="Set the env var">
+        <Step n={2} title="Set the env vars">
           <CodeBlock
             language="bash"
-            code={`export KYVERNLABS_AGENT_KEY=kv_live_...
-export VAULT_ID=vlt_...`}
+            code={`export KYVERN_AGENT_KEY=kv_live_...
+# optional: route earnings to a KAST-funded card
+export MY_KAST_ADDRESS=...`}
           />
         </Step>
-        <Step n={3} title="Pay a merchant">
+        <Step n={3} title="Pay (5 lines)">
           <CodeBlock
             language="ts"
-            code={`import { Vault } from "@kyvernlabs/sdk";
+            code={`import { Vault, KastDestination } from "@kyvernlabs/sdk";
 
-const vault = new Vault({
-  agentKey: process.env.KYVERNLABS_AGENT_KEY!,
-});
-
-const res = await vault.pay({
-  merchant: "api.openai.com",
-  recipientPubkey: "5eyKt4yXtD9Wz8gPWs9fEUv9AQCoTFv9o6xAiBm1Kjv6",
-  amount: 0.12,
-  memo: "forecast lookup",
-});
-
-if (res.decision === "blocked") {
-  console.log("refused:", res.code, res.reason);
-} else {
-  console.log("settled:", res.tx.signature);
-}`}
+const vault = new Vault({ agentKey: process.env.KYVERN_AGENT_KEY! });
+const myKast = KastDestination.fromAddress(process.env.MY_KAST_ADDRESS!);
+const res = await vault.pay({ ...myKast, amount: 1.50, memo: "weekly yield share" });
+if (res.decision !== "allowed") throw new Error(res.reason);`}
           />
+          <p className="mt-3 text-[13px] text-[#6E6E73]">
+            That&apos;s a real on-chain USDC transfer to the user&apos;s KAST
+            deposit address — five lines, decided by the chain. The same
+            policy that runs here also runs on every spend the agent makes.
+          </p>
         </Step>
       </Steps>
     </Section>
@@ -408,6 +410,232 @@ function Next() {
           href="https://squads.so"
           external
         />
+      </div>
+    </Section>
+  );
+}
+
+/* ─── Wrap pay.sh ─── */
+
+function PayShWrap() {
+  return (
+    <Section id="paysh" title="Wrap pay.sh with Kyvern in 4 lines" eyebrow="Headline guide">
+      <p className="mb-4 text-[14px] leading-relaxed text-[#6E6E73]">
+        <a
+          href="https://pay.sh"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-[#3B82F6] hover:underline"
+        >
+          pay.sh
+        </a>{" "}
+        is the Solana Foundation&apos;s payment layer for HTTP agents. It
+        handles 402/x402/MPP challenges and asks the local wallet to sign.
+        Their docs say <em>&ldquo;Real payments still require local user
+        authorization.&rdquo;</em> Kyvern is what closes that gap — the
+        chain takes the place of the wallet approval prompt so an agent
+        can run autonomously without compromising safety.
+      </p>
+      <CodeBlock
+        language="bash"
+        code={`# 1. Install both tools.
+brew install pay                 # macOS
+# or
+npm install -g @solana/pay       # Linux/Windows
+npm install @kyvernlabs/sdk
+
+# 2. Scaffold a Kyvern-protected agent that pays pay.sh APIs.
+npx create-kyvern-agent my-agent
+
+# 3. The scaffolded agent calls pay.sh through your Kyvern vault.
+#    Every call passes through your on-chain policy. Drains, rogue
+#    endpoints, over-cap purchases — all refused before pay.sh sees them.
+cd my-agent && npm start`}
+      />
+      <p className="mt-4 mb-2 text-[14px] font-semibold">The architectural moment</p>
+      <p className="mb-3 text-[14px] leading-relaxed text-[#6E6E73]">
+        Before invoking pay.sh, ask the vault first:
+      </p>
+      <CodeBlock
+        language="ts"
+        code={`const allowance = await vault.checkAllowance({
+  merchant: "api.pay.sh",
+  amount: 0.001,
+});
+if (allowance.decision !== "allowed") {
+  // Kyvern refused — pay.sh is never invoked, no wallet prompt fires.
+  return console.warn("blocked:", allowance.reason);
+}
+
+// Kyvern allowed — pay.sh executes the 402-paywalled call.
+const result = execSync(
+  \`pay --sandbox curl https://pay.sh/<service-url>\`,
+  { encoding: "utf-8" },
+);`}
+      />
+      <p className="mt-4 text-[13px] text-[#8E8E93]">
+        Kyvern is <em>compatible with pay.sh and any HTTP-402 payment
+        rail.</em> Not partnered with pay.sh. The composability is the
+        integration.
+      </p>
+    </Section>
+  );
+}
+
+/* ─── KAST payout ─── */
+
+function KastPayout() {
+  return (
+    <Section
+      id="kast"
+      title="Sending earnings to a KAST-funded card"
+      eyebrow="Real-world payoff loop"
+    >
+      <p className="mb-4 text-[14px] leading-relaxed text-[#6E6E73]">
+        Every KAST user has a Solana USDC deposit address. Send USDC there
+        → it tops up their card → they spend at 150M+ merchants worldwide.
+        Kyvern wraps that flow in a vault budget so an agent can route a
+        share of accrued earnings to your card automatically.
+      </p>
+      <Steps>
+        <Step n={1} title="Find your address">
+          Open the KAST app → <em>Deposit</em> → <em>Solana USDC</em>. Copy
+          the address.
+        </Step>
+        <Step n={2} title="Allowlist as MY_KAST">
+          In Kyvern{" "}
+          <Link href="/app" className="text-[#3B82F6] hover:underline">
+            /app
+          </Link>
+          , paste it under <em>MY_KAST setup</em>. Click{" "}
+          <em>Allowlist as MY_KAST</em>. (This adds <code>kast.xyz</code>{" "}
+          to your vault&apos;s allowlist + persists the address.)
+        </Step>
+        <Step n={3} title="Spend in five lines">
+          <CodeBlock
+            language="ts"
+            code={`import { Vault, KastDestination } from "@kyvernlabs/sdk";
+
+const vault = new Vault({ agentKey: process.env.KYVERN_AGENT_KEY! });
+const myKast = KastDestination.fromAddress(process.env.MY_KAST_ADDRESS!);
+const res = await vault.pay({ ...myKast, amount: 1.50, memo: "weekly yield share" });
+if (res.decision !== "allowed") throw new Error(res.reason);`}
+          />
+        </Step>
+      </Steps>
+      <p className="mt-5 text-[14px] text-[#6E6E73]">
+        Don&apos;t have a KAST card?{" "}
+        <a
+          href="https://go.kast.xyz/VqVO/STPAK"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-[#3B82F6] hover:underline"
+        >
+          Get one →
+        </a>
+      </p>
+      <p className="mt-3 text-[13px] text-[#8E8E93]">
+        Kyvern is <em>compatible with KAST deposit rails</em>. Not
+        affiliated with KAST. We don&apos;t verify the address belongs to
+        a KAST account — the user owns the address either way.
+      </p>
+    </Section>
+  );
+}
+
+/* ─── checkAllowance reference ─── */
+
+function CheckAllowanceRef() {
+  return (
+    <Section id="check-allowance" title="vault.checkAllowance()" eyebrow="Method">
+      <p className="mb-4 text-[14px] text-[#6E6E73]">
+        Run the same off-chain policy check that <code>pay()</code> runs,
+        but without making a payment. Returns the chain&apos;s verdict
+        ahead of time so an agent can decide whether to fire the
+        underlying paid call.
+      </p>
+      <CodeBlock
+        language="ts"
+        code={`await vault.checkAllowance({
+  merchant: string,         // URL or host, normalized server-side
+  amount: number,           // USD
+  memo?: string,            // required if vault.requireMemo === true
+}): Promise<{ decision: "allowed" | "blocked", reason?: string, code?: string }>`}
+      />
+      <p className="mt-4 text-[13px] text-[#6E6E73]">
+        Use this when you&apos;re wrapping pay.sh, x402, or any 402-paywalled
+        rail — the vault decides BEFORE the rail&apos;s wallet prompt fires.
+      </p>
+    </Section>
+  );
+}
+
+/* ─── Honesty section ─── */
+
+function Honesty() {
+  return (
+    <Section id="honesty" title="What this is, and what this isn't" eyebrow="Honesty">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div
+          className="rounded-[12px] border p-5"
+          style={{ borderColor: "rgba(34,197,94,0.20)", background: "rgba(34,197,94,0.04)" }}
+        >
+          <h3 className="mb-2 text-[14px] font-semibold tracking-tight">
+            What this is
+          </h3>
+          <ul className="space-y-1.5 text-[13.5px] leading-relaxed text-[#374151]">
+            <li>
+              Financial safety infrastructure for autonomous agents on
+              Solana — a smart safe, an on-chain policy program, an SDK,
+              and a scaffolder.
+            </li>
+            <li>
+              An on-chain policy program at{" "}
+              <code className="text-[12px]">PpmZ…MSqc</code> deployed to
+              devnet, enforcing per-tx caps, daily/weekly caps,
+              merchant allowlists, memo requirements, velocity caps, and
+              a kill switch.
+            </li>
+            <li>
+              Atlas, our reference agent, has been running on Solana
+              devnet continuously since April 20, 2026 — every block and
+              every settle is a real on-chain transaction you can verify
+              on Explorer.
+            </li>
+          </ul>
+        </div>
+        <div
+          className="rounded-[12px] border p-5"
+          style={{ borderColor: "rgba(245,158,11,0.20)", background: "rgba(245,158,11,0.04)" }}
+        >
+          <h3 className="mb-2 text-[14px] font-semibold tracking-tight">
+            What this isn&apos;t
+          </h3>
+          <ul className="space-y-1.5 text-[13.5px] leading-relaxed text-[#374151]">
+            <li>
+              A hardware device, an AI experience, a fully autonomous
+              trading bot, mainnet-deployed, or a financial advisor.
+              Mainnet audit in progress.
+            </li>
+            <li>
+              A KAST partner. We route on-chain to a public Solana USDC
+              deposit address that any KAST user owns. The integration
+              speaks via the working flow + the affiliate link.
+            </li>
+            <li>
+              A pay.sh partner or wrapper SDK. Kyvern is the policy
+              layer above the rails — pay.sh executes the paid HTTP
+              call; Kyvern decides which calls the agent is allowed to
+              make. Both products&apos; value compounds.
+            </li>
+            <li>
+              Atlas&apos;s decisions are scripted by design. The moat is
+              the financial control layer, not the intelligence — even a
+              deliberately minimal agent demonstrates the thesis. LLM-
+              driven Atlas is post-Frontier.
+            </li>
+          </ul>
+        </div>
       </div>
     </Section>
   );
