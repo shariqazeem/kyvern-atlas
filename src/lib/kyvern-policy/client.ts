@@ -277,6 +277,53 @@ export async function callExecutePayment(
 }
 
 /* ──────────────────────────────────────────────────────────────────
+   pause / resume — kill-switch admin instructions.
+   Authority-signed (the keypair that initialized the policy).
+   ────────────────────────────────────────────────────────────────── */
+
+export async function pausePolicy(
+  connection: Connection,
+  authority: Keypair,
+  multisig: PublicKey,
+): Promise<{ signature: string }> {
+  const program = makeProgram(connection, authority);
+  const [policyPda] = derivePolicyPda(multisig);
+  const sig = await (program.methods as unknown as {
+    pause: () => {
+      accountsPartial: (a: unknown) => { rpc: () => Promise<string> };
+    };
+  })
+    .pause()
+    .accountsPartial({
+      policy: policyPda,
+      authority: authority.publicKey,
+    })
+    .rpc();
+  return { signature: sig };
+}
+
+export async function resumePolicy(
+  connection: Connection,
+  authority: Keypair,
+  multisig: PublicKey,
+): Promise<{ signature: string }> {
+  const program = makeProgram(connection, authority);
+  const [policyPda] = derivePolicyPda(multisig);
+  const sig = await (program.methods as unknown as {
+    resume: () => {
+      accountsPartial: (a: unknown) => { rpc: () => Promise<string> };
+    };
+  })
+    .resume()
+    .accountsPartial({
+      policy: policyPda,
+      authority: authority.publicKey,
+    })
+    .rpc();
+  return { signature: sig };
+}
+
+/* ──────────────────────────────────────────────────────────────────
    Probe — does the policy PDA exist for this vault?
    ────────────────────────────────────────────────────────────────── */
 

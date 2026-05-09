@@ -39,6 +39,8 @@ import {
   callExecutePayment,
   hashMerchantHostname,
   KYVERN_POLICY_PROGRAM_ID,
+  pausePolicy,
+  resumePolicy,
 } from "@/lib/kyvern-policy/client";
 import { checkRateLimit, getClientIP } from "@/lib/rate-limit";
 
@@ -82,6 +84,20 @@ const SCENARIOS: Record<string, ScenarioParams> = {
     expectedErrorCode: 12002,
     expectedErrorName: "AmountExceedsPerTxMax",
     description: "Pay $5 to api.openai.com — per-tx cap is $2",
+  },
+  vault_paused: {
+    // Special scenario: the route briefly toggles the kill switch
+    // (pause → attempt → resume), so even a perfectly-formed payment
+    // gets refused on-chain by the Kyvern program with VaultPaused.
+    // Atlas's runner may miss one cycle during the ~3s pause window;
+    // it logs the failure and keeps going.
+    amountUsd: 0.001,
+    merchant: "api.openai.com",
+    memo: "kill switch test",
+    expectFailure: true,
+    expectedErrorCode: 12000,
+    expectedErrorName: "VaultPaused",
+    description: "Pause the vault, then try paying — chain refuses",
   },
   settled_allowed: {
     // Atlas's Squads spending limit gets eaten by the live runner
@@ -256,25 +272,55 @@ export async function POST(req: NextRequest) {
   // Build merchant hash
   const merchantHash = hashMerchantHostname(scenario.merchant.toLowerCase());
 
+  // For the vault_paused scenario, briefly pause the policy first.
+  // Always resume in the finally block so a thrown error mid-flow
+  // doesn't leave Atlas's policy stuck off — the live runner depends
+  // on the policy being unpaused.
+  let pausedForDemo = false;
+  if (scenarioKey === "vault_paused") {
+    try {
+      await pausePolicy(connection, feePayer, multisig);
+      pausedForDemo = true;
+    } catch (e) {
+      return NextResponse.json({
+        ok: false,
+        error: "pause_failed",
+        message: e instanceof Error ? e.message : String(e),
+      });
+    }
+  }
+
   // Fire it
   const startedAt = Date.now();
-  const result = await callExecutePayment({
-    connection,
-    feePayer,
-    member,
-    multisig,
-    spendingLimit,
-    mint,
-    vault: vaultPda,
-    vaultTokenAccount,
-    destination,
-    destinationTokenAccount,
-    amountBaseUnits: BigInt(Math.round(scenario.amountUsd * 1_000_000)),
-    decimals: 6,
-    merchantHash,
-    memo: scenario.memo,
-    expectFailure: scenario.expectFailure,
-  });
+  let result: { signature: string | null; explorerUrl: string | null };
+  try {
+    result = await callExecutePayment({
+      connection,
+      feePayer,
+      member,
+      multisig,
+      spendingLimit,
+      mint,
+      vault: vaultPda,
+      vaultTokenAccount,
+      destination,
+      destinationTokenAccount,
+      amountBaseUnits: BigInt(Math.round(scenario.amountUsd * 1_000_000)),
+      decimals: 6,
+      merchantHash,
+      memo: scenario.memo,
+      expectFailure: scenario.expectFailure,
+    });
+  } finally {
+    // Always resume if we paused, even if the attempt threw.
+    if (pausedForDemo) {
+      try {
+        await resumePolicy(connection, feePayer, multisig);
+      } catch (e) {
+        console.error("[probe-scenarios] resume failed — Atlas may be stuck paused:", e);
+      }
+    }
+  }
   const durationMs = Date.now() - startedAt;
 
   if (!result.signature) {
