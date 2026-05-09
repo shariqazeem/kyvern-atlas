@@ -3,69 +3,50 @@
 /**
  * KyvernOS — the authenticated shell.
  *
- * First visit: plays the unboxing cinematic, then reveals the OS.
- * Returning visits: straight into the OS.
+ * The OS-level Unboxing overlay was retired 2026-05-09 — /unbox is
+ * the canonical cinematic now and firing a second one over /app
+ * created a duplicate-unboxing bug (separate paywall/abilities
+ * card after the user already finished /unbox). Single source of
+ * cinematic: /unbox → /app → no overlays.
  *
- * Device-shell exception: on `/app` (exact path) the inner `<main>`
- * drops its 680px max-width + padding so the new full-bleed device
- * shell can fill the viewport. Other /app/* routes (worker detail,
- * inbox, settings) keep the constrained main.
+ * The bottom TabBar (Home/Findings/Settings) was also retired —
+ * the alive console is self-contained and the legacy /app/inbox +
+ * /app/settings routes had stale worker-era UIs. Kept the routes
+ * alive for direct-link compatibility but no longer surfaced in
+ * primary nav.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { AnimatePresence } from "framer-motion";
 import { useAuth } from "@/hooks/use-auth";
 import { ConnectGate } from "@/components/dashboard/connect-gate";
-import { TabBar } from "./tab-bar";
 import { StatusBar } from "./status-bar";
-import { Unboxing } from "./unboxing";
 
-const UNBOX_KEY = "kyvern:unboxed";
 const GUEST_WALLET_KEY = "kyvern:dev-wallet";
 
 export function KyvernOS({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
   const pathname = usePathname() ?? "";
   // Device-shell routes: every page that uses PageShell / IdentityStrip /
-  // the new full-bleed layout. The legacy 680px-capped main only covers
-  // /app/tasks (un-redesigned) + miscellaneous nested routes.
+  // the new full-bleed layout.
   const isDeviceShell =
     pathname === "/app" ||
     pathname.startsWith("/app/agents/") ||
     pathname.startsWith("/app/inbox") ||
     pathname === "/app/settings";
-  const [showUnboxing, setShowUnboxing] = useState(false);
-  const [unboxChecked, setUnboxChecked] = useState(false);
   const [isGuest, setIsGuest] = useState(false);
   const [guestChecked, setGuestChecked] = useState(false);
 
   // Detect guest mode — /try plants a kyvern:dev-wallet in localStorage.
   // When present and the user is NOT Privy-authenticated, we treat the
   // session as a sandbox visitor: skip the ConnectGate redirect, render
-  // the OS, but never trigger the unbox cinematic.
+  // the OS.
   useEffect(() => {
     if (typeof window === "undefined") return;
     const guestWallet = window.localStorage.getItem(GUEST_WALLET_KEY);
     setIsGuest(!!guestWallet && !isAuthenticated);
     setGuestChecked(true);
   }, [isAuthenticated]);
-
-  // Check if user has seen the unboxing — only relevant for real
-  // authenticated users; guests already saw /try's cinematic.
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    const seen = window.localStorage.getItem(UNBOX_KEY);
-    if (!seen) {
-      setShowUnboxing(true);
-    }
-    setUnboxChecked(true);
-  }, [isAuthenticated]);
-
-  const handleUnboxComplete = useCallback(() => {
-    window.localStorage.setItem(UNBOX_KEY, "1");
-    setShowUnboxing(false);
-  }, []);
 
   if (isLoading || !guestChecked) {
     return (
@@ -92,36 +73,21 @@ export function KyvernOS({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // Wait until we've checked localStorage before rendering. Guests
-  // skip the unbox cinematic check entirely (they came in via /try).
-  if (isAuthenticated && !unboxChecked) return null;
-
   return (
-    <>
-      {/* Unboxing overlay */}
-      <AnimatePresence>
-        {showUnboxing && (
-          <Unboxing onComplete={handleUnboxComplete} />
-        )}
-      </AnimatePresence>
-
-      {/* The OS */}
-      <div
-        className="min-h-screen overflow-x-hidden"
-        style={{ background: "#FAFAFA" }}
+    <div
+      className="min-h-screen overflow-x-hidden"
+      style={{ background: "#FAFAFA" }}
+    >
+      <StatusBar />
+      <main
+        className={
+          isDeviceShell
+            ? "pb-12 w-full"
+            : "px-5 sm:px-8 pb-24 max-w-[680px] mx-auto w-full"
+        }
       >
-        <StatusBar />
-        <main
-          className={
-            isDeviceShell
-              ? "pb-[88px] w-full"
-              : "px-5 sm:px-8 pb-24 max-w-[680px] mx-auto w-full"
-          }
-        >
-          {children}
-        </main>
-        <TabBar />
-      </div>
-    </>
+        {children}
+      </main>
+    </div>
   );
 }
