@@ -195,9 +195,23 @@ export function GraphAgentDetail({ agentId }: Props) {
           >
             {meta.name}
           </h1>
-          <div className="flex items-center gap-2 mt-0.5">
+          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
             <StatusPill status={meta.status} />
             {graph && <TriggerSummaryPill trigger={graph.trigger} />}
+            <a
+              href="https://explorer.solana.com/address/PpmZErWfT5zpeo1fJtTbpqezFGbRUamaNNRWViaMSqc?cluster=devnet"
+              target="_blank"
+              rel="noreferrer"
+              title="Every money-moving step routes through this on-chain Kyvern policy program."
+              className="font-mono uppercase tracking-[0.10em] rounded px-1.5 py-0.5 inline-flex items-center gap-1 hover:underline"
+              style={{
+                fontSize: 9,
+                color: "#15803D",
+                background: "rgba(34,197,94,0.10)",
+              }}
+            >
+              ⛓ Policy · PpmZ…MSqc
+            </a>
           </div>
         </div>
         <button
@@ -405,6 +419,7 @@ function StepOutputCard({ output }: { output: StepOutput }) {
   const explorerUrl = output.signature
     ? `https://explorer.solana.com/tx/${output.signature}?cluster=devnet`
     : null;
+  const previewText = previewOutputForType(output);
   return (
     <div
       className="rounded-[8px] p-2"
@@ -430,6 +445,21 @@ function StepOutputCard({ output }: { output: StepOutput }) {
         <span className="text-[11.5px] font-medium" style={{ color: "#0A0A0A" }}>
           {output.label}
         </span>
+        {(output.type === "vault.pay" || output.type === "transfer.usdc") && (
+          <span
+            className="font-mono uppercase tracking-[0.10em] rounded px-1 py-0.5"
+            style={{
+              fontSize: 8,
+              color: output.signatureStatus === "failed" ? "#B91C1C" : "#15803D",
+              background: output.signatureStatus === "failed"
+                ? "rgba(239,68,68,0.10)"
+                : "rgba(34,197,94,0.10)",
+            }}
+            title="Routed through Kyvern policy program PpmZ…MSqc"
+          >
+            {output.signatureStatus === "failed" ? "chain refused" : "chain settled"}
+          </span>
+        )}
         {explorerUrl && (
           <a
             href={explorerUrl}
@@ -442,6 +472,14 @@ function StepOutputCard({ output }: { output: StepOutput }) {
           </a>
         )}
       </div>
+      {previewText && (
+        <p
+          className="text-[11px] mt-1.5 leading-relaxed whitespace-pre-wrap"
+          style={{ color: "rgba(15,23,42,0.75)" }}
+        >
+          {previewText}
+        </p>
+      )}
       {output.error && (
         <p className="text-[10.5px] font-mono mt-1" style={{ color: "#B91C1C" }}>
           {output.error}
@@ -449,6 +487,40 @@ function StepOutputCard({ output }: { output: StepOutput }) {
       )}
     </div>
   );
+}
+
+/** Pull the most user-friendly preview from a step's output. LLM
+ *  steps surface .text inline; signal steps show subject + first
+ *  bullet; http steps show status + truncated body summary. */
+function previewOutputForType(output: StepOutput): string | null {
+  if (output.status !== "succeeded") return null;
+  const v = output.output as Record<string, unknown> | null;
+  if (!v) return null;
+  if (output.type === "llm" && typeof v.text === "string") {
+    const txt = v.text.slice(0, 600);
+    return txt.length < (v.text as string).length ? txt + "…" : txt;
+  }
+  if (output.type === "signal") {
+    const subject = typeof v.subject === "string" ? v.subject : "";
+    const kind = typeof v.kind === "string" ? `[${v.kind}] ` : "";
+    return subject ? `📬 ${kind}${subject}` : null;
+  }
+  if (output.type === "http") {
+    const status = typeof v.status === "number" ? v.status : "?";
+    const body = v.body;
+    if (typeof body === "string") {
+      return `HTTP ${status} · ${body.slice(0, 240)}${body.length > 240 ? "…" : ""}`;
+    }
+    return `HTTP ${status} · (body returned)`;
+  }
+  if (output.type === "vault.pay" || output.type === "transfer.usdc") {
+    if (v.signature) return `→ ${v.merchant ?? v.to} · $${(v as { amountUsd?: number }).amountUsd ?? "?"}`;
+    return null;
+  }
+  if (output.type === "log" && typeof v.message === "string") {
+    return v.message;
+  }
+  return null;
 }
 
 function GraphTab({ graph, onEdit }: { graph: AgentGraph | null; onEdit: () => void }) {
@@ -461,6 +533,7 @@ function GraphTab({ graph, onEdit }: { graph: AgentGraph | null; onEdit: () => v
   }
   return (
     <div className="flex flex-col gap-3">
+      <SdkPreview graph={graph} />
       <div className="flex items-center justify-between">
         <span
           className="font-mono uppercase tracking-[0.14em]"
@@ -687,6 +760,140 @@ function formatMs(ms: number): string {
   if (ms < 3_600_000) return `${Math.round(ms / 60_000)}m`;
   if (ms < 86_400_000) return `${Math.round(ms / 3_600_000)}h`;
   return `${Math.round(ms / 86_400_000)}d`;
+}
+
+/** SdkPreview — shows the user what their composed agent would look
+ *  like as raw @kyvernlabs/sdk code. Strips the policy plumbing
+ *  (vault.pay always routes through the on-chain program) and shows
+ *  the moral equivalent of the graph as a script. Demystifies the
+ *  composer: it's not a black box, it's a UI on top of the same
+ *  primitives the SDK exposes. */
+function SdkPreview({ graph }: { graph: AgentGraph }) {
+  const code = graphToSdkPseudocode(graph);
+  return (
+    <details
+      className="rounded-[12px] group"
+      style={{
+        background: "#0A0A0A",
+        border: "1px solid rgba(15,23,42,0.10)",
+      }}
+    >
+      <summary
+        className="cursor-pointer px-3 py-2 flex items-center justify-between text-[11px]"
+        style={{ color: "#A7F3D0" }}
+      >
+        <span className="font-mono uppercase tracking-[0.14em]">
+          ⛓ How this works · same primitives as @kyvernlabs/sdk
+        </span>
+        <span style={{ color: "#6B7280", fontSize: 10 }}>tap to expand</span>
+      </summary>
+      <pre
+        className="px-3 pb-3 pt-1 text-[11px] font-mono leading-relaxed overflow-x-auto"
+        style={{ color: "#F3F4F6" }}
+      >
+        {code}
+      </pre>
+    </details>
+  );
+}
+
+function graphToSdkPseudocode(graph: AgentGraph): string {
+  const lines: string[] = [
+    `// Equivalent SDK code — every vault.pay routes through the`,
+    `// on-chain Kyvern policy program (PpmZ…MSqc). Refusals come`,
+    `// back as real failed Solana txs you can verify on Explorer.`,
+    ``,
+    `import { Vault } from "@kyvernlabs/sdk";`,
+    ``,
+    `const vault = new Vault({ key: process.env.KYVERN_KEY });`,
+    ``,
+    triggerToCode(graph.trigger),
+  ];
+  for (const step of graph.steps) {
+    lines.push(...stepToCode(step, 2));
+  }
+  lines.push(`});`);
+  return lines.join("\n");
+}
+
+function triggerToCode(trigger: AgentGraph["trigger"]): string {
+  switch (trigger.kind) {
+    case "manual":
+      return `// Trigger: manual run\n(async () => {`;
+    case "interval":
+      return `// Trigger: every ${Math.round(trigger.ms / 1000)}s\nsetInterval(async () => {`;
+    case "cron":
+      return `// Trigger: cron "${trigger.expr}"\ncron.schedule("${trigger.expr}", async () => {`;
+    case "webhook":
+      return `// Trigger: webhook (secret in URL)\nwebhook.on("trigger", async (payload) => {`;
+  }
+}
+
+function stepToCode(step: AgentGraph["steps"][number], indent: number): string[] {
+  const pad = " ".repeat(indent);
+  switch (step.type) {
+    case "llm": {
+      const v = step.outputVar ?? "out";
+      return [
+        `${pad}// ${step.label}`,
+        `${pad}const ${v} = await llm.call({`,
+        `${pad}  provider: "${step.config.provider}",`,
+        `${pad}  model: "${step.config.model}",`,
+        `${pad}  system: ${JSON.stringify(step.config.system.slice(0, 60))}…,`,
+        `${pad}  prompt: ${JSON.stringify(step.config.prompt.slice(0, 60))}…,`,
+        `${pad}});`,
+      ];
+    }
+    case "http":
+      return [
+        `${pad}// ${step.label}`,
+        `${pad}const ${step.outputVar ?? "res"} = await fetch("${step.config.url.slice(0, 60)}…", {`,
+        `${pad}  method: "${step.config.method}",`,
+        `${pad}});`,
+      ];
+    case "vault.pay":
+      return [
+        `${pad}// ${step.label} — chain-enforced (passes through PpmZ…MSqc)`,
+        `${pad}const ${step.outputVar ?? "tx"} = await vault.pay({`,
+        `${pad}  merchant: "${step.config.merchant}",`,
+        `${pad}  to: "${String(step.config.to).slice(0, 8)}…",`,
+        `${pad}  amount: ${step.config.amount},`,
+        `${pad}  memo: "${step.config.memo}",`,
+        `${pad}});  // ← chain refuses if rules don't pass`,
+      ];
+    case "transfer.usdc":
+      return [
+        `${pad}// ${step.label} — chain-enforced`,
+        `${pad}const ${step.outputVar ?? "tx"} = await vault.transfer({`,
+        `${pad}  to: "${String(step.config.to).slice(0, 8)}…",`,
+        `${pad}  amount: ${step.config.amount},`,
+        `${pad}});`,
+      ];
+    case "log":
+      return [`${pad}log(${JSON.stringify(step.config.message.slice(0, 60))}…);`];
+    case "signal":
+      return [
+        `${pad}// ${step.label}`,
+        `${pad}await inbox.emit({`,
+        `${pad}  kind: "${step.config.kind}",`,
+        `${pad}  subject: ${JSON.stringify(step.config.subject.slice(0, 60))}…,`,
+        `${pad}});`,
+      ];
+    case "branch":
+      return [
+        `${pad}if (${step.config.condition}) {`,
+        ...step.config.then.flatMap((s) => stepToCode(s, indent + 2)),
+        `${pad}} else {`,
+        ...step.config.else.flatMap((s) => stepToCode(s, indent + 2)),
+        `${pad}}`,
+      ];
+    case "loop":
+      return [
+        `${pad}for (const ${step.config.itemVar} of ${step.config.items}) {`,
+        ...step.config.body.flatMap((s) => stepToCode(s, indent + 2)),
+        `${pad}}`,
+      ];
+  }
 }
 
 function RunStatusDot({ status }: { status: AgentRun["status"] }) {

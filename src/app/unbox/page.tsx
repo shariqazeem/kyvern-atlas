@@ -36,7 +36,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight, Check } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { usePrivy } from "@privy-io/react-auth";
-import { seedDefaultWorkersIfEmpty } from "@/lib/onboarding/seed-workers";
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
@@ -130,20 +129,20 @@ export default function UnboxPage() {
     setProvisionError(null);
     try {
       // 1. Resolve the device — existing vault wins, otherwise
-      //    create a fresh one. Either way we end up with a deviceId
-      //    we can seed workers onto.
-      let deviceId: string | null = null;
+      //    create a fresh one. We don't actually need the resulting
+      //    deviceId locally anymore (auto-seeding the legacy trio
+      //    was retired in v1.1 — see note below). The /vault/create
+      //    response is awaited so we know it succeeded before we
+      //    redirect; that's all.
       const list = await fetch(
         `/api/vault/list?ownerWallet=${encodeURIComponent(wallet)}`,
       );
       const listJson = list.ok ? await list.json() : { vaults: [] };
       const existing = Array.isArray(listJson?.vaults) ? listJson.vaults : [];
-      if (existing.length > 0) {
-        deviceId = existing[0]?.vault?.id ?? null;
-      } else {
+      if (existing.length === 0) {
         // No vault yet → create with sensible defaults. The user
         // can raise budgets later in /app/settings if they want
-        // more headroom for their workers.
+        // more headroom for their agents.
         const res = await fetch("/api/vault/create", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -170,18 +169,15 @@ export default function UnboxPage() {
               "Vault provisioning failed",
           );
         }
-        const created = await res.json();
-        deviceId = created?.vault?.id ?? null;
       }
 
-      // 2. Seed the demo trio onto the device — Sentinel/Bounty
-      //    Hunter on Superteam Dev >$500, Wren/Whale Tracker on
-      //    Kraken hot wallet, Pulse/Token Pulse on SOL band. The
-      //    user lands on /app with three workers already running;
-      //    the first finding hits within ~90s. Idempotent.
-      if (deviceId) {
-        await seedDefaultWorkersIfEmpty(deviceId);
-      }
+      // Auto-seed retired as of v1.1 — the legacy Sentinel/Wren/Pulse
+      // trio was emitting Pulse "SOL hit $X" signals into new users'
+      // inboxes alongside their own graph agents, which conflated two
+      // unrelated narratives. New users now land on an empty canvas and
+      // compose their own agents from the recipe gallery. The legacy
+      // trio + Atlas continue to run for the existing pre-v1.1 vaults
+      // that already have them.
 
       router.push("/app");
     } catch (e) {

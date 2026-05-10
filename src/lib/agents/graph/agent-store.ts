@@ -148,7 +148,9 @@ export function listGraphAgentsForDevice(
     .prepare(
       `SELECT id, name, emoji, graph_json, created_at, status
          FROM agents
-         WHERE device_id = ? AND graph_json IS NOT NULL
+         WHERE device_id = ?
+           AND graph_json IS NOT NULL
+           AND status != 'retired'
          ORDER BY created_at DESC`,
     )
     .all(deviceId) as Row[];
