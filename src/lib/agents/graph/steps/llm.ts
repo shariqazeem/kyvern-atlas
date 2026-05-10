@@ -206,10 +206,23 @@ async function callOpenAiCompat(
     throw new Error(`${provider} ${r.status}: ${errText.slice(0, 500)}`);
   }
   const data = (await r.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
+    choices?: Array<{
+      message?: {
+        // Standard OpenAI-compat field
+        content?: string | null;
+        // Reasoning models on Commonstack (gpt-oss-120b, DeepSeek-R1
+        // family) put their thinking in reasoning_content and leave
+        // content empty when the response is reasoning-heavy.
+        reasoning_content?: string | null;
+      };
+    }>;
     usage?: { prompt_tokens: number; completion_tokens: number };
   };
-  const text = data.choices?.[0]?.message?.content ?? "";
+  const msg = data.choices?.[0]?.message;
+  const text =
+    (msg?.content && msg.content.trim()) ||
+    (msg?.reasoning_content && msg.reasoning_content.trim()) ||
+    "";
   const inputTokens = data.usage?.prompt_tokens ?? 0;
   const outputTokens = data.usage?.completion_tokens ?? 0;
   return {
