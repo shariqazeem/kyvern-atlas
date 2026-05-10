@@ -409,17 +409,28 @@ function RunsTab({ runs, graph }: { runs: AgentRun[]; graph: AgentGraph | null }
               className="rounded-[8px] px-2 py-1 text-left flex items-center gap-1.5 shrink-0 transition"
               style={{
                 background: active ? "#FFFFFF" : "transparent",
-                border: `1px solid ${active ? "rgba(15,23,42,0.10)" : "transparent"}`,
+                border: `1px solid ${active ? "rgba(15,23,42,0.12)" : "transparent"}`,
                 boxShadow: active
-                  ? "0 1px 2px rgba(15,23,42,0.04)"
+                  ? "0 1px 2px rgba(15,23,42,0.05), 0 0 0 3px rgba(34,197,94,0.10)"
                   : undefined,
               }}
             >
               <span
                 className="rounded-full"
-                style={{ width: 6, height: 6, background: dotColor }}
+                style={{
+                  width: 6,
+                  height: 6,
+                  background: dotColor,
+                  boxShadow: active ? `0 0 0 2px ${dotColor}30` : undefined,
+                }}
               />
-              <span className="font-mono text-[10.5px]" style={{ color: "#0A0A0A" }}>
+              <span
+                className="font-mono text-[10.5px]"
+                style={{
+                  color: active ? "#0A0A0A" : "rgba(15,23,42,0.55)",
+                  fontWeight: active ? 600 : 400,
+                }}
+              >
                 {new Date(r.startedAt).toLocaleTimeString([], {
                   hour: "2-digit",
                   minute: "2-digit",
@@ -568,18 +579,46 @@ function StepOutputCard({ output }: { output: StepOutput }) {
           </a>
         )}
       </div>
-      {previewText && (
-        <p
-          className="text-[11px] mt-1.5 leading-relaxed whitespace-pre-wrap"
-          style={{ color: "rgba(15,23,42,0.75)" }}
-        >
-          {previewText}
-        </p>
-      )}
+      {previewText && <PreviewBlock text={previewText} />}
       {output.error && (
         <p className="text-[10.5px] font-mono mt-1" style={{ color: "#B91C1C" }}>
           {output.error}
         </p>
+      )}
+    </div>
+  );
+}
+
+/** Inspectable preview block — capped width, mono, soft border + tint.
+ *  Truncates after ~6 lines with a "show full" toggle. Replaces the
+ *  raw paragraph that ran the full page width. */
+function PreviewBlock({ text }: { text: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const lineCount = text.split("\n").length;
+  const charCount = text.length;
+  const overflowing = lineCount > 6 || charCount > 480;
+  return (
+    <div className="mt-2" style={{ maxWidth: 720 }}>
+      <pre
+        className="text-[11px] font-mono leading-relaxed whitespace-pre-wrap rounded-[8px] px-2.5 py-2 overflow-hidden"
+        style={{
+          color: "rgba(15,23,42,0.78)",
+          background: "rgba(15,23,42,0.03)",
+          border: "1px solid rgba(15,23,42,0.07)",
+          maxHeight: expanded ? "none" : 110,
+        }}
+      >
+        {text}
+      </pre>
+      {overflowing && (
+        <button
+          type="button"
+          onClick={() => setExpanded(!expanded)}
+          className="mt-1 text-[10.5px] font-mono uppercase tracking-[0.10em] hover:underline"
+          style={{ color: "#6B7280" }}
+        >
+          {expanded ? "show less" : "show full"}
+        </button>
       )}
     </div>
   );
@@ -629,72 +668,73 @@ function GraphTab({ graph, onEdit }: { graph: AgentGraph | null; onEdit: () => v
   }
   return (
     <div className="flex flex-col gap-3">
-      {/* Canvas — agent's graph as a living diagram */}
-      <GraphFlowView graph={graph} />
-
-      {/* Edit affordance + step list (compact, supplementary) */}
-      <div className="flex items-center justify-between">
-        <span
-          className="font-mono uppercase tracking-[0.14em]"
-          style={{ fontSize: 9.5, color: "#9CA3AF" }}
+      {/* Canvas with chrome — trigger + Edit overlaid in the corners
+          so editing reads as a property of the canvas, not a separate
+          section. */}
+      <div className="relative">
+        <GraphFlowView graph={graph} />
+        <div
+          className="absolute top-3 left-3 inline-flex items-center gap-1.5 rounded-[8px] px-2 py-1 pointer-events-auto"
+          style={{
+            background: "rgba(255,255,255,0.92)",
+            backdropFilter: "blur(6px)",
+            border: "1px solid rgba(15,23,42,0.10)",
+            fontSize: 10,
+          }}
         >
-          Trigger · {graph.trigger.kind}
-        </span>
+          <span
+            className="font-mono uppercase tracking-[0.12em]"
+            style={{ color: "#9CA3AF" }}
+          >
+            Trigger
+          </span>
+          <span
+            className="font-mono"
+            style={{ color: "#0A0A0A" }}
+          >
+            {triggerInline(graph.trigger)}
+          </span>
+        </div>
         <button
           type="button"
           onClick={onEdit}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] text-[11.5px] font-medium hover:bg-slate-50"
+          className="absolute top-3 right-3 inline-flex items-center gap-1 rounded-[8px] px-2.5 py-1 hover:bg-slate-50 transition pointer-events-auto"
           style={{
-            background: "#FFFFFF",
+            background: "rgba(255,255,255,0.92)",
+            backdropFilter: "blur(6px)",
             border: "1px solid rgba(15,23,42,0.10)",
-            color: "#0A0A0A",
+            fontSize: 11,
           }}
         >
-          <Edit3 className="w-3.5 h-3.5" /> Edit
+          <Edit3 className="w-3 h-3" /> Edit
         </button>
       </div>
-      <div
-        className="rounded-[12px] p-3 flex flex-col gap-2"
-        style={{
-          background: "#FFFFFF",
-          border: "1px solid rgba(15,23,42,0.08)",
-        }}
-      >
-        {graph.steps.map((step, i) => (
-          <div key={step.id} className="flex items-center gap-2 text-[12px]">
-            <span
-              className="font-mono"
-              style={{ fontSize: 9, color: "#9CA3AF", minWidth: 18 }}
-            >
-              {i + 1}.
-            </span>
-            <span
-              className="font-mono uppercase tracking-[0.10em] rounded px-1.5 py-0.5"
-              style={{
-                fontSize: 8.5,
-                background: "rgba(15,23,42,0.04)",
-                color: "#374151",
-              }}
-            >
-              {step.type}
-            </span>
-            <span style={{ color: "#0A0A0A" }}>{step.label}</span>
-            {"outputVar" in step && step.outputVar && (
-              <code
-                className="ml-auto font-mono"
-                style={{ fontSize: 10, color: "#9CA3AF" }}
-              >
-                → {step.outputVar}
-              </code>
-            )}
-          </div>
-        ))}
-      </div>
 
-      {/* SDK equivalent — collapsible code preview */}
+      {/* SDK equivalent — the strongest affordance, sits right below
+          the canvas so the user sees graph → code as one narrative. */}
       <SdkPreview graph={graph} />
     </div>
   );
+}
+
+function triggerInline(trigger: AgentGraph["trigger"]): string {
+  switch (trigger.kind) {
+    case "manual":
+      return "Manual";
+    case "interval":
+      return `Every ${formatMsShort(trigger.ms)}`;
+    case "cron":
+      return `Cron · ${trigger.expr}`;
+    case "webhook":
+      return "Webhook";
+  }
+}
+
+function formatMsShort(ms: number): string {
+  if (ms < 60_000) return `${Math.round(ms / 1000)}s`;
+  if (ms < 3_600_000) return `${Math.round(ms / 60_000)}m`;
+  if (ms < 86_400_000) return `${Math.round(ms / 3_600_000)}h`;
+  return `${Math.round(ms / 86_400_000)}d`;
 }
 
 function SettingsTab({
@@ -713,14 +753,8 @@ function SettingsTab({
   onDelete: () => void;
 }) {
   return (
-    <div className="flex flex-col gap-3">
-      <div
-        className="rounded-[12px] p-3 flex flex-col gap-2"
-        style={{
-          background: "#FFFFFF",
-          border: "1px solid rgba(15,23,42,0.08)",
-        }}
-      >
+    <div className="flex flex-col gap-3 max-w-[640px]">
+      <div className="flex items-center justify-between">
         <span
           className="font-mono uppercase tracking-[0.14em]"
           style={{ fontSize: 9.5, color: "#9CA3AF" }}
@@ -763,34 +797,27 @@ function SettingsTab({
       </div>
 
       {graph && (
-        <div
-          className="rounded-[12px] p-3 flex flex-col gap-2"
-          style={{
-            background: "#FFFFFF",
-            border: "1px solid rgba(15,23,42,0.08)",
-          }}
-        >
+        <div className="flex items-center justify-between">
           <span
             className="font-mono uppercase tracking-[0.14em]"
             style={{ fontSize: 9.5, color: "#9CA3AF" }}
           >
             Budget
           </span>
-          <div className="text-[12px]" style={{ color: "#0A0A0A" }}>
-            <p>Max runs / day: <span className="font-mono">{graph.config.maxRunsPerDay}</span></p>
-            <p>Max ${" "}/ run: <span className="font-mono">${graph.config.maxCostPerRunUsd.toFixed(2)}</span></p>
-          </div>
-          <p className="text-[10.5px]" style={{ color: "rgba(15,23,42,0.55)" }}>
-            Edit budgets via the Graph tab → Edit button.
-          </p>
+          <span className="text-[12px] font-mono" style={{ color: "rgba(15,23,42,0.75)" }}>
+            <span style={{ color: "#0A0A0A" }}>{graph.config.maxRunsPerDay}</span>
+            {" runs/day · "}
+            <span style={{ color: "#0A0A0A" }}>${graph.config.maxCostPerRunUsd.toFixed(2)}</span>
+            {" max/run"}
+          </span>
         </div>
       )}
 
       <div
-        className="rounded-[12px] p-3 flex flex-col gap-2"
+        className="rounded-[10px] p-2.5 flex items-center justify-between gap-3 mt-2"
         style={{
           background: "rgba(239,68,68,0.04)",
-          border: "1px solid rgba(239,68,68,0.20)",
+          border: "1px solid rgba(239,68,68,0.18)",
         }}
       >
         <span
@@ -803,7 +830,7 @@ function SettingsTab({
           type="button"
           onClick={onDelete}
           disabled={busy !== null}
-          className="self-start flex items-center gap-1.5 px-3 py-2 rounded-[10px] text-[12.5px] font-medium disabled:opacity-50"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] text-[12px] font-medium disabled:opacity-50"
           style={{
             background: "rgba(239,68,68,0.10)",
             border: "1px solid rgba(239,68,68,0.30)",

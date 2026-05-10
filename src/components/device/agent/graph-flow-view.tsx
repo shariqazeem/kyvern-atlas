@@ -39,11 +39,14 @@ const POLICY_PROGRAM = "PpmZErWfT5zpeo1fJtTbpqezFGbRUamaNNRWViaMSqc";
 
 /* ─── Layout constants ───────────────────────────────────────── */
 
-const NODE_WIDTH = 220;
-const STEP_Y_GAP = 90;
-const FIRST_STEP_Y = 40;
-const VAULT_Y_GAP = 110;
-const CHAIN_Y_GAP = 60;
+const NODE_WIDTH = 188;
+const NODE_HEIGHT = 64;
+const STEP_Y_GAP = 76;
+const FIRST_STEP_Y = 24;
+const VAULT_Y_GAP = 88;
+const CHAIN_Y_GAP = 64;
+const CHAIN_WIDTH = 168;
+const VAULT_WIDTH = 120;
 
 interface Props {
   graph: AgentGraph;
@@ -85,15 +88,16 @@ export function GraphFlowView({
   // Compute total height so the canvas auto-sizes to the diagram
   const computedHeight = Math.max(
     height,
-    FIRST_STEP_Y + graph.steps.length * STEP_Y_GAP + CHAIN_Y_GAP + VAULT_Y_GAP,
+    FIRST_STEP_Y + graph.steps.length * STEP_Y_GAP + CHAIN_Y_GAP + VAULT_Y_GAP + 32,
   );
 
   return (
     <div
-      className="rounded-[12px] overflow-hidden"
+      className="relative rounded-[14px] overflow-hidden"
       style={{
-        background: "linear-gradient(180deg, #FFFFFF 0%, #FAFAFA 100%)",
+        background: "linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%)",
         border: "1px solid rgba(15,23,42,0.08)",
+        boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.5)",
         height: computedHeight,
       }}
     >
@@ -102,7 +106,13 @@ export function GraphFlowView({
         edges={edges}
         nodeTypes={nodeTypes}
         fitView
-        fitViewOptions={{ padding: 0.15, minZoom: 0.6, maxZoom: 1.2 }}
+        // Tight padding + clamped zoom — keeps the graph dead-center
+        // and prevents ReactFlow's auto-fit from stretching short
+        // graphs across the whole canvas (which produced the "lost
+        // in space" feel).
+        fitViewOptions={{ padding: 0.22, minZoom: 0.85, maxZoom: 1.0 }}
+        minZoom={0.6}
+        maxZoom={1.2}
         nodesDraggable={false}
         nodesConnectable={false}
         elementsSelectable={false}
@@ -116,7 +126,7 @@ export function GraphFlowView({
           variant={BackgroundVariant.Dots}
           gap={18}
           size={1}
-          color="rgba(15,23,42,0.08)"
+          color="rgba(15,23,42,0.06)"
         />
       </ReactFlow>
     </div>
@@ -143,15 +153,25 @@ function layoutGraph(
       draggable: false,
     });
 
-    // Default sequential edge to the next step
+    // Default sequential edge to the next step. Light up green when
+    // the run state shows this transition succeeded.
     if (i < graph.steps.length - 1) {
+      const fromStatus = runState?.get(step.id);
+      const toStatus = runState?.get(graph.steps[i + 1].id);
+      const succeeded = fromStatus === "succeeded" && toStatus !== undefined;
       edges.push({
         id: `e-seq-${step.id}-${graph.steps[i + 1].id}`,
         source: step.id,
         target: graph.steps[i + 1].id,
         type: "default",
         animated: false,
-        style: { stroke: "rgba(15,23,42,0.20)", strokeWidth: 1.5 },
+        style: succeeded
+          ? {
+              stroke: "#22C55E",
+              strokeWidth: 2,
+              filter: "drop-shadow(0 0 4px rgba(34,197,94,0.45))",
+            }
+          : { stroke: "rgba(15,23,42,0.18)", strokeWidth: 2 },
       });
     }
   });
@@ -172,7 +192,7 @@ function layoutGraph(
   nodes.push({
     id: "_chain",
     type: "chain",
-    position: { x: centerX - 80, y: chainY },
+    position: { x: centerX - CHAIN_WIDTH / 2, y: chainY },
     data: { programId: POLICY_PROGRAM } as ChainNodeData,
     draggable: false,
   });
@@ -180,38 +200,58 @@ function layoutGraph(
   nodes.push({
     id: "_vault",
     type: "vault",
-    position: { x: centerX - 60, y: vaultY },
+    position: { x: centerX - VAULT_WIDTH / 2, y: vaultY },
     data: { network: "devnet" } as VaultNodeData,
     draggable: false,
   });
 
   // Edges from each money step → chain → vault
+  const anyMoneySucceeded = moneySteps.some(
+    (ms) => runState?.get(ms.id) === "succeeded",
+  );
+  const anyMoneyFailed = moneySteps.some(
+    (ms) => runState?.get(ms.id) === "failed",
+  );
   for (const ms of moneySteps) {
+    const status = runState?.get(ms.id);
+    const stroke =
+      status === "succeeded" ? "#22C55E"
+      : status === "failed" ? "#EF4444"
+      : "#22C55E";
     edges.push({
       id: `e-money-${ms.id}-chain`,
       source: ms.id,
       target: "_chain",
       type: "default",
-      animated: !!runState?.get(ms.id),
+      animated: status === "running",
       style: {
-        stroke:
-          runState?.get(ms.id) === "succeeded" ? "#22C55E"
-          : runState?.get(ms.id) === "failed" ? "#EF4444"
-          : "#22C55E",
-        strokeWidth: 2,
+        stroke,
+        strokeWidth: 2.4,
         strokeDasharray: "6 4",
+        filter: status === "succeeded"
+          ? "drop-shadow(0 0 5px rgba(34,197,94,0.50))"
+          : status === "failed"
+            ? "drop-shadow(0 0 5px rgba(239,68,68,0.45))"
+            : undefined,
       },
     });
   }
 
-  // Chain → vault (always present)
+  // Chain → vault (always present, glows when a money step in the
+  // selected run actually settled)
   edges.push({
     id: "e-chain-vault",
     source: "_chain",
     target: "_vault",
     type: "default",
     animated: false,
-    style: { stroke: "#22C55E", strokeWidth: 2 },
+    style: {
+      stroke: anyMoneyFailed && !anyMoneySucceeded ? "#EF4444" : "#22C55E",
+      strokeWidth: 2.4,
+      filter: anyMoneySucceeded
+        ? "drop-shadow(0 0 5px rgba(34,197,94,0.50))"
+        : undefined,
+    },
   });
 
   return { nodes, edges };
@@ -224,23 +264,30 @@ function StepNode({ data }: NodeProps) {
   const step = d.step;
   const status = d.status;
   const palette = TYPE_PALETTE[step.type];
+  const borderColor =
+    status === "running" ? "rgba(245,158,11,0.55)"
+    : status === "succeeded" ? "rgba(34,197,94,0.55)"
+    : status === "failed" ? "rgba(239,68,68,0.55)"
+    : "rgba(15,23,42,0.12)";
   return (
     <div
-      className="rounded-[10px] flex flex-col gap-0.5"
+      className="rounded-[12px] flex flex-col"
       style={{
         width: NODE_WIDTH,
-        background: status === "running" ? "rgba(245,158,11,0.06)"
-          : status === "failed" ? "rgba(239,68,68,0.04)"
-          : "#FFFFFF",
-        border: `1px solid ${
-          status === "running" ? "rgba(245,158,11,0.40)"
-          : status === "succeeded" ? "rgba(34,197,94,0.40)"
-          : status === "failed" ? "rgba(239,68,68,0.40)"
-          : "rgba(15,23,42,0.10)"
-        }`,
-        padding: "8px 10px",
-        boxShadow: "0 1px 2px rgba(15,23,42,0.04), 0 4px 12px -8px rgba(15,23,42,0.10)",
-        transition: "all 0.2s",
+        minHeight: NODE_HEIGHT,
+        background: "#FFFFFF",
+        border: `1px solid ${borderColor}`,
+        // Tile feel — subtle inner top highlight + soft outer shadow so
+        // the node looks like a physical object resting on the canvas
+        // rather than a div.
+        boxShadow: [
+          "inset 0 1px 0 rgba(255,255,255,0.95)",
+          "0 1px 2px rgba(15,23,42,0.05)",
+          "0 8px 24px -12px rgba(15,23,42,0.18)",
+          status === "succeeded" ? "0 0 0 3px rgba(34,197,94,0.10)" : "",
+          status === "failed" ? "0 0 0 3px rgba(239,68,68,0.10)" : "",
+        ].filter(Boolean).join(", "),
+        transition: "all 0.18s",
       }}
     >
       <Handle
@@ -248,7 +295,8 @@ function StepNode({ data }: NodeProps) {
         position={Position.Top}
         style={{ background: "transparent", border: "none", width: 1, height: 1 }}
       />
-      <div className="flex items-center gap-1.5">
+      {/* Header — type pill + status dot */}
+      <div className="flex items-center justify-between px-2.5 pt-2">
         <span
           className="rounded px-1.5 py-0.5 font-mono uppercase tracking-[0.10em]"
           style={{
@@ -261,9 +309,9 @@ function StepNode({ data }: NodeProps) {
         </span>
         {status && (
           <span
-            className="font-mono uppercase tracking-[0.10em]"
+            className="font-mono"
             style={{
-              fontSize: 8.5,
+              fontSize: 9,
               color: status === "succeeded" ? "#15803D"
                 : status === "failed" ? "#B91C1C"
                 : status === "running" ? "#B45309"
@@ -274,19 +322,29 @@ function StepNode({ data }: NodeProps) {
           </span>
         )}
       </div>
+      {/* Label */}
       <div
-        className="text-[12px] font-semibold tracking-[-0.005em] truncate"
+        className="text-[12.5px] font-semibold tracking-[-0.005em] truncate px-2.5 pt-0.5"
         style={{ color: "#0A0A0A" }}
       >
         {step.label}
       </div>
+      {/* Footer — output var lives INSIDE the tile, not floating */}
       {"outputVar" in step && step.outputVar && (
         <div
-          className="font-mono"
-          style={{ fontSize: 9.5, color: "#9CA3AF" }}
+          className="font-mono px-2.5 pt-0.5 pb-1.5 truncate"
+          style={{
+            fontSize: 9.5,
+            color: "rgba(15,23,42,0.45)",
+            borderTop: "1px solid rgba(15,23,42,0.05)",
+            marginTop: 4,
+          }}
         >
           → {step.outputVar}
         </div>
+      )}
+      {!("outputVar" in step && step.outputVar) && (
+        <div style={{ height: 6 }} />
       )}
       <Handle
         type="source"
@@ -297,16 +355,20 @@ function StepNode({ data }: NodeProps) {
   );
 }
 
+/* Chain glyph — visually MORE prominent than the vault. Black body
+ * with green stroke + soft green halo says "this is a gate, not a
+ * resting destination." The vault below is the destination. */
 function ChainNode() {
   return (
     <div
-      className="rounded-full flex flex-col items-center justify-center gap-0.5"
+      className="rounded-[14px] flex flex-col items-center justify-center gap-0.5 relative"
       style={{
-        width: 160,
+        width: CHAIN_WIDTH,
         height: 56,
-        background: "linear-gradient(180deg, #ECFDF5 0%, #FFFFFF 100%)",
-        border: "1px solid rgba(34,197,94,0.40)",
-        boxShadow: "0 4px 14px rgba(34,197,94,0.12), inset 0 0 0 4px rgba(34,197,94,0.04)",
+        background: "linear-gradient(180deg, #0A0A0A 0%, #111827 100%)",
+        border: "1.5px solid rgba(34,197,94,0.55)",
+        boxShadow:
+          "inset 0 1px 0 rgba(255,255,255,0.06), 0 0 0 4px rgba(34,197,94,0.08), 0 8px 24px -10px rgba(34,197,94,0.40)",
       }}
     >
       <Handle
@@ -315,17 +377,17 @@ function ChainNode() {
         style={{ background: "transparent", border: "none", width: 1, height: 1 }}
       />
       <span
-        className="font-mono uppercase tracking-[0.14em]"
-        style={{ fontSize: 9, color: "#15803D" }}
+        className="font-mono uppercase tracking-[0.18em] flex items-center gap-1"
+        style={{ fontSize: 9, color: "#34D399" }}
       >
-        ⛓ Kyvern policy
+        <span style={{ fontSize: 11, lineHeight: 1 }}>⛓</span> Kyvern policy
       </span>
       <a
         href={`https://explorer.solana.com/address/${POLICY_PROGRAM}?cluster=devnet`}
         target="_blank"
         rel="noreferrer"
         className="font-mono inline-flex items-center gap-0.5 hover:underline"
-        style={{ fontSize: 9, color: "#15803D" }}
+        style={{ fontSize: 9, color: "rgba(167,243,208,0.85)" }}
         onClick={(e) => e.stopPropagation()}
       >
         PpmZ…MSqc <ExternalLink className="w-2 h-2" />
@@ -339,18 +401,21 @@ function ChainNode() {
   );
 }
 
+/* Vault — quieter rest state. Neutral background with a small green
+ * status dot showing it's live. Lets the chain glyph be the active
+ * focal point of the diagram. */
 function VaultNode({ data }: NodeProps) {
   const d = data as VaultNodeData;
   return (
     <div
-      className="rounded-full flex flex-col items-center justify-center gap-0.5"
+      className="rounded-[16px] flex flex-col items-center justify-center gap-0.5"
       style={{
-        width: 120,
-        height: 80,
-        background: "linear-gradient(180deg, #FFFFFF 0%, #ECFDF5 100%)",
-        border: "1px solid rgba(34,197,94,0.40)",
+        width: VAULT_WIDTH,
+        height: 64,
+        background: "linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%)",
+        border: "1px solid rgba(15,23,42,0.10)",
         boxShadow:
-          "0 1px 2px rgba(15,23,42,0.04), 0 8px 32px -10px rgba(34,197,94,0.30)",
+          "inset 0 1px 0 rgba(255,255,255,0.95), 0 1px 2px rgba(15,23,42,0.04), 0 8px 24px -12px rgba(15,23,42,0.18)",
       }}
     >
       <Handle
@@ -358,12 +423,23 @@ function VaultNode({ data }: NodeProps) {
         position={Position.Top}
         style={{ background: "transparent", border: "none", width: 1, height: 1 }}
       />
-      <span
-        className="font-mono uppercase tracking-[0.16em]"
-        style={{ fontSize: 9, color: "#6B7280" }}
-      >
-        VAULT
-      </span>
+      <div className="flex items-center gap-1.5">
+        <span
+          className="rounded-full"
+          style={{
+            width: 6,
+            height: 6,
+            background: "#22C55E",
+            boxShadow: "0 0 0 2px rgba(34,197,94,0.20)",
+          }}
+        />
+        <span
+          className="font-mono uppercase tracking-[0.16em]"
+          style={{ fontSize: 9.5, color: "#0A0A0A" }}
+        >
+          VAULT
+        </span>
+      </div>
       <span
         className="font-mono uppercase tracking-[0.14em]"
         style={{ fontSize: 8, color: "#9CA3AF" }}
