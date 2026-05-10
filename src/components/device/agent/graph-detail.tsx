@@ -15,6 +15,7 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { ArrowLeft, Edit3, Play, RefreshCw, Pause, Trash2, ExternalLink } from "lucide-react";
 import { BuilderModal } from "../builder/modal";
+import { GraphFlowView } from "./graph-flow-view";
 import type { AgentGraph, AgentRun, StepOutput } from "@/lib/agents/graph/types";
 
 interface Props {
@@ -244,23 +245,44 @@ export function GraphAgentDetail({ agentId }: Props) {
         </div>
       )}
 
-      {/* Tabs */}
-      <div className="flex gap-1.5">
-        {(["runs", "graph", "settings"] as const).map((t) => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => setTab(t)}
-            className="px-3 py-1.5 rounded-[8px] text-[12px] font-medium tracking-[-0.005em]"
-            style={{
-              background: tab === t ? "#0A0A0A" : "rgba(15,23,42,0.04)",
-              color: tab === t ? "#FFFFFF" : "#0A0A0A",
-              border: "1px solid rgba(15,23,42,0.10)",
-            }}
-          >
-            {t}
-          </button>
-        ))}
+      {/* Tabs — premium segmented pill */}
+      <div className="flex items-center gap-2">
+        <div
+          className="inline-flex p-0.5 rounded-[10px]"
+          style={{
+            background: "rgba(15,23,42,0.04)",
+            border: "1px solid rgba(15,23,42,0.06)",
+          }}
+        >
+          {(["runs", "graph", "settings"] as const).map((t) => {
+            const active = tab === t;
+            return (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setTab(t)}
+                className="relative px-3.5 py-1.5 rounded-[8px] text-[12px] font-semibold tracking-[-0.005em] transition"
+                style={{
+                  background: active ? "#FFFFFF" : "transparent",
+                  color: active ? "#0A0A0A" : "rgba(15,23,42,0.55)",
+                  boxShadow: active
+                    ? "0 1px 2px rgba(15,23,42,0.05), 0 4px 12px -8px rgba(15,23,42,0.10)"
+                    : undefined,
+                }}
+              >
+                <span className="capitalize">{t}</span>
+                {t === "runs" && runs.length > 0 && (
+                  <span
+                    className="ml-1.5 font-mono"
+                    style={{ fontSize: 10, color: active ? "#9CA3AF" : "rgba(15,23,42,0.35)" }}
+                  >
+                    {runs.length}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
         <button
           type="button"
           onClick={refresh}
@@ -273,7 +295,7 @@ export function GraphAgentDetail({ agentId }: Props) {
       </div>
 
       {/* Tab body */}
-      {tab === "runs" && <RunsTab runs={runs} />}
+      {tab === "runs" && <RunsTab runs={runs} graph={graph} />}
       {tab === "graph" && (
         <GraphTab
           graph={graph}
@@ -320,7 +342,23 @@ export function GraphAgentDetail({ agentId }: Props) {
 
 /* ─── Tabs ───────────────────────────────────────────────────── */
 
-function RunsTab({ runs }: { runs: AgentRun[] }) {
+function RunsTab({ runs, graph }: { runs: AgentRun[]; graph: AgentGraph | null }) {
+  const [selectedRunId, setSelectedRunId] = useState<string | null>(
+    runs[0]?.id ?? null,
+  );
+  const selectedRun = runs.find((r) => r.id === selectedRunId) ?? null;
+
+  // Build a step-id → status map for the canvas to color the nodes
+  const runState = useMemo(() => {
+    const m = new Map<string, "succeeded" | "failed" | "skipped" | "running">();
+    if (selectedRun) {
+      for (const out of selectedRun.stepOutputs) {
+        m.set(out.stepId, out.status);
+      }
+    }
+    return m;
+  }, [selectedRun]);
+
   if (runs.length === 0) {
     return (
       <div
@@ -336,16 +374,74 @@ function RunsTab({ runs }: { runs: AgentRun[] }) {
     );
   }
   return (
-    <div className="flex flex-col gap-2">
-      {runs.map((run) => (
-        <RunRow key={run.id} run={run} />
-      ))}
+    <div className="flex flex-col gap-3">
+      {/* Canvas with the selected run's state highlighted */}
+      {graph && (
+        <GraphFlowView graph={graph} runState={runState} height={360} />
+      )}
+
+      {/* Run picker timeline */}
+      <div
+        className="rounded-[12px] p-2 flex items-center gap-2 overflow-x-auto"
+        style={{
+          background: "rgba(15,23,42,0.02)",
+          border: "1px solid rgba(15,23,42,0.06)",
+        }}
+      >
+        <span
+          className="font-mono uppercase tracking-[0.14em] px-2 shrink-0"
+          style={{ fontSize: 9, color: "#9CA3AF" }}
+        >
+          Runs · {runs.length}
+        </span>
+        {runs.map((r) => {
+          const active = r.id === selectedRunId;
+          const dotColor =
+            r.status === "succeeded" ? "#22C55E"
+            : r.status === "failed" ? "#EF4444"
+            : r.status === "running" ? "#F59E0B"
+            : "#9CA3AF";
+          return (
+            <button
+              key={r.id}
+              type="button"
+              onClick={() => setSelectedRunId(r.id)}
+              className="rounded-[8px] px-2 py-1 text-left flex items-center gap-1.5 shrink-0 transition"
+              style={{
+                background: active ? "#FFFFFF" : "transparent",
+                border: `1px solid ${active ? "rgba(15,23,42,0.10)" : "transparent"}`,
+                boxShadow: active
+                  ? "0 1px 2px rgba(15,23,42,0.04)"
+                  : undefined,
+              }}
+            >
+              <span
+                className="rounded-full"
+                style={{ width: 6, height: 6, background: dotColor }}
+              />
+              <span className="font-mono text-[10.5px]" style={{ color: "#0A0A0A" }}>
+                {new Date(r.startedAt).toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Selected run's step output cards */}
+      {selectedRun && (
+        <div className="flex flex-col gap-2">
+          <RunRow run={selectedRun} initiallyOpen />
+        </div>
+      )}
     </div>
   );
 }
 
-function RunRow({ run }: { run: AgentRun }) {
-  const [open, setOpen] = useState(false);
+function RunRow({ run, initiallyOpen = false }: { run: AgentRun; initiallyOpen?: boolean }) {
+  const [open, setOpen] = useState(initiallyOpen);
   const summary = useMemo(() => {
     const ok = run.stepOutputs.filter((s) => s.status === "succeeded").length;
     const failed = run.stepOutputs.filter((s) => s.status === "failed").length;
@@ -533,7 +629,10 @@ function GraphTab({ graph, onEdit }: { graph: AgentGraph | null; onEdit: () => v
   }
   return (
     <div className="flex flex-col gap-3">
-      <SdkPreview graph={graph} />
+      {/* Canvas — agent's graph as a living diagram */}
+      <GraphFlowView graph={graph} />
+
+      {/* Edit affordance + step list (compact, supplementary) */}
       <div className="flex items-center justify-between">
         <span
           className="font-mono uppercase tracking-[0.14em]"
@@ -591,6 +690,9 @@ function GraphTab({ graph, onEdit }: { graph: AgentGraph | null; onEdit: () => v
           </div>
         ))}
       </div>
+
+      {/* SDK equivalent — collapsible code preview */}
+      <SdkPreview graph={graph} />
     </div>
   );
 }
