@@ -914,14 +914,30 @@ export async function tickEligibleAgents(): Promise<{
   errors: number;
 }> {
   const { listAliveAgents } = await import("./store");
+  const { tickGraphAgents, isGraphBasedAgent } = await import("./graph/scheduler");
   const agents = listAliveAgents();
   const now = Date.now();
 
   let ticked = 0;
   let errors = 0;
 
+  // Graph-based agents (the v1 composer): handled in their own
+  // scheduler which checks interval/cron triggers and dispatches
+  // through the run dispatcher. Legacy template path below skips
+  // these to avoid double-ticking.
+  try {
+    const result = await tickGraphAgents();
+    ticked += result.dispatched;
+    errors += result.errors;
+  } catch (e) {
+    console.error("[agent-pool] graph scheduler failed:", e);
+    errors++;
+  }
+
   for (const agent of agents) {
     if (agent.template === "atlas" && agent.id === "agt_atlas") continue;
+    // Skip graph-based agents — owned by the scheduler above.
+    if (isGraphBasedAgent(agent.id)) continue;
 
     // Section 3A — first-thought priority queue
     //   total_thoughts === 0  →  tick on the next pool cycle (no wait)
