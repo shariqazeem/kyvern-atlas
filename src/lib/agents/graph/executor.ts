@@ -29,6 +29,7 @@ import { executeHttp } from "./steps/http";
 import { executeLlm } from "./steps/llm";
 import { executeLog } from "./steps/log";
 import { executeTransferUsdc, executeVaultPay } from "./steps/pay";
+import { executeSignal } from "./steps/signal";
 import type {
   AgentGraph,
   RunContext,
@@ -174,6 +175,8 @@ async function dispatchLeaf(
   switch (step.type) {
     case "log":
       return executeLog(ctx, step.config);
+    case "signal":
+      return executeSignal(ctx, step.config);
     case "http":
       return executeHttp(ctx, step.config);
     case "llm":

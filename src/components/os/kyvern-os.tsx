@@ -9,11 +9,10 @@
  * card after the user already finished /unbox). Single source of
  * cinematic: /unbox → /app → no overlays.
  *
- * The bottom TabBar (Home/Findings/Settings) was also retired —
- * the alive console is self-contained and the legacy /app/inbox +
- * /app/settings routes had stale worker-era UIs. Kept the routes
- * alive for direct-link compatibility but no longer surfaced in
- * primary nav.
+ * The bottom TabBar (Home/Findings/Settings) is back as of v1.1 —
+ * graph agents now emit signals via the `signal` step type, so the
+ * Findings tab is meaningful again. Settings holds vault config +
+ * provider keys + master agent controls.
  */
 
 import { useEffect, useState } from "react";
@@ -21,6 +20,7 @@ import { usePathname } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
 import { ConnectGate } from "@/components/dashboard/connect-gate";
 import { StatusBar } from "./status-bar";
+import { TabBar } from "./tab-bar";
 
 const GUEST_WALLET_KEY = "kyvern:dev-wallet";
 
@@ -82,12 +82,13 @@ export function KyvernOS({ children }: { children: React.ReactNode }) {
       <main
         className={
           isDeviceShell
-            ? "pb-12 w-full"
-            : "px-5 sm:px-8 pb-24 max-w-[680px] mx-auto w-full"
+            ? "pb-28 w-full"
+            : "px-5 sm:px-8 pb-28 max-w-[680px] mx-auto w-full"
         }
       >
         {children}
       </main>
+      <TabBar />
     </div>
   );
 }

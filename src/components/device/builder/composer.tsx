@@ -562,6 +562,7 @@ function typeColor(t: StepType): { bg: string; fg: string } {
     case "vault.pay": return { bg: "rgba(34,197,94,0.12)", fg: "#15803D" };
     case "transfer.usdc": return { bg: "rgba(34,197,94,0.12)", fg: "#15803D" };
     case "log": return { bg: "rgba(15,23,42,0.06)", fg: "#374151" };
+    case "signal": return { bg: "rgba(236,72,153,0.12)", fg: "#9D174D" };
     case "branch": return { bg: "rgba(245,158,11,0.12)", fg: "#B45309" };
     case "loop": return { bg: "rgba(245,158,11,0.12)", fg: "#B45309" };
   }
@@ -580,6 +581,7 @@ function StepTypePicker({
     { type: "vault.pay", emoji: "💸", label: "vault.pay", desc: "Chain-enforced merchant payment" },
     { type: "transfer.usdc", emoji: "🪙", label: "transfer.usdc", desc: "Direct USDC transfer (allowlist)" },
     { type: "log", emoji: "📝", label: "log", desc: "Write to your event feed" },
+    { type: "signal", emoji: "📬", label: "signal", desc: "Emit a finding to your inbox" },
     { type: "branch", emoji: "🌿", label: "branch", desc: "If / else on a condition" },
     { type: "loop", emoji: "🔁", label: "loop", desc: "Iterate over an array" },
   ];
@@ -690,6 +692,19 @@ function makeStep(type: StepType): StepDef {
         type: "log",
         label: "Log",
         config: { message: "", level: "info" },
+      };
+    case "signal":
+      return {
+        id,
+        type: "signal",
+        label: "Emit finding",
+        config: {
+          kind: "alert",
+          subject: "",
+          evidence: "",
+          suggestion: "",
+          sourceUrl: "",
+        },
       };
     case "branch":
       return {

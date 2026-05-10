@@ -42,45 +42,63 @@ function newId(prefix: string): string {
   return `${prefix}_${randomUUID().slice(0, 8)}`;
 }
 
-/* ─── 1. Daily AI inference (LLM + log) ──────────────────────── */
+/* ─── 1. Daily Solana brief (LLM → log → signal) ─────────────── */
 
-const dailyAiInference: RecipeDef = {
-  id: "daily-ai-inference",
-  name: "Daily AI inference",
+const dailySolanaBrief: RecipeDef = {
+  id: "daily-solana-brief",
+  name: "Daily Solana brief",
   emoji: "🧠",
-  description: "Ask your LLM a question once a day, log the answer to your feed.",
+  description: "Every morning your agent writes a short Solana market brief and posts it to your inbox.",
   longDescription:
-    "Sends one prompt to Anthropic (BYOK key required) every 24 hours and " +
-    "logs the result to your device feed. The simplest possible LLM agent — " +
-    "good for daily summaries, scheduled status checks, or just kicking the " +
-    "tires on the composer.",
+    "Once a day at 8am UTC, your agent prompts your LLM (BYOK) for a 3-bullet " +
+    "summary of what's worth knowing about Solana right now — protocol news, " +
+    "ecosystem launches, notable on-chain moves. The result is logged to your " +
+    "event feed AND emitted as an inbox finding so you can scan it without " +
+    "clicking into the device. Good first agent for testing the loop.",
   tag: "ai",
   graph: {
     version: 1,
-    trigger: { kind: "interval", ms: 86_400_000 }, // 24h
-    config: { maxRunsPerDay: 5, maxCostPerRunUsd: 0.10 },
+    trigger: { kind: "cron", expr: "0 8 * * *" }, // daily at 8am UTC
+    config: { maxRunsPerDay: 3, maxCostPerRunUsd: 0.10 },
     steps: [
       {
         id: newId("step"),
         type: "llm",
-        label: "Ask Claude",
-        outputVar: "answer",
+        label: "Generate brief",
+        outputVar: "brief",
         config: {
           provider: "commonstack",
           model: COMMONSTACK_DEFAULT_MODEL,
-          system: "You are a concise assistant. Answer in 1-2 sentences.",
-          prompt: "Give me one interesting fact about Solana from this week.",
-          maxTokens: 200,
+          system:
+            "You write tight 3-bullet morning briefs for solo developers " +
+            "building on Solana. Each bullet is 1 short sentence. No " +
+            "preamble, no markdown headers. Just three bullets prefixed " +
+            "with '• '. Topics: protocol news, ecosystem launches, on-chain " +
+            "trends. Be specific. Don't fabricate dates.",
+          prompt: "Write today's Solana brief.",
+          maxTokens: 300,
           temperature: 0.7,
         },
       },
       {
         id: newId("step"),
         type: "log",
-        label: "Log answer to feed",
+        label: "Log to feed",
         config: {
-          message: "📰 Daily AI: {{answer.text}}",
+          message: "📰 Solana brief · {{brief.text}}",
           level: "info",
+        },
+      },
+      {
+        id: newId("step"),
+        type: "signal",
+        label: "Post to inbox",
+        config: {
+          kind: "daily_brief",
+          subject: "Today's Solana brief",
+          evidence: "{{brief.text}}",
+          suggestion: "",
+          sourceUrl: "",
         },
       },
     ],
@@ -173,45 +191,78 @@ const kastAutoTopup: RecipeDef = {
   },
 };
 
-/* ─── 4. Wallet watcher (HTTP poll, no money) ────────────────── */
+/* ─── 4. Wallet watcher (HTTP → LLM → signal) ────────────────── */
 
 const walletWatcher: RecipeDef = {
   id: "wallet-watcher",
   name: "Wallet watcher",
   emoji: "🔍",
-  description: "Poll a Solana address every 15 minutes; log significant moves.",
+  description: "Watch a Solana address. When something noteworthy happens, your agent posts a finding to your inbox.",
   longDescription:
-    "Hits the Helius API to fetch the SOL + USDC balance of a watched address. " +
-    "Logs any balance change to your feed. No money moves — pure observation. " +
-    "Replace the address with one you actually care about (e.g. a counterparty " +
-    "or your own cold wallet).",
+    "Every 15 minutes, fetches the latest signatures for a watched address " +
+    "from the public Solana RPC, asks your LLM whether anything looks " +
+    "noteworthy (large transfers, swaps, suspicious patterns), and emits an " +
+    "inbox finding when it is. No money moves — pure observation. Useful for " +
+    "watching a counterparty, a cold wallet, a treasury, or a competitor.\n\n" +
+    "Edit the watched address in the HTTP step's body before deploying.",
   tag: "watch",
   graph: {
     version: 1,
     trigger: { kind: "interval", ms: 900_000 }, // 15 min
-    config: { maxRunsPerDay: 100, maxCostPerRunUsd: 0 },
+    config: { maxRunsPerDay: 100, maxCostPerRunUsd: 0.05 },
     steps: [
       {
         id: newId("step"),
         type: "http",
-        label: "Fetch balance",
-        outputVar: "balance",
+        label: "Fetch recent signatures",
+        outputVar: "signatures",
         config: {
-          method: "GET",
+          method: "POST",
           url: "https://api.devnet.solana.com",
           headers: { "Content-Type": "application/json" },
-          body: null,
+          body: {
+            jsonrpc: "2.0",
+            id: 1,
+            method: "getSignaturesForAddress",
+            params: [
+              "<paste-address-to-watch>",
+              { limit: 5 },
+            ],
+          },
           payShWrap: false,
           timeoutMs: 30_000,
         },
       },
       {
         id: newId("step"),
-        type: "log",
-        label: "Log observation",
+        type: "llm",
+        label: "Assess significance",
+        outputVar: "assessment",
         config: {
-          message: "🔍 Wallet balance check at {{trigger.kind}} · status {{balance.status}}",
-          level: "info",
+          provider: "commonstack",
+          model: COMMONSTACK_DEFAULT_MODEL,
+          system:
+            "You're a wallet-watching analyst. Given recent Solana " +
+            "signatures, decide if anything in the last 15 minutes is " +
+            "worth a notification. Return a JSON object with two fields: " +
+            "{ \"alert\": boolean, \"summary\": string }. summary is " +
+            "max 1 sentence describing the most notable activity. Set " +
+            "alert=true only if something genuinely unusual happened.",
+          prompt: "Recent signatures: {{signatures.body}}",
+          maxTokens: 200,
+          temperature: 0,
+        },
+      },
+      {
+        id: newId("step"),
+        type: "signal",
+        label: "Post finding (if alert)",
+        config: {
+          kind: "wallet_watch",
+          subject: "Wallet activity flagged",
+          evidence: "{{assessment.text}}",
+          suggestion: "Click the source URL to see recent txs on Explorer.",
+          sourceUrl: "https://explorer.solana.com/address/<paste-address>?cluster=devnet",
         },
       },
     ],
@@ -321,23 +372,39 @@ const tipJar: RecipeDef = {
   },
 };
 
-/* ─── 7. Daily digest (LLM summarizes feed) ──────────────────── */
+/* ─── 7. Vault digest (HTTP → LLM → signal) ──────────────────── */
 
-const dailyDigest: RecipeDef = {
-  id: "daily-digest",
-  name: "Daily digest",
+const vaultDigest: RecipeDef = {
+  id: "vault-digest",
+  name: "Vault digest",
   emoji: "📜",
-  description: "LLM summarizes today's vault activity, posts to your feed.",
+  description: "Every evening your agent reads your vault's activity and posts a one-paragraph summary to your inbox.",
   longDescription:
-    "Once a day, asks your LLM provider to write a 2-sentence summary of the " +
-    "day. The current version uses a static prompt; v1.1 will pipe in the " +
-    "vault event feed as context so the digest reflects actual activity.",
+    "At 9pm UTC daily, fetches your vault's recent events (settled, blocked, " +
+    "and refused payments), asks your LLM to summarize the day in 2-3 " +
+    "sentences (what happened, what was blocked and why, what's notable), " +
+    "and emits the summary as an inbox finding. Calmer alternative to " +
+    "scrolling the feed — a daily 'how did my agents do' card.",
   tag: "ai",
   graph: {
     version: 1,
-    trigger: { kind: "cron", expr: "0 21 * * *" }, // 9pm UTC daily
+    trigger: { kind: "cron", expr: "0 21 * * *" }, // 9pm UTC
     config: { maxRunsPerDay: 2, maxCostPerRunUsd: 0.10 },
     steps: [
+      {
+        id: newId("step"),
+        type: "http",
+        label: "Fetch vault events",
+        outputVar: "events",
+        config: {
+          method: "GET",
+          url: "{{vault.id}}", // overridden after vault is known — placeholder
+          headers: {},
+          body: null,
+          payShWrap: false,
+          timeoutMs: 30_000,
+        },
+      },
       {
         id: newId("step"),
         type: "llm",
@@ -346,22 +413,25 @@ const dailyDigest: RecipeDef = {
         config: {
           provider: "commonstack",
           model: COMMONSTACK_DEFAULT_MODEL,
-          system: "You write concise daily summaries. 2 sentences max.",
-          prompt:
-            "Summarize the kind of day a typical Kyvern user might have had: " +
-            "a few payments settled, maybe a violation blocked, daily caps " +
-            "respected. Make it warm but factual.",
-          maxTokens: 150,
+          system:
+            "You write a calm 2-3 sentence end-of-day summary of a " +
+            "Solana vault's activity. Mention what settled, what was " +
+            "blocked, and any notable spend pattern. Don't make up data.",
+          prompt: "Today's events: {{events.body}}",
+          maxTokens: 250,
           temperature: 0.6,
         },
       },
       {
         id: newId("step"),
-        type: "log",
-        label: "Post digest",
+        type: "signal",
+        label: "Post digest to inbox",
         config: {
-          message: "📜 Today: {{digest.text}}",
-          level: "info",
+          kind: "vault_digest",
+          subject: "Today's vault digest",
+          evidence: "{{digest.text}}",
+          suggestion: "",
+          sourceUrl: "",
         },
       },
     ],
@@ -431,13 +501,13 @@ const quoteAndPay: RecipeDef = {
 /* ─── Export ─────────────────────────────────────────────────── */
 
 export const RECIPES: RecipeDef[] = [
-  dailyAiInference,
+  dailySolanaBrief,
   subscriptionRenewer,
   kastAutoTopup,
   walletWatcher,
   yieldRebalancer,
   tipJar,
-  dailyDigest,
+  vaultDigest,
   quoteAndPay,
 ];
 

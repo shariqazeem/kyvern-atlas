@@ -76,6 +76,14 @@ export const LogStepConfigSchema = z.object({
   level: z.enum(["info", "warn", "error"]),
 });
 
+export const SignalStepConfigSchema = z.object({
+  kind: z.string().min(1).max(64),
+  subject: z.string().min(1).max(256),
+  evidence: z.string().max(2000),
+  suggestion: z.string().max(500),
+  sourceUrl: z.string().max(500),
+});
+
 /* ─── On-error policy ────────────────────────────────────────── */
 
 export const OnErrorPolicySchema = z.enum(["fail", "skip", "continue"]);
@@ -111,6 +119,10 @@ export const StepDefSchema: z.ZodType<StepDef> = z.lazy(() =>
     StepBaseSchema.omit({ outputVar: true }).extend({
       type: z.literal("log"),
       config: LogStepConfigSchema,
+    }),
+    StepBaseSchema.omit({ outputVar: true }).extend({
+      type: z.literal("signal"),
+      config: SignalStepConfigSchema,
     }),
     StepBaseSchema.omit({ outputVar: true }).extend({
       type: z.literal("branch"),

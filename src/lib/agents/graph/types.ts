@@ -93,6 +93,21 @@ export interface LogStepConfig {
   level: "info" | "warn" | "error";
 }
 
+export interface SignalStepConfig {
+  /** Categorical kind — "alert" / "info" / "trigger_fired" etc. Used
+   *  by the inbox to color-code and group. Free-form string. */
+  kind: string;
+  /** One-line subject the inbox card shows as the title. Interpolated. */
+  subject: string;
+  /** Multi-line evidence (each line = one bullet on the card).
+   *  Interpolated. Use \n to separate. */
+  evidence: string;
+  /** Optional one-line action recommendation. Interpolated. */
+  suggestion: string;
+  /** Optional URL to anchor the finding (Explorer, Helius, etc.). */
+  sourceUrl: string;
+}
+
 export interface BranchStepConfig {
   /** Condition expression — restricted grammar (see expression.ts).
    *  Examples: "price < 90", "summary != ''", "count > 5 && active". */
@@ -119,6 +134,7 @@ export type StepType =
   | "vault.pay"
   | "transfer.usdc"
   | "log"
+  | "signal"
   | "branch"
   | "loop";
 
@@ -128,6 +144,7 @@ export type StepDef =
   | { id: string; type: "vault.pay"; label: string; config: VaultPayStepConfig; outputVar?: string; onError?: OnErrorPolicy }
   | { id: string; type: "transfer.usdc"; label: string; config: TransferUsdcStepConfig; outputVar?: string; onError?: OnErrorPolicy }
   | { id: string; type: "log"; label: string; config: LogStepConfig; onError?: OnErrorPolicy }
+  | { id: string; type: "signal"; label: string; config: SignalStepConfig; onError?: OnErrorPolicy }
   | { id: string; type: "branch"; label: string; config: BranchStepConfig; onError?: OnErrorPolicy }
   | { id: string; type: "loop"; label: string; config: LoopStepConfig; onError?: OnErrorPolicy };
 

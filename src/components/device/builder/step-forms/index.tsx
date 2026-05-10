@@ -108,6 +108,7 @@ export function StepForm({ step, onChange, priorSteps }: Props) {
       {step.type === "vault.pay" && <VaultPayFields step={step} onChange={onChange} />}
       {step.type === "transfer.usdc" && <TransferUsdcFields step={step} onChange={onChange} />}
       {step.type === "log" && <LogFields step={step} onChange={onChange} />}
+      {step.type === "signal" && <SignalFields step={step} onChange={onChange} />}
       {step.type === "branch" && <BranchFields step={step} onChange={onChange} priorSteps={priorSteps} />}
       {step.type === "loop" && <LoopFields step={step} onChange={onChange} priorSteps={priorSteps} />}
     </div>
@@ -506,6 +507,79 @@ function LogFields({
           <option>warn</option>
           <option>error</option>
         </select>
+      </Field>
+    </div>
+  );
+}
+
+/* ─── signal ─────────────────────────────────────────────────── */
+
+function SignalFields({
+  step,
+  onChange,
+}: {
+  step: Extract<StepDef, { type: "signal" }>;
+  onChange: (next: StepDef) => void;
+}) {
+  const setConfig = (patch: Partial<typeof step.config>) =>
+    onChange({ ...step, config: { ...step.config, ...patch } });
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="grid grid-cols-2 gap-2">
+        <Field label="Kind">
+          <input
+            type="text"
+            value={step.config.kind}
+            onChange={(e) => setConfig({ kind: e.target.value })}
+            placeholder="alert, info, trigger_fired …"
+            maxLength={64}
+            className="px-2 py-1.5 rounded text-[12px] font-mono"
+            style={TEXT_INPUT_STYLE}
+          />
+        </Field>
+        <Field label="Source URL (optional)">
+          <input
+            type="text"
+            value={step.config.sourceUrl}
+            onChange={(e) => setConfig({ sourceUrl: e.target.value })}
+            placeholder="https://… (Explorer, Helius, etc)"
+            maxLength={500}
+            className="px-2 py-1.5 rounded text-[12px] font-mono"
+            style={TEXT_INPUT_STYLE}
+          />
+        </Field>
+      </div>
+      <Field label="Subject (1-line title for the inbox card)">
+        <input
+          type="text"
+          value={step.config.subject}
+          onChange={(e) => setConfig({ subject: e.target.value })}
+          placeholder="SOL crossed your $90 trigger"
+          maxLength={256}
+          className="px-2 py-1.5 rounded text-[12px]"
+          style={TEXT_INPUT_STYLE}
+        />
+      </Field>
+      <Field label="Evidence (one bullet per line, up to 8)">
+        <textarea
+          value={step.config.evidence}
+          onChange={(e) => setConfig({ evidence: e.target.value })}
+          rows={4}
+          placeholder={"Price: ${{price}}\nTrigger: < $90\nVolume: {{volume}}"}
+          className="px-2 py-1.5 rounded text-[12px] resize-y"
+          style={TEXT_INPUT_STYLE}
+        />
+      </Field>
+      <Field label="Suggestion (optional)">
+        <input
+          type="text"
+          value={step.config.suggestion}
+          onChange={(e) => setConfig({ suggestion: e.target.value })}
+          placeholder="Mirror to Pulse / archive / take action"
+          maxLength={500}
+          className="px-2 py-1.5 rounded text-[12px]"
+          style={TEXT_INPUT_STYLE}
+        />
       </Field>
     </div>
   );
