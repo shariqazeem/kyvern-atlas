@@ -16,6 +16,7 @@ import type {
   LlmProvider,
   HttpStepConfig,
 } from "@/lib/agents/graph/types";
+import { VarInput } from "../var-input";
 
 interface Props {
   step: StepDef;
@@ -103,12 +104,12 @@ export function StepForm({ step, onChange, priorSteps }: Props) {
       )}
 
       {/* Type-specific body */}
-      {step.type === "llm" && <LlmFields step={step} onChange={onChange} />}
-      {step.type === "http" && <HttpFields step={step} onChange={onChange} />}
-      {step.type === "vault.pay" && <VaultPayFields step={step} onChange={onChange} />}
-      {step.type === "transfer.usdc" && <TransferUsdcFields step={step} onChange={onChange} />}
-      {step.type === "log" && <LogFields step={step} onChange={onChange} />}
-      {step.type === "signal" && <SignalFields step={step} onChange={onChange} />}
+      {step.type === "llm" && <LlmFields step={step} onChange={onChange} priorSteps={priorSteps} />}
+      {step.type === "http" && <HttpFields step={step} onChange={onChange} priorSteps={priorSteps} />}
+      {step.type === "vault.pay" && <VaultPayFields step={step} onChange={onChange} priorSteps={priorSteps} />}
+      {step.type === "transfer.usdc" && <TransferUsdcFields step={step} onChange={onChange} priorSteps={priorSteps} />}
+      {step.type === "log" && <LogFields step={step} onChange={onChange} priorSteps={priorSteps} />}
+      {step.type === "signal" && <SignalFields step={step} onChange={onChange} priorSteps={priorSteps} />}
       {step.type === "branch" && <BranchFields step={step} onChange={onChange} priorSteps={priorSteps} />}
       {step.type === "loop" && <LoopFields step={step} onChange={onChange} priorSteps={priorSteps} />}
     </div>
@@ -154,9 +155,11 @@ const LLM_MODELS: Record<LlmProvider, string[]> = {
 function LlmFields({
   step,
   onChange,
+  priorSteps,
 }: {
   step: Extract<StepDef, { type: "llm" }>;
   onChange: (next: StepDef) => void;
+  priorSteps: StepDef[];
 }) {
   const setConfig = (patch: Partial<typeof step.config>) =>
     onChange({ ...step, config: { ...step.config, ...patch } });
@@ -199,20 +202,24 @@ function LlmFields({
         </Field>
       </div>
       <Field label="System prompt">
-        <textarea
+        <VarInput
           value={step.config.system}
-          onChange={(e) => setConfig({ system: e.target.value })}
+          onChange={(v) => setConfig({ system: v })}
+          priorSteps={priorSteps}
+          multiline
           rows={2}
           className="px-2 py-1.5 rounded text-[12px] resize-y"
           style={TEXT_INPUT_STYLE}
         />
       </Field>
-      <Field label="Prompt">
-        <textarea
+      <Field label="Prompt — type {{ to insert a variable">
+        <VarInput
           value={step.config.prompt}
-          onChange={(e) => setConfig({ prompt: e.target.value })}
+          onChange={(v) => setConfig({ prompt: v })}
+          priorSteps={priorSteps}
+          multiline
           rows={4}
-          placeholder="What should the LLM do? Use {{var}} for dynamic values."
+          placeholder="What should the LLM do? Type {{ to reference prior step output, trigger payload, or vault info."
           className="px-2 py-1.5 rounded text-[12px] resize-y"
           style={TEXT_INPUT_STYLE}
         />
@@ -251,9 +258,11 @@ function LlmFields({
 function HttpFields({
   step,
   onChange,
+  priorSteps,
 }: {
   step: Extract<StepDef, { type: "http" }>;
   onChange: (next: StepDef) => void;
+  priorSteps: StepDef[];
 }) {
   const setConfig = (patch: Partial<HttpStepConfig>) =>
     onChange({ ...step, config: { ...step.config, ...patch } });
@@ -275,13 +284,14 @@ function HttpFields({
             <option>PATCH</option>
           </select>
         </Field>
-        <Field label="URL">
-          <input
-            type="text"
+        <Field label="URL — type {{ to insert a variable">
+          <VarInput
             value={step.config.url}
-            onChange={(e) => setConfig({ url: e.target.value })}
+            onChange={(v) => setConfig({ url: v })}
+            priorSteps={priorSteps}
             placeholder="https://api.example.com/path"
-            className="px-2 py-1.5 rounded text-[12px] font-mono"
+            font="mono"
+            className="px-2 py-1.5 rounded text-[12px]"
             style={TEXT_INPUT_STYLE}
           />
         </Field>
@@ -360,54 +370,58 @@ function HttpFields({
 function VaultPayFields({
   step,
   onChange,
+  priorSteps,
 }: {
   step: Extract<StepDef, { type: "vault.pay" }>;
   onChange: (next: StepDef) => void;
+  priorSteps: StepDef[];
 }) {
   const setConfig = (patch: Partial<typeof step.config>) =>
     onChange({ ...step, config: { ...step.config, ...patch } });
   return (
     <div className="flex flex-col gap-2">
       <Field label="Merchant (must be allowlisted)">
-        <input
-          type="text"
+        <VarInput
           value={step.config.merchant}
-          onChange={(e) => setConfig({ merchant: e.target.value })}
+          onChange={(v) => setConfig({ merchant: v })}
+          priorSteps={priorSteps}
           placeholder="api.openai.com"
-          className="px-2 py-1.5 rounded text-[12px] font-mono"
+          font="mono"
+          className="px-2 py-1.5 rounded text-[12px]"
           style={TEXT_INPUT_STYLE}
         />
       </Field>
       <Field label="To (Solana pubkey)">
-        <input
-          type="text"
+        <VarInput
           value={step.config.to}
-          onChange={(e) => setConfig({ to: e.target.value })}
+          onChange={(v) => setConfig({ to: v })}
+          priorSteps={priorSteps}
           placeholder="Pubkey of the recipient ATA owner"
-          className="px-2 py-1.5 rounded text-[12px] font-mono"
+          font="mono"
+          className="px-2 py-1.5 rounded text-[12px]"
           style={TEXT_INPUT_STYLE}
         />
       </Field>
       <div className="grid grid-cols-2 gap-2">
         <Field label="Amount (USDC)">
-          <input
-            type="text"
+          <VarInput
             value={String(step.config.amount)}
-            onChange={(e) => {
-              const v = e.target.value;
+            onChange={(v) => {
               const n = Number(v);
               setConfig({ amount: Number.isFinite(n) && !v.includes("{") ? n : v });
             }}
+            priorSteps={priorSteps}
             placeholder="0.05 or {{var}}"
-            className="px-2 py-1.5 rounded text-[12px] font-mono"
+            font="mono"
+            className="px-2 py-1.5 rounded text-[12px]"
             style={TEXT_INPUT_STYLE}
           />
         </Field>
         <Field label="Memo">
-          <input
-            type="text"
+          <VarInput
             value={step.config.memo}
-            onChange={(e) => setConfig({ memo: e.target.value })}
+            onChange={(v) => setConfig({ memo: v })}
+            priorSteps={priorSteps}
             maxLength={256}
             className="px-2 py-1.5 rounded text-[12px]"
             style={TEXT_INPUT_STYLE}
@@ -423,43 +437,47 @@ function VaultPayFields({
 function TransferUsdcFields({
   step,
   onChange,
+  priorSteps,
 }: {
   step: Extract<StepDef, { type: "transfer.usdc" }>;
   onChange: (next: StepDef) => void;
+  priorSteps: StepDef[];
 }) {
   const setConfig = (patch: Partial<typeof step.config>) =>
     onChange({ ...step, config: { ...step.config, ...patch } });
   return (
     <div className="flex flex-col gap-2">
       <Field label="To (allowlisted Solana pubkey)">
-        <input
-          type="text"
+        <VarInput
           value={step.config.to}
-          onChange={(e) => setConfig({ to: e.target.value })}
+          onChange={(v) => setConfig({ to: v })}
+          priorSteps={priorSteps}
           placeholder="Your MY_KAST address or another allowlisted recipient"
-          className="px-2 py-1.5 rounded text-[12px] font-mono"
+          font="mono"
+          className="px-2 py-1.5 rounded text-[12px]"
           style={TEXT_INPUT_STYLE}
         />
       </Field>
       <div className="grid grid-cols-2 gap-2">
         <Field label="Amount (USDC)">
-          <input
-            type="text"
+          <VarInput
             value={String(step.config.amount)}
-            onChange={(e) => {
-              const v = e.target.value;
+            onChange={(v) => {
               const n = Number(v);
               setConfig({ amount: Number.isFinite(n) && !v.includes("{") ? n : v });
             }}
-            className="px-2 py-1.5 rounded text-[12px] font-mono"
+            priorSteps={priorSteps}
+            placeholder="0.05 or {{var}}"
+            font="mono"
+            className="px-2 py-1.5 rounded text-[12px]"
             style={TEXT_INPUT_STYLE}
           />
         </Field>
         <Field label="Memo">
-          <input
-            type="text"
+          <VarInput
             value={step.config.memo}
-            onChange={(e) => setConfig({ memo: e.target.value })}
+            onChange={(v) => setConfig({ memo: v })}
+            priorSteps={priorSteps}
             maxLength={256}
             className="px-2 py-1.5 rounded text-[12px]"
             style={TEXT_INPUT_STYLE}
@@ -475,19 +493,21 @@ function TransferUsdcFields({
 function LogFields({
   step,
   onChange,
+  priorSteps,
 }: {
   step: Extract<StepDef, { type: "log" }>;
   onChange: (next: StepDef) => void;
+  priorSteps: StepDef[];
 }) {
   const setConfig = (patch: Partial<typeof step.config>) =>
     onChange({ ...step, config: { ...step.config, ...patch } });
   return (
     <div className="flex flex-col gap-2">
-      <Field label="Message (interpolated)">
-        <input
-          type="text"
+      <Field label="Message — type {{ to insert a variable">
+        <VarInput
           value={step.config.message}
-          onChange={(e) => setConfig({ message: e.target.value })}
+          onChange={(v) => setConfig({ message: v })}
+          priorSteps={priorSteps}
           placeholder="Daily price update: {{summary.text}}"
           maxLength={2000}
           className="px-2 py-1.5 rounded text-[12px]"
@@ -517,9 +537,11 @@ function LogFields({
 function SignalFields({
   step,
   onChange,
+  priorSteps,
 }: {
   step: Extract<StepDef, { type: "signal" }>;
   onChange: (next: StepDef) => void;
+  priorSteps: StepDef[];
 }) {
   const setConfig = (patch: Partial<typeof step.config>) =>
     onChange({ ...step, config: { ...step.config, ...patch } });
@@ -538,22 +560,23 @@ function SignalFields({
           />
         </Field>
         <Field label="Source URL (optional)">
-          <input
-            type="text"
+          <VarInput
             value={step.config.sourceUrl}
-            onChange={(e) => setConfig({ sourceUrl: e.target.value })}
+            onChange={(v) => setConfig({ sourceUrl: v })}
+            priorSteps={priorSteps}
             placeholder="https://… (Explorer, Helius, etc)"
             maxLength={500}
-            className="px-2 py-1.5 rounded text-[12px] font-mono"
+            font="mono"
+            className="px-2 py-1.5 rounded text-[12px]"
             style={TEXT_INPUT_STYLE}
           />
         </Field>
       </div>
-      <Field label="Subject (1-line title for the inbox card)">
-        <input
-          type="text"
+      <Field label="Subject — 1-line title for the inbox card">
+        <VarInput
           value={step.config.subject}
-          onChange={(e) => setConfig({ subject: e.target.value })}
+          onChange={(v) => setConfig({ subject: v })}
+          priorSteps={priorSteps}
           placeholder="SOL crossed your $90 trigger"
           maxLength={256}
           className="px-2 py-1.5 rounded text-[12px]"
@@ -561,9 +584,11 @@ function SignalFields({
         />
       </Field>
       <Field label="Evidence (one bullet per line, up to 8)">
-        <textarea
+        <VarInput
           value={step.config.evidence}
-          onChange={(e) => setConfig({ evidence: e.target.value })}
+          onChange={(v) => setConfig({ evidence: v })}
+          priorSteps={priorSteps}
+          multiline
           rows={4}
           placeholder={"Price: ${{price}}\nTrigger: < $90\nVolume: {{volume}}"}
           className="px-2 py-1.5 rounded text-[12px] resize-y"
@@ -571,10 +596,10 @@ function SignalFields({
         />
       </Field>
       <Field label="Suggestion (optional)">
-        <input
-          type="text"
+        <VarInput
           value={step.config.suggestion}
-          onChange={(e) => setConfig({ suggestion: e.target.value })}
+          onChange={(v) => setConfig({ suggestion: v })}
+          priorSteps={priorSteps}
           placeholder="Mirror to Pulse / archive / take action"
           maxLength={500}
           className="px-2 py-1.5 rounded text-[12px]"

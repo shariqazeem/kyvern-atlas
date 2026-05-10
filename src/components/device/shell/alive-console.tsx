@@ -300,9 +300,13 @@ export function AliveConsole({
         vaultId={vaultId}
         ownerWallet={ownerWallet}
         onClose={() => setBuilderOpen(false)}
-        onDeployed={() => {
+        onDeployed={(agentId: string) => {
           setBuilderOpen(false);
-          // Bump the canvas's key so it remounts + refetches
+          // Route the user to the new agent's detail page so the
+          // "I just deployed something — now let me see it work"
+          // moment is one click closed instead of a manual hunt
+          // back through the canvas tile.
+          router.push(`/app/agents/${agentId}`);
           setCanvasRefreshKey((k) => k + 1);
         }}
       />

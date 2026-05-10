@@ -19,6 +19,7 @@ import { X, ArrowLeft } from "lucide-react";
 import { RECIPES, cloneRecipeGraph, type RecipeDef } from "@/lib/agents/graph/recipes";
 import { Composer } from "./composer";
 import { RecipeGallery } from "./recipe-gallery";
+import { RecipeReview } from "./recipe-review";
 import type { AgentGraph } from "@/lib/agents/graph/types";
 
 interface Props {
@@ -39,7 +40,7 @@ interface Props {
   onDeployed: (agentId: string) => void;
 }
 
-type Step = "pick" | "edit";
+type Step = "pick" | "review" | "edit";
 
 export function BuilderModal({
   open,
@@ -49,22 +50,34 @@ export function BuilderModal({
   editingAgent,
   onDeployed,
 }: Props) {
-  // If editing, skip the pick step entirely.
+  // If editing, skip pick/review entirely and go straight to compose.
   const [step, setStep] = useState<Step>(editingAgent ? "edit" : "pick");
   const [seedGraph, setSeedGraph] = useState<AgentGraph | null>(
     editingAgent?.graph ?? null,
   );
   const [seedName, setSeedName] = useState<string>(editingAgent?.name ?? "");
   const [seedEmoji, setSeedEmoji] = useState<string>(editingAgent?.emoji ?? "🤖");
+  // The recipe being reviewed, kept so the Customize button can
+  // hand its name+emoji+graph clone to the composer.
+  const [reviewRecipe, setReviewRecipe] = useState<RecipeDef | null>(null);
 
   function handleRecipePick(recipe: RecipeDef) {
+    // Land on the review screen, NOT the full composer. Median user
+    // deploys in two clicks. Power user clicks Customize to open the
+    // composer with this graph pre-loaded.
+    setReviewRecipe(recipe);
     setSeedGraph(cloneRecipeGraph(recipe));
     setSeedName(recipe.name);
     setSeedEmoji(recipe.emoji);
+    setStep("review");
+  }
+
+  function handleCustomizeFromReview() {
     setStep("edit");
   }
 
   function handleStartBlank() {
+    setReviewRecipe(null);
     setSeedGraph(emptyGraph());
     setSeedName("");
     setSeedEmoji("🤖");
@@ -78,6 +91,7 @@ export function BuilderModal({
     setTimeout(() => {
       if (!editingAgent) {
         setStep("pick");
+        setReviewRecipe(null);
         setSeedGraph(null);
         setSeedName("");
         setSeedEmoji("🤖");
@@ -125,10 +139,14 @@ export function BuilderModal({
                 style={{ borderBottom: "1px solid rgba(15,23,42,0.08)" }}
               >
                 <div className="flex items-center gap-2">
-                  {step === "edit" && !editingAgent && (
+                  {(step === "edit" || step === "review") && !editingAgent && (
                     <button
                       type="button"
-                      onClick={() => setStep("pick")}
+                      onClick={() =>
+                        step === "edit" && reviewRecipe
+                          ? setStep("review")
+                          : setStep("pick")
+                      }
                       className="p-1 rounded hover:bg-slate-100"
                       aria-label="Back"
                     >
@@ -143,7 +161,9 @@ export function BuilderModal({
                       ? `Edit · ${editingAgent.name}`
                       : step === "pick"
                         ? "Deploy a new agent"
-                        : "Compose"}
+                        : step === "review"
+                          ? "Review & deploy"
+                          : "Compose"}
                   </h2>
                 </div>
                 <button
@@ -163,6 +183,20 @@ export function BuilderModal({
                     recipes={RECIPES}
                     onPick={handleRecipePick}
                     onStartBlank={handleStartBlank}
+                  />
+                )}
+                {step === "review" && reviewRecipe && seedGraph && (
+                  <RecipeReview
+                    recipe={reviewRecipe}
+                    graph={seedGraph}
+                    vaultId={vaultId}
+                    ownerWallet={ownerWallet}
+                    onCustomize={handleCustomizeFromReview}
+                    onDeployed={(id) => {
+                      onDeployed(id);
+                      handleClose();
+                    }}
+                    onCancel={() => setStep("pick")}
                   />
                 )}
                 {step === "edit" && seedGraph && (

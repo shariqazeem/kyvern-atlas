@@ -12,6 +12,7 @@
 import { motion } from "framer-motion";
 import { Sparkles } from "lucide-react";
 import type { RecipeDef } from "@/lib/agents/graph/recipes";
+import { RecipeIcon } from "./step-icon";
 
 interface Props {
   recipes: RecipeDef[];
@@ -55,7 +56,7 @@ function RecipeCard({ recipe, onClick }: { recipe: RecipeDef; onClick: () => voi
       }}
     >
       <div className="flex items-center justify-between">
-        <span className="text-[20px] leading-none">{recipe.emoji}</span>
+        <RecipeIcon recipeId={recipe.id} tag={recipe.tag} size={36} />
         <TagPill tag={recipe.tag} />
       </div>
       <div

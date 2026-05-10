@@ -26,6 +26,7 @@ import type {
 import { TriggerForm } from "./trigger-form";
 import { StepForm } from "./step-forms/index";
 import { TestRunPanel, type TestRunResult } from "./test-run-panel";
+import { StepIcon } from "./step-icon";
 
 interface Props {
   initialGraph: AgentGraph;
@@ -333,22 +334,25 @@ export function Composer({
       {/* Test run results */}
       {testRun && <TestRunPanel result={testRun} onClose={() => setTestRun(null)} />}
 
-      {/* Bottom bar */}
-      <div className="flex items-center justify-between gap-2 pt-2" style={{ borderTop: "1px solid rgba(15,23,42,0.08)" }}>
+      {/* Bottom bar — paired CTAs, right-aligned */}
+      <div
+        className="flex items-center justify-end gap-2 pt-3"
+        style={{ borderTop: "1px solid rgba(15,23,42,0.08)" }}
+      >
         <button
           type="button"
           onClick={runTest}
           disabled={!editingAgentId || busy !== null}
           title={
             !editingAgentId
-              ? "Deploy first — Test run executes a saved agent. After Deploy, you can run from the agent's detail page."
+              ? "Deploy first — Test run executes a saved agent."
               : "Run this agent once with the saved graph"
           }
           className="flex items-center gap-1.5 px-3 py-2 rounded-[10px] text-[12.5px] font-medium disabled:opacity-50"
           style={{
             background: "rgba(15,23,42,0.04)",
             border: "1px solid rgba(15,23,42,0.10)",
-            color: "#0A0A0A",
+            color: "rgba(15,23,42,0.75)",
           }}
         >
           <Play className="w-3.5 h-3.5" />
@@ -362,7 +366,7 @@ export function Composer({
           style={{
             background: "#22C55E",
             color: "#FFFFFF",
-            boxShadow: "0 1px 2px rgba(34,197,94,0.30)",
+            boxShadow: "0 1px 2px rgba(34,197,94,0.30), 0 8px 20px -8px rgba(34,197,94,0.40)",
           }}
         >
           <Save className="w-3.5 h-3.5" />
@@ -487,24 +491,31 @@ function StepCard({
         border: `1px solid ${expanded ? "rgba(34,197,94,0.30)" : "rgba(15,23,42,0.10)"}`,
       }}
     >
-      <div className="flex items-center gap-2 px-2.5 py-2">
-        <span
-          className="rounded px-1.5 py-0.5 font-mono uppercase tracking-[0.10em]"
-          style={{
-            background: typeColor(step.type).bg,
-            color: typeColor(step.type).fg,
-            fontSize: 8.5,
-          }}
-        >
-          {step.type}
-        </span>
+      <div className="flex items-center gap-2.5 pl-2 pr-1.5 py-1.5 group">
+        <StepIcon type={step.type} size={28} />
         <button
           type="button"
           onClick={onToggle}
-          className="flex-1 text-left text-[12.5px] font-medium tracking-[-0.005em] truncate"
-          style={{ color: "#0A0A0A" }}
+          className="flex-1 text-left min-w-0"
         >
-          {step.label || "(unlabeled)"}
+          <div
+            className="text-[12.5px] font-semibold tracking-[-0.005em] truncate"
+            style={{ color: "#0A0A0A" }}
+          >
+            {step.label || "(unlabeled)"}
+          </div>
+          <div
+            className="font-mono uppercase tracking-[0.10em]"
+            style={{ fontSize: 9, color: "rgba(15,23,42,0.45)" }}
+          >
+            {step.type}
+            {"outputVar" in step && step.outputVar && (
+              <span style={{ color: "rgba(15,23,42,0.40)" }}>
+                {" · → "}
+                {step.outputVar}
+              </span>
+            )}
+          </div>
         </button>
         <div className="flex items-center gap-0.5">
           <IconBtn onClick={onMoveUp} disabled={!onMoveUp} title="Move up">
@@ -555,19 +566,6 @@ function IconBtn({
   );
 }
 
-function typeColor(t: StepType): { bg: string; fg: string } {
-  switch (t) {
-    case "llm": return { bg: "rgba(168,85,247,0.12)", fg: "#7E22CE" };
-    case "http": return { bg: "rgba(59,130,246,0.12)", fg: "#1E3A8A" };
-    case "vault.pay": return { bg: "rgba(34,197,94,0.12)", fg: "#15803D" };
-    case "transfer.usdc": return { bg: "rgba(34,197,94,0.12)", fg: "#15803D" };
-    case "log": return { bg: "rgba(15,23,42,0.06)", fg: "#374151" };
-    case "signal": return { bg: "rgba(236,72,153,0.12)", fg: "#9D174D" };
-    case "branch": return { bg: "rgba(245,158,11,0.12)", fg: "#B45309" };
-    case "loop": return { bg: "rgba(245,158,11,0.12)", fg: "#B45309" };
-  }
-}
-
 function StepTypePicker({
   onPick,
   onCancel,
@@ -575,15 +573,36 @@ function StepTypePicker({
   onPick: (type: StepType) => void;
   onCancel: () => void;
 }) {
-  const types: Array<{ type: StepType; emoji: string; label: string; desc: string }> = [
-    { type: "llm", emoji: "🧠", label: "LLM", desc: "Anthropic / OpenAI / DeepSeek / Commonstack" },
-    { type: "http", emoji: "🌐", label: "HTTP", desc: "GET/POST any URL (with optional pay.sh wrap)" },
-    { type: "vault.pay", emoji: "💸", label: "vault.pay", desc: "Chain-enforced merchant payment" },
-    { type: "transfer.usdc", emoji: "🪙", label: "transfer.usdc", desc: "Direct USDC transfer (allowlist)" },
-    { type: "log", emoji: "📝", label: "log", desc: "Write to your event feed" },
-    { type: "signal", emoji: "📬", label: "signal", desc: "Emit a finding to your inbox" },
-    { type: "branch", emoji: "🌿", label: "branch", desc: "If / else on a condition" },
-    { type: "loop", emoji: "🔁", label: "loop", desc: "Iterate over an array" },
+  // Grouped by role so users can scan by intent (money / logic /
+  // output) instead of scanning all eight options. Same grouping as
+  // the StepIcon palette colors.
+  const groups: Array<{
+    label: string;
+    types: Array<{ type: StepType; label: string; desc: string }>;
+  }> = [
+    {
+      label: "Money",
+      types: [
+        { type: "vault.pay", label: "vault.pay", desc: "Chain-enforced merchant payment" },
+        { type: "transfer.usdc", label: "transfer.usdc", desc: "Direct USDC transfer (allowlist)" },
+      ],
+    },
+    {
+      label: "Logic",
+      types: [
+        { type: "llm", label: "LLM", desc: "Anthropic / OpenAI / DeepSeek / Commonstack" },
+        { type: "http", label: "HTTP", desc: "GET/POST any URL (with pay.sh wrap)" },
+        { type: "branch", label: "Branch", desc: "If / else on a condition" },
+        { type: "loop", label: "Loop", desc: "Iterate over an array" },
+      ],
+    },
+    {
+      label: "Output",
+      types: [
+        { type: "log", label: "Log", desc: "Write to your event feed" },
+        { type: "signal", label: "Signal", desc: "Emit a finding to your inbox" },
+      ],
+    },
   ];
   return (
     <>
@@ -596,37 +615,43 @@ function StepTypePicker({
         className="fixed inset-0 z-[60] flex items-center justify-center p-4 pointer-events-none"
       >
         <div
-          className="w-full max-w-[480px] rounded-[14px] p-3 pointer-events-auto"
+          className="w-full max-w-[520px] rounded-[14px] p-3 pointer-events-auto"
           style={{
             background: "#FFFFFF",
             border: "1px solid rgba(15,23,42,0.10)",
             boxShadow: "0 24px 60px -16px rgba(15,23,42,0.30)",
           }}
         >
-          <p
-            className="px-1 py-1 text-[11px] font-mono uppercase tracking-[0.14em]"
-            style={{ color: "#9CA3AF" }}
-          >
-            Pick a step type
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 mt-1">
-            {types.map((t) => (
-              <button
-                key={t.type}
-                type="button"
-                onClick={() => onPick(t.type)}
-                className="flex items-start gap-2 p-2 rounded-[8px] hover:bg-slate-50 text-left"
-              >
-                <span className="text-[16px] leading-none mt-0.5">{t.emoji}</span>
-                <div>
-                  <div className="text-[12.5px] font-semibold" style={{ color: "#0A0A0A" }}>
-                    {t.label}
-                  </div>
-                  <div className="text-[11px]" style={{ color: "rgba(15,23,42,0.55)" }}>
-                    {t.desc}
-                  </div>
+          <div className="flex flex-col gap-3">
+            {groups.map((group) => (
+              <div key={group.label} className="flex flex-col gap-1">
+                <p
+                  className="px-1 text-[11px] font-mono uppercase tracking-[0.14em]"
+                  style={{ color: "#9CA3AF" }}
+                >
+                  {group.label}
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                  {group.types.map((t) => (
+                    <button
+                      key={t.type}
+                      type="button"
+                      onClick={() => onPick(t.type)}
+                      className="flex items-center gap-2.5 p-2 rounded-[8px] hover:bg-slate-50 text-left"
+                    >
+                      <StepIcon type={t.type} size={28} />
+                      <div className="min-w-0">
+                        <div className="text-[12.5px] font-semibold truncate" style={{ color: "#0A0A0A" }}>
+                          {t.label}
+                        </div>
+                        <div className="text-[10.5px] truncate" style={{ color: "rgba(15,23,42,0.55)" }}>
+                          {t.desc}
+                        </div>
+                      </div>
+                    </button>
+                  ))}
                 </div>
-              </button>
+              </div>
             ))}
           </div>
         </div>
