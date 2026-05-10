@@ -3,25 +3,32 @@
 /**
  * AliveConsole — /app's mission-control stage.
  *
- * Post-pivot (2026-05-10): the body of /app is now a single Worker
- * Card (Atlas), framed as the reference autonomous worker, plus a
- * Deploy-a-Worker template gallery and a small Developer-mode link.
+ * The user's signed-in surface. After the 2026-05-10 swap, the hero
+ * is the user's OWN vault as a Worker Card (not Atlas). Atlas is
+ * demoted to a small reference strip — still the inevitability proof,
+ * but no longer the protagonist on the user's device.
  *
- * The earlier two-column wizard+feed layout moved to /app/developer
- * — kept for SDK users, off the main stage. Atlas's data is real,
- * unbroken since 2026-04-20, and tells the inevitability story
- * better than any onboarding wizard could.
+ * Layout, top-to-bottom:
+ *   1. Whisper line
+ *   2. <UserVaultCard> — hero, mounted with the user's primary vault
+ *   3. <AtlasReferenceStrip> — one-line callout to /atlas
+ *   4. <WorkerTemplates> — provision-vault + roadmap cards
+ *   5. Developer mode link
  *
- * Props are kept compatible with the prior shape since /app/page.tsx
- * still passes them in; vaultId / ownerWallet / etc. are no longer
- * read by the body, but the prop surface stays so callers don't break.
+ * Data: /api/vault/[id] for the user's vault (same endpoint as the
+ * per-vault page). Polls every 5s.
  */
 
 import Link from "next/link";
+import { useCallback, useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Code2, ArrowRight } from "lucide-react";
-import { WorkerCard } from "../worker/worker-card";
+import { ArrowRight, Code2 } from "lucide-react";
 import { WorkerTemplates } from "../worker/worker-templates";
+import {
+  UserVaultCard,
+  type VaultPayload,
+} from "../worker/user-vault-card";
+import { AtlasReferenceStrip } from "../worker/atlas-reference-strip";
 import type { PanelKind } from "../home/affordance-row";
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
@@ -37,10 +44,40 @@ interface Props {
   className?: string;
 }
 
-export function AliveConsole({ className }: Props) {
+export function AliveConsole({ vaultId, ownerWallet, className }: Props) {
+  const [data, setData] = useState<VaultPayload | null>(null);
+  const [now, setNow] = useState<number>(() => Date.now());
+
+  // Local clock — drives "last call 17s ago" + age timer
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  // Load user's vault payload + poll
+  const load = useCallback(async () => {
+    if (!vaultId) return;
+    try {
+      const r = await fetch(`/api/vault/${vaultId}?limit=20`, {
+        cache: "no-store",
+      });
+      if (!r.ok) return;
+      const d = (await r.json()) as VaultPayload;
+      setData(d);
+    } catch {
+      /* swallow */
+    }
+  }, [vaultId]);
+  useEffect(() => {
+    void load();
+    if (!vaultId) return;
+    const t = setInterval(load, 5_000);
+    return () => clearInterval(t);
+  }, [load, vaultId]);
+
   return (
     <div className={`flex flex-col gap-4 sm:gap-5 ${className ?? ""}`}>
-      {/* Whisper line — sets the frame: Atlas is the proof, deploy your own. */}
+      {/* Whisper line — sets the frame: this is YOUR worker */}
       <motion.div
         initial={{ opacity: 0, y: 4 }}
         animate={{ opacity: 1, y: 0 }}
@@ -51,18 +88,26 @@ export function AliveConsole({ className }: Props) {
           className="text-[12.5px] tracking-[-0.005em]"
           style={{ color: "rgba(15,23,42,0.55)" }}
         >
-          Atlas is the reference autonomous worker — running for 20 days on
-          Solana devnet. Provision your own vault to build the next one.
+          Your worker is provisioned. Click <span style={{ fontWeight: 600 }}>Watch
+          the chain refuse</span> for your first on-chain proof, or wire your
+          code via the SDK.
         </p>
       </motion.div>
 
-      {/* Hero: Atlas worker card — the unforgettable proof */}
-      <WorkerCard />
+      {/* Hero: USER's vault Worker Card (or skeleton until data lands) */}
+      {data ? (
+        <UserVaultCard data={data} ownerWallet={ownerWallet} now={now} />
+      ) : (
+        <UserVaultSkeleton />
+      )}
 
-      {/* Deploy a Worker — 1 real (Clone Atlas) + 4 roadmap */}
+      {/* Atlas demoted to reference strip */}
+      <AtlasReferenceStrip />
+
+      {/* Build your worker — provision + roadmap */}
       <WorkerTemplates />
 
-      {/* Developer mode — discoverable but off-stage */}
+      {/* Developer mode link */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -97,6 +142,52 @@ export function AliveConsole({ className }: Props) {
           />
         </Link>
       </motion.div>
+    </div>
+  );
+}
+
+function UserVaultSkeleton() {
+  return (
+    <div
+      className="relative w-full"
+      style={{
+        background: "#FFFFFF",
+        borderRadius: 20,
+        border: "1px solid rgba(15,23,42,0.06)",
+        minHeight: 420,
+      }}
+    >
+      <div className="p-6 flex flex-col gap-5">
+        <div className="flex items-center gap-3">
+          <div
+            className="w-14 h-14 rounded-[14px]"
+            style={{ background: "rgba(15,23,42,0.05)" }}
+          />
+          <div className="flex flex-col gap-2 flex-1">
+            <div
+              className="h-5 rounded w-32"
+              style={{ background: "rgba(15,23,42,0.05)" }}
+            />
+            <div
+              className="h-3 rounded w-48"
+              style={{ background: "rgba(15,23,42,0.04)" }}
+            />
+          </div>
+        </div>
+        <div
+          className="h-20 rounded-[14px]"
+          style={{ background: "rgba(15,23,42,0.04)" }}
+        />
+        <div className="grid grid-cols-4 gap-2">
+          {[0, 1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="h-16 rounded-[12px]"
+              style={{ background: "rgba(15,23,42,0.03)" }}
+            />
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
