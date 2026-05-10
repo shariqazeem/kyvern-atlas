@@ -253,9 +253,200 @@ const vaultDigest: RecipeDef = {
   },
 };
 
+/* ─── 4. Pulse · price-trigger swap ──────────────────────────── */
+//
+// Watches SOL price every 10 minutes. When SOL crosses below the
+// threshold ($90 default), fires a chain-enforced "swap" payment
+// of $0.01 USDC to Atlas's vault — memoed as a SOL swap intent.
+// The on-chain artifact is real either way:
+//
+//   · If the user has allowlisted "kyvern.swap.sol" → settles, real
+//     Explorer link in the inbox card.
+//   · If not (default) → chain refuses with code 12005 → real
+//     failed-tx with the program error in the trace.
+//
+// THIS IS THE DEMO — every Pulse fire produces a verifiable on-chain
+// artifact regardless. The recipient is Atlas's owner wallet (a
+// stable platform-side anchor with a USDC ATA since 2026-04-20).
+
+const ATLAS_OWNER_WALLET = "26H7uJfss352DnB8uWc1MTgg2Vuk2ZL9oEwV2i7sLTpp";
+
+const pulseTrigger: RecipeDef = {
+  id: "pulse-trigger",
+  name: "Pulse · price trigger",
+  emoji: "📈",
+  description: "Watches SOL. When it dips below your threshold, fires a chain-enforced swap.",
+  longDescription:
+    "Every 10 minutes, fetches the SOL/USD price from CoinGecko. If SOL " +
+    "crosses below $90 (edit in the composer), fires a vault.pay through " +
+    "the on-chain Kyvern policy program — chain-enforced cap, chain-enforced " +
+    "merchant allowlist. Either the swap settles (if you've allowlisted " +
+    "`kyvern.swap.sol`) or the chain refuses with custom error code 12005 — " +
+    "real failed tx, real Explorer link, every time.",
+  tag: "spend",
+  graph: {
+    version: 1,
+    trigger: { kind: "interval", ms: 600_000 }, // 10 min
+    config: { maxRunsPerDay: 144, maxCostPerRunUsd: 0.10 },
+    steps: [
+      {
+        id: newId("step"),
+        type: "http",
+        label: "Fetch SOL price",
+        outputVar: "price",
+        config: {
+          method: "GET",
+          url: "https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd",
+          headers: {},
+          body: null,
+          payShWrap: false,
+          timeoutMs: 20_000,
+        },
+      },
+      {
+        id: newId("step"),
+        type: "log",
+        label: "Note current price",
+        config: {
+          message: "📊 SOL · live ${{price.body.solana.usd}}",
+          level: "info",
+        },
+      },
+      {
+        id: newId("step"),
+        type: "branch",
+        label: "Below $90?",
+        config: {
+          condition: "price.body.solana.usd < 90",
+          then: [
+            {
+              id: newId("step"),
+              type: "vault.pay",
+              label: "Fire swap intent · USDC → SOL",
+              outputVar: "fire",
+              config: {
+                merchant: "kyvern.swap.sol",
+                to: ATLAS_OWNER_WALLET,
+                amount: 0.01,
+                memo: "kvn.swap.SOL · pulse fire · ${{price.body.solana.usd}}",
+              },
+            },
+            {
+              id: newId("step"),
+              type: "signal",
+              label: "Pulse fired",
+              config: {
+                kind: "trigger_fired",
+                subject: "Pulse fired · SOL crossed your trigger",
+                evidence:
+                  "Trigger: SOL < $90\n" +
+                  "Live: ${{price.body.solana.usd}}\n" +
+                  "Fire signature: {{?fire.signature}}\n" +
+                  "Outcome: {{?fire.reason}}",
+                suggestion:
+                  "Allowlist `kyvern.swap.sol` on your vault to let future fires settle.",
+                sourceUrl: "{{?fire.explorerUrl}}",
+              },
+            },
+          ],
+          else: [
+            {
+              id: newId("step"),
+              type: "log",
+              label: "Above threshold — idle",
+              config: {
+                message: "🔵 SOL ${{price.body.solana.usd}} > $90 · trigger idle",
+                level: "info",
+              },
+            },
+          ],
+        },
+      },
+    ],
+  },
+};
+
+/* ─── 5. Pay.sh quote · live x402 paid call ──────────────────── */
+//
+// Buys a real $0.001 AAPL stock quote from pay.sh's debugger
+// service. Round-trips:
+//   1. Off-chain policy check (per-tx cap, allowlist)
+//   2. On-chain settlement via Squads spending limit
+//   3. pay binary invokes the x402 paid call (sandbox mode at the
+//      pay.sh layer — ephemeral wallet, no real-money there)
+//   4. AAPL quote JSON returned + posted to inbox
+//
+// Demonstrates the moat: the chain gates the API spend BEFORE pay.sh
+// is invoked. Cap exceeded → chain refusal, pay.sh never called.
+// Real on-chain artifact every run.
+
+const paySh: RecipeDef = {
+  id: "paysh-quote",
+  name: "Pay.sh quote · AAPL",
+  emoji: "🛰️",
+  description: "Buy a real x402-paid stock quote. Chain settles first, then pay.sh executes.",
+  longDescription:
+    "Every hour, fires a chain-enforced $0.001 USDC payment via Squads, " +
+    "then shells out to the pay binary to invoke pay.sh's debugger service " +
+    "(`debugger.pay.sh/mpp/quote/AAPL`). Returns an AAPL quote you'd " +
+    "otherwise need a Bloomberg subscription for. The Kyvern policy program " +
+    "is the gate — every pay.sh call passes through it before USDC moves.",
+  tag: "spend",
+  graph: {
+    version: 1,
+    trigger: { kind: "interval", ms: 3_600_000 }, // 1 hour
+    config: { maxRunsPerDay: 24, maxCostPerRunUsd: 0.10 },
+    steps: [
+      {
+        id: newId("step"),
+        type: "http",
+        label: "Buy AAPL quote via pay.sh",
+        outputVar: "quote",
+        config: {
+          method: "GET",
+          url: "https://debugger.pay.sh/mpp/quote/AAPL",
+          headers: {},
+          body: null,
+          // The magic flag — routes through serverVaultPay first
+          // (chain enforcement) then shells out to `pay --sandbox curl`.
+          // The chain refuses if the spend exceeds the per-tx cap.
+          payShWrap: true,
+          timeoutMs: 60_000,
+        },
+      },
+      {
+        id: newId("step"),
+        type: "log",
+        label: "Log quote",
+        config: {
+          message:
+            "🛰️ AAPL via pay.sh · settled {{quote.paySh.signature}} · {{quote.body}}",
+          level: "info",
+        },
+      },
+      {
+        id: newId("step"),
+        type: "signal",
+        label: "Post to inbox",
+        config: {
+          kind: "paysh_quote",
+          subject: "AAPL quote bought via pay.sh",
+          evidence:
+            "Chain-settled: {{quote.paySh.signature}}\n" +
+            "Pay.sh response: {{quote.body}}",
+          suggestion: "View the chain artifact on Solana Explorer.",
+          sourceUrl: "{{quote.paySh.explorerUrl}}",
+        },
+      },
+    ],
+  },
+};
+
 /* ─── Export ─────────────────────────────────────────────────── */
 
 export const RECIPES: RecipeDef[] = [
+  pulseTrigger,
+  paySh,
   dailySolanaBrief,
   walletWatcher,
   vaultDigest,

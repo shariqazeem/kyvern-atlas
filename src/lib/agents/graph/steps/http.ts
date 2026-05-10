@@ -77,16 +77,20 @@ export async function executeHttp(
     }
   }
 
-  // pay.sh wrap — TODO P1.4b will route through the existing pay.sh
-  // helper used by /api/atlas/probe-paysh. For now, no-op (the
-  // composer can still call x402-paid endpoints by adding the
-  // X-PAYMENT header explicitly).
+  const timeoutMs = Math.min(Math.max(config.timeoutMs ?? 60_000, 1000), 120_000);
+
+  // pay.sh wrap — settle a chain-enforced $0.001 USDC payment via
+  // serverVaultPay (so the policy program gates the API spend), then
+  // shell out to the pay binary which handles the x402 paid call.
+  // Same path /api/atlas/probe-paysh uses.
+  //
+  // The chain-enforcement story: every pay.sh call passes through
+  // PpmZ…MSqc first. Cap exceeded → chain refusal before pay.sh
+  // is invoked at all. This is the differentiator vs raw pay.sh.
   if (config.payShWrap) {
-    // Not yet implemented — falls through to plain fetch.
-    headers["X-Kyvern-Pay-Sh-Wrap"] = "v0-pending";
+    return executePayShWrap(ctx, parsed.toString(), timeoutMs);
   }
 
-  const timeoutMs = Math.min(Math.max(config.timeoutMs ?? 60_000, 1000), 120_000);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -153,5 +157,117 @@ export async function executeHttp(
       body: parsedBody,
       headers: Object.fromEntries(response.headers.entries()),
     },
+  };
+}
+
+/* ─── pay.sh wrap (real x402 path) ───────────────────────────── */
+
+// Atlas's owner wallet — stable platform-side recipient with a USDC
+// ATA since 2026-04-20. The vault.pay routes here, the chain enforces
+// the cap, then we shell out to the pay binary to do the actual
+// x402 payment + fetch.
+const PAYSH_RECIPIENT = "26H7uJfss352DnB8uWc1MTgg2Vuk2ZL9oEwV2i7sLTpp";
+// Default amount per pay.sh call — small, well under typical caps.
+const PAYSH_DEFAULT_USD = 0.001;
+
+async function executePayShWrap(
+  ctx: RunContext,
+  url: string,
+  timeoutMs: number,
+): Promise<StepExecutionResult> {
+  // Lazy-load to keep the bundle small for graphs that don't use
+  // pay.sh.
+  const [{ serverVaultPay }, { execFile }, { promisify }] = await Promise.all([
+    import("@/lib/server-pay"),
+    import("child_process"),
+    import("util"),
+  ]);
+  const execFileAsync = promisify(execFile);
+
+  // 1. Off-chain check + chain settle. The chain enforces the cap;
+  //    if refused, pay.sh is never called.
+  const fire = await serverVaultPay({
+    vaultId: ctx.vaultId,
+    merchant: "api.pay.sh",
+    recipientPubkey: PAYSH_RECIPIENT,
+    amountUsd: PAYSH_DEFAULT_USD,
+    memo: `pay.sh wrap · ${new URL(url).host}`,
+    logEvent: {
+      eventType: "spending_sent",
+      counterparty: "🛰️ Pay.sh",
+      description: `pay.sh · ${new URL(url).host} · $${PAYSH_DEFAULT_USD.toFixed(3)}`,
+    },
+  });
+  if (!fire.success) {
+    return {
+      ok: false,
+      output: {
+        reason: fire.reason ?? "vault.pay refused",
+        blocked: !!fire.blocked,
+        signature: fire.signature ?? null,
+        explorerUrl: fire.explorerUrl ?? null,
+      },
+      error: fire.reason ?? "pay.sh wrap refused on-chain",
+      signature: fire.signature ?? undefined,
+      signatureStatus: "failed",
+      costUsd: 0,
+    };
+  }
+
+  // 2. Shell out to `pay --sandbox curl <url>`. Same path
+  //    /api/atlas/probe-paysh uses. Sandbox flag means an ephemeral
+  //    wallet is used at the pay.sh layer (no real money there).
+  const PAY_BIN = process.env.PAY_BIN ?? "pay";
+  let payOutput = "";
+  try {
+    const { stdout } = await execFileAsync(
+      PAY_BIN,
+      ["--sandbox", "curl", url],
+      { timeout: timeoutMs, maxBuffer: 256 * 1024 },
+    );
+    payOutput = stdout;
+  } catch (e) {
+    return {
+      ok: false,
+      output: {
+        chain_settled: true,
+        signature: fire.signature,
+        explorerUrl: fire.explorerUrl,
+        pay_error: e instanceof Error ? e.message : String(e),
+      },
+      error: `pay binary error: ${e instanceof Error ? e.message : e}`,
+      signature: fire.signature ?? undefined,
+      signatureStatus: "success",
+      costUsd: PAYSH_DEFAULT_USD,
+    };
+  }
+
+  // 3. Parse pay output. The pay binary interleaves status events on
+  //    stdout; the actual API response is the last JSON-looking line.
+  const trimmed = payOutput.trim();
+  const lines = trimmed.split("\n").filter((l) => l.trim().length > 0);
+  let parsedPayBody: unknown = trimmed;
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const c = lines[i].trim();
+    if (c.startsWith("{") || c.startsWith("[")) {
+      try { parsedPayBody = JSON.parse(c); break; } catch { /* keep raw */ }
+    }
+  }
+
+  return {
+    ok: true,
+    output: {
+      status: 200,
+      body: parsedPayBody,
+      paySh: {
+        settled: true,
+        signature: fire.signature,
+        explorerUrl: fire.explorerUrl,
+        amountUsd: PAYSH_DEFAULT_USD,
+      },
+    },
+    signature: fire.signature ?? undefined,
+    signatureStatus: "success",
+    costUsd: PAYSH_DEFAULT_USD,
   };
 }

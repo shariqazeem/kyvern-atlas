@@ -121,9 +121,12 @@ import {
   HandCoins,
   ScrollText,
   Receipt,
+  Satellite,
 } from "lucide-react";
 
 const RECIPE_ICON: Record<string, LucideIcon> = {
+  "pulse-trigger": TrendingUp,
+  "paysh-quote": Satellite,
   "daily-solana-brief": Newspaper,
   "subscription-renewer": RefreshCw,
   "kast-auto-topup": CreditCard,
