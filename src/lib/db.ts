@@ -920,6 +920,64 @@ function migrate(db: Database.Database) {
   } catch {
     /* fresh DB or no token_pulse rows yet — fine */
   }
+
+  // ── Agent Platform v1 — graph composer ───────────────────────────
+  //
+  // agents.graph_json — the user-composed StepDef[] + trigger + budget
+  // config (see src/lib/agents/graph/types.ts). NULL on legacy agents
+  // (Atlas, the worker-era trio) so the runner can fall back to its
+  // current LLM/scripted path. Agents created via the composer have
+  // this set; runner.tickEligibleAgents() consults it for cron/interval
+  // eligibility before the legacy frequency_seconds gate.
+  tryAlter(`ALTER TABLE agents ADD COLUMN graph_json TEXT`);
+
+  // agent_runs — one row per execution of a graph. The step-by-step
+  // detail is JSON-blobbed in step_outputs_json (an array of StepOutput).
+  // Indexed on (agent_id, started_at DESC) for the agent detail page's
+  // run-history tab. trigger_kind mirrors the graph's TriggerDef.kind
+  // for filterability without parsing the JSON blob.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS agent_runs (
+      id                TEXT PRIMARY KEY,
+      agent_id          TEXT NOT NULL,
+      started_at        INTEGER NOT NULL,
+      finished_at       INTEGER,
+      status            TEXT NOT NULL,
+      trigger_kind      TEXT NOT NULL,
+      trigger_payload   TEXT,
+      step_outputs_json TEXT NOT NULL DEFAULT '[]',
+      error_message     TEXT,
+      total_cost_usd    REAL NOT NULL DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS idx_agent_runs_recent
+      ON agent_runs(agent_id, started_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_agent_runs_status
+      ON agent_runs(status, started_at DESC);
+  `);
+
+  // user_provider_keys — BYOK storage for LLM step execution. Each
+  // owner_wallet can have one key per (provider, label) combination.
+  // encrypted_key_blob is AES-GCM ciphertext keyed off
+  // KYVERN_KEY_VAULT_SECRET (see src/lib/agents/graph/keys-crypto.ts).
+  // last_test_status caches the most recent verifyKey() result so the
+  // UI can show "✓ working" / "✗ quota_exceeded" without re-pinging
+  // the provider on every render.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS user_provider_keys (
+      id                  TEXT PRIMARY KEY,
+      owner_wallet        TEXT NOT NULL,
+      provider            TEXT NOT NULL,
+      label               TEXT NOT NULL,
+      encrypted_key_blob  TEXT NOT NULL,
+      key_last4           TEXT NOT NULL,
+      created_at          INTEGER NOT NULL,
+      last_used_at        INTEGER,
+      last_test_status    TEXT,
+      last_test_at        INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_user_provider_keys_owner
+      ON user_provider_keys(owner_wallet, provider);
+  `);
 }
 
 // --- Benchmark Queries (cross-user market intelligence) ---
