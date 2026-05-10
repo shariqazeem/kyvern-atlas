@@ -25,6 +25,8 @@ import { AgentEventFeed } from "../feed/agent-event-feed";
 import { IntegrationWizard } from "../wizard/integration-wizard";
 import { GraphCanvas } from "../graph-canvas/canvas";
 import { BuilderModal } from "../builder/modal";
+import { KeysModal } from "../keys/keys-modal";
+import { Key } from "lucide-react";
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
@@ -59,9 +61,10 @@ export function AliveConsole({
     lastEventTs: null,
   });
 
-  // Agent platform v1 — graph canvas + builder modal
+  // Agent platform v1 — graph canvas + builder modal + keys modal
   const router = useRouter();
   const [builderOpen, setBuilderOpen] = useState(false);
+  const [keysOpen, setKeysOpen] = useState(false);
   const [canvasRefreshKey, setCanvasRefreshKey] = useState(0);
 
   // Hydrate agent key prefix once
@@ -133,8 +136,26 @@ export function AliveConsole({
 
   return (
     <div className={`flex flex-col gap-3 h-full ${className ?? ""}`}>
-      {/* T4 — live agent status line */}
-      <AgentStatusLine keyPrefix={keyPrefix} lastEventTs={stats.lastEventTs} />
+      {/* T4 — live agent status line + provider keys button */}
+      <div className="flex items-center justify-center gap-2 flex-wrap">
+        <AgentStatusLine keyPrefix={keyPrefix} lastEventTs={stats.lastEventTs} />
+        <button
+          type="button"
+          onClick={() => setKeysOpen(true)}
+          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full transition"
+          style={{
+            background: "rgba(15,23,42,0.04)",
+            border: "1px solid rgba(15,23,42,0.06)",
+            fontSize: 9.5,
+          }}
+          title="Manage provider keys (BYOK)"
+        >
+          <Key className="w-3 h-3" style={{ color: "#6B7280" }} strokeWidth={2.2} />
+          <span className="font-mono uppercase tracking-[0.14em]" style={{ color: "#9CA3AF" }}>
+            Keys
+          </span>
+        </button>
+      </div>
 
       {/* Agent platform v1 — graph canvas. Empty state: deploy CTA.
           Otherwise: tiles + strings to vault. Clicking a tile opens
@@ -284,6 +305,13 @@ export function AliveConsole({
           // Bump the canvas's key so it remounts + refetches
           setCanvasRefreshKey((k) => k + 1);
         }}
+      />
+
+      {/* BYOK provider keys modal */}
+      <KeysModal
+        open={keysOpen}
+        ownerWallet={ownerWallet}
+        onClose={() => setKeysOpen(false)}
       />
     </div>
   );

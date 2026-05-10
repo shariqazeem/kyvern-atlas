@@ -18,6 +18,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { AgentPageShell } from "@/components/device/agent/agent-page-shell";
+import { GraphAgentDetail } from "@/components/device/agent/graph-detail";
 import type { ChatMessage } from "@/components/agent/chat-drawer";
 import type {
   PulseConfig,
@@ -76,6 +77,9 @@ export default function AgentDetailPage({
   const [lastFinding, setLastFinding] = useState<LiveStateFinding | null>(null);
   const [inputValue, setInputValue] = useState("");
   const [sending, setSending] = useState(false);
+  // Agent platform v1: when the agent is graph-based, swap to the
+  // composer-aware detail view instead of the legacy worker shell.
+  const [hasGraph, setHasGraph] = useState<boolean | null>(null);
 
   const isFreshParam = searchParams.get("fresh") === "true";
   const showActivation =
@@ -107,6 +111,7 @@ export default function AgentDetailPage({
       const agentJson = await agentRes.json();
       const chatJson = await chatRes.json();
       setAgent(agentJson.agent);
+      setHasGraph(agentJson.hasGraph === true);
       setLastAction((agentJson.lastAction as LiveStateAction | null) ?? null);
       setLastFinding(
         (agentJson.lastFinding as LiveStateFinding | null) ?? null,
@@ -234,6 +239,12 @@ export default function AgentDetailPage({
         />
       </div>
     );
+  }
+
+  // Graph-based agent — render the composer-aware detail view
+  // and skip the legacy worker shell entirely.
+  if (hasGraph) {
+    return <GraphAgentDetail agentId={params.id} />;
   }
 
   if (error || !agent) {
