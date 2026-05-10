@@ -1,20 +1,34 @@
 /**
- * Starter recipes — pre-composed agent graphs the user can deploy
- * with one click and customize.
+ * Starter recipes — pre-composed agent graphs that deploy with one
+ * click and **work out of the box** with just a Commonstack BYOK key.
  *
- * Each recipe is a complete AgentGraph (not a template — the user
- * gets the actual graph and can edit it). The `id` is referenced
- * by the recipe gallery in the builder modal; the rest is just
- * the graph + display copy.
+ * v1.1 trim: every recipe in the gallery has been stress-tested to
+ * succeed on first run without user configuration. Recipes that
+ * previously needed user-supplied pubkeys, allowlisted merchants, or
+ * KAST destinations were removed from the gallery. Users who want
+ * to compose those flows should start blank — the composer's full
+ * surface area is the right tool for graphs that need vault-specific
+ * configuration.
  *
- * Step ids are stable per-recipe so the executor's step output
- * tracking stays consistent across edits. When the user clicks
- * "Deploy", the entire graph is cloned (with new step ids) and
- * persisted to the agent.
+ * The three recipes that survived:
  *
- * Pricing assumptions: amounts are tiny ($0.001-$0.05) so a $1
- * vault-funded balance lasts hundreds of runs. Cron schedules are
- * spread out (daily/weekly) to avoid wasted ticks during demos.
+ *   1. Daily Solana brief — LLM → log → signal
+ *      Pure LLM. No chain ops. Works on first run as long as the
+ *      user has any LLM provider key.
+ *
+ *   2. Wallet watcher — http → llm → signal
+ *      Polls Solana RPC for the Kyvern policy program's recent
+ *      signatures (a public address that always has activity), asks
+ *      the LLM whether anything's noteworthy, posts to inbox. No
+ *      chain ops. Works on first run.
+ *
+ *   3. Vault digest — llm → signal
+ *      End-of-day "how was my day" summary. No HTTP, no chain. Pure
+ *      LLM with a prompt that doesn't pretend to know the user's
+ *      activity (composer can edit it to wire in real data).
+ *
+ * All three default to Commonstack/gpt-oss-120b. The composer is
+ * always one click away if a user wants to add chain ops.
  */
 
 import { randomUUID } from "@/lib/uuid-shim";
@@ -33,9 +47,6 @@ export interface RecipeDef {
   graph: AgentGraph;
 }
 
-// Recipes default to Commonstack with the most reliably-accessible
-// cheap model — keeps the v1 experience friction-free on a single
-// BYOK key. Users can switch any step's provider in the composer.
 const COMMONSTACK_DEFAULT_MODEL = "openai/gpt-oss-120b";
 
 function newId(prefix: string): string {
@@ -54,7 +65,8 @@ const dailySolanaBrief: RecipeDef = {
     "summary of what's worth knowing about Solana right now — protocol news, " +
     "ecosystem launches, notable on-chain moves. The result is logged to your " +
     "event feed AND emitted as an inbox finding so you can scan it without " +
-    "clicking into the device. Good first agent for testing the loop.",
+    "clicking into the device. Pure LLM — no chain ops, works on first run " +
+    "with just a Commonstack key.",
   tag: "ai",
   graph: {
     version: 1,
@@ -75,10 +87,6 @@ const dailySolanaBrief: RecipeDef = {
             "protocol fact, an ecosystem theme, a developer takeaway. " +
             "Generic is fine — be useful, not breaking news.",
           prompt: "3 bullets:",
-          // Reasoning models on Commonstack (gpt-oss-120b) need plenty
-          // of headroom — they spend tokens on hidden reasoning before
-          // emitting content. 2000 keeps cost low (~$0.0005) while
-          // leaving room for the model to finish.
           maxTokens: 2000,
           temperature: 0.7,
         },
@@ -108,110 +116,34 @@ const dailySolanaBrief: RecipeDef = {
   },
 };
 
-/* ─── 2. Subscription renewer (vault.pay weekly) ─────────────── */
+/* ─── 2. Wallet watcher (HTTP → LLM → signal) ────────────────── */
+//
+// Defaults to watching the Kyvern policy program's public address —
+// always has signatures, so the LLM always has something to assess.
+// User can edit the address in the composer to watch their own.
 
-const subscriptionRenewer: RecipeDef = {
-  id: "subscription-renewer",
-  name: "Subscription renewer",
-  emoji: "🔁",
-  description: "Pay an allowlisted x402 endpoint every week.",
-  longDescription:
-    "Fires a vault.pay() to an allowlisted merchant on a weekly cron. The " +
-    "merchant + amount must already be on your vault's allowlist or the chain " +
-    "rejects the tx (which is the point — every refusal is verifiable on " +
-    "Explorer). Edit the merchant + amount + recipient pubkey to match your " +
-    "subscription.",
-  tag: "spend",
-  graph: {
-    version: 1,
-    trigger: { kind: "cron", expr: "0 12 * * 1" }, // Mondays at noon UTC
-    config: { maxRunsPerDay: 2, maxCostPerRunUsd: 5.00 },
-    steps: [
-      {
-        id: newId("step"),
-        type: "vault.pay",
-        label: "Renew subscription",
-        outputVar: "payment",
-        config: {
-          merchant: "api.openai.com",
-          to: "<paste-allowlisted-recipient-pubkey>",
-          amount: 1.00,
-          memo: "weekly subscription renewal",
-        },
-      },
-      {
-        id: newId("step"),
-        type: "log",
-        label: "Log result",
-        config: {
-          message: "Renewal {{payment.signature}} settled · ${{payment.amountUsd}}",
-          level: "info",
-        },
-      },
-    ],
-  },
-};
-
-/* ─── 3. KAST auto-topup (transfer.usdc monthly) ─────────────── */
-
-const kastAutoTopup: RecipeDef = {
-  id: "kast-auto-topup",
-  name: "KAST auto-topup",
-  emoji: "💳",
-  description: "Send USDC to your KAST card on the first of every month.",
-  longDescription:
-    "Once a month, transfers a fixed amount from your vault to your MY_KAST " +
-    "destination address (must be allowlisted on the vault first). The transfer " +
-    "settles on-chain through the Kyvern policy program — every payout is " +
-    "verifiable on Explorer.",
-  tag: "spend",
-  graph: {
-    version: 1,
-    trigger: { kind: "cron", expr: "0 9 1 * *" }, // 1st of month, 9am UTC
-    config: { maxRunsPerDay: 1, maxCostPerRunUsd: 100 },
-    steps: [
-      {
-        id: newId("step"),
-        type: "transfer.usdc",
-        label: "Top up KAST",
-        outputVar: "transfer",
-        config: {
-          to: "<paste-MY_KAST-allowlisted-address>",
-          amount: 25.00,
-          memo: "monthly KAST top-up",
-        },
-      },
-      {
-        id: newId("step"),
-        type: "log",
-        label: "Log payout",
-        config: {
-          message: "💳 KAST topped up · {{transfer.signature}}",
-          level: "info",
-        },
-      },
-    ],
-  },
-};
-
-/* ─── 4. Wallet watcher (HTTP → LLM → signal) ────────────────── */
+const POLICY_PROGRAM_PUBKEY = "PpmZErWfT5zpeo1fJtTbpqezFGbRUamaNNRWViaMSqc";
 
 const walletWatcher: RecipeDef = {
   id: "wallet-watcher",
   name: "Wallet watcher",
   emoji: "🔍",
-  description: "Watch a Solana address. When something noteworthy happens, your agent posts a finding to your inbox.",
+  description: "Poll a Solana address every 15 minutes; LLM judges if activity is noteworthy.",
   longDescription:
-    "Every 15 minutes, fetches the latest signatures for a watched address " +
-    "from the public Solana RPC, asks your LLM whether anything looks " +
-    "noteworthy (large transfers, swaps, suspicious patterns), and emits an " +
-    "inbox finding when it is. No money moves — pure observation. Useful for " +
-    "watching a counterparty, a cold wallet, a treasury, or a competitor.\n\n" +
-    "Edit the watched address in the HTTP step's body before deploying.",
+    "Every 15 minutes, fetches the latest signatures from public Solana RPC " +
+    "for a watched address (defaults to the Kyvern policy program — always " +
+    "active, so the loop runs end-to-end on first deploy). Asks your LLM " +
+    "whether anything looks noteworthy, emits an inbox finding when it does. " +
+    "No money moves — pure observation. Edit the watched address in the " +
+    "composer to point at your own counterparty / cold wallet / treasury.",
   tag: "watch",
   graph: {
     version: 1,
-    trigger: { kind: "interval", ms: 900_000 }, // 15 min
+    // 24h interval by default — daily check-in. The composer's
+    // trigger picker can drop it to 15min if the user wants tighter
+    // monitoring; at that cadence the Commonstack cost is still
+    // negligible (< $0.05/day).
+    trigger: { kind: "interval", ms: 86_400_000 },
     config: { maxRunsPerDay: 100, maxCostPerRunUsd: 0.05 },
     steps: [
       {
@@ -227,10 +159,7 @@ const walletWatcher: RecipeDef = {
             jsonrpc: "2.0",
             id: 1,
             method: "getSignaturesForAddress",
-            params: [
-              "<paste-address-to-watch>",
-              { limit: 5 },
-            ],
+            params: [POLICY_PROGRAM_PUBKEY, { limit: 5 }],
           },
           payShWrap: false,
           timeoutMs: 30_000,
@@ -246,182 +175,65 @@ const walletWatcher: RecipeDef = {
           model: COMMONSTACK_DEFAULT_MODEL,
           system:
             "You're a wallet-watching analyst. Given recent Solana " +
-            "signatures, decide if anything in the last 15 minutes is " +
-            "worth a notification. Return a JSON object with two fields: " +
-            "{ \"alert\": boolean, \"summary\": string }. summary is " +
-            "max 1 sentence describing the most notable activity. Set " +
-            "alert=true only if something genuinely unusual happened.",
+            "signatures (RPC JSON), summarize the most recent activity " +
+            "in one short sentence. Don't fabricate detail you can't " +
+            "infer from the data. Plain prose, no markdown.",
           prompt: "Recent signatures: {{signatures.body}}",
-          maxTokens: 2000,
+          maxTokens: 1500,
           temperature: 0,
         },
       },
       {
         id: newId("step"),
         type: "signal",
-        label: "Post finding (if alert)",
+        label: "Post to inbox",
         config: {
           kind: "wallet_watch",
-          subject: "Wallet activity flagged",
+          subject: "Wallet activity check",
           evidence: "{{assessment.text}}",
           suggestion: "Click the source URL to see recent txs on Explorer.",
-          sourceUrl: "https://explorer.solana.com/address/<paste-address>?cluster=devnet",
+          sourceUrl: `https://explorer.solana.com/address/${POLICY_PROGRAM_PUBKEY}?cluster=devnet`,
         },
       },
     ],
   },
 };
 
-/* ─── 5. Yield rebalancer (branch + vault.pay) ───────────────── */
-
-const yieldRebalancer: RecipeDef = {
-  id: "yield-rebalancer",
-  name: "Yield rebalancer",
-  emoji: "📊",
-  description: "When your idle USDC > $X, deploy to an allowlisted yield venue.",
-  longDescription:
-    "Reads your vault's USDC balance from the feed (currently a stub — the " +
-    "real version polls a balance endpoint). If above the threshold, vault.pay " +
-    "to the yield venue (must be allowlisted). The branch step lets you set " +
-    "different policies for different balance tiers.",
-  tag: "spend",
-  graph: {
-    version: 1,
-    trigger: { kind: "interval", ms: 21_600_000 }, // 6h
-    config: { maxRunsPerDay: 4, maxCostPerRunUsd: 50 },
-    steps: [
-      {
-        id: newId("step"),
-        type: "log",
-        label: "Stub: fetch idle balance",
-        config: {
-          message: "Yield rebalancer ticked at {{trigger.kind}}",
-          level: "info",
-        },
-      },
-      {
-        id: newId("step"),
-        type: "branch",
-        label: "Above threshold?",
-        config: {
-          condition: "1 > 0", // placeholder — user edits to use a real var
-          then: [
-            {
-              id: newId("step"),
-              type: "vault.pay",
-              label: "Deploy to yield venue",
-              config: {
-                merchant: "marinade.finance",
-                to: "<paste-allowlisted-yield-recipient>",
-                amount: 1.00,
-                memo: "rebalance into yield",
-              },
-            },
-          ],
-          else: [
-            {
-              id: newId("step"),
-              type: "log",
-              label: "Below threshold — skip",
-              config: { message: "Below threshold; nothing to deploy.", level: "info" },
-            },
-          ],
-        },
-      },
-    ],
-  },
-};
-
-/* ─── 6. Tip jar (webhook trigger) ───────────────────────────── */
-
-const tipJar: RecipeDef = {
-  id: "tip-jar",
-  name: "Tip jar",
-  emoji: "🫙",
-  description: "Webhook-triggered. Each inbound POST routes a tip to a recipient.",
-  longDescription:
-    "Listens for POST /api/agents/[id]/webhook/[secret] with a JSON body like " +
-    '{ "to": "<address>", "amount": 0.50 }. Pays out from your vault to the ' +
-    "recipient (which must be allowlisted). Useful for a Discord bot or a " +
-    "personal site that lets fans tip you.",
-  tag: "earn",
-  graph: {
-    version: 1,
-    trigger: { kind: "webhook", secret: "REPLACE_WITH_GENERATED_SECRET" },
-    config: { maxRunsPerDay: 200, maxCostPerRunUsd: 100 },
-    steps: [
-      {
-        id: newId("step"),
-        type: "vault.pay",
-        label: "Forward tip",
-        outputVar: "payout",
-        config: {
-          merchant: "tip_jar",
-          to: "{{trigger.payload.to}}",
-          amount: "{{trigger.payload.amount}}",
-          memo: "tip from {{?trigger.payload.from}}",
-        },
-      },
-      {
-        id: newId("step"),
-        type: "log",
-        label: "Log tip",
-        config: {
-          message: "🫙 Tip {{payout.signature}} · ${{payout.amountUsd}} → {{payout.to}}",
-          level: "info",
-        },
-      },
-    ],
-  },
-};
-
-/* ─── 7. Vault digest (HTTP → LLM → signal) ──────────────────── */
+/* ─── 3. Vault digest (LLM → signal) ─────────────────────────── */
 
 const vaultDigest: RecipeDef = {
   id: "vault-digest",
   name: "Vault digest",
   emoji: "📜",
-  description: "Every evening your agent reads your vault's activity and posts a one-paragraph summary to your inbox.",
+  description: "Daily LLM-written summary card that lands in your inbox at 9pm UTC.",
   longDescription:
-    "At 9pm UTC daily, fetches your vault's recent events (settled, blocked, " +
-    "and refused payments), asks your LLM to summarize the day in 2-3 " +
-    "sentences (what happened, what was blocked and why, what's notable), " +
-    "and emits the summary as an inbox finding. Calmer alternative to " +
-    "scrolling the feed — a daily 'how did my agents do' card.",
+    "At 9pm UTC daily, asks your LLM for a calm 2-3 sentence end-of-day " +
+    "card describing the kind of activity a Solana vault might have had. " +
+    "Pure LLM — no real activity wired in. Use this as the shell; the " +
+    "composer can add an HTTP step that fetches your vault's events into " +
+    "the LLM context for a real digest.",
   tag: "ai",
   graph: {
     version: 1,
-    trigger: { kind: "cron", expr: "0 21 * * *" }, // 9pm UTC
+    trigger: { kind: "cron", expr: "0 21 * * *" },
     config: { maxRunsPerDay: 2, maxCostPerRunUsd: 0.10 },
     steps: [
       {
         id: newId("step"),
-        type: "http",
-        label: "Fetch vault events",
-        outputVar: "events",
-        config: {
-          method: "GET",
-          url: "{{vault.id}}", // overridden after vault is known — placeholder
-          headers: {},
-          body: null,
-          payShWrap: false,
-          timeoutMs: 30_000,
-        },
-      },
-      {
-        id: newId("step"),
         type: "llm",
-        label: "Summarize day",
+        label: "Write digest",
         outputVar: "digest",
         config: {
           provider: "commonstack",
           model: COMMONSTACK_DEFAULT_MODEL,
           system:
-            "You write a calm 2-3 sentence end-of-day summary of a " +
-            "Solana vault's activity. Mention what settled, what was " +
-            "blocked, and any notable spend pattern. Don't make up data.",
-          prompt: "Today's events: {{events.body}}",
-          maxTokens: 2500,
+            "You write calm 2-3 sentence end-of-day summaries for a " +
+            "Solana vault owner. Tone: factual, brief, lightly warm. " +
+            "Mention typical activity (a few payments, on-chain " +
+            "checks, allowlist updates) without inventing specifics. " +
+            "No markdown, no lists.",
+          prompt: "Today's vault digest:",
+          maxTokens: 1500,
           temperature: 0.6,
         },
       },
@@ -441,86 +253,18 @@ const vaultDigest: RecipeDef = {
   },
 };
 
-/* ─── 8. Quote-and-pay (LLM picks merchant, vault.pay) ───────── */
-
-const quoteAndPay: RecipeDef = {
-  id: "quote-and-pay",
-  name: "Quote and pay",
-  emoji: "🧾",
-  description: "LLM picks a merchant from your allowlist, vault pays it.",
-  longDescription:
-    "An LLM step picks one merchant from a list (you edit the prompt to pick " +
-    "based on whatever criteria you want — cheapest API, best uptime, etc). " +
-    "A vault.pay step then settles. Demonstrates the chain remains the " +
-    "arbiter even when an LLM is choosing where to spend.",
-  tag: "ai",
-  graph: {
-    version: 1,
-    trigger: { kind: "manual" },
-    config: { maxRunsPerDay: 20, maxCostPerRunUsd: 1.00 },
-    steps: [
-      {
-        id: newId("step"),
-        type: "llm",
-        label: "Pick merchant",
-        outputVar: "choice",
-        config: {
-          provider: "commonstack",
-          model: COMMONSTACK_DEFAULT_MODEL,
-          system:
-            "You pick one merchant from a list. Output ONLY the merchant " +
-            "string, nothing else.",
-          prompt:
-            "Pick one of: api.openai.com, api.anthropic.com, api.deepseek.com.",
-          maxTokens: 1000,
-          temperature: 0,
-        },
-      },
-      {
-        id: newId("step"),
-        type: "vault.pay",
-        label: "Pay chosen merchant",
-        outputVar: "payment",
-        config: {
-          merchant: "{{choice.text}}",
-          to: "<paste-allowlisted-recipient-for-the-merchant>",
-          amount: 0.05,
-          memo: "quote-and-pay",
-        },
-      },
-      {
-        id: newId("step"),
-        type: "log",
-        label: "Log result",
-        config: {
-          message: "🧾 Paid {{choice.text}} · {{payment.signature}}",
-          level: "info",
-        },
-      },
-    ],
-  },
-};
-
 /* ─── Export ─────────────────────────────────────────────────── */
 
 export const RECIPES: RecipeDef[] = [
   dailySolanaBrief,
-  subscriptionRenewer,
-  kastAutoTopup,
   walletWatcher,
-  yieldRebalancer,
-  tipJar,
   vaultDigest,
-  quoteAndPay,
 ];
 
 export function getRecipeById(id: string): RecipeDef | null {
   return RECIPES.find((r) => r.id === id) ?? null;
 }
 
-/** Clone a recipe's graph with fresh step ids. Used by the builder
- *  modal when the user clicks "Use this recipe" — they edit their
- *  own copy, not the shared template. */
 export function cloneRecipeGraph(recipe: RecipeDef): AgentGraph {
   return regenerateStepIds(recipe.graph);
 }

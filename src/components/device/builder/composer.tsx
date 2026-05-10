@@ -13,7 +13,7 @@
  * UX is fine for the sizes we expect, ≤ 20 steps).
  */
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Plus, Play, Save, ChevronUp, ChevronDown, Trash2, Edit3 } from "lucide-react";
 import { randomUUID } from "@/lib/uuid-shim";
@@ -27,6 +27,8 @@ import { TriggerForm } from "./trigger-form";
 import { StepForm } from "./step-forms/index";
 import { TestRunPanel, type TestRunResult } from "./test-run-panel";
 import { StepIcon } from "./step-icon";
+import { lintGraph, type VaultSnapshot } from "@/lib/agents/graph/lint";
+import { AlertTriangle, Info } from "lucide-react";
 
 interface Props {
   initialGraph: AgentGraph;
@@ -57,8 +59,59 @@ export function Composer({
   const [testRun, setTestRun] = useState<TestRunResult | null>(null);
   const [busy, setBusy] = useState<"test" | "deploy" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [vaultSnap, setVaultSnap] = useState<VaultSnapshot | null>(null);
 
-  const ready = vaultId && ownerWallet && name.trim() && graph.steps.length > 0;
+  // Pull the vault snapshot + provider keys once for the linter so
+  // warnings show inline as the user composes.
+  useEffect(() => {
+    if (!vaultId || !ownerWallet) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const [vRes, kRes] = await Promise.all([
+          fetch(`/api/vault/${vaultId}`, {
+            headers: { "x-owner-wallet": ownerWallet },
+          }),
+          fetch(`/api/keys/providers`, {
+            headers: { "x-owner-wallet": ownerWallet },
+          }),
+        ]);
+        const vData = vRes.ok ? await vRes.json() : null;
+        const kData = kRes.ok ? await kRes.json() : null;
+        if (cancelled) return;
+        const vault = vData?.vault;
+        const providers = new Set<VaultSnapshot["configuredProviders"] extends Set<infer T> ? T : never>();
+        for (const k of (kData?.keys ?? []) as Array<{ provider: string }>) {
+          providers.add(k.provider as never);
+        }
+        setVaultSnap({
+          perTxMaxUsd: vault?.perTxMaxUsd ?? 0.5,
+          dailyLimitUsd: vault?.dailyLimitUsd ?? 5,
+          weeklyLimitUsd: vault?.weeklyLimitUsd ?? 25,
+          allowedMerchants: vault?.allowedMerchants ?? [],
+          paused: !!vault?.pausedAt,
+          configuredProviders: providers,
+        });
+      } catch {
+        /* swallow */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [vaultId, ownerWallet]);
+
+  const lintResult = useMemo(
+    () => lintGraph(graph, vaultSnap ?? undefined),
+    [graph, vaultSnap],
+  );
+
+  const ready =
+    vaultId &&
+    ownerWallet &&
+    name.trim() &&
+    graph.steps.length > 0 &&
+    !lintResult.hasErrors;
 
   function updateTrigger(trigger: TriggerDef) {
     setGraph({ ...graph, trigger });
@@ -333,6 +386,60 @@ export function Composer({
 
       {/* Test run results */}
       {testRun && <TestRunPanel result={testRun} onClose={() => setTestRun(null)} />}
+
+      {/* Pre-deploy lint — surfaces placeholder strings, invalid
+          pubkeys, per-tx max overflows, missing provider keys. The
+          Deploy button is gated on no errors. */}
+      {lintResult.issues.length > 0 && (
+        <div
+          className="rounded-[12px] flex flex-col gap-2 p-3"
+          style={{
+            background: lintResult.hasErrors
+              ? "rgba(239,68,68,0.05)"
+              : "rgba(245,158,11,0.06)",
+            border: `1px solid ${lintResult.hasErrors ? "rgba(239,68,68,0.25)" : "rgba(245,158,11,0.25)"}`,
+          }}
+        >
+          <div className="flex items-center gap-2">
+            {lintResult.hasErrors ? (
+              <AlertTriangle className="w-4 h-4" style={{ color: "#B91C1C" }} />
+            ) : (
+              <Info className="w-4 h-4" style={{ color: "#B45309" }} />
+            )}
+            <span
+              className="text-[12.5px] font-semibold"
+              style={{ color: lintResult.hasErrors ? "#B91C1C" : "#B45309" }}
+            >
+              {lintResult.hasErrors
+                ? `${lintResult.issues.filter((i) => i.severity === "error").length} issue${lintResult.issues.filter((i) => i.severity === "error").length === 1 ? "" : "s"} to fix before deploying`
+                : `${lintResult.issues.length} thing${lintResult.issues.length === 1 ? "" : "s"} to know`}
+            </span>
+          </div>
+          <div className="flex flex-col gap-1.5 pl-6">
+            {lintResult.issues.map((issue, i) => (
+              <div key={i} className="text-[12px] leading-snug">
+                <span
+                  className="font-mono uppercase tracking-[0.10em] mr-1.5"
+                  style={{
+                    fontSize: 9,
+                    color: issue.severity === "error" ? "#B91C1C" : "#B45309",
+                  }}
+                >
+                  {issue.severity === "error" ? "fix" : "fyi"}
+                </span>
+                <span style={{ color: "#0A0A0A" }}>
+                  {issue.stepLabel} · {issue.message}
+                </span>
+                {issue.fix && (
+                  <span style={{ color: "rgba(15,23,42,0.55)", display: "block", marginTop: 2 }}>
+                    {issue.fix}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Bottom bar — paired CTAs, right-aligned */}
       <div

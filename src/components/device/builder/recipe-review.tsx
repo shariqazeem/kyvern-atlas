@@ -17,11 +17,12 @@
  * Power user → 1 extra tap (Customize) to edit anything.
  */
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Save, Settings2 } from "lucide-react";
+import { Save, Settings2, AlertTriangle, Info } from "lucide-react";
 import type { AgentGraph, TriggerDef } from "@/lib/agents/graph/types";
 import type { RecipeDef } from "@/lib/agents/graph/recipes";
+import { lintGraph, type VaultSnapshot, type LintIssue } from "@/lib/agents/graph/lint";
 import { RecipeIcon } from "./step-icon";
 
 interface Props {
@@ -46,6 +47,52 @@ export function RecipeReview({
   const [name, setName] = useState(recipe.name);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [vaultSnap, setVaultSnap] = useState<VaultSnapshot | null>(null);
+
+  // Fetch vault config + provider keys so the linter can warn about
+  // per-tx max overflows + missing provider keys before deploy.
+  useEffect(() => {
+    if (!vaultId || !ownerWallet) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const [vRes, kRes] = await Promise.all([
+          fetch(`/api/vault/${vaultId}`, {
+            headers: { "x-owner-wallet": ownerWallet },
+          }),
+          fetch(`/api/keys/providers`, {
+            headers: { "x-owner-wallet": ownerWallet },
+          }),
+        ]);
+        const vData = vRes.ok ? await vRes.json() : null;
+        const kData = kRes.ok ? await kRes.json() : null;
+        if (cancelled) return;
+        const vault = vData?.vault;
+        const providers = new Set<VaultSnapshot["configuredProviders"] extends Set<infer T> ? T : never>();
+        for (const k of (kData?.keys ?? []) as Array<{ provider: string }>) {
+          providers.add(k.provider as never);
+        }
+        setVaultSnap({
+          perTxMaxUsd: vault?.perTxMaxUsd ?? 0.5,
+          dailyLimitUsd: vault?.dailyLimitUsd ?? 5,
+          weeklyLimitUsd: vault?.weeklyLimitUsd ?? 25,
+          allowedMerchants: vault?.allowedMerchants ?? [],
+          paused: !!vault?.pausedAt,
+          configuredProviders: providers,
+        });
+      } catch {
+        /* swallow — linter falls back to graph-only checks */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [vaultId, ownerWallet]);
+
+  const lintResult = useMemo(
+    () => lintGraph(graph, vaultSnap ?? undefined),
+    [graph, vaultSnap],
+  );
 
   const stepSummary = describeSteps(graph);
   const triggerSummary = describeTrigger(graph.trigger);
@@ -154,6 +201,11 @@ export function RecipeReview({
         />
       </div>
 
+      {/* Pre-deploy lint warnings */}
+      {lintResult.issues.length > 0 && (
+        <LintPanel issues={lintResult.issues} />
+      )}
+
       {/* Errors */}
       {error && (
         <div
@@ -197,17 +249,27 @@ export function RecipeReview({
           <button
             type="button"
             onClick={deploy}
-            disabled={busy || !name.trim()}
+            disabled={busy || !name.trim() || lintResult.hasErrors}
+            title={
+              lintResult.hasErrors
+                ? "Resolve the issues above before deploying"
+                : undefined
+            }
             className="flex items-center gap-1.5 px-4 py-2 rounded-[10px] text-[13px] font-semibold disabled:opacity-50"
             style={{
-              background: "#22C55E",
+              background: lintResult.hasErrors ? "#9CA3AF" : "#22C55E",
               color: "#FFFFFF",
-              boxShadow:
-                "0 1px 2px rgba(34,197,94,0.30), 0 8px 20px -8px rgba(34,197,94,0.40)",
+              boxShadow: lintResult.hasErrors
+                ? "none"
+                : "0 1px 2px rgba(34,197,94,0.30), 0 8px 20px -8px rgba(34,197,94,0.40)",
             }}
           >
             <Save className="w-3.5 h-3.5" />
-            {busy ? "Deploying…" : "Deploy now"}
+            {busy
+              ? "Deploying…"
+              : lintResult.hasErrors
+                ? "Fix issues to deploy"
+                : "Deploy now"}
           </button>
         </div>
       </div>
@@ -268,4 +330,73 @@ function formatMs(ms: number): string {
   if (ms < 3_600_000) return `${Math.round(ms / 60_000)} min`;
   if (ms < 86_400_000) return `${Math.round(ms / 3_600_000)} hour${Math.round(ms / 3_600_000) === 1 ? "" : "s"}`;
   return `${Math.round(ms / 86_400_000)} day${Math.round(ms / 86_400_000) === 1 ? "" : "s"}`;
+}
+
+/* ─── LintPanel — pre-deploy warnings ─────────────────────────── */
+
+function LintPanel({ issues }: { issues: LintIssue[] }) {
+  const errors = issues.filter((i) => i.severity === "error");
+  const warnings = issues.filter((i) => i.severity === "warning");
+  const headline =
+    errors.length > 0
+      ? `${errors.length} issue${errors.length === 1 ? "" : "s"} to fix before deploying`
+      : `${warnings.length} thing${warnings.length === 1 ? "" : "s"} to know before deploying`;
+  const tone =
+    errors.length > 0
+      ? {
+          bg: "rgba(239,68,68,0.05)",
+          border: "rgba(239,68,68,0.25)",
+          fg: "#B91C1C",
+        }
+      : {
+          bg: "rgba(245,158,11,0.06)",
+          border: "rgba(245,158,11,0.25)",
+          fg: "#B45309",
+        };
+  return (
+    <div
+      className="rounded-[12px] flex flex-col gap-2 p-3"
+      style={{
+        background: tone.bg,
+        border: `1px solid ${tone.border}`,
+      }}
+    >
+      <div className="flex items-center gap-2">
+        {errors.length > 0 ? (
+          <AlertTriangle className="w-4 h-4" style={{ color: tone.fg }} />
+        ) : (
+          <Info className="w-4 h-4" style={{ color: tone.fg }} />
+        )}
+        <span
+          className="text-[12.5px] font-semibold tracking-[-0.005em]"
+          style={{ color: tone.fg }}
+        >
+          {headline}
+        </span>
+      </div>
+      <div className="flex flex-col gap-1.5 pl-6">
+        {issues.map((issue, i) => (
+          <div key={i} className="text-[12px] leading-snug">
+            <span
+              className="font-mono uppercase tracking-[0.10em] mr-1.5"
+              style={{
+                fontSize: 9,
+                color: issue.severity === "error" ? "#B91C1C" : "#B45309",
+              }}
+            >
+              {issue.severity === "error" ? "fix" : "fyi"}
+            </span>
+            <span style={{ color: "#0A0A0A" }}>
+              {issue.stepLabel} · {issue.message}
+            </span>
+            {issue.fix && (
+              <span style={{ color: "rgba(15,23,42,0.55)", display: "block", marginTop: 2 }}>
+                {issue.fix}
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
