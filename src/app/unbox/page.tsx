@@ -149,14 +149,22 @@ export default function UnboxPage() {
           body: JSON.stringify({
             ownerWallet: wallet,
             name: deriveSerial(wallet).replace("KVN-", "Kyvern "),
-            emoji: "🧭",
+            emoji: "K",
             purpose: "research",
             dailyLimitUsd: 5,
             weeklyLimitUsd: 25,
             perTxMaxUsd: 0.5,
             maxCallsPerWindow: 60,
             velocityWindow: "1h",
-            allowedMerchants: [],
+            // Seed with the same defaults Atlas uses so a freshly
+            // provisioned vault doesn't surface a scary "no merchants
+            // whitelisted — every payment will be refused" warning.
+            // Owner can edit later in /app/settings.
+            allowedMerchants: [
+              "api.openai.com",
+              "api.anthropic.com",
+              "api.perplexity.ai",
+            ],
             requireMemo: true,
             network: "devnet",
           }),

@@ -142,7 +142,12 @@ export function UserVaultCard({
         {firstCall && (
           <FirstCallPanel
             vaultId={data.vault.id}
-            ownerWallet={ownerWallet}
+            // Use the vault's STORED owner directly. useAuth() can race
+            // with Privy embedded-wallet provisioning and surface a
+            // different address than what was stored at create time —
+            // sidestep the mismatch entirely by trusting the payload
+            // that already came back from /api/vault/[id].
+            ownerWallet={data.vault.ownerWallet ?? ownerWallet}
             perTxMaxUsd={data.budget.perTxMaxUsd}
             network={data.vault.network}
           />
@@ -1006,17 +1011,17 @@ function HeistOverlay({
       return;
     }
     if (chars < target.text.length) {
-      const speed = target.tone === "danger" ? 18 : 24;
+      const speed = target.tone === "danger" ? 9 : 12;
       const t = setTimeout(() => setChars((c) => c + 1), speed);
       return () => clearTimeout(t);
     }
     // Pause between lines, longer after the danger / warn lines
     const pause =
       target.tone === "warn"
-        ? 320
+        ? 180
         : target.tone === "danger"
-          ? 380
-          : 180;
+          ? 220
+          : 90;
     const t = setTimeout(() => {
       setLineIdx((i) => i + 1);
       setChars(0);
@@ -1033,7 +1038,7 @@ function HeistOverlay({
     }
     if (result?.signature) {
       // Tiny pause for tension
-      const t = setTimeout(() => setPhase("flashing"), 420);
+      const t = setTimeout(() => setPhase("flashing"), 220);
       return () => clearTimeout(t);
     }
   }, [phase, result, errorMsg]);
@@ -1041,7 +1046,7 @@ function HeistOverlay({
   // Flashing → settled
   useEffect(() => {
     if (phase !== "flashing") return;
-    const t = setTimeout(() => setPhase("settled"), 700);
+    const t = setTimeout(() => setPhase("settled"), 480);
     return () => clearTimeout(t);
   }, [phase]);
 

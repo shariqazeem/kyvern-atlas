@@ -76,11 +76,11 @@ function lineFor(state: DeviceState): string {
   // integration-console flow: mint key → run snippet → watch events.
   switch (state) {
     case "empty":
-      return "Your device is online. Mint a key on the right to start integrating.";
+      return "Vault provisioned · click Watch the chain refuse for the proof.";
     case "funded_default":
-      return "Your device is ready. Walk the 5-step wizard or paste the SDK snippet.";
+      return "Vault provisioned · click Watch the chain refuse for the proof.";
     case "partial":
-      return "Integration in progress. Click any step to continue.";
+      return "Integration in progress.";
     case "active":
     default:
       return "";

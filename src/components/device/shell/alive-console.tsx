@@ -78,38 +78,32 @@ export function AliveConsole({ vaultId, ownerWallet, className }: Props) {
 
   return (
     <div className={`flex flex-col gap-4 sm:gap-5 ${className ?? ""}`}>
-      {/* Whisper line — sets the frame: this is YOUR worker */}
-      <motion.div
-        initial={{ opacity: 0, y: 4 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: EASE }}
-        className="text-center px-4"
-      >
-        <p
-          className="text-[12.5px] tracking-[-0.005em]"
-          style={{ color: "rgba(15,23,42,0.55)" }}
-        >
-          Your worker is provisioned. Click <span style={{ fontWeight: 600 }}>Watch
-          the chain refuse</span> for your first on-chain proof, or wire your
-          code via the SDK.
-        </p>
-      </motion.div>
-
-      {/* Hero: USER's vault Worker Card (or skeleton until data lands) */}
+      {/* Hero: USER's vault Worker Card (or skeleton until data lands).
+          The Atlas live-tape is rendered inside the card, so we don't
+          need a separate reference strip on /app — that was clutter. */}
       {data ? (
         <UserVaultCard data={data} ownerWallet={ownerWallet} now={now} />
       ) : (
         <UserVaultSkeleton />
       )}
 
-      {/* Atlas demoted to reference strip */}
+      {/* Pay.sh interception — network activity visualizer.
+          Pass the vault's STORED owner (not auth wallet) to dodge
+          Privy embedded-wallet timing mismatches. */}
+      <PayShFlow
+        vaultId={vaultId}
+        ownerWallet={data?.vault.ownerWallet ?? ownerWallet}
+      />
+
+      {/* Roadmap of hosted autonomous workers. Hidden once the user
+          has their own vault — the templates were a first-time
+          orientation. After provisioning, judges already see what
+          they came for; the row was just clutter. */}
+      {!data && <WorkerTemplates />}
+
+      {/* Atlas reference — single line at the bottom, smallest weight,
+          links to the public observatory. */}
       <AtlasReferenceStrip />
-
-      {/* Pay.sh interception — network activity visualizer */}
-      <PayShFlow vaultId={vaultId} ownerWallet={ownerWallet} />
-
-      {/* Build your worker — provision + roadmap */}
-      <WorkerTemplates />
 
       {/* Developer mode link */}
       <motion.div
