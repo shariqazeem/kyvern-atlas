@@ -157,14 +157,22 @@ export async function POST(
     );
   }
 
-  // Resolve Commonstack API key (same provider Atlas uses).
-  const apiKey = process.env.COMMONSTACK_API_KEY?.trim();
+  // Resolve Commonstack API key. Prefer COMMONSTACK_TERMINAL_KEY so
+  // the Secure Terminal can have its own budget cap separate from
+  // Atlas's autonomous decision loop (which uses COMMONSTACK_API_KEY).
+  // Fall back to the shared key if the terminal-specific one isn't set.
+  const apiKey = (
+    process.env.COMMONSTACK_TERMINAL_KEY?.trim() ||
+    process.env.COMMONSTACK_API_KEY?.trim() ||
+    ""
+  );
   if (!apiKey) {
     return NextResponse.json(
       {
         ok: false,
         error: "no_llm_key",
-        message: "COMMONSTACK_API_KEY is not set on the server.",
+        message:
+          "COMMONSTACK_TERMINAL_KEY (or COMMONSTACK_API_KEY) is not set.",
       },
       { status: 400 },
     );
