@@ -131,7 +131,16 @@ export async function GET(
         }
       : null;
 
-    return NextResponse.json({ agent, thoughts, lastAction, lastFinding });
+    // hasGraph — public-safe flag so the detail page can route to
+    // the graph-agent renderer without needing auth to peek at the
+    // graph itself. The actual graph (which carries the webhook
+    // secret) is fetched via the auth'd /graph endpoint.
+    const graphRow = db
+      .prepare(`SELECT graph_json IS NOT NULL AS has_graph FROM agents WHERE id = ?`)
+      .get(params.id) as { has_graph: number } | undefined;
+    const hasGraph = graphRow?.has_graph === 1;
+
+    return NextResponse.json({ agent, thoughts, lastAction, lastFinding, hasGraph });
   } catch (e) {
     console.error("[agents/id]", e);
     return NextResponse.json({ error: "internal error" }, { status: 500 });
