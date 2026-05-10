@@ -60,6 +60,7 @@ export const HttpStepConfigSchema = z.object({
 
 export const VaultPayStepConfigSchema = z.object({
   merchant: z.string().min(1).max(256),
+  to: z.string().min(32).max(64),
   amount: z.union([z.number().min(0), z.string().min(1).max(64)]),
   memo: z.string().max(256),
 });

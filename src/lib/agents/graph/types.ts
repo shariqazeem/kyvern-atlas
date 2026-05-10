@@ -64,9 +64,12 @@ export interface HttpStepConfig {
 }
 
 export interface VaultPayStepConfig {
-  /** Merchant identifier (must be on the vault's allowlist or it'll
-   *  be a real failed tx with `MerchantNotAllowlisted`). Interpolated. */
+  /** Merchant identifier — the rule-check label (must be on the
+   *  vault's allowlist or the tx is rejected on-chain with
+   *  `MerchantNotAllowlisted`). Interpolated. */
   merchant: string;
+  /** Solana pubkey to send the USDC to. Interpolated. */
+  to: string;
   /** USDC amount — number or interpolated string that resolves to one. */
   amount: number | string;
   /** Memo string — written to the on-chain memo, interpolated. */
@@ -199,6 +202,26 @@ export interface AgentRun {
   errorMessage: string | null;
   /** Sum of all step costUsd values. */
   totalCostUsd: number;
+}
+
+/* ─── Step executor contract (runtime-side) ──────────────────── */
+
+/** Result returned by every step-type executor. The orchestrator
+ *  in executor.ts handles wrapping these into StepOutput rows and
+ *  threading their output through to subsequent steps. */
+export interface StepExecutionResult {
+  ok: boolean;
+  /** The captured output value — bound to step.outputVar (or a
+   *  slugified label) so later steps can reference it. May be a
+   *  string, object, array, number — anything JSON-serializable. */
+  output: unknown;
+  /** Human-readable error message when ok=false. */
+  error?: string;
+  /** Solana signature (settled or rejected) when the step touched chain. */
+  signature?: string;
+  signatureStatus?: "success" | "failed";
+  /** USD cost of this step (LLM tokens, pay.sh, etc.). 0 if free. */
+  costUsd?: number;
 }
 
 /* ─── Run context (in-memory only, NOT persisted) ─────────────── */
