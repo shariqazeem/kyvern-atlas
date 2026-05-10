@@ -25,7 +25,12 @@ const TEST_MODELS: Record<LlmProvider, string> = {
   anthropic: "claude-haiku-4-5",
   openai: "gpt-4o-mini",
   deepseek: "deepseek-chat",
-  commonstack: "deepseek-ai/DeepSeek-V3.2-Exp",
+  // openai/gpt-oss-120b is the most reliably-accessible cheap model on
+  // Commonstack across account tiers (per kyvern_deploy_learnings the
+  // V3.2-Exp lineup is gated for some accounts and returns 400). We
+  // use it for the test endpoint specifically so a working key never
+  // shows up as "unknown" just because of model access.
+  commonstack: "openai/gpt-oss-120b",
 };
 
 const rateBuckets = new Map<string, number[]>();
@@ -94,15 +99,31 @@ export async function POST(
     );
   }
 
-  const status = await testProviderKey(row.provider, plaintext);
-  recordKeyTest(row.id, owner, status);
-  return NextResponse.json({ ok: status === "ok", status });
+  const result = await testProviderKey(row.provider, plaintext);
+  recordKeyTest(row.id, owner, result.status);
+  if (result.status !== "ok") {
+    console.warn(
+      `[keys/test] ${row.provider} → ${result.status} (HTTP ${result.httpStatus ?? "?"}): ${(result.body ?? "").slice(0, 300)}`,
+    );
+  }
+  return NextResponse.json({
+    ok: result.status === "ok",
+    status: result.status,
+    httpStatus: result.httpStatus ?? null,
+    detail: result.status === "ok" ? null : (result.body ?? "").slice(0, 300),
+  });
+}
+
+interface TestResult {
+  status: ProviderKeyTestStatus;
+  httpStatus?: number;
+  body?: string;
 }
 
 async function testProviderKey(
   provider: LlmProvider,
   apiKey: string,
-): Promise<ProviderKeyTestStatus> {
+): Promise<TestResult> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TEST_TIMEOUT_MS);
   try {
@@ -143,20 +164,26 @@ async function testProviderKey(
     return classifyResponse(r);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    if (msg.includes("aborted")) return "network_error";
-    return "network_error";
+    if (msg.includes("aborted")) {
+      return { status: "network_error", body: "request timed out" };
+    }
+    return { status: "network_error", body: msg };
   } finally {
     clearTimeout(timer);
   }
 }
 
-async function classifyResponse(r: Response): Promise<ProviderKeyTestStatus> {
-  if (r.ok) return "ok";
-  if (r.status === 401 || r.status === 403) return "invalid";
-  if (r.status === 429) {
-    const txt = await r.text().catch(() => "");
-    if (/quota|limit/i.test(txt)) return "quota_exceeded";
-    return "quota_exceeded";
+async function classifyResponse(r: Response): Promise<TestResult> {
+  const body = await r.text().catch(() => "");
+  if (r.ok) return { status: "ok", httpStatus: r.status };
+  if (r.status === 401 || r.status === 403) {
+    return { status: "invalid", httpStatus: r.status, body };
   }
-  return "unknown";
+  if (r.status === 429) {
+    if (/quota|limit/i.test(body)) {
+      return { status: "quota_exceeded", httpStatus: r.status, body };
+    }
+    return { status: "quota_exceeded", httpStatus: r.status, body };
+  }
+  return { status: "unknown", httpStatus: r.status, body };
 }

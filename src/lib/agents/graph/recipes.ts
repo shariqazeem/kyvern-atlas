@@ -17,7 +17,7 @@
  * spread out (daily/weekly) to avoid wasted ticks during demos.
  */
 
-import { randomUUID } from "crypto";
+import { randomUUID } from "@/lib/uuid-shim";
 import type { AgentGraph } from "./types";
 
 export interface RecipeDef {
@@ -33,9 +33,10 @@ export interface RecipeDef {
   graph: AgentGraph;
 }
 
-const ANTHROPIC_DEFAULT_MODEL = "claude-haiku-4-5";
-const OPENAI_DEFAULT_MODEL = "gpt-4o-mini";
-const DEEPSEEK_DEFAULT_MODEL = "deepseek-chat";
+// Recipes default to Commonstack with the most reliably-accessible
+// cheap model — keeps the v1 experience friction-free on a single
+// BYOK key. Users can switch any step's provider in the composer.
+const COMMONSTACK_DEFAULT_MODEL = "openai/gpt-oss-120b";
 
 function newId(prefix: string): string {
   return `${prefix}_${randomUUID().slice(0, 8)}`;
@@ -65,8 +66,8 @@ const dailyAiInference: RecipeDef = {
         label: "Ask Claude",
         outputVar: "answer",
         config: {
-          provider: "anthropic",
-          model: ANTHROPIC_DEFAULT_MODEL,
+          provider: "commonstack",
+          model: COMMONSTACK_DEFAULT_MODEL,
           system: "You are a concise assistant. Answer in 1-2 sentences.",
           prompt: "Give me one interesting fact about Solana from this week.",
           maxTokens: 200,
@@ -343,8 +344,8 @@ const dailyDigest: RecipeDef = {
         label: "Summarize day",
         outputVar: "digest",
         config: {
-          provider: "openai",
-          model: OPENAI_DEFAULT_MODEL,
+          provider: "commonstack",
+          model: COMMONSTACK_DEFAULT_MODEL,
           system: "You write concise daily summaries. 2 sentences max.",
           prompt:
             "Summarize the kind of day a typical Kyvern user might have had: " +
@@ -391,8 +392,8 @@ const quoteAndPay: RecipeDef = {
         label: "Pick merchant",
         outputVar: "choice",
         config: {
-          provider: "deepseek",
-          model: DEEPSEEK_DEFAULT_MODEL,
+          provider: "commonstack",
+          model: COMMONSTACK_DEFAULT_MODEL,
           system:
             "You pick one merchant from a list. Output ONLY the merchant " +
             "string, nothing else.",

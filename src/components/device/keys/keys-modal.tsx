@@ -56,14 +56,17 @@ export function KeysModal({ open, ownerWallet, onClose }: Props) {
   async function testKey(id: string) {
     if (!ownerWallet) return;
     setBusy(id);
+    setError(null);
     try {
       const r = await fetch(`/api/keys/providers/${id}/test`, {
         method: "POST",
         headers: { "x-owner-wallet": ownerWallet },
       });
       const data = await r.json();
-      if (!r.ok && r.status !== 200) {
-        setError(data.error ?? `test failed (${r.status})`);
+      if (!data.ok) {
+        const httpPart = data.httpStatus ? ` (HTTP ${data.httpStatus})` : "";
+        const detailPart = data.detail ? ` · ${String(data.detail).slice(0, 200)}` : "";
+        setError(`Test → ${data.status}${httpPart}${detailPart}`);
       }
       void refresh();
     } catch (e) {

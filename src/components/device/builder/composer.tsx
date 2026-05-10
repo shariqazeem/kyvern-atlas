@@ -122,6 +122,14 @@ export function Composer({
 
   async function deploy() {
     if (!ready) return;
+    if (!ownerWallet) {
+      setError("Auth not yet hydrated — wait a second and retry.");
+      return;
+    }
+    if (!vaultId) {
+      setError("No vault attached to this session — refresh and try again.");
+      return;
+    }
     setBusy("deploy");
     setError(null);
     try {
@@ -331,6 +339,11 @@ export function Composer({
           type="button"
           onClick={runTest}
           disabled={!editingAgentId || busy !== null}
+          title={
+            !editingAgentId
+              ? "Deploy first — Test run executes a saved agent. After Deploy, you can run from the agent's detail page."
+              : "Run this agent once with the saved graph"
+          }
           className="flex items-center gap-1.5 px-3 py-2 rounded-[10px] text-[12.5px] font-medium disabled:opacity-50"
           style={{
             background: "rgba(15,23,42,0.04)",

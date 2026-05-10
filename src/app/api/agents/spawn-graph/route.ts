@@ -60,9 +60,19 @@ export async function POST(req: NextRequest) {
   }
 
   const requestOwner = req.headers.get("x-owner-wallet")?.trim() || "";
-  if (!requestOwner || requestOwner !== vault.ownerWallet) {
+  if (!requestOwner) {
     return NextResponse.json(
-      { ok: false, error: "unauthorized" },
+      { ok: false, error: "owner_wallet_header_missing" },
+      { status: 401 },
+    );
+  }
+  if (requestOwner !== vault.ownerWallet) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "owner_mismatch",
+        message: `caller wallet ${requestOwner.slice(0, 8)}… does not own this vault`,
+      },
       { status: 401 },
     );
   }

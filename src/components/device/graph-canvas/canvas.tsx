@@ -48,47 +48,51 @@ export function GraphCanvas({
   className,
 }: Props) {
   const [agents, setAgents] = useState<GraphAgentSummary[] | null>(null);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // Poll the agent list every 8s so the canvas stays in sync as
   // runs land (status pill changes from running → succeeded etc).
+  // Also fires on tab focus + on every mount so navigating back
+  // from the detail page (post-delete) shows fresh state without a
+  // hard reload.
   useEffect(() => {
-    if (!vaultId || !ownerWallet) {
-      setLoading(false);
-      return;
-    }
+    if (!vaultId || !ownerWallet) return;
     let cancelled = false;
     const tick = async () => {
       try {
         const r = await fetch(
           `/api/devices/${vaultId}/graph-agents`,
-          { headers: { "x-owner-wallet": ownerWallet } },
+          {
+            headers: { "x-owner-wallet": ownerWallet },
+            cache: "no-store",
+          },
         );
         if (cancelled) return;
         if (r.status === 401) return; // owner not yet hydrated
         if (!r.ok) {
           setError(`fetch agents failed: ${r.status}`);
-          setLoading(false);
           return;
         }
         const data = (await r.json()) as { agents: GraphAgentSummary[] };
         if (!cancelled) {
           setAgents(data.agents);
           setError(null);
-          setLoading(false);
         }
       } catch (e) {
         if (cancelled) return;
         setError(e instanceof Error ? e.message : String(e));
-        setLoading(false);
       }
     };
     void tick();
-    const t = setInterval(tick, 8000);
+    const interval = setInterval(tick, 8000);
+    const onFocus = () => void tick();
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
     return () => {
       cancelled = true;
-      clearInterval(t);
+      clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
     };
   }, [vaultId, ownerWallet]);
 
@@ -96,7 +100,10 @@ export function GraphCanvas({
   // at the bottom-center; agents fan out across the top half.
   const slots = useMemo(() => layoutSlots((agents?.length ?? 0) + 1), [agents?.length]);
 
-  const empty = !loading && (agents?.length ?? 0) === 0;
+  // Empty whenever there are no agents — including the loading state.
+  // This avoids the canvas rendering an "agents! is non-null" branch
+  // before the first fetch lands.
+  const empty = (agents?.length ?? 0) === 0;
 
   return (
     <div
@@ -132,7 +139,7 @@ export function GraphCanvas({
         >
           {empty
             ? "Your device runs agents. Compose one — the chain decides every dollar."
-            : `${agents!.length} agent${agents!.length === 1 ? "" : "s"} running. Every dollar enforced on-chain.`}
+            : `${agents?.length ?? 0} agent${(agents?.length ?? 0) === 1 ? "" : "s"} running. Every dollar enforced on-chain.`}
         </p>
       </div>
 
@@ -194,8 +201,10 @@ export function GraphCanvas({
             style={{
               left: empty
                 ? "50%"
-                : `${((slots[agents!.length]?.x ?? 400) / 800) * 100}%`,
-              top: empty ? "50%" : `${((slots[agents!.length]?.y ?? 60) / 220) * 100}%`,
+                : `${((slots[agents?.length ?? 0]?.x ?? 400) / 800) * 100}%`,
+              top: empty
+                ? "50%"
+                : `${((slots[agents?.length ?? 0]?.y ?? 60) / 220) * 100}%`,
               transform: "translate(-50%, -50%)",
             }}
           >
