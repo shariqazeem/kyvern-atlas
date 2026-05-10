@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import OpenAI from "openai";
 import { getVault } from "@/lib/vault-store";
 import { serverVaultPay } from "@/lib/server-pay";
-import { loadKeyForUse } from "@/lib/agents/graph/keys-store";
 import { checkRateLimit, getClientIP } from "@/lib/rate-limit";
 
 /* ════════════════════════════════════════════════════════════════════
@@ -37,8 +37,15 @@ const DEMO_URL =
   process.env.NEXT_PUBLIC_PAYSH_DEMO_SERVICE_URL ??
   "https://debugger.pay.sh/mpp/quote/AAPL";
 const PAY_BIN = process.env.PAY_BIN ?? "pay";
-const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
-const LLM_MODEL = "claude-3-5-haiku-20241022";
+
+// Commonstack (OpenAI-compatible) — same provider Atlas uses for its
+// LLM decisions. v4-flash is the cheapest tier; if it 403's on this
+// account (memory note · v4-flash sometimes blocked despite playground
+// access), we fall back to v3.2 which Atlas runs reliably.
+const COMMONSTACK_BASE_URL = "https://api.commonstack.ai/v1";
+const PRIMARY_MODEL =
+  process.env.SECURE_CLI_LLM_MODEL ?? "deepseek/deepseek-v4-flash";
+const FALLBACK_MODEL = "deepseek/deepseek-v3.2";
 
 const ALLOWED_MERCHANTS_FOR_LLM = [
   "api.openai.com",
@@ -143,15 +150,14 @@ export async function POST(
     );
   }
 
-  // Resolve LLM key — BYOK (anthropic) preferred, else server env fallback.
-  const apiKey = resolveAnthropicKey(vault.ownerWallet);
+  // Resolve Commonstack API key (same provider Atlas uses).
+  const apiKey = process.env.COMMONSTACK_API_KEY?.trim();
   if (!apiKey) {
     return NextResponse.json(
       {
         ok: false,
         error: "no_llm_key",
-        message:
-          "Add an Anthropic API key in /app/keys, or set ANTHROPIC_API_KEY on the server.",
+        message: "COMMONSTACK_API_KEY is not set on the server.",
       },
       { status: 400 },
     );
@@ -159,8 +165,16 @@ export async function POST(
 
   // ─── Step 1: Parse the user's intent via real LLM ──────────────
   let parsed: ParsedIntent;
+  let parserModelUsed = PRIMARY_MODEL;
   try {
-    const text = await callAnthropic(apiKey, PARSER_SYSTEM, prompt, 200);
+    const { text, modelUsed } = await callCommonstack(
+      apiKey,
+      PARSER_SYSTEM,
+      prompt,
+      220,
+      true,
+    );
+    parserModelUsed = modelUsed;
     parsed = sanitizeParsed(JSON.parse(extractJsonObject(text)));
   } catch (e) {
     return NextResponse.json(
@@ -239,13 +253,22 @@ export async function POST(
   // ─── Step 5: Real LLM answer to the user's actual prompt ───────
   let answer = "";
   let answerError: string | null = null;
+  let answerModelUsed = parserModelUsed;
   try {
     const quoteContext =
       payShQuote != null
         ? `Pay.sh sandbox returned this quote: ${JSON.stringify(payShQuote).slice(0, 400)}.`
         : "Pay.sh sandbox responded but the quote was not parseable.";
     const userPromptForAnswer = `User asked: "${prompt}"\n\n${quoteContext}`;
-    answer = await callAnthropic(apiKey, ANSWER_SYSTEM, userPromptForAnswer, 240);
+    const r = await callCommonstack(
+      apiKey,
+      ANSWER_SYSTEM,
+      userPromptForAnswer,
+      260,
+      false,
+    );
+    answer = r.text;
+    answerModelUsed = r.modelUsed;
   } catch (e) {
     answerError = e instanceof Error ? e.message : "LLM answer failed";
   }
@@ -267,64 +290,78 @@ export async function POST(
       url: DEMO_URL,
     },
     answer: { text: answer, error: answerError },
+    llm: { parser: parserModelUsed, answer: answerModelUsed },
     totalDurationMs: Date.now() - startedAt,
   });
 }
 
 /* ─── Helpers ────────────────────────────────────────────────────── */
 
-function resolveAnthropicKey(ownerWallet: string): string | null {
-  try {
-    const byok = loadKeyForUse(ownerWallet, "anthropic");
-    if (byok?.plaintext) return byok.plaintext;
-  } catch {
-    /* swallow — fall through to env */
+let _client: OpenAI | null = null;
+function commonstackClient(apiKey: string): OpenAI {
+  if (!_client) {
+    _client = new OpenAI({ apiKey, baseURL: COMMONSTACK_BASE_URL });
   }
-  const env = process.env.ANTHROPIC_API_KEY?.trim();
-  return env && env.length > 0 ? env : null;
+  return _client;
 }
 
-async function callAnthropic(
+/** Call Commonstack (OpenAI-compatible) with primary→fallback model
+ *  cascade. v4-flash sometimes 403's on this account despite playground
+ *  access (see memory: commonstack_provider_gotcha) — on a hard 403 or
+ *  model-unavailable response we automatically retry with v3.2 which
+ *  Atlas runs reliably 24/7.
+ *
+ *  jsonObject=true asks the server to enforce a JSON object response. */
+async function callCommonstack(
   apiKey: string,
   system: string,
   userPrompt: string,
   maxTokens: number,
-): Promise<string> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 25_000);
-  let r: Response;
-  try {
-    r = await fetch(ANTHROPIC_URL, {
-      method: "POST",
-      headers: {
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: LLM_MODEL,
-        max_tokens: maxTokens,
-        temperature: 0.2,
-        system,
-        messages: [{ role: "user", content: userPrompt }],
-      }),
-      signal: controller.signal,
-    });
-  } finally {
-    clearTimeout(timer);
-  }
-  if (!r.ok) {
-    const errText = await r.text().catch(() => "");
-    throw new Error(`anthropic ${r.status}: ${errText.slice(0, 240)}`);
-  }
-  const data = (await r.json()) as {
-    content?: Array<{ type: string; text: string }>;
+  jsonObject: boolean,
+): Promise<{ text: string; modelUsed: string }> {
+  const c = commonstackClient(apiKey);
+  const tryOnce = async (model: string): Promise<string> => {
+    const ac = new AbortController();
+    const timer = setTimeout(() => ac.abort(), 25_000);
+    try {
+      const res = await c.chat.completions.create(
+        {
+          model,
+          max_tokens: maxTokens,
+          temperature: 0.2,
+          ...(jsonObject ? { response_format: { type: "json_object" as const } } : {}),
+          messages: [
+            { role: "system", content: system },
+            { role: "user", content: userPrompt },
+          ],
+        },
+        { signal: ac.signal },
+      );
+      const text = (res.choices?.[0]?.message?.content ?? "").trim();
+      if (!text) throw new Error("empty completion");
+      return text;
+    } finally {
+      clearTimeout(timer);
+    }
   };
-  return (data.content ?? [])
-    .filter((c) => c.type === "text")
-    .map((c) => c.text)
-    .join("")
-    .trim();
+
+  try {
+    const text = await tryOnce(PRIMARY_MODEL);
+    return { text, modelUsed: PRIMARY_MODEL };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    // Retry with the fallback only on signals that strongly suggest the
+    // model itself is unavailable (403, 404, model_not_found, etc.).
+    // Don't retry on transport / abort errors that would also fail on
+    // the fallback.
+    const looksLikeModelIssue =
+      /403|model.+(not.+found|unavailable|access)|forbidden|not.+permitted/i.test(
+        msg,
+      );
+    if (!looksLikeModelIssue) throw e;
+    const text = await tryOnce(FALLBACK_MODEL);
+    return { text, modelUsed: FALLBACK_MODEL };
+  }
 }
 
 /** LLMs occasionally wrap JSON in fenced code blocks despite system
