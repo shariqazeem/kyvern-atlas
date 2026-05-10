@@ -440,25 +440,37 @@ function NoDeviceState() {
       <div
         className="w-[80px] h-[80px] rounded-[22px] mb-5 flex items-center justify-center"
         style={{
-          background: "linear-gradient(135deg, #FFFFFF, #F3F4F6)",
-          border: "1px solid rgba(15,23,42,0.06)",
-          boxShadow: "0 8px 24px -10px rgba(15,23,42,0.10)",
+          background: "linear-gradient(135deg, #0A0A0A 0%, #1F2937 100%)",
+          boxShadow:
+            "0 0 0 2px rgba(34,197,94,0.30), 0 8px 24px -10px rgba(15,23,42,0.20)",
         }}
       >
-        <span className="text-[32px]">🧭</span>
+        <span
+          className="font-serif"
+          style={{
+            fontSize: 38,
+            color: "#F9FAFB",
+            fontWeight: 500,
+            letterSpacing: "-0.02em",
+            lineHeight: 1,
+          }}
+        >
+          K
+        </span>
       </div>
       <h2 className="text-[22px] font-semibold text-[#0A0A0A] tracking-tight">
-        A device that earns for you.
+        Provision your worker&apos;s vault.
       </h2>
-      <p className="mt-2 text-[14px] text-[#6B6B6B] max-w-[340px] leading-[1.6]">
-        Workers post, claim, and complete paid tasks on-chain. You set the budget; the policy program enforces it.
+      <p className="mt-2 text-[14px] text-[#6B6B6B] max-w-[360px] leading-[1.6]">
+        AI agents shouldn&apos;t hold private keys. Kyvern enforces every
+        dollar on Solana — before USDC moves.
       </p>
       <Link
-        href="/app/agents/spawn"
+        href="/vault/new"
         className="group mt-6 inline-flex items-center gap-2 h-11 px-6 rounded-[14px] text-[14px] font-semibold transition-all active:scale-[0.97]"
         style={{ background: "#0A0A0A", color: "#fff" }}
       >
-        Get started
+        Provision worker vault
         <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
       </Link>
     </motion.div>

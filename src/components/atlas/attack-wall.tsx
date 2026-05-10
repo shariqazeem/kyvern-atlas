@@ -181,7 +181,7 @@ export function AttackWall({ attacks, limit = 60 }: AttackWallProps) {
                       cursor: explorerHref ? "pointer" : "default",
                     }}
                   >
-                    <span style={{ color: "#FCA5A5" }}>❌</span>
+                    <span style={{ color: "#FCA5A5" }}>✕</span>
                     <span style={{ color: "#FCA5A5" }}>FAILED</span>
                     <span style={{ color: "rgba(255,255,255,0.18)" }}>·</span>
                     <span style={{ color: "rgba(255,255,255,0.55)" }}>

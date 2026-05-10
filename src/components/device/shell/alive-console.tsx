@@ -29,6 +29,7 @@ import {
   type VaultPayload,
 } from "../worker/user-vault-card";
 import { AtlasReferenceStrip } from "../worker/atlas-reference-strip";
+import { PayShFlow } from "../worker/paysh-flow";
 import type { PanelKind } from "../home/affordance-row";
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
@@ -103,6 +104,9 @@ export function AliveConsole({ vaultId, ownerWallet, className }: Props) {
 
       {/* Atlas demoted to reference strip */}
       <AtlasReferenceStrip />
+
+      {/* Pay.sh interception — network activity visualizer */}
+      <PayShFlow vaultId={vaultId} ownerWallet={ownerWallet} />
 
       {/* Build your worker — provision + roadmap */}
       <WorkerTemplates />

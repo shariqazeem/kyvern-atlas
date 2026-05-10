@@ -105,7 +105,7 @@ export default function VaultDetailPage({
           className="text-[18px] font-semibold tracking-[-0.015em]"
           style={{ color: "#0A0A0A" }}
         >
-          {data.vault.emoji} {data.vault.name}
+          {data.vault.name}
         </h1>
         <span
           className="font-mono text-[10.5px]"

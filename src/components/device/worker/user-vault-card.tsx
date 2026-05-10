@@ -176,7 +176,7 @@ function Identity({
 
   return (
     <div className="flex items-start gap-4">
-      <Avatar emoji={vault.emoji} alive={alive} />
+      <Avatar name={vault.name} alive={alive} />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <h2
@@ -255,7 +255,11 @@ function Identity({
   );
 }
 
-function Avatar({ emoji, alive }: { emoji: string; alive: boolean }) {
+function Avatar({ name, alive }: { name: string; alive: boolean }) {
+  // First A-Z character of the vault name, uppercased. Falls back
+  // to "K" if no letter is found. Serif typography keeps the
+  // hardware/letterform feel — same treatment as Atlas's "A".
+  const letter = (name.match(/[A-Za-z]/)?.[0] ?? "K").toUpperCase();
   return (
     <div
       className="relative flex-shrink-0"
@@ -285,7 +289,18 @@ function Avatar({ emoji, alive }: { emoji: string; alive: boolean }) {
           background: "linear-gradient(135deg, #0A0A0A 0%, #1F2937 100%)",
         }}
       >
-        <span style={{ fontSize: 24, lineHeight: 1 }}>{emoji}</span>
+        <span
+          className="font-serif"
+          style={{
+            fontSize: 26,
+            color: "#F9FAFB",
+            fontWeight: 500,
+            letterSpacing: "-0.02em",
+            lineHeight: 1,
+          }}
+        >
+          {letter}
+        </span>
       </div>
       <div
         aria-hidden
@@ -1618,7 +1633,12 @@ function StatTile({
   mono?: boolean;
 }) {
   const valueColor = tone === "amber" ? "#B45309" : "#0A0A0A";
-  // Counter pulse — flash + scale when the underlying value changes.
+  // Boot-up counter: on first mount, tween from 0 to the numeric portion
+  // of the value over ~700ms so the page feels like hardware booting up.
+  const display = useBootedNumber(value);
+
+  // Counter pulse — flash + scale when the underlying value changes
+  // mid-session (after the boot tween completes).
   const prevRef = useRef<string>(value);
   const [pulsing, setPulsing] = useState(false);
   useEffect(() => {
@@ -1656,10 +1676,61 @@ function StatTile({
         }}
         transition={{ duration: 0.18, ease: EASE }}
       >
-        {value}
+        {display}
       </motion.span>
     </div>
   );
+}
+
+/** Boot-up numeric tween — when the component mounts with a numeric
+ *  value (e.g. "3", "1,472", "0"), animate from 0 → target over ~700ms.
+ *  Non-numeric values (mono PDA strings) skip the tween and render
+ *  directly. Counter pulse on subsequent value changes still fires
+ *  via the StatTile's prevRef. */
+function useBootedNumber(value: string): string {
+  // Detect numeric: digits, commas, decimals only (with optional leading $)
+  const numericMatch = value.match(/^(\$?)([\d,.]+)$/);
+  const isNumeric = !!numericMatch;
+  const targetNum = useMemo(() => {
+    if (!numericMatch) return null;
+    return parseFloat(numericMatch[2].replace(/,/g, ""));
+  }, [numericMatch]);
+  const prefix = numericMatch?.[1] ?? "";
+  const [shown, setShown] = useState<number>(0);
+  const startedRef = useRef(false);
+
+  useEffect(() => {
+    if (!isNumeric || targetNum === null) return;
+    if (startedRef.current) {
+      // After first mount, snap to new value immediately — counter
+      // pulse handles the visual feedback.
+      setShown(targetNum);
+      return;
+    }
+    startedRef.current = true;
+    const startTs = performance.now();
+    const duration = 700;
+    let raf = 0;
+    const step = (now: number) => {
+      const t = Math.min(1, (now - startTs) / duration);
+      // ease-out cubic for snappy boot
+      const eased = 1 - Math.pow(1 - t, 3);
+      setShown(targetNum * eased);
+      if (t < 1) raf = requestAnimationFrame(step);
+      else setShown(targetNum);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [isNumeric, targetNum]);
+
+  if (!isNumeric || targetNum === null) return value;
+  // Preserve formatting: integer if value had no decimal; locale separators
+  const hasDecimal = value.includes(".");
+  if (hasDecimal) {
+    const decimals = (value.split(".")[1] ?? "").replace(/[^\d]/g, "").length;
+    return `${prefix}${shown.toFixed(Math.max(2, decimals))}`;
+  }
+  return `${prefix}${Math.round(shown).toLocaleString()}`;
 }
 
 /* ─── Recent Activity ────────────────────────────────────────────── */

@@ -220,7 +220,7 @@ export function SettingsPageShell({
                     className="text-[13.5px] font-semibold tracking-[-0.005em]"
                     style={{ color: "#0A0A0A" }}
                   >
-                    {d.vault.emoji} {d.vault.name}
+                    {d.vault.name}
                   </span>
                   <span
                     className="font-mono text-[10.5px]"
