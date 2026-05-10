@@ -32,6 +32,7 @@ import {
   Code2,
   Copy,
   ExternalLink,
+  Plus,
   Radio,
   Shield,
   Sparkles,
@@ -201,7 +202,11 @@ export function UserVaultCard({
                   payments={data.payments}
                   network={data.vault.network}
                 />
-                <Allowlist merchants={data.vault.allowedMerchants} />
+                <Allowlist
+                  merchants={data.vault.allowedMerchants}
+                  vaultId={data.vault.id}
+                  ownerWallet={resolvedOwner}
+                />
               </motion.div>
             )}
           </AnimatePresence>
@@ -1950,43 +1955,100 @@ function PaymentChip({
 
 /* ─── Allowlist ──────────────────────────────────────────────────── */
 
-function Allowlist({ merchants }: { merchants: string[] }) {
-  if (!merchants || merchants.length === 0) {
-    return (
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center gap-1.5">
-          <Shield
-            className="w-3 h-3"
-            style={{ color: "rgba(15,23,42,0.45)" }}
-            strokeWidth={2}
-          />
-          <span
-            className="font-mono uppercase tracking-[0.14em]"
-            style={{ fontSize: 9.5, color: "rgba(15,23,42,0.55)" }}
-          >
-            Merchant allowlist
-          </span>
-        </div>
-        <div
-          className="rounded-[12px] p-3 text-[12px]"
-          style={{
-            background: "rgba(245,158,11,0.04)",
-            border: "1px solid rgba(245,158,11,0.18)",
-            color: "#B45309",
-          }}
-        >
-          No merchants whitelisted — every payment will be refused on-chain
-          until you add at least one.
-        </div>
-      </div>
-    );
-  }
+function Allowlist({
+  merchants,
+  vaultId,
+  ownerWallet,
+}: {
+  merchants: string[];
+  vaultId: string;
+  ownerWallet: string | null;
+}) {
+  // Local mirror of the on-chain list — gets overwritten by the
+  // parent on every poll, but updated optimistically on add/remove
+  // so the UI feels instant.
+  const [list, setList] = useState<string[]>(merchants);
+  const [adding, setAdding] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Re-sync when parent payload changes.
+  const remoteJson = JSON.stringify(merchants);
+  useEffect(() => {
+    setList(merchants);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [remoteJson]);
+
+  const persist = useCallback(
+    async (next: string[]) => {
+      if (!ownerWallet) {
+        setError("Sign in first.");
+        return false;
+      }
+      setError(null);
+      setPending(true);
+      try {
+        const r = await fetch(`/api/vault/${vaultId}/allowlist`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-owner-wallet": ownerWallet,
+          },
+          body: JSON.stringify({ merchants: next }),
+        });
+        const d = (await r.json()) as {
+          ok?: boolean;
+          allowedMerchants?: string[];
+          error?: string;
+          message?: string;
+        };
+        if (!r.ok || !d.ok) {
+          setError(d.message ?? d.error ?? `request failed (${r.status})`);
+          return false;
+        }
+        if (Array.isArray(d.allowedMerchants)) setList(d.allowedMerchants);
+        return true;
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "request failed");
+        return false;
+      } finally {
+        setPending(false);
+      }
+    },
+    [vaultId, ownerWallet],
+  );
+
+  const onAdd = useCallback(async () => {
+    const m = draft.trim().toLowerCase();
+    if (!m) return;
+    if (list.includes(m)) {
+      setError("Already on the allowlist.");
+      return;
+    }
+    const next = [...list, m];
+    const ok = await persist(next);
+    if (ok) {
+      setDraft("");
+      setAdding(false);
+    }
+  }, [draft, list, persist]);
+
+  const onRemove = useCallback(
+    async (m: string) => {
+      await persist(list.filter((x) => x !== m));
+    },
+    [list, persist],
+  );
+
+  const empty = list.length === 0;
+
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-1.5">
         <Shield
           className="w-3 h-3"
-          style={{ color: "#15803D" }}
+          style={{ color: empty ? "rgba(15,23,42,0.45)" : "#15803D" }}
           strokeWidth={2.2}
         />
         <span
@@ -1995,27 +2057,153 @@ function Allowlist({ merchants }: { merchants: string[] }) {
         >
           Merchant allowlist
         </span>
-        <span
-          className="font-mono"
-          style={{ fontSize: 10, color: "rgba(15,23,42,0.45)" }}
-        >
-          · {merchants.length} approved
-        </span>
-      </div>
-      <div className="flex flex-wrap gap-1.5">
-        {merchants.map((m) => (
+        {!empty && (
           <span
-            key={m}
-            className="font-mono px-2 py-1 rounded-md text-[11px]"
-            style={{
-              background: "rgba(34,197,94,0.06)",
-              border: "1px solid rgba(34,197,94,0.18)",
-              color: "#0A0A0A",
-            }}
+            className="font-mono"
+            style={{ fontSize: 10, color: "rgba(15,23,42,0.45)" }}
           >
-            {m}
+            · {list.length} approved
           </span>
-        ))}
+        )}
+        <button
+          type="button"
+          onClick={() => {
+            setAdding((v) => !v);
+            setError(null);
+          }}
+          disabled={!ownerWallet || pending || list.length >= 32}
+          className="ml-auto inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-mono uppercase tracking-[0.10em] transition-all hover:bg-[rgba(15,23,42,0.04)] disabled:opacity-50"
+          style={{
+            color: "rgba(15,23,42,0.65)",
+            border: "1px solid rgba(15,23,42,0.10)",
+          }}
+        >
+          {adding ? (
+            <>
+              <X className="w-2.5 h-2.5" strokeWidth={2.4} />
+              Cancel
+            </>
+          ) : (
+            <>
+              <Plus className="w-2.5 h-2.5" strokeWidth={2.4} />
+              Add
+            </>
+          )}
+        </button>
+      </div>
+
+      {empty && !adding && (
+        <div
+          className="rounded-[10px] p-2.5 text-[11.5px]"
+          style={{
+            background: "rgba(245,158,11,0.04)",
+            border: "1px solid rgba(245,158,11,0.18)",
+            color: "#B45309",
+          }}
+        >
+          No merchants approved — every payment will be refused on-chain
+          until you add at least one.
+        </div>
+      )}
+
+      <AnimatePresence>
+        {adding && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.18, ease: EASE }}
+            className="overflow-hidden"
+          >
+            <div className="flex items-center gap-1.5">
+              <input
+                type="text"
+                placeholder="api.example.com"
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void onAdd();
+                  else if (e.key === "Escape") {
+                    setAdding(false);
+                    setError(null);
+                  }
+                }}
+                disabled={pending}
+                autoFocus
+                className="flex-1 font-mono px-2.5 py-1.5 rounded-md outline-none transition-all focus:border-[rgba(34,197,94,0.40)] focus:bg-white"
+                style={{
+                  fontSize: 12,
+                  color: "#0A0A0A",
+                  background: "rgba(15,23,42,0.03)",
+                  border: "1px solid rgba(15,23,42,0.10)",
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => void onAdd()}
+                disabled={pending || !draft.trim()}
+                className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium transition-all active:scale-[0.98] disabled:opacity-50"
+                style={{
+                  background: "#0A0A0A",
+                  color: "#FFFFFF",
+                }}
+              >
+                {pending ? (
+                  <span
+                    className="w-3 h-3 border-2 rounded-full animate-spin"
+                    style={{
+                      borderColor: "rgba(255,255,255,0.30)",
+                      borderTopColor: "#FFFFFF",
+                    }}
+                  />
+                ) : (
+                  "Add"
+                )}
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {error && (
+        <span
+          className="text-[11px]"
+          style={{ color: "#B45309" }}
+        >
+          {error}
+        </span>
+      )}
+
+      <div className="flex flex-wrap gap-1.5">
+        <AnimatePresence initial={false}>
+          {list.map((m) => (
+            <motion.span
+              key={m}
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              transition={{ duration: 0.18, ease: EASE }}
+              className="group inline-flex items-center gap-1 font-mono px-2 py-1 rounded-md text-[11px]"
+              style={{
+                background: "rgba(34,197,94,0.06)",
+                border: "1px solid rgba(34,197,94,0.18)",
+                color: "#0A0A0A",
+              }}
+            >
+              {m}
+              <button
+                type="button"
+                onClick={() => void onRemove(m)}
+                disabled={pending}
+                aria-label={`Remove ${m}`}
+                className="opacity-0 group-hover:opacity-100 transition-opacity hover:text-[#B45309]"
+                style={{ color: "rgba(15,23,42,0.45)" }}
+              >
+                <X className="w-2.5 h-2.5" strokeWidth={2.4} />
+              </button>
+            </motion.span>
+          ))}
+        </AnimatePresence>
       </div>
     </div>
   );

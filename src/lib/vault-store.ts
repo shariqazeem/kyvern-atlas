@@ -369,6 +369,35 @@ export function setVaultKastDestination(
   return getVault(vaultId);
 }
 
+/** Replace the off-chain allowlist for a vault. The on-chain
+ *  policy program's allowlist is set at initialize_policy and updated
+ *  via a separate update_allowlist instruction (not wired from the UI
+ *  yet). For SDK calls routed through /api/vault/pay, the off-chain
+ *  pre-check uses this list. */
+export function setVaultAllowedMerchants(
+  vaultId: string,
+  merchants: string[],
+): VaultRecord | null {
+  const vault = getVault(vaultId);
+  if (!vault) return null;
+  // Normalize: trim, dedupe, lowercase, drop empty
+  const cleaned = Array.from(
+    new Set(
+      merchants
+        .map((m) => (typeof m === "string" ? m.trim().toLowerCase() : ""))
+        .filter((m) => m.length > 0),
+    ),
+  );
+  getDb()
+    .prepare(
+      `UPDATE vaults
+         SET allowed_merchants = ?, updated_at = datetime('now')
+         WHERE id = ?`,
+    )
+    .run(JSON.stringify(cleaned), vaultId);
+  return getVault(vaultId);
+}
+
 export function setVaultSquadsState(
   vaultId: string,
   state: {

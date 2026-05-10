@@ -172,18 +172,36 @@ export default function DeveloperPage() {
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: EASE, delay: 0.05 }}
-          className="grid grid-cols-1 md:grid-cols-2 gap-4"
+          className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] gap-5"
         >
           <IntegrationWizard
             vaultId={vaultId}
             ownerWallet={wallet ?? null}
-            className="min-h-[420px]"
+            className="min-h-[480px]"
           />
-          <AgentEventFeed
-            vaultId={vaultId}
-            ownerWallet={wallet ?? null}
-            className="min-h-[420px]"
-          />
+          <div className="flex flex-col gap-3">
+            <div>
+              <div
+                className="font-mono uppercase tracking-[0.18em]"
+                style={{ color: "rgba(15,23,42,0.45)", fontSize: 10 }}
+              >
+                Live SDK events
+              </div>
+              <p
+                className="text-[12px] mt-0.5"
+                style={{ color: "rgba(15,23,42,0.55)" }}
+              >
+                Every <span className="font-mono">vault.pay()</span> from your
+                code lands here in real time. Settled, refused, or blocked —
+                with the on-chain signature when applicable.
+              </p>
+            </div>
+            <AgentEventFeed
+              vaultId={vaultId}
+              ownerWallet={wallet ?? null}
+              className="min-h-[440px]"
+            />
+          </div>
         </motion.div>
       )}
     </div>
