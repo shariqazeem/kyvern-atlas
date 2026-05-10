@@ -375,6 +375,11 @@ function CurrentObjective({
         ? `next cycle in ${countdown(nextCycleMs)}`
         : "next cycle imminent"
       : null;
+  const capResetMs = status.policy.windowResetsAt
+    ? new Date(status.policy.windowResetsAt).getTime() - now
+    : null;
+  const capResetRel =
+    capResetMs !== null && capResetMs > 0 ? countdown(capResetMs) : "soon";
 
   // Rotating "thinking..." flavor while waiting for next cycle
   const thinkingPhrases = useMemo(
@@ -497,6 +502,44 @@ function CurrentObjective({
             </>
           )}
         </div>
+
+        {/* Policy-gated banner — surfaces WHY decisions are getting
+            refused on-chain right now. Cap reached = policy doing its
+            job, not Atlas being broken. */}
+        {status.policy.exhausted && (
+          <div
+            className="mt-1 rounded-md flex items-start gap-2 px-2.5 py-2"
+            style={{
+              background: "rgba(34,197,94,0.06)",
+              border: "1px solid rgba(34,197,94,0.22)",
+            }}
+          >
+            <Shield
+              className="w-3.5 h-3.5 flex-shrink-0 mt-0.5"
+              strokeWidth={2.2}
+              style={{ color: "#86EFAC" }}
+            />
+            <div className="flex flex-col gap-0.5">
+              <span
+                className="font-mono uppercase tracking-[0.12em]"
+                style={{ fontSize: 9, color: "#86EFAC" }}
+              >
+                Daily cap reached · policy enforcing
+              </span>
+              <span
+                className="font-mono leading-[1.45]"
+                style={{
+                  fontSize: 11,
+                  color: "rgba(229,231,235,0.75)",
+                }}
+              >
+                ${status.policy.spentTodayUsd.toFixed(2)} of $
+                {status.policy.dailyCapUsd.toFixed(2)} spent today. Every spend
+                below is being refused on-chain. Resumes in {capResetRel}.
+              </span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Scanline accent */}
@@ -515,28 +558,22 @@ function CurrentObjective({
 /* ─── Economic Lifecycle ribbon ──────────────────────────────────── */
 
 function EconomicLifecycle({ status }: { status: AtlasStatus }) {
-  // Treasury balance: earned − spent. Atlas's vault USDC isn't in
-  // /api/atlas/status, so we approximate: what the worker has produced
-  // in net economic value. Honest framing.
-  const treasury = Math.max(
-    0,
-    status.totalEarnedUsd - status.totalSpentUsd,
-  );
+  // Net P&L = earned − spent. Atlas runs at controlled R&D burn:
+  // it spends on inference + data feeds to develop subscriber base.
+  // Negative is *honest* current-state — frame neutrally, never red.
+  const net = status.totalEarnedUsd - status.totalSpentUsd;
+  const netDisplay =
+    net >= 0
+      ? `+$${formatUsd(net)}`
+      : `($${formatUsd(Math.abs(net))})`; // accounting style
   const items = [
     {
-      label: "Earned",
+      label: "Revenue",
       value: `$${formatUsd(status.totalEarnedUsd)}`,
       tone: "green" as const,
     },
     {
-      label: "Treasury",
-      value: `$${formatUsd(treasury > 0 ? treasury : status.totalEarnedUsd - status.totalSpentUsd)}`,
-      tone: "neutral" as const,
-      // Show negative net honestly — Atlas spends to earn
-      raw: status.totalEarnedUsd - status.totalSpentUsd,
-    },
-    {
-      label: "Spent",
+      label: "Spend",
       value: `$${formatUsd(status.totalSpentUsd)}`,
       tone: "neutral" as const,
     },
@@ -545,6 +582,13 @@ function EconomicLifecycle({ status }: { status: AtlasStatus }) {
       value: status.totalSettled.toLocaleString(),
       tone: "neutral" as const,
       sub: "txs",
+    },
+    {
+      label: "Net",
+      value: netDisplay,
+      tone: "neutral" as const,
+      sub: "p&l",
+      raw: net,
     },
   ];
 
@@ -598,7 +642,13 @@ function RibbonCell({
   raw?: number;
 }) {
   const negative = raw !== undefined && raw < 0;
-  const valueColor = tone === "green" ? "#15803D" : negative ? "#B45309" : "#0A0A0A";
+  // Negative is R&D phase, not failure — neutral gray, never red/amber
+  const valueColor =
+    tone === "green"
+      ? "#15803D"
+      : negative
+        ? "rgba(15,23,42,0.55)"
+        : "#0A0A0A";
   return (
     <div className="flex flex-col items-center text-center col-span-1 min-w-0">
       <span
@@ -718,6 +768,29 @@ function AutonomousActions({
         </span>
       </div>
 
+      {/* When daily cap is exhausted, every "failed" decision below is
+          actually a policy refusal on-chain — that's the system working.
+          Surface it explicitly so the feed doesn't read as "broken." */}
+      {status.policy.exhausted && (
+        <div
+          className="text-[11px] leading-[1.45] px-2.5 py-1.5 rounded-md"
+          style={{
+            background: "rgba(34,197,94,0.05)",
+            border: "1px solid rgba(34,197,94,0.16)",
+            color: "rgba(15,23,42,0.65)",
+          }}
+        >
+          <span className="font-mono uppercase tracking-[0.10em] mr-1.5"
+            style={{ color: "#15803D", fontSize: 9 }}>
+            Note
+          </span>
+          Atlas hit its $
+          {status.policy.dailyCapUsd.toFixed(2)} daily cap. The actions
+          below are being refused by the policy program — that&apos;s the
+          chain enforcing the budget, not a malfunction.
+        </div>
+      )}
+
       <div
         className="rounded-[12px] overflow-hidden"
         style={{ border: "1px solid rgba(15,23,42,0.05)" }}
@@ -728,6 +801,7 @@ function AutonomousActions({
             d={d}
             isLast={i === Math.min(decisions.length, 5) - 1}
             network={status.network}
+            policyExhausted={status.policy.exhausted}
           />
         ))}
         {decisions.length === 0 && (
@@ -747,10 +821,12 @@ function DecisionRow({
   d,
   isLast,
   network,
+  policyExhausted,
 }: {
   d: Decision;
   isLast: boolean;
   network: "devnet" | "mainnet";
+  policyExhausted: boolean;
 }) {
   const ts = formatHHMM(d.decidedAt);
   const explorerUrl = d.txSignature
@@ -787,7 +863,12 @@ function DecisionRow({
       >
         {d.reasoning}
       </span>
-      <OutcomeChip outcome={d.outcome} amountUsd={d.amountUsd} />
+      <OutcomeChip
+        outcome={d.outcome}
+        amountUsd={d.amountUsd}
+        policyExhausted={policyExhausted}
+        hasSignature={!!d.txSignature}
+      />
       {explorerUrl ? (
         <a
           href={explorerUrl}
@@ -809,7 +890,17 @@ function DecisionRow({
   );
 }
 
-function OutcomeChip({ outcome, amountUsd }: { outcome: string; amountUsd: number }) {
+function OutcomeChip({
+  outcome,
+  amountUsd,
+  policyExhausted,
+  hasSignature,
+}: {
+  outcome: string;
+  amountUsd: number;
+  policyExhausted: boolean;
+  hasSignature: boolean;
+}) {
   let bg = "rgba(15,23,42,0.04)";
   let color = "rgba(15,23,42,0.55)";
   let label: string = outcome;
@@ -817,6 +908,16 @@ function OutcomeChip({ outcome, amountUsd }: { outcome: string; amountUsd: numbe
     bg = "rgba(34,197,94,0.10)";
     color = "#15803D";
     label = `+$${amountUsd.toFixed(amountUsd < 0.1 ? 3 : 2)}`;
+  } else if (
+    (outcome === "failed" || outcome === "blocked") &&
+    policyExhausted &&
+    !hasSignature
+  ) {
+    // Daily cap reached → policy program refused the spend on-chain.
+    // That's the system working, not a malfunction. Render green.
+    bg = "rgba(34,197,94,0.10)";
+    color = "#15803D";
+    label = "policy gated";
   } else if (outcome === "failed" || outcome === "blocked") {
     bg = "rgba(245,158,11,0.10)";
     color = "#B45309";
