@@ -28,8 +28,6 @@ import {
   UserVaultCard,
   type VaultPayload,
 } from "../worker/user-vault-card";
-import { AtlasReferenceStrip } from "../worker/atlas-reference-strip";
-import { PayShFlow } from "../worker/paysh-flow";
 import type { PanelKind } from "../home/affordance-row";
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
@@ -78,32 +76,18 @@ export function AliveConsole({ vaultId, ownerWallet, className }: Props) {
 
   return (
     <div className={`flex flex-col gap-4 sm:gap-5 ${className ?? ""}`}>
-      {/* Hero: USER's vault Worker Card (or skeleton until data lands).
-          The Atlas live-tape is rendered inside the card, so we don't
-          need a separate reference strip on /app — that was clutter. */}
+      {/* Hero: USER's vault Worker Card. Now a tabbed device shell —
+          Runtime / Network / Rules — per Apple-OS layout pivot. The
+          Atlas live-tape, Pay.sh circuit, policy ribbon, etc. all
+          live INSIDE the card on their respective tabs. */}
       {data ? (
         <UserVaultCard data={data} ownerWallet={ownerWallet} now={now} />
       ) : (
         <UserVaultSkeleton />
       )}
 
-      {/* Pay.sh interception — network activity visualizer.
-          Pass the vault's STORED owner (not auth wallet) to dodge
-          Privy embedded-wallet timing mismatches. */}
-      <PayShFlow
-        vaultId={vaultId}
-        ownerWallet={data?.vault.ownerWallet ?? ownerWallet}
-      />
-
-      {/* Roadmap of hosted autonomous workers. Hidden once the user
-          has their own vault — the templates were a first-time
-          orientation. After provisioning, judges already see what
-          they came for; the row was just clutter. */}
+      {/* First-time orientation only — hidden once the user has a vault. */}
       {!data && <WorkerTemplates />}
-
-      {/* Atlas reference — single line at the bottom, smallest weight,
-          links to the public observatory. */}
-      <AtlasReferenceStrip />
 
       {/* Developer mode link */}
       <motion.div

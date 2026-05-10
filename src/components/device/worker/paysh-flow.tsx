@@ -136,33 +136,27 @@ export function PayShFlow({ vaultId, ownerWallet }: Props) {
     <motion.section
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.55, ease: EASE, delay: 0.05 }}
-      className="rounded-[18px]"
-      style={{
-        background: "#FFFFFF",
-        border: "1px solid rgba(15,23,42,0.06)",
-        boxShadow:
-          "0 1px 2px rgba(15,23,42,0.04), 0 16px 40px -20px rgba(15,23,42,0.10)",
-      }}
+      transition={{ duration: 0.4, ease: EASE }}
+      className="flex flex-col gap-3"
     >
       {/* Header */}
-      <div className="px-5 sm:px-6 pt-5 pb-1">
+      <div>
         <div
           className="font-mono uppercase tracking-[0.18em] mb-1"
           style={{ color: "rgba(15,23,42,0.45)", fontSize: 10 }}
         >
-          Network · Pay.sh interception
+          Pay.sh interception
         </div>
         <h3
-          className="text-[16px] font-semibold tracking-[-0.01em]"
+          className="text-[14.5px] font-semibold tracking-[-0.01em]"
           style={{ color: "#0A0A0A" }}
         >
-          Every paid API call passes through your policy program first.
+          Every paid API call routes through your policy program first.
         </h3>
       </div>
 
       {/* Circuit diagram */}
-      <div className="px-5 sm:px-6 py-6">
+      <div className="py-3">
         <div
           className="relative"
           style={{ height: 92 }}
@@ -289,7 +283,7 @@ export function PayShFlow({ vaultId, ownerWallet }: Props) {
       </div>
 
       {/* Buttons */}
-      <div className="px-5 sm:px-6 pb-4 flex items-center gap-2 flex-wrap">
+      <div className="flex items-center gap-2 flex-wrap">
         <button
           type="button"
           onClick={() => fire("paysh_over_cap")}
@@ -348,7 +342,7 @@ export function PayShFlow({ vaultId, ownerWallet }: Props) {
             exit={{ opacity: 0, height: 0 }}
             transition={{ duration: 0.4, ease: EASE }}
           >
-            <div className="px-5 sm:px-6 py-4 flex flex-col gap-2.5">
+            <div className="py-2 flex flex-col gap-2.5">
               {phase === "blocked" ? (
                 <div className="flex flex-col gap-1">
                   <p
@@ -444,7 +438,7 @@ export function PayShFlow({ vaultId, ownerWallet }: Props) {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
-            className="px-5 sm:px-6 py-3 text-[12px]"
+            className="py-2 text-[12px]"
             style={{ color: "#B45309" }}
           >
             {error}

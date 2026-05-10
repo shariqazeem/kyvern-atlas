@@ -24,6 +24,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
+import { PayShFlow } from "./paysh-flow";
 import {
   Activity,
   ArrowRight,
@@ -101,6 +102,8 @@ interface Props {
   className?: string;
 }
 
+type Tab = "runtime" | "network" | "rules";
+
 export function UserVaultCard({
   data,
   ownerWallet,
@@ -108,6 +111,9 @@ export function UserVaultCard({
   firstCall = true,
   className,
 }: Props) {
+  const [tab, setTab] = useState<Tab>("runtime");
+  const resolvedOwner = data.vault.ownerWallet ?? ownerWallet;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
@@ -132,33 +138,137 @@ export function UserVaultCard({
         }}
       />
 
-      <div className="relative p-5 sm:p-6 flex flex-col gap-5">
+      <div className="relative p-5 sm:p-6 flex flex-col gap-4">
         <Identity vault={data.vault} payments={data.payments} now={now} />
-        <LiveTape />
-        <RuntimePanel vault={data.vault} now={now} />
-        <SdkPreview vaultId={data.vault.id} />
-        {firstCall && (
-          <FirstCallPanel
-            vaultId={data.vault.id}
-            // Use the vault's STORED owner directly. useAuth() can race
-            // with Privy embedded-wallet provisioning and surface a
-            // different address than what was stored at create time —
-            // sidestep the mismatch entirely by trusting the payload
-            // that already came back from /api/vault/[id].
-            ownerWallet={data.vault.ownerWallet ?? ownerWallet}
-            perTxMaxUsd={data.budget.perTxMaxUsd}
-            network={data.vault.network}
-          />
-        )}
-        <PolicyRibbon budget={data.budget} />
-        <StatsGrid vault={data.vault} payments={data.payments} />
-        <RecentActivity payments={data.payments} network={data.vault.network} />
-        <Allowlist merchants={data.vault.allowedMerchants} />
+        <SegmentedControl tab={tab} onChange={setTab} />
+
+        {/* Tab content — fixed-height viewport so the whole card stays
+            anchored without scrolling beyond the chrome. */}
+        <div
+          className="relative"
+          style={{ minHeight: 380 }}
+        >
+          <AnimatePresence mode="wait">
+            {tab === "runtime" && (
+              <motion.div
+                key="runtime"
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.25, ease: EASE }}
+                className="flex flex-col gap-5"
+              >
+                <RuntimePanel vault={data.vault} now={now} />
+                <SdkPreview vaultId={data.vault.id} />
+                {firstCall && (
+                  <FirstCallPanel
+                    vaultId={data.vault.id}
+                    ownerWallet={resolvedOwner}
+                    perTxMaxUsd={data.budget.perTxMaxUsd}
+                    network={data.vault.network}
+                  />
+                )}
+              </motion.div>
+            )}
+            {tab === "network" && (
+              <motion.div
+                key="network"
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.25, ease: EASE }}
+                className="flex flex-col gap-4"
+              >
+                <LiveTape />
+                <PayShFlow
+                  vaultId={data.vault.id}
+                  ownerWallet={resolvedOwner}
+                />
+              </motion.div>
+            )}
+            {tab === "rules" && (
+              <motion.div
+                key="rules"
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.25, ease: EASE }}
+                className="flex flex-col gap-5"
+              >
+                <PolicyRibbon budget={data.budget} />
+                <StatsGrid vault={data.vault} payments={data.payments} />
+                <RecentActivity
+                  payments={data.payments}
+                  network={data.vault.network}
+                />
+                <Allowlist merchants={data.vault.allowedMerchants} />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
         <Footer network={data.vault.network} />
       </div>
     </motion.div>
   );
 }
+
+/* ─── SegmentedControl (iOS-style 3-tab pill) ───────────────────── */
+
+function SegmentedControl({
+  tab,
+  onChange,
+}: {
+  tab: Tab;
+  onChange: (t: Tab) => void;
+}) {
+  const tabs: Array<{ id: Tab; label: string }> = [
+    { id: "runtime", label: "Runtime" },
+    { id: "network", label: "Network" },
+    { id: "rules", label: "Rules" },
+  ];
+  return (
+    <div
+      className="relative inline-flex items-center self-center rounded-[10px] p-[3px]"
+      style={{
+        background: "rgba(15,23,42,0.05)",
+        border: "1px solid rgba(15,23,42,0.04)",
+        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.5)",
+      }}
+    >
+      {tabs.map((t) => {
+        const active = tab === t.id;
+        return (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => onChange(t.id)}
+            className="relative z-10 px-4 py-1.5 text-[12px] font-medium tracking-[-0.01em] transition-colors"
+            style={{
+              color: active ? "#0A0A0A" : "rgba(15,23,42,0.55)",
+              minWidth: 86,
+            }}
+          >
+            {active && (
+              <motion.span
+                layoutId="seg-pill"
+                className="absolute inset-0 rounded-[8px]"
+                style={{
+                  background: "#FFFFFF",
+                  boxShadow:
+                    "0 1px 2px rgba(15,23,42,0.10), 0 0 0 0.5px rgba(15,23,42,0.06)",
+                }}
+                transition={{ type: "spring", stiffness: 380, damping: 32 }}
+              />
+            )}
+            <span className="relative z-10">{t.label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 
 /* ─── Identity ──────────────────────────────────────────────────── */
 
