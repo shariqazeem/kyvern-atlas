@@ -21,14 +21,17 @@
  * No fake activity. No simulated economy. Real on-chain proof.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Activity,
   ArrowRight,
+  Check,
   Code2,
+  Copy,
   ExternalLink,
+  Radio,
   Shield,
   ShieldAlert,
   Sparkles,
@@ -132,7 +135,9 @@ export function UserVaultCard({
 
       <div className="relative p-5 sm:p-6 flex flex-col gap-5">
         <Identity vault={data.vault} payments={data.payments} now={now} />
+        <LiveTape />
         <RuntimePanel vault={data.vault} now={now} />
+        <SdkPreview vaultId={data.vault.id} />
         {firstCall && (
           <FirstCallPanel
             vaultId={data.vault.id}
@@ -293,6 +298,236 @@ function Avatar({ emoji, alive }: { emoji: string; alive: boolean }) {
   );
 }
 
+/* ─── LiveTape (Atlas events, ambient drift) ────────────────────── */
+
+interface TapeItem {
+  id: string;
+  whenMs: number;
+  label: string;
+  tone: "green" | "amber";
+  ts: string;
+}
+
+interface TapeFeedEntry {
+  id?: string;
+  _kind?: "decision" | "attack";
+  _when?: string;
+  decidedAt?: string;
+  attemptedAt?: string;
+  outcome?: string;
+  amountUsd?: number;
+  type?: string;
+}
+
+function toTapeItem(e: TapeFeedEntry): TapeItem | null {
+  if (!e?.id) return null;
+  const whenIso = e._when ?? e.decidedAt ?? e.attemptedAt ?? null;
+  const whenMs = parseTs(whenIso);
+  if (!whenMs) return null;
+  const ts = formatHHMM(whenMs);
+  if (e._kind === "decision") {
+    if (e.outcome === "idle") return null;
+    const amt = typeof e.amountUsd === "number" ? e.amountUsd : 0;
+    if (e.outcome === "settled") {
+      return { id: e.id, whenMs, ts, label: `+$${fmtAmount(amt)}`, tone: "green" };
+    }
+    return {
+      id: e.id,
+      whenMs,
+      ts,
+      label: `$${fmtAmount(amt)} refused`,
+      tone: "amber",
+    };
+  }
+  if (e._kind === "attack") {
+    const type = (e.type ?? "attack").replace(/_/g, " ");
+    return { id: e.id, whenMs, ts, label: `${type} refused`, tone: "amber" };
+  }
+  return null;
+}
+
+function fmtAmount(v: number): string {
+  if (v < 0.01) return v.toFixed(3);
+  return v.toFixed(2);
+}
+
+function LiveTape() {
+  const [items, setItems] = useState<TapeItem[]>([]);
+  const cacheRef = useRef<Map<string, TapeItem>>(new Map());
+
+  useEffect(() => {
+    let alive = true;
+    const tick = async () => {
+      try {
+        const r = await fetch("/api/atlas/decisions?kind=both&limit=20", {
+          cache: "no-store",
+        });
+        if (!r.ok) return;
+        const d = (await r.json()) as { feed?: TapeFeedEntry[] };
+        if (!alive) return;
+        const map = cacheRef.current;
+        for (const e of d.feed ?? []) {
+          if (!e?.id || map.has(e.id)) continue;
+          const item = toTapeItem(e);
+          if (item) map.set(item.id, item);
+        }
+        // Keep newest 12, rendered ASC so newest is on the RIGHT,
+        // marquee drifts LEFT — new pills enter from the right edge,
+        // old pills exit on the left edge.
+        const all = [...map.values()].sort((a, b) => b.whenMs - a.whenMs);
+        const kept = all.slice(0, 12);
+        const keepIds = new Set(kept.map((i) => i.id));
+        for (const k of [...map.keys()]) {
+          if (!keepIds.has(k)) map.delete(k);
+        }
+        setItems(kept.slice().reverse()); // ASC for render order
+      } catch {
+        /* swallow */
+      }
+    };
+    void tick();
+    const iv = setInterval(tick, 4000);
+    return () => {
+      alive = false;
+      clearInterval(iv);
+    };
+  }, []);
+
+  return (
+    <div
+      className="relative rounded-[12px] overflow-hidden"
+      style={{
+        background: "rgba(15,23,42,0.025)",
+        border: "1px solid rgba(15,23,42,0.05)",
+        height: 38,
+      }}
+    >
+      {/* Left header label — always visible */}
+      <div
+        aria-hidden
+        className="absolute top-0 left-3 bottom-0 z-20 flex items-center gap-1.5 pointer-events-none"
+      >
+        <motion.span
+          className="rounded-full"
+          style={{
+            width: 5,
+            height: 5,
+            background: "#22C55E",
+            boxShadow: "0 0 6px #22C55E",
+          }}
+          animate={{ opacity: [0.5, 1, 0.5] }}
+          transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
+        />
+        <Radio
+          className="w-2.5 h-2.5"
+          strokeWidth={2.4}
+          style={{ color: "#15803D" }}
+        />
+        <span
+          className="font-mono uppercase tracking-[0.14em]"
+          style={{ fontSize: 8.5, color: "rgba(15,23,42,0.55)" }}
+        >
+          Atlas · live
+        </span>
+      </div>
+
+      {/* Edge fade masks */}
+      <div
+        aria-hidden
+        className="absolute inset-y-0 left-0 w-28 z-10 pointer-events-none"
+        style={{
+          background:
+            "linear-gradient(90deg, #FAFBFC 35%, rgba(250,251,252,0) 100%)",
+        }}
+      />
+      <div
+        aria-hidden
+        className="absolute inset-y-0 right-0 w-16 z-10 pointer-events-none"
+        style={{
+          background:
+            "linear-gradient(270deg, #FAFBFC 0%, rgba(250,251,252,0) 100%)",
+        }}
+      />
+
+      {/* Slow infinite leftward drift wrapper */}
+      <motion.div
+        className="flex items-center gap-1.5 whitespace-nowrap h-full pl-32 pr-8"
+        animate={{ x: ["0%", "-50%"] }}
+        transition={{
+          x: {
+            repeat: Infinity,
+            repeatType: "loop",
+            duration: 45,
+            ease: "linear",
+          },
+        }}
+      >
+        <AnimatePresence initial={false}>
+          {items.map((it) => (
+            <motion.span
+              key={it.id}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.4 }}
+              className="font-mono whitespace-nowrap px-2 py-1 rounded-md flex-shrink-0"
+              style={{
+                fontSize: 10.5,
+                background:
+                  it.tone === "green"
+                    ? "rgba(34,197,94,0.10)"
+                    : "rgba(245,158,11,0.10)",
+                color: it.tone === "green" ? "#15803D" : "#B45309",
+                border:
+                  it.tone === "green"
+                    ? "1px solid rgba(34,197,94,0.20)"
+                    : "1px solid rgba(245,158,11,0.20)",
+              }}
+            >
+              <span style={{ opacity: 0.55 }}>{it.ts}</span>
+              <span className="mx-1" style={{ opacity: 0.35 }}>
+                ·
+              </span>
+              {it.label}
+            </motion.span>
+          ))}
+        </AnimatePresence>
+        {/* Doubled set — gives the marquee a seamless loop. We render
+            the same pills twice so when x reaches -50% the second set
+            is already in place at x:0. */}
+        {items.length > 0 && (
+          <div aria-hidden className="flex items-center gap-1.5 ml-1.5">
+            {items.map((it) => (
+              <span
+                key={`dup-${it.id}`}
+                className="font-mono whitespace-nowrap px-2 py-1 rounded-md flex-shrink-0"
+                style={{
+                  fontSize: 10.5,
+                  background:
+                    it.tone === "green"
+                      ? "rgba(34,197,94,0.10)"
+                      : "rgba(245,158,11,0.10)",
+                  color: it.tone === "green" ? "#15803D" : "#B45309",
+                  border:
+                    it.tone === "green"
+                      ? "1px solid rgba(34,197,94,0.20)"
+                      : "1px solid rgba(245,158,11,0.20)",
+                }}
+              >
+                <span style={{ opacity: 0.55 }}>{it.ts}</span>
+                <span className="mx-1" style={{ opacity: 0.35 }}>
+                  ·
+                </span>
+                {it.label}
+              </span>
+            ))}
+          </div>
+        )}
+      </motion.div>
+    </div>
+  );
+}
+
 /* ─── Runtime Panel (dark terminal) ──────────────────────────────── */
 
 function RuntimePanel({ vault, now }: { vault: VaultRecord; now: number }) {
@@ -326,7 +561,7 @@ function RuntimePanel({ vault, now }: { vault: VaultRecord; now: number }) {
           "inset 0 1px 0 rgba(255,255,255,0.04), 0 0 24px -8px rgba(34,197,94,0.18)",
       }}
     >
-      <div className="px-4 py-3.5 flex flex-col gap-2">
+      <div className="px-5 py-5 sm:py-6 flex flex-col gap-2.5">
         <div className="flex items-center gap-2 flex-wrap">
           <span
             className="font-mono uppercase tracking-[0.18em]"
@@ -347,17 +582,17 @@ function RuntimePanel({ vault, now }: { vault: VaultRecord; now: number }) {
           </span>
         </div>
 
-        <div className="flex items-start gap-2">
+        <div className="flex items-start gap-2.5">
           <span
-            className="font-mono mt-0.5"
-            style={{ fontSize: 13, color: "#86EFAC" }}
+            className="font-mono mt-0.5 flex-shrink-0"
+            style={{ fontSize: 15, color: "#86EFAC", lineHeight: 1.6 }}
           >
             &gt;
           </span>
           <span
-            className="font-mono leading-[1.55]"
+            className="font-mono leading-[1.6]"
             style={{
-              fontSize: 13.5,
+              fontSize: 15,
               color: "#E5E7EB",
               letterSpacing: "-0.005em",
             }}
@@ -373,7 +608,7 @@ function RuntimePanel({ vault, now }: { vault: VaultRecord; now: number }) {
           <span className="flex items-center gap-1.5">
             <motion.span
               className="rounded-full"
-              style={{ width: 5, height: 5, background: "#86EFAC" }}
+              style={{ width: 6, height: 6, background: "#86EFAC" }}
               animate={{ opacity: [0.4, 1, 0.4] }}
               transition={{ duration: 1.2, repeat: Infinity }}
             />
@@ -402,6 +637,153 @@ function RuntimePanel({ vault, now }: { vault: VaultRecord; now: number }) {
             "linear-gradient(90deg, transparent, rgba(134,239,172,0.45), transparent)",
         }}
       />
+    </div>
+  );
+}
+
+/* ─── SDK preview (4-line snippet · copy buttons) ──────────────── */
+
+function SdkPreview({ vaultId }: { vaultId: string }) {
+  const [keyPrefix, setKeyPrefix] = useState<string | null>(null);
+  const [copied, setCopied] = useState<"snippet" | "install" | null>(null);
+
+  useEffect(() => {
+    if (!vaultId) return;
+    let alive = true;
+    fetch(`/api/devices/${vaultId}/agent-key`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { keyPrefix?: string | null } | null) => {
+        if (!alive) return;
+        if (d?.keyPrefix) setKeyPrefix(d.keyPrefix);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [vaultId]);
+
+  const apiKey = keyPrefix
+    ? `"${keyPrefix}…"`
+    : `process.env.KYVERN_AGENT_KEY`;
+  const snippet =
+    `import { Vault } from "@kyvernlabs/sdk";\n` +
+    `const vault = new Vault({ agentKey: ${apiKey} });\n` +
+    `const res = await vault.pay({ merchant: "api.openai.com", amount: 0.05 });\n` +
+    `console.log(res.decision); // "allowed" or "refused"`;
+  const installCmd = "npm install @kyvernlabs/sdk";
+
+  const copy = useCallback((which: "snippet" | "install", text: string) => {
+    if (typeof navigator === "undefined" || !navigator.clipboard) return;
+    void navigator.clipboard.writeText(text);
+    setCopied(which);
+    setTimeout(() => setCopied(null), 1500);
+  }, []);
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center gap-1.5">
+        <Code2
+          className="w-3 h-3"
+          strokeWidth={2}
+          style={{ color: "rgba(15,23,42,0.45)" }}
+        />
+        <span
+          className="font-mono uppercase tracking-[0.14em]"
+          style={{ fontSize: 9.5, color: "rgba(15,23,42,0.55)" }}
+        >
+          Wire it · 4 lines
+        </span>
+      </div>
+
+      {/* Dark code block */}
+      <div
+        className="relative rounded-[12px] overflow-hidden"
+        style={{
+          background: "#0A0E1A",
+          border: "1px solid rgba(15,23,42,0.10)",
+          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
+        }}
+      >
+        <button
+          type="button"
+          aria-label="Copy snippet"
+          onClick={() => copy("snippet", snippet)}
+          className="absolute top-2 right-2 z-10 inline-flex items-center justify-center rounded-md transition-all hover:bg-white/10 active:scale-95"
+          style={{
+            width: 26,
+            height: 26,
+            background: "rgba(255,255,255,0.04)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            color:
+              copied === "snippet"
+                ? "#86EFAC"
+                : "rgba(229,231,235,0.65)",
+          }}
+        >
+          {copied === "snippet" ? (
+            <Check className="w-3 h-3" strokeWidth={2.4} />
+          ) : (
+            <Copy className="w-3 h-3" strokeWidth={2} />
+          )}
+        </button>
+        <pre
+          className="font-mono px-4 py-3 overflow-x-auto"
+          style={{
+            fontSize: 11.5,
+            lineHeight: 1.65,
+            color: "rgba(229,231,235,0.92)",
+            margin: 0,
+            letterSpacing: "-0.005em",
+          }}
+        >
+          {snippet}
+        </pre>
+        {/* Top scanline accent */}
+        <div
+          aria-hidden
+          className="absolute inset-x-0 top-0 h-px pointer-events-none"
+          style={{
+            background:
+              "linear-gradient(90deg, transparent, rgba(134,239,172,0.40), transparent)",
+          }}
+        />
+      </div>
+
+      {/* npm install row */}
+      <div className="flex items-center justify-between gap-2 px-1 flex-wrap">
+        <span
+          className="text-[11px]"
+          style={{ color: "rgba(15,23,42,0.55)" }}
+        >
+          → Run this in your terminal
+        </span>
+        <button
+          type="button"
+          onClick={() => copy("install", installCmd)}
+          className="font-mono inline-flex items-center gap-1.5 px-2 py-1 rounded-md transition-all hover:bg-[rgba(15,23,42,0.04)]"
+          style={{
+            fontSize: 11,
+            color: "#0A0A0A",
+            background: "rgba(15,23,42,0.04)",
+            border: "1px solid rgba(15,23,42,0.08)",
+          }}
+        >
+          {installCmd}
+          {copied === "install" ? (
+            <Check
+              className="w-3 h-3"
+              strokeWidth={2.4}
+              style={{ color: "#15803D" }}
+            />
+          ) : (
+            <Copy
+              className="w-3 h-3"
+              strokeWidth={2}
+              style={{ color: "rgba(15,23,42,0.50)" }}
+            />
+          )}
+        </button>
+      </div>
     </div>
   );
 }
@@ -721,15 +1103,14 @@ function PolicyRibbon({ budget }: { budget: BudgetSnapshot }) {
             className="relative h-1.5 rounded-full overflow-hidden"
             style={{ background: "rgba(15,23,42,0.06)" }}
           >
-            <motion.div
+            <div
               className="absolute inset-y-0 left-0 rounded-full"
               style={{
                 background: utilPct >= 90 ? "#B45309" : "#22C55E",
                 opacity: utilPct === 0 ? 0 : 1,
+                width: `${Math.max(2, utilPct)}%`,
+                transition: "width 600ms cubic-bezier(0.16, 1, 0.3, 1)",
               }}
-              initial={{ width: 0 }}
-              animate={{ width: `${Math.max(2, utilPct)}%` }}
-              transition={{ duration: 0.6, ease: EASE }}
             />
           </div>
         </div>
@@ -832,6 +1213,17 @@ function StatTile({
   mono?: boolean;
 }) {
   const valueColor = tone === "amber" ? "#B45309" : "#0A0A0A";
+  // Counter pulse — flash + scale when the underlying value changes.
+  const prevRef = useRef<string>(value);
+  const [pulsing, setPulsing] = useState(false);
+  useEffect(() => {
+    if (prevRef.current !== value) {
+      prevRef.current = value;
+      setPulsing(true);
+      const t = setTimeout(() => setPulsing(false), 350);
+      return () => clearTimeout(t);
+    }
+  }, [value]);
   return (
     <div
       className="rounded-[12px] p-3 flex flex-col gap-1"
@@ -846,16 +1238,21 @@ function StatTile({
       >
         {label}
       </span>
-      <span
-        className={`tabular-nums font-semibold ${mono ? "font-mono" : "font-mono"}`}
+      <motion.span
+        className="tabular-nums font-semibold font-mono inline-block"
         style={{
           fontSize: mono ? 13 : 16,
-          color: valueColor,
           letterSpacing: "-0.01em",
+          transformOrigin: "left center",
         }}
+        animate={{
+          scale: pulsing ? 1.06 : 1,
+          color: pulsing ? "#15803D" : valueColor,
+        }}
+        transition={{ duration: 0.18, ease: EASE }}
       >
         {value}
-      </span>
+      </motion.span>
     </div>
   );
 }
@@ -904,14 +1301,23 @@ function RecentActivity({
           className="rounded-[12px] overflow-hidden"
           style={{ border: "1px solid rgba(15,23,42,0.05)" }}
         >
-          {payments.slice(0, 5).map((p, i) => (
-            <PaymentRow
-              key={p.id}
-              p={p}
-              network={network}
-              isLast={i === Math.min(payments.length, 5) - 1}
-            />
-          ))}
+          <AnimatePresence initial={false}>
+            {payments.slice(0, 5).map((p, i) => (
+              <motion.div
+                key={p.id}
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2, ease: EASE }}
+              >
+                <PaymentRow
+                  p={p}
+                  network={network}
+                  isLast={i === Math.min(payments.length, 5) - 1}
+                />
+              </motion.div>
+            ))}
+          </AnimatePresence>
         </div>
       )}
     </div>

@@ -126,24 +126,59 @@ export function WorkerTemplates() {
 
 function TemplateCard({ tpl }: { tpl: Tpl }) {
   const isActive = tpl.tone === "active";
-  const inner = (
+  const inner = isActive ? (
+    <motion.div
+      className="relative h-full rounded-[14px] p-3.5 flex flex-col gap-2 overflow-hidden"
+      style={{
+        background:
+          "linear-gradient(180deg, rgba(34,197,94,0.04) 0%, #FFFFFF 100%)",
+        border: "1px solid rgba(34,197,94,0.30)",
+      }}
+      animate={{
+        boxShadow: [
+          "0 1px 2px rgba(15,23,42,0.04), 0 12px 32px -16px rgba(34,197,94,0.20)",
+          "0 1px 2px rgba(15,23,42,0.04), 0 12px 32px -16px rgba(34,197,94,0.40), 0 0 0 1px rgba(34,197,94,0.30)",
+          "0 1px 2px rgba(15,23,42,0.04), 0 12px 32px -16px rgba(34,197,94,0.20)",
+        ],
+      }}
+      transition={{ duration: 2.6, repeat: Infinity, ease: "easeInOut" }}
+    >
+      <TemplateCardBody tpl={tpl} isActive />
+    </motion.div>
+  ) : (
     <div
       className="relative h-full rounded-[14px] p-3.5 flex flex-col gap-2 overflow-hidden transition-all"
-      style={
-        isActive
-          ? {
-              background:
-                "linear-gradient(180deg, rgba(34,197,94,0.04) 0%, #FFFFFF 100%)",
-              border: "1px solid rgba(34,197,94,0.30)",
-              boxShadow:
-                "0 1px 2px rgba(15,23,42,0.04), 0 12px 32px -16px rgba(34,197,94,0.20)",
-            }
-          : {
-              background: "#FFFFFF",
-              border: "1px solid rgba(15,23,42,0.06)",
-            }
-      }
+      style={{
+        background: "#FFFFFF",
+        border: "1px dashed rgba(15,23,42,0.18)",
+        opacity: 0.7,
+      }}
     >
+      <TemplateCardBody tpl={tpl} isActive={false} />
+    </div>
+  );
+  if (isActive && tpl.href) {
+    return (
+      <Link
+        href={tpl.href}
+        className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-[#22C55E] rounded-[14px]"
+      >
+        {inner}
+      </Link>
+    );
+  }
+  return <div aria-disabled className="cursor-not-allowed">{inner}</div>;
+}
+
+function TemplateCardBody({
+  tpl,
+  isActive,
+}: {
+  tpl: Tpl;
+  isActive: boolean;
+}) {
+  return (
+    <>
       {/* Icon */}
       <div
         className="w-9 h-9 rounded-[10px] flex items-center justify-center flex-shrink-0"
@@ -190,13 +225,11 @@ function TemplateCard({ tpl }: { tpl: Tpl }) {
           className="font-mono uppercase tracking-[0.12em] px-1.5 py-0.5 rounded"
           style={{
             fontSize: 8.5,
-            color: isActive ? "#15803D" : "rgba(15,23,42,0.50)",
-            background: isActive
-              ? "rgba(34,197,94,0.10)"
-              : "rgba(15,23,42,0.04)",
+            color: isActive ? "#15803D" : "rgba(15,23,42,0.40)",
+            background: isActive ? "rgba(34,197,94,0.10)" : "transparent",
             border: isActive
               ? "1px solid rgba(34,197,94,0.20)"
-              : "1px solid rgba(15,23,42,0.05)",
+              : "1px dashed rgba(15,23,42,0.15)",
           }}
         >
           {tpl.badge ?? (isActive ? "Live" : "Soon")}
@@ -209,30 +242,6 @@ function TemplateCard({ tpl }: { tpl: Tpl }) {
           />
         )}
       </div>
-
-      {/* Roadmap subtle stripe */}
-      {!isActive && (
-        <div
-          aria-hidden
-          className="absolute inset-x-0 bottom-0 h-px pointer-events-none"
-          style={{
-            background:
-              "linear-gradient(90deg, transparent, rgba(15,23,42,0.08), transparent)",
-          }}
-        />
-      )}
-    </div>
+    </>
   );
-
-  if (isActive && tpl.href) {
-    return (
-      <Link
-        href={tpl.href}
-        className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-[#22C55E] rounded-[14px]"
-      >
-        {inner}
-      </Link>
-    );
-  }
-  return <div aria-disabled className="cursor-not-allowed">{inner}</div>;
 }
