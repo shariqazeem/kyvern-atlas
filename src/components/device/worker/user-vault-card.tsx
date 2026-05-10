@@ -71,7 +71,7 @@ export interface BudgetSnapshot {
 
 export interface Payment {
   id: string;
-  ts: string | number;
+  createdAt: string;
   merchant: string;
   amountUsd: number;
   status: "settled" | "blocked" | "failed" | "allowed";
@@ -163,7 +163,7 @@ function Identity({
   now: number;
 }) {
   const lastEvent = payments[0];
-  const lastTs = lastEvent ? parseTs(lastEvent.ts) : null;
+  const lastTs = lastEvent ? parseTs(lastEvent.createdAt) : null;
   const lastRel = lastTs ? relTime(now - lastTs) : null;
   const alive = !vault.pausedAt;
   const serial = deriveSerial(vault.id);
@@ -787,10 +787,10 @@ function StatsGrid({
   vault: VaultRecord;
   payments: Payment[];
 }) {
-  const callsToday = payments.filter((p) => isToday(parseTs(p.ts))).length;
+  const callsToday = payments.filter((p) => isToday(parseTs(p.createdAt))).length;
   const blockedToday = payments.filter(
     (p) =>
-      isToday(parseTs(p.ts)) &&
+      isToday(parseTs(p.createdAt)) &&
       (p.status === "blocked" || p.status === "failed"),
   ).length;
   const vaultAddr = vault.vaultPda ?? vault.squadsAddress ?? "—";
@@ -927,7 +927,7 @@ function PaymentRow({
   isLast: boolean;
   network: "devnet" | "mainnet";
 }) {
-  const ts = formatHHMM(parseTs(p.ts));
+  const ts = formatHHMM(parseTs(p.createdAt));
   const explorerUrl = p.txSignature
     ? `https://explorer.solana.com/tx/${p.txSignature}?cluster=${network}`
     : null;
@@ -1111,8 +1111,10 @@ function Sep() {
   );
 }
 
-function parseTs(raw: string | number): number {
+function parseTs(raw: string | number | null | undefined): number {
+  if (raw === null || raw === undefined) return 0;
   if (typeof raw === "number") return raw;
+  if (typeof raw !== "string" || raw.length === 0) return 0;
   let ms = Date.parse(raw);
   if (isNaN(ms)) {
     const norm = raw.includes("T") ? raw : raw.replace(" ", "T") + "Z";
