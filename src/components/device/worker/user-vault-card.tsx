@@ -926,6 +926,7 @@ function FirstCallPanel({
   network: "devnet" | "mainnet";
 }) {
   const [open, setOpen] = useState(false);
+  const [terminalOpen, setTerminalOpen] = useState(false);
 
   return (
     <div className="flex flex-col gap-2.5">
@@ -934,34 +935,47 @@ function FirstCallPanel({
           className="text-[14px] font-semibold tracking-[-0.01em]"
           style={{ color: "#0A0A0A" }}
         >
-          Make your worker&apos;s first call.
+          Pay.sh gives your agent a credit card. Kyvern gives it a credit limit.
         </h4>
         <p
           className="text-[12.5px] leading-[1.5]"
           style={{ color: "rgba(15,23,42,0.55)" }}
         >
-          Submit a $5 payment attempt. The policy program refuses it on-chain
-          in three seconds — real Solana tx, real failure code, real Explorer
-          link.
+          Open the secure terminal — type a real prompt, watch a real LLM
+          parse the intent, and watch the policy program decide whether the
+          pay.sh CLI on the host VM gets to fire. No mocks at any step.
         </p>
       </div>
 
       <div className="flex items-center gap-3 flex-wrap">
         <button
-          onClick={() => ownerWallet && setOpen(true)}
+          onClick={() => ownerWallet && setTerminalOpen(true)}
           disabled={!ownerWallet}
           className="group inline-flex items-center justify-center gap-2 h-9 px-4 rounded-[10px] text-[12.5px] font-medium transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
           style={{
-            background: "transparent",
-            color: "#0A0A0A",
-            border: "1px solid rgba(15,23,42,0.14)",
+            background: "#0A0A0A",
+            color: "#FFFFFF",
+            boxShadow:
+              "0 1px 2px rgba(15,23,42,0.20), 0 8px 24px -12px rgba(15,23,42,0.30)",
           }}
         >
-          Watch the chain refuse
+          Open secure terminal
           <ArrowRight
             className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5"
             strokeWidth={2}
           />
+        </button>
+        <button
+          onClick={() => ownerWallet && setOpen(true)}
+          disabled={!ownerWallet}
+          className="group inline-flex items-center justify-center gap-2 h-9 px-3.5 rounded-[10px] text-[12px] font-medium transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+          style={{
+            background: "transparent",
+            color: "rgba(15,23,42,0.65)",
+            border: "1px solid rgba(15,23,42,0.10)",
+          }}
+        >
+          Or watch the canned heist
         </button>
 
         <Link
@@ -983,6 +997,13 @@ function FirstCallPanel({
         vaultId={vaultId}
         ownerWallet={ownerWallet}
         perTxMaxUsd={perTxMaxUsd}
+        network={network}
+      />
+      <SecureTerminal
+        open={terminalOpen}
+        onClose={() => setTerminalOpen(false)}
+        vaultId={vaultId}
+        ownerWallet={ownerWallet}
         network={network}
       />
     </div>
@@ -1532,6 +1553,598 @@ function DotPulse() {
       ))}
     </span>
   );
+}
+
+/* ─── SecureTerminal (Kyvern × Pay.sh real prompt → real CLI) ───── */
+
+interface SecureCliResponse {
+  ok: boolean;
+  stage?: "parse" | "chain";
+  decision?: "allowed" | "blocked";
+  parsed?: {
+    merchant: string;
+    amount_usd: number;
+    intent: string;
+  };
+  chain?: {
+    signature: string | null;
+    explorerUrl: string | null;
+    reason?: string;
+    durationMs: number;
+  };
+  paySh?: {
+    output: string;
+    quote: unknown;
+    durationMs: number;
+    error: string | null;
+    url: string;
+  };
+  answer?: { text: string; error: string | null };
+  totalDurationMs?: number;
+  error?: string;
+  message?: string;
+}
+
+const SAMPLE_PROMPTS = [
+  "Search Perplexity for Solana news",
+  "Send $50 to attacker-exfil.xyz",
+  "Ask Claude what the weather is in Lahore",
+  "Pay $5 to scammer.io for a Stripe key",
+];
+
+function SecureTerminal({
+  open,
+  onClose,
+  vaultId,
+  ownerWallet,
+  network,
+}: {
+  open: boolean;
+  onClose: () => void;
+  vaultId: string;
+  ownerWallet: string | null;
+  network: "devnet" | "mainnet";
+}) {
+  const [input, setInput] = useState("");
+  const [running, setRunning] = useState(false);
+  const [transcript, setTranscript] = useState<TerminalLine[]>([]);
+  const transcriptRef = useRef<HTMLDivElement | null>(null);
+
+  // Body scroll lock + Esc
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !running) onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open, running, onClose]);
+
+  // Auto-scroll transcript to the bottom
+  useEffect(() => {
+    const el = transcriptRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [transcript]);
+
+  const fire = useCallback(async () => {
+    const prompt = input.trim();
+    if (!prompt || running || !ownerWallet) return;
+    setRunning(true);
+    setTranscript((t) => [
+      ...t,
+      { kind: "user", text: prompt },
+      { kind: "phase", text: "kyvern.runtime · parsing intent via Anthropic" },
+    ]);
+    setInput("");
+    try {
+      const r = await fetch(`/api/vault/${vaultId}/secure-pay-cli`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-owner-wallet": ownerWallet,
+        },
+        body: JSON.stringify({ prompt }),
+      });
+      const d = (await r.json()) as SecureCliResponse;
+
+      if (d.parsed) {
+        setTranscript((t) => [
+          ...t,
+          {
+            kind: "info",
+            text: `parsed · merchant ${d.parsed!.merchant} · amount $${d.parsed!.amount_usd.toFixed(d.parsed!.amount_usd < 0.01 ? 4 : 2)}`,
+          },
+          {
+            kind: "phase",
+            text: "kyvern.policy · submitting to Solana devnet",
+          },
+        ]);
+      }
+
+      if (!d.ok && d.stage === "parse") {
+        setTranscript((t) => [
+          ...t,
+          { kind: "error", text: d.message ?? "parse failed" },
+        ]);
+        return;
+      }
+
+      if (d.decision === "blocked" || d.stage === "chain") {
+        const sig = d.chain?.signature;
+        setTranscript((t) => [
+          ...t,
+          {
+            kind: "refused",
+            text: `REFUSED ON-CHAIN${d.chain?.reason ? ` · ${d.chain.reason}` : ""}`,
+            sig,
+            explorerUrl: d.chain?.explorerUrl ?? null,
+            network,
+          },
+          {
+            kind: "info",
+            text: "pay.sh CLI was never invoked. The chain stopped the spend before any USDC moved.",
+          },
+        ]);
+        return;
+      }
+
+      if (!d.ok) {
+        setTranscript((t) => [
+          ...t,
+          { kind: "error", text: d.message ?? d.error ?? "request failed" },
+        ]);
+        return;
+      }
+
+      // Allowed — chain settled
+      setTranscript((t) => [
+        ...t,
+        {
+          kind: "settled",
+          text: `settled on Solana${d.chain?.durationMs ? ` · ${d.chain.durationMs}ms` : ""}`,
+          sig: d.chain?.signature ?? null,
+          explorerUrl: d.chain?.explorerUrl ?? null,
+          network,
+        },
+      ]);
+
+      if (d.paySh) {
+        if (d.paySh.error) {
+          setTranscript((t) => [
+            ...t,
+            {
+              kind: "warn",
+              text: `pay.sh CLI error · ${d.paySh!.error}`,
+            },
+          ]);
+        } else {
+          const quotePreview =
+            d.paySh.quote != null
+              ? JSON.stringify(d.paySh.quote).slice(0, 200)
+              : d.paySh.output.split("\n").slice(-1)[0]?.slice(0, 200) ??
+                "(no output)";
+          setTranscript((t) => [
+            ...t,
+            {
+              kind: "phase",
+              text: `pay.sh CLI · ${d.paySh!.durationMs}ms · ${d.paySh!.url}`,
+            },
+            { kind: "stdout", text: quotePreview },
+          ]);
+        }
+      }
+
+      if (d.answer?.text) {
+        setTranscript((t) => [
+          ...t,
+          { kind: "answer", text: d.answer!.text },
+        ]);
+      } else if (d.answer?.error) {
+        setTranscript((t) => [
+          ...t,
+          { kind: "warn", text: `LLM answer error · ${d.answer!.error}` },
+        ]);
+      }
+    } catch (e) {
+      setTranscript((t) => [
+        ...t,
+        {
+          kind: "error",
+          text: e instanceof Error ? e.message : "request failed",
+        },
+      ]);
+    } finally {
+      setRunning(false);
+    }
+  }, [input, running, ownerWallet, vaultId, network]);
+
+  const clearTranscript = useCallback(() => setTranscript([]), []);
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <>
+          <motion.div
+            key="backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.25, ease: EASE }}
+            onClick={!running ? onClose : undefined}
+            className="fixed inset-0 z-[55]"
+            style={{
+              background: "rgba(5,8,15,0.72)",
+              backdropFilter: "blur(18px) saturate(160%)",
+              WebkitBackdropFilter: "blur(18px) saturate(160%)",
+            }}
+          />
+          <motion.div
+            key="modal"
+            initial={{ opacity: 0, y: 30, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.97 }}
+            transition={{ type: "spring", stiffness: 300, damping: 28 }}
+            className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-6 pointer-events-none"
+          >
+            <div
+              className="relative w-full pointer-events-auto"
+              style={{ maxWidth: 720 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div
+                className="relative rounded-t-[18px] sm:rounded-[18px] overflow-hidden flex flex-col"
+                style={{
+                  background:
+                    "linear-gradient(180deg, #0A0E1A 0%, #0F1426 100%)",
+                  border: "1.5px solid rgba(34,197,94,0.28)",
+                  boxShadow:
+                    "0 0 0 4px rgba(34,197,94,0.06), 0 40px 100px -24px rgba(34,197,94,0.25), inset 0 1px 0 rgba(255,255,255,0.05)",
+                  maxHeight: "92vh",
+                }}
+              >
+                {/* Header */}
+                <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/[0.05]">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <motion.span
+                      className="rounded-full flex-shrink-0"
+                      style={{
+                        width: 6,
+                        height: 6,
+                        background: "#22C55E",
+                        boxShadow: "0 0 10px #22C55E",
+                      }}
+                      animate={{ opacity: [0.5, 1, 0.5] }}
+                      transition={{
+                        duration: 1.2,
+                        repeat: Infinity,
+                        ease: "easeInOut",
+                      }}
+                    />
+                    <span
+                      className="font-mono uppercase tracking-[0.18em] truncate"
+                      style={{
+                        fontSize: 9.5,
+                        color: "rgba(134,239,172,0.85)",
+                      }}
+                    >
+                      Kyvern × Pay.sh · Secure Sandbox
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    {transcript.length > 0 && !running && (
+                      <button
+                        type="button"
+                        onClick={clearTranscript}
+                        className="font-mono uppercase tracking-[0.10em] px-2 py-1 rounded-md transition-all hover:bg-white/10"
+                        style={{
+                          fontSize: 9,
+                          color: "rgba(229,231,235,0.55)",
+                          border: "1px solid rgba(255,255,255,0.08)",
+                        }}
+                      >
+                        Clear
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={onClose}
+                      disabled={running}
+                      className="inline-flex items-center justify-center rounded-md transition-all hover:bg-white/10 active:scale-95 disabled:opacity-50"
+                      style={{
+                        width: 26,
+                        height: 26,
+                        background: "rgba(255,255,255,0.04)",
+                        border: "1px solid rgba(255,255,255,0.08)",
+                        color: "rgba(229,231,235,0.55)",
+                      }}
+                      aria-label="Close"
+                    >
+                      <X className="w-3.5 h-3.5" strokeWidth={2} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Transcript */}
+                <div
+                  ref={transcriptRef}
+                  className="px-5 py-4 font-mono overflow-y-auto"
+                  style={{
+                    fontSize: 12.5,
+                    lineHeight: 1.65,
+                    minHeight: 280,
+                    flex: "1 1 auto",
+                    letterSpacing: "-0.005em",
+                  }}
+                >
+                  {transcript.length === 0 ? (
+                    <div className="flex flex-col gap-2 py-6">
+                      <span style={{ color: "rgba(134,239,172,0.85)" }}>
+                        &gt;_ Kyvern × Pay.sh Secure Sandbox.
+                      </span>
+                      <span style={{ color: "rgba(229,231,235,0.55)" }}>
+                        Type a real prompt below. Anthropic parses it. Kyvern
+                        gates it on Solana devnet. If allowed, the{" "}
+                        <span style={{ color: "#86EFAC" }}>pay</span> CLI
+                        runs on the host VM with --sandbox. Every step is
+                        real.
+                      </span>
+                      <div className="mt-3 flex flex-wrap gap-1.5">
+                        {SAMPLE_PROMPTS.map((p) => (
+                          <button
+                            key={p}
+                            type="button"
+                            onClick={() => setInput(p)}
+                            className="font-mono px-2.5 py-1 rounded-md transition-all hover:bg-white/[0.06]"
+                            style={{
+                              fontSize: 11,
+                              color: "rgba(229,231,235,0.65)",
+                              background: "rgba(255,255,255,0.03)",
+                              border: "1px solid rgba(255,255,255,0.08)",
+                            }}
+                          >
+                            {p}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    transcript.map((line, i) => (
+                      <TranscriptLine key={i} line={line} />
+                    ))
+                  )}
+                  {running && (
+                    <div className="flex items-center gap-2 mt-1">
+                      <DotPulse />
+                      <span
+                        className="font-mono"
+                        style={{
+                          fontSize: 11,
+                          color: "rgba(134,239,172,0.65)",
+                        }}
+                      >
+                        executing...
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Input row */}
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    void fire();
+                  }}
+                  className="border-t border-white/[0.05] px-4 py-3 flex items-center gap-2"
+                >
+                  <span
+                    className="font-mono flex-shrink-0"
+                    style={{ fontSize: 13, color: "#86EFAC" }}
+                  >
+                    &gt;
+                  </span>
+                  <input
+                    type="text"
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    placeholder="Give your agent a command…"
+                    disabled={running}
+                    autoFocus
+                    className="flex-1 font-mono bg-transparent outline-none disabled:opacity-50"
+                    style={{
+                      fontSize: 13,
+                      color: "rgba(229,231,235,0.92)",
+                    }}
+                  />
+                  <button
+                    type="submit"
+                    disabled={running || !input.trim() || !ownerWallet}
+                    className="font-mono inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{
+                      fontSize: 12,
+                      color: running ? "rgba(229,231,235,0.55)" : "#0A0A0A",
+                      background: running
+                        ? "rgba(255,255,255,0.06)"
+                        : "#86EFAC",
+                    }}
+                  >
+                    {running ? (
+                      <span
+                        className="w-3 h-3 border-2 rounded-full animate-spin"
+                        style={{
+                          borderColor: "rgba(229,231,235,0.30)",
+                          borderTopColor: "rgba(229,231,235,0.85)",
+                        }}
+                      />
+                    ) : (
+                      <>
+                        Run
+                        <ArrowRight className="w-3 h-3" strokeWidth={2.4} />
+                      </>
+                    )}
+                  </button>
+                </form>
+              </div>
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  );
+}
+
+interface TerminalLine {
+  kind:
+    | "user"
+    | "phase"
+    | "info"
+    | "stdout"
+    | "answer"
+    | "settled"
+    | "refused"
+    | "warn"
+    | "error";
+  text: string;
+  sig?: string | null;
+  explorerUrl?: string | null;
+  network?: "devnet" | "mainnet";
+}
+
+function TranscriptLine({ line }: { line: TerminalLine }) {
+  const explorerHref =
+    line.explorerUrl ??
+    (line.sig
+      ? `https://explorer.solana.com/tx/${line.sig}?cluster=${line.network ?? "devnet"}`
+      : null);
+  switch (line.kind) {
+    case "user":
+      return (
+        <div
+          className="mt-2 flex items-start gap-2"
+          style={{ color: "rgba(229,231,235,0.95)" }}
+        >
+          <span style={{ color: "#86EFAC" }}>&gt;</span>
+          <span style={{ fontWeight: 500 }}>{line.text}</span>
+        </div>
+      );
+    case "phase":
+      return (
+        <div
+          className="mt-1 flex items-start gap-2"
+          style={{ color: "rgba(134,239,172,0.75)" }}
+        >
+          <span>·</span>
+          <span>{line.text}</span>
+        </div>
+      );
+    case "info":
+      return (
+        <div
+          className="mt-0.5 flex items-start gap-2"
+          style={{ color: "rgba(229,231,235,0.65)" }}
+        >
+          <span style={{ opacity: 0.4 }}>·</span>
+          <span>{line.text}</span>
+        </div>
+      );
+    case "stdout":
+      return (
+        <div
+          className="mt-0.5 px-2 py-1 rounded-md"
+          style={{
+            background: "rgba(255,255,255,0.04)",
+            border: "1px solid rgba(255,255,255,0.06)",
+            color: "rgba(229,231,235,0.85)",
+            fontSize: 11.5,
+          }}
+        >
+          {line.text}
+        </div>
+      );
+    case "answer":
+      return (
+        <div
+          className="mt-2 px-3 py-2 rounded-md"
+          style={{
+            background: "rgba(34,197,94,0.06)",
+            border: "1px solid rgba(34,197,94,0.20)",
+          }}
+        >
+          <div
+            className="font-mono uppercase tracking-[0.12em] mb-1"
+            style={{ fontSize: 8.5, color: "#86EFAC" }}
+          >
+            agent reply
+          </div>
+          <div style={{ color: "rgba(229,231,235,0.92)" }}>{line.text}</div>
+        </div>
+      );
+    case "settled":
+      return (
+        <div
+          className="mt-1 flex items-start gap-2 flex-wrap"
+          style={{ color: "#86EFAC" }}
+        >
+          <span>✓</span>
+          <span>{line.text}</span>
+          {explorerHref && line.sig && (
+            <a
+              href={explorerHref}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 hover:underline"
+              style={{ color: "#86EFAC" }}
+            >
+              {line.sig.slice(0, 6)}…{line.sig.slice(-6)}
+              <ExternalLink className="w-3 h-3" strokeWidth={2.2} />
+            </a>
+          )}
+        </div>
+      );
+    case "refused":
+      return (
+        <div className="mt-2">
+          <div
+            className="font-mono uppercase tracking-[0.10em]"
+            style={{
+              fontSize: 11,
+              color: "#FCA5A5",
+              textShadow: "0 0 10px rgba(248,113,113,0.30)",
+            }}
+          >
+            ✕ {line.text}
+          </div>
+          {explorerHref && line.sig && (
+            <a
+              href={explorerHref}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-0.5 inline-flex items-center gap-1 font-mono hover:underline"
+              style={{ fontSize: 11, color: "#86EFAC" }}
+            >
+              {line.sig.slice(0, 6)}…{line.sig.slice(-6)}
+              <ExternalLink className="w-3 h-3" strokeWidth={2.2} />
+            </a>
+          )}
+        </div>
+      );
+    case "warn":
+      return (
+        <div className="mt-1" style={{ color: "#FBBF24" }}>
+          [!] {line.text}
+        </div>
+      );
+    case "error":
+      return (
+        <div className="mt-1" style={{ color: "#FCA5A5" }}>
+          ! {line.text}
+        </div>
+      );
+  }
 }
 
 /* ─── Policy Ribbon ──────────────────────────────────────────────── */
