@@ -797,26 +797,25 @@ export function countSignals(
   deviceId: string,
   status?: SignalStatus,
 ): number {
-  // Phase 8 — inbox count mirrors the inbox query: user-facing kinds
-  // only. The full audit count for admin views can read signals
-  // directly without going through this helper.
+  // Inbox count mirrors the inbox query. v1.1 dropped the
+  // USER_FACING_KINDS filter so graph-emitted signals (daily_brief,
+  // vault_digest, wallet_watch, custom) count in the unread badge.
   const db = getDb();
-  const placeholders = [...USER_FACING_KINDS].map(() => "?").join(",");
   if (status) {
     const r = db
       .prepare(
         `SELECT COUNT(*) as n FROM signals
-          WHERE device_id = ? AND status = ? AND kind IN (${placeholders})`,
+          WHERE device_id = ? AND status = ?`,
       )
-      .get(deviceId, status, ...USER_FACING_KINDS) as { n: number };
+      .get(deviceId, status) as { n: number };
     return r.n;
   }
   const r = db
     .prepare(
       `SELECT COUNT(*) as n FROM signals
-        WHERE device_id = ? AND kind IN (${placeholders})`,
+        WHERE device_id = ?`,
     )
-    .get(deviceId, ...USER_FACING_KINDS) as { n: number };
+    .get(deviceId) as { n: number };
   return r.n;
 }
 

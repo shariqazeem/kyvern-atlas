@@ -45,6 +45,12 @@ export async function GET(
       limit,
       since,
       excludeSnoozed: !includeSnoozed,
+      // Graph-platform agents emit signals with kinds outside the
+      // legacy USER_FACING_KINDS set (daily_brief, vault_digest,
+      // wallet_watch, custom user-defined). Drop the kind filter so
+      // they show up — the renderer falls back to default icon/color
+      // for any unknown kind.
+      userFacingOnly: false,
     });
 
     // Join agent names + emojis in one query — also pull the device's

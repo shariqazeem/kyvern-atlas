@@ -70,13 +70,16 @@ const dailySolanaBrief: RecipeDef = {
           provider: "commonstack",
           model: COMMONSTACK_DEFAULT_MODEL,
           system:
-            "You write tight 3-bullet morning briefs for solo developers " +
-            "building on Solana. Each bullet is 1 short sentence. No " +
-            "preamble, no markdown headers. Just three bullets prefixed " +
-            "with '• '. Topics: protocol news, ecosystem launches, on-chain " +
-            "trends. Be specific. Don't fabricate dates.",
-          prompt: "Write today's Solana brief.",
-          maxTokens: 300,
+            "Output exactly 3 bullets about Solana, no preamble. Each " +
+            "bullet 1 short sentence prefixed with '• '. Topics: a " +
+            "protocol fact, an ecosystem theme, a developer takeaway. " +
+            "Generic is fine — be useful, not breaking news.",
+          prompt: "3 bullets:",
+          // Reasoning models on Commonstack (gpt-oss-120b) need plenty
+          // of headroom — they spend tokens on hidden reasoning before
+          // emitting content. 2000 keeps cost low (~$0.0005) while
+          // leaving room for the model to finish.
+          maxTokens: 2000,
           temperature: 0.7,
         },
       },
@@ -249,7 +252,7 @@ const walletWatcher: RecipeDef = {
             "max 1 sentence describing the most notable activity. Set " +
             "alert=true only if something genuinely unusual happened.",
           prompt: "Recent signatures: {{signatures.body}}",
-          maxTokens: 200,
+          maxTokens: 2000,
           temperature: 0,
         },
       },
@@ -418,7 +421,7 @@ const vaultDigest: RecipeDef = {
             "Solana vault's activity. Mention what settled, what was " +
             "blocked, and any notable spend pattern. Don't make up data.",
           prompt: "Today's events: {{events.body}}",
-          maxTokens: 250,
+          maxTokens: 2500,
           temperature: 0.6,
         },
       },
@@ -469,7 +472,7 @@ const quoteAndPay: RecipeDef = {
             "string, nothing else.",
           prompt:
             "Pick one of: api.openai.com, api.anthropic.com, api.deepseek.com.",
-          maxTokens: 30,
+          maxTokens: 1000,
           temperature: 0,
         },
       },
