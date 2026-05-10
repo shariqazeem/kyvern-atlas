@@ -371,12 +371,29 @@ async function callCommonstack(
     return { text, modelUsed: PRIMARY_MODEL };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
+
+    // 429 is transient — Commonstack throttles per-key. One short
+    // backoff retry on the same model gets us past most spikes.
+    if (/\b429\b|rate.?limit/i.test(msg)) {
+      await new Promise((r) => setTimeout(r, 1200));
+      try {
+        const text = await tryOnce(PRIMARY_MODEL);
+        return { text, modelUsed: PRIMARY_MODEL };
+      } catch (e2) {
+        const msg2 = e2 instanceof Error ? e2.message : String(e2);
+        if (/\b429\b|rate.?limit/i.test(msg2)) {
+          throw new Error("Commonstack throttled — try again in a moment");
+        }
+        // fall through to fallback model
+      }
+    }
+
     // Retry with the fallback only on signals that strongly suggest the
     // model itself is unavailable (403, 404, model_not_found, etc.).
     // Don't retry on transport / abort errors that would also fail on
     // the fallback.
     const looksLikeModelIssue =
-      /403|model.+(not.+found|unavailable|access)|forbidden|not.+permitted/i.test(
+      /403|404|model.+(not.+found|unavailable|access)|forbidden|not.+permitted/i.test(
         msg,
       );
     if (!looksLikeModelIssue) throw e;
