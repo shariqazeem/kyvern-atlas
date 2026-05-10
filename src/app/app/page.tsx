@@ -310,14 +310,13 @@ export default function DeviceHome() {
         />
 
         <main
-          className="flex-1 min-h-0 grid gap-4 sm:gap-6 p-4 sm:p-6 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_380px]"
+          className="flex-1 min-h-0 flex flex-col gap-4 sm:gap-6 p-4 sm:p-6 mx-auto w-full"
+          style={{ maxWidth: 760 }}
         >
-          {/* STATE STRIP — Phase 6 Frontier-grand-champion activation
-              flow. Vanishes when state === 'active'. Spans the full
-              grid width — without col-span the strip would push
-              CanvasZone into the 380px sidebar slot. */}
+          {/* STATE STRIP — only when not active. Shrunk to a single
+              centered column now that the right sidebar is gone. */}
           {status?.deviceState && status.deviceState !== "active" && (
-            <div className="lg:col-span-2 -mb-1">
+            <div className="-mb-1">
               <StateStrip
                 state={status.deviceState}
                 onTopUp={onTopUp}
@@ -333,10 +332,7 @@ export default function DeviceHome() {
             </div>
           )}
 
-          {/* Worker-stage slot. ?alive=1 swaps DevTilesCanvas for the
-              new live integration console (TRANSFORM_24H §T0). The
-              chassis (vault-anchored frame, dot-grid backdrop, soft
-              halo) is preserved in both modes. */}
+          {/* Worker-stage. Single centered column — Apple-hardware feel. */}
           {aliveConsole ? (
             <AliveConsole
               vaultId={deviceId}
@@ -358,17 +354,24 @@ export default function DeviceHome() {
             />
           )}
 
-          <ControlZone
-            actionFeed={status?.actionFeed ?? []}
-            network={status?.network ?? "devnet"}
-            weeklyBenefit={status?.weeklyBenefit ?? null}
-            policySummary={status?.policySummary ?? null}
-            vaultEmpty={(status?.usdcBalance ?? 0) < 0.01}
-            onTopUp={onTopUp}
-            panel={panel}
-            onOpenPanel={setPanel}
-            className="min-h-0"
-          />
+          {/* ControlZone (right sidebar) retired from /app — was a
+              dashboard, this is a device. Keeping the import + the
+              panel deep-link routing below for ?panel= URLs (open-bay
+              etc. still work via direct link, just no longer surfaced
+              from a sidebar). */}
+          {false && (
+            <ControlZone
+              actionFeed={status?.actionFeed ?? []}
+              network={status?.network ?? "devnet"}
+              weeklyBenefit={status?.weeklyBenefit ?? null}
+              policySummary={status?.policySummary ?? null}
+              vaultEmpty={(status?.usdcBalance ?? 0) < 0.01}
+              onTopUp={onTopUp}
+              panel={panel}
+              onOpenPanel={setPanel}
+              className="min-h-0"
+            />
+          )}
         </main>
 
         <ManifestoStrip className="h-8 flex-shrink-0" />

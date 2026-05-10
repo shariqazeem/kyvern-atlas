@@ -33,10 +33,8 @@ import {
   ExternalLink,
   Radio,
   Shield,
-  ShieldAlert,
   Sparkles,
   X,
-  Zap,
 } from "lucide-react";
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
@@ -549,7 +547,7 @@ function LiveTape() {
   );
 }
 
-/* ─── Runtime Panel (dark terminal) ──────────────────────────────── */
+/* ─── Runtime Panel (light Apple-glass) ──────────────────────────── */
 
 function RuntimePanel({ vault, now }: { vault: VaultRecord; now: number }) {
   const phrases = useMemo(
@@ -576,17 +574,15 @@ function RuntimePanel({ vault, now }: { vault: VaultRecord; now: number }) {
     <div
       className="relative rounded-[14px] overflow-hidden"
       style={{
-        background: "linear-gradient(180deg, #0A0E1A 0%, #0F1426 100%)",
-        border: "1px solid rgba(34,197,94,0.18)",
-        boxShadow:
-          "inset 0 1px 0 rgba(255,255,255,0.04), 0 0 24px -8px rgba(34,197,94,0.18)",
+        background: "#F5F5F7",
+        border: "1px solid rgba(15,23,42,0.05)",
       }}
     >
       <div className="px-5 py-5 sm:py-6 flex flex-col gap-2.5">
         <div className="flex items-center gap-2 flex-wrap">
           <span
             className="font-mono uppercase tracking-[0.18em]"
-            style={{ fontSize: 9, color: "rgba(134,239,172,0.75)" }}
+            style={{ fontSize: 9, color: "rgba(15,23,42,0.50)" }}
           >
             Runtime Status
           </span>
@@ -594,8 +590,8 @@ function RuntimePanel({ vault, now }: { vault: VaultRecord; now: number }) {
             className="font-mono uppercase tracking-[0.14em] px-1.5 py-0.5 rounded"
             style={{
               fontSize: 8.5,
-              color: "rgba(134,239,172,0.85)",
-              background: "rgba(34,197,94,0.10)",
+              color: "#15803D",
+              background: "rgba(34,197,94,0.08)",
               border: "1px solid rgba(34,197,94,0.18)",
             }}
           >
@@ -606,7 +602,7 @@ function RuntimePanel({ vault, now }: { vault: VaultRecord; now: number }) {
         <div className="flex items-start gap-2.5">
           <span
             className="font-mono mt-0.5 flex-shrink-0"
-            style={{ fontSize: 15, color: "#86EFAC", lineHeight: 1.6 }}
+            style={{ fontSize: 15, color: "#15803D", lineHeight: 1.6 }}
           >
             &gt;
           </span>
@@ -614,14 +610,16 @@ function RuntimePanel({ vault, now }: { vault: VaultRecord; now: number }) {
             className="font-mono leading-[1.6]"
             style={{
               fontSize: 15,
-              color: "#E5E7EB",
+              color: "rgba(15,23,42,0.85)",
               letterSpacing: "-0.005em",
             }}
           >
             Awaiting strategy. Wire your code via{" "}
-            <span style={{ color: "#86EFAC" }}>@kyvernlabs/sdk</span> to
-            define this worker&apos;s behavior — every call routes through the
-            policy program.
+            <span style={{ color: "#15803D", fontWeight: 600 }}>
+              @kyvernlabs/sdk
+            </span>{" "}
+            to define this worker&apos;s behavior — every call routes
+            through the policy program.
           </span>
         </div>
 
@@ -629,7 +627,7 @@ function RuntimePanel({ vault, now }: { vault: VaultRecord; now: number }) {
           <span className="flex items-center gap-1.5">
             <motion.span
               className="rounded-full"
-              style={{ width: 6, height: 6, background: "#86EFAC" }}
+              style={{ width: 6, height: 6, background: "#22C55E" }}
               animate={{ opacity: [0.4, 1, 0.4] }}
               transition={{ duration: 1.2, repeat: Infinity }}
             />
@@ -641,7 +639,7 @@ function RuntimePanel({ vault, now }: { vault: VaultRecord; now: number }) {
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.5 }}
                 className="font-mono"
-                style={{ fontSize: 10.5, color: "rgba(134,239,172,0.75)" }}
+                style={{ fontSize: 10.5, color: "rgba(15,23,42,0.55)" }}
               >
                 {phrases[idx]}…
               </motion.span>
@@ -650,14 +648,6 @@ function RuntimePanel({ vault, now }: { vault: VaultRecord; now: number }) {
         </div>
       </div>
 
-      <div
-        aria-hidden
-        className="absolute inset-x-0 top-0 h-px pointer-events-none"
-        style={{
-          background:
-            "linear-gradient(90deg, transparent, rgba(134,239,172,0.45), transparent)",
-        }}
-      />
     </div>
   );
 }
@@ -716,29 +706,26 @@ function SdkPreview({ vaultId }: { vaultId: string }) {
         </span>
       </div>
 
-      {/* Dark code block */}
+      {/* Light code block — Apple-glass */}
       <div
         className="relative rounded-[12px] overflow-hidden"
         style={{
-          background: "#0A0E1A",
-          border: "1px solid rgba(15,23,42,0.10)",
-          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
+          background: "#F5F5F7",
+          border: "1px solid rgba(15,23,42,0.05)",
         }}
       >
         <button
           type="button"
           aria-label="Copy snippet"
           onClick={() => copy("snippet", snippet)}
-          className="absolute top-2 right-2 z-10 inline-flex items-center justify-center rounded-md transition-all hover:bg-white/10 active:scale-95"
+          className="absolute top-2 right-2 z-10 inline-flex items-center justify-center rounded-md transition-all hover:bg-[rgba(15,23,42,0.06)] active:scale-95"
           style={{
             width: 26,
             height: 26,
-            background: "rgba(255,255,255,0.04)",
-            border: "1px solid rgba(255,255,255,0.08)",
+            background: "rgba(255,255,255,0.7)",
+            border: "1px solid rgba(15,23,42,0.06)",
             color:
-              copied === "snippet"
-                ? "#86EFAC"
-                : "rgba(229,231,235,0.65)",
+              copied === "snippet" ? "#15803D" : "rgba(15,23,42,0.55)",
           }}
         >
           {copied === "snippet" ? (
@@ -752,22 +739,13 @@ function SdkPreview({ vaultId }: { vaultId: string }) {
           style={{
             fontSize: 11.5,
             lineHeight: 1.65,
-            color: "rgba(229,231,235,0.92)",
+            color: "rgba(15,23,42,0.85)",
             margin: 0,
             letterSpacing: "-0.005em",
           }}
         >
           {snippet}
         </pre>
-        {/* Top scanline accent */}
-        <div
-          aria-hidden
-          className="absolute inset-x-0 top-0 h-px pointer-events-none"
-          style={{
-            background:
-              "linear-gradient(90deg, transparent, rgba(134,239,172,0.40), transparent)",
-          }}
-        />
       </div>
 
       {/* npm install row */}
@@ -835,70 +813,54 @@ function FirstCallPanel({
   const [open, setOpen] = useState(false);
 
   return (
-    <div
-      className="rounded-[14px] p-4 flex flex-col gap-3"
-      style={{
-        background:
-          "linear-gradient(180deg, rgba(34,197,94,0.05) 0%, #FFFFFF 100%)",
-        border: "1.5px solid rgba(34,197,94,0.30)",
-        boxShadow: "0 0 0 4px rgba(34,197,94,0.04)",
-      }}
-    >
-      <div className="flex items-start gap-2.5">
-        <Zap
-          className="w-4 h-4 flex-shrink-0 mt-0.5"
-          strokeWidth={2.2}
-          style={{ color: "#15803D" }}
-        />
-        <div className="flex flex-col gap-0.5 flex-1 min-w-0">
-          <h4
-            className="text-[14px] font-semibold tracking-[-0.005em]"
-            style={{ color: "#0A0A0A" }}
-          >
-            Make your worker&apos;s first call
-          </h4>
-          <p
-            className="text-[12px] leading-[1.45]"
-            style={{ color: "rgba(15,23,42,0.65)" }}
-          >
-            Watch a malicious agent try to drain $5 — and watch your policy
-            program refuse it on-chain in 3 seconds. Real Solana tx, real
-            failure code, real Explorer link.
-          </p>
-        </div>
+    <div className="flex flex-col gap-2.5">
+      <div className="flex flex-col gap-0.5">
+        <h4
+          className="text-[14px] font-semibold tracking-[-0.01em]"
+          style={{ color: "#0A0A0A" }}
+        >
+          Make your worker&apos;s first call.
+        </h4>
+        <p
+          className="text-[12.5px] leading-[1.5]"
+          style={{ color: "rgba(15,23,42,0.55)" }}
+        >
+          Submit a $5 payment attempt. The policy program refuses it on-chain
+          in three seconds — real Solana tx, real failure code, real Explorer
+          link.
+        </p>
       </div>
 
-      <button
-        onClick={() => ownerWallet && setOpen(true)}
-        disabled={!ownerWallet}
-        className="group inline-flex items-center justify-center gap-2 h-10 px-4 rounded-[10px] text-[13px] font-semibold transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
-        style={{
-          background: "linear-gradient(180deg, #15803D 0%, #166534 100%)",
-          color: "#FFFFFF",
-          boxShadow:
-            "0 1px 2px rgba(21,128,61,0.30), 0 8px 24px -12px rgba(21,128,61,0.40)",
-        }}
-      >
-        <ShieldAlert className="w-4 h-4" strokeWidth={2.2} />
-        Watch the chain refuse a violation
-        <ArrowRight
-          className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5"
-          strokeWidth={2.2}
-        />
-      </button>
+      <div className="flex items-center gap-3 flex-wrap">
+        <button
+          onClick={() => ownerWallet && setOpen(true)}
+          disabled={!ownerWallet}
+          className="group inline-flex items-center justify-center gap-2 h-9 px-4 rounded-[10px] text-[12.5px] font-medium transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+          style={{
+            background: "transparent",
+            color: "#0A0A0A",
+            border: "1px solid rgba(15,23,42,0.14)",
+          }}
+        >
+          Watch the chain refuse
+          <ArrowRight
+            className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5"
+            strokeWidth={2}
+          />
+        </button>
 
-      <Link
-        href="/app/developer"
-        className="group inline-flex items-center gap-1.5 text-[11.5px] hover:underline self-start"
-        style={{ color: "rgba(15,23,42,0.65)" }}
-      >
-        <Code2 className="w-3 h-3" strokeWidth={2} />
-        Or send a real settled payment via the SDK
-        <ArrowRight
-          className="w-3 h-3 transition-transform group-hover:translate-x-0.5"
-          strokeWidth={2}
-        />
-      </Link>
+        <Link
+          href="/app/developer"
+          className="group inline-flex items-center gap-1.5 text-[11.5px] hover:underline"
+          style={{ color: "rgba(15,23,42,0.55)" }}
+        >
+          Or send a real settled payment via the SDK
+          <ArrowRight
+            className="w-3 h-3 transition-transform group-hover:translate-x-0.5"
+            strokeWidth={2}
+          />
+        </Link>
+      </div>
 
       <HeistOverlay
         open={open}
@@ -1778,12 +1740,9 @@ function RecentActivity({
           </p>
         </div>
       ) : (
-        <div
-          className="rounded-[12px] overflow-hidden"
-          style={{ border: "1px solid rgba(15,23,42,0.05)" }}
-        >
+        <div className="flex flex-col">
           <AnimatePresence initial={false}>
-            {payments.slice(0, 5).map((p, i) => (
+            {payments.slice(0, 5).map((p) => (
               <motion.div
                 key={p.id}
                 initial={{ opacity: 0, y: -4 }}
@@ -1791,11 +1750,7 @@ function RecentActivity({
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.2, ease: EASE }}
               >
-                <PaymentRow
-                  p={p}
-                  network={network}
-                  isLast={i === Math.min(payments.length, 5) - 1}
-                />
+                <PaymentRow p={p} network={network} />
               </motion.div>
             ))}
           </AnimatePresence>
@@ -1807,11 +1762,9 @@ function RecentActivity({
 
 function PaymentRow({
   p,
-  isLast,
   network,
 }: {
   p: Payment;
-  isLast: boolean;
   network: "devnet" | "mainnet";
 }) {
   const ts = formatHHMM(parseTs(p.createdAt));
@@ -1820,11 +1773,7 @@ function PaymentRow({
     : null;
   return (
     <div
-      className="px-3 py-2.5 flex items-center gap-3"
-      style={{
-        background: "#FFFFFF",
-        borderBottom: isLast ? undefined : "1px solid rgba(15,23,42,0.04)",
-      }}
+      className="px-1 py-1.5 flex items-center gap-3"
     >
       <span
         className="font-mono tabular-nums flex-shrink-0"
@@ -1967,8 +1916,8 @@ function Allowlist({ merchants }: { merchants: string[] }) {
 function Footer({ network }: { network: "devnet" | "mainnet" }) {
   return (
     <div
-      className="flex items-center justify-between gap-2 flex-wrap pt-1 border-t"
-      style={{ borderColor: "rgba(15,23,42,0.05)", paddingTop: 12 }}
+      className="flex items-center justify-between gap-2 flex-wrap pt-1"
+      style={{ paddingTop: 4 }}
     >
       <span
         className="text-[10.5px]"
