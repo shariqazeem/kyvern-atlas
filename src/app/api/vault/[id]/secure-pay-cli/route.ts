@@ -72,15 +72,22 @@ Rules:
 
 Return JSON only.`;
 
-const ANSWER_SYSTEM = `You are running inside the Kyvern × Pay.sh secure terminal. The agent's payment intent has been settled on Solana devnet — the terminal already has proof of the on-chain transaction. Now answer the user's actual question concisely.
+const ANSWER_SYSTEM = `You are an autonomous agent operating inside the Kyvern Secure Terminal on Solana devnet. The user's spending authorization just settled on-chain through the Kyvern policy program. You are now authorized to act. Answer the user's request concisely as their agent.
 
 Rules:
-- Plain text only, no markdown. Under 80 words.
-- If the user asked for data you can't truly verify (a live price, today's news), say "Pay.sh sandbox returned: <quote>" and use the AAPL quote provided to you, then add a brief informational sentence.
-- Don't hallucinate a real-time answer.`;
+- ALWAYS produce visible output text. Never return an empty response — at minimum acknowledge what was authorized.
+- Plain text only, no markdown. Under 100 words.
+- If the user asked for live external data (current price, today's news, real-time API result), say so plainly: state what you would call, what the policy authorized, and that the result would come from that merchant. Don't hallucinate a real-time answer.
+- For general questions you can answer from your training, just answer them directly.
+- For action requests ("send X to Y"), describe what just happened on-chain and what you would do next.`;
 
 interface Body {
   prompt?: string;
+  /** Default false. When true, the endpoint also shells out to the
+   *  `pay --sandbox curl` binary on the host VM after the chain
+   *  settles. Used by the "× pay.sh integration" demo on the Network
+   *  tab; the primary Secure Terminal leaves this off for speed. */
+  invokePaySh?: boolean;
 }
 
 interface ParsedIntent {
@@ -217,37 +224,42 @@ export async function POST(
     });
   }
 
-  // ─── Step 4: Real pay.sh CLI invocation on the host VM ─────────
+  // ─── Step 4: Optional pay.sh CLI invocation (skipped by default) ─
+  // Kept for the "× pay.sh integration" demo on the Network tab; the
+  // primary Secure Terminal flow no longer shells out — chain settle
+  // → LLM answer is enough and faster.
+  const invokePaySh = body.invokePaySh === true;
   let payShOutput = "";
   let payShQuote: unknown = null;
   let payShDurationMs = 0;
   let payShError: string | null = null;
-  try {
-    const payShStart = Date.now();
-    const { stdout } = await execFileAsync(
-      PAY_BIN,
-      ["--sandbox", "curl", DEMO_URL],
-      { timeout: 30_000, maxBuffer: 256 * 1024 },
-    );
-    payShDurationMs = Date.now() - payShStart;
-    payShOutput = stdout.trim();
-    // Extract last JSON line as the API response
-    const lines = payShOutput
-      .split("\n")
-      .filter((l) => l.trim().length > 0);
-    for (let i = lines.length - 1; i >= 0; i--) {
-      const candidate = lines[i].trim();
-      if (candidate.startsWith("{") || candidate.startsWith("[")) {
-        try {
-          payShQuote = JSON.parse(candidate);
-          break;
-        } catch {
-          /* keep looking */
+  if (invokePaySh) {
+    try {
+      const payShStart = Date.now();
+      const { stdout } = await execFileAsync(
+        PAY_BIN,
+        ["--sandbox", "curl", DEMO_URL],
+        { timeout: 30_000, maxBuffer: 256 * 1024 },
+      );
+      payShDurationMs = Date.now() - payShStart;
+      payShOutput = stdout.trim();
+      const lines = payShOutput
+        .split("\n")
+        .filter((l) => l.trim().length > 0);
+      for (let i = lines.length - 1; i >= 0; i--) {
+        const candidate = lines[i].trim();
+        if (candidate.startsWith("{") || candidate.startsWith("[")) {
+          try {
+            payShQuote = JSON.parse(candidate);
+            break;
+          } catch {
+            /* keep looking */
+          }
         }
       }
+    } catch (e) {
+      payShError = e instanceof Error ? e.message : "pay CLI failed";
     }
-  } catch (e) {
-    payShError = e instanceof Error ? e.message : "pay CLI failed";
   }
 
   // ─── Step 5: Real LLM answer to the user's actual prompt ───────
@@ -255,16 +267,14 @@ export async function POST(
   let answerError: string | null = null;
   let answerModelUsed = parserModelUsed;
   try {
-    const quoteContext =
-      payShQuote != null
-        ? `Pay.sh sandbox returned this quote: ${JSON.stringify(payShQuote).slice(0, 400)}.`
-        : "Pay.sh sandbox responded but the quote was not parseable.";
-    const userPromptForAnswer = `User asked: "${prompt}"\n\n${quoteContext}`;
+    const userPromptForAnswer = invokePaySh && payShQuote != null
+      ? `User asked: "${prompt}"\n\nFor reference, a sandbox quote service returned: ${JSON.stringify(payShQuote).slice(0, 400)}.`
+      : `User asked: "${prompt}"\n\nThe Kyvern policy program just authorized $${parsed.amount_usd.toFixed(parsed.amount_usd < 0.01 ? 4 : 2)} to ${parsed.merchant} on Solana. Answer the user's question concisely as their authorized agent.`;
     const r = await callCommonstack(
       apiKey,
       ANSWER_SYSTEM,
       userPromptForAnswer,
-      260,
+      600,
       false,
     );
     answer = r.text;
@@ -282,13 +292,15 @@ export async function POST(
       explorerUrl: chainResult.explorerUrl ?? null,
       durationMs: chainDurationMs,
     },
-    paySh: {
-      output: payShOutput,
-      quote: payShQuote,
-      durationMs: payShDurationMs,
-      error: payShError,
-      url: DEMO_URL,
-    },
+    paySh: invokePaySh
+      ? {
+          output: payShOutput,
+          quote: payShQuote,
+          durationMs: payShDurationMs,
+          error: payShError,
+          url: DEMO_URL,
+        }
+      : null,
     answer: { text: answer, error: answerError },
     llm: { parser: parserModelUsed, answer: answerModelUsed },
     totalDurationMs: Date.now() - startedAt,
@@ -337,9 +349,18 @@ async function callCommonstack(
         },
         { signal: ac.signal },
       );
-      const text = (res.choices?.[0]?.message?.content ?? "").trim();
-      if (!text) throw new Error("empty completion");
-      return text;
+      const msg = res.choices?.[0]?.message;
+      // DeepSeek returns a `reasoning_content` field on top of `content`
+      // for some completions. When `content` is empty (model decided
+      // its answer was implicit), surface the reasoning so the user
+      // gets visible output. Stripping internal-thinking tags first.
+      const direct = (msg?.content ?? "").trim();
+      if (direct) return direct;
+      const reasoning = stripReasoningTags(
+        ((msg as { reasoning_content?: string } | null)?.reasoning_content ?? "").trim(),
+      );
+      if (reasoning) return reasoning;
+      throw new Error("empty completion");
     } finally {
       clearTimeout(timer);
     }
@@ -403,3 +424,17 @@ function sanitizeParsed(raw: unknown): ParsedIntent {
 // Keep the LLM-allowlist export referenced for clarity even though we
 // don't enforce a hard whitelist (the on-chain policy program does).
 void ALLOWED_MERCHANTS_FOR_LLM;
+
+/** Strip <thinking>...</thinking> style tags from reasoning content
+ *  and clip to a sensible length so we don't dump 800 tokens of
+ *  internal monologue into the terminal. */
+function stripReasoningTags(text: string): string {
+  if (!text) return "";
+  return text
+    .replace(/<\/?thinking>/gi, "")
+    .replace(/<\/?reasoning>/gi, "")
+    .replace(/^\s*okay,?\s*/i, "")
+    .replace(/^\s*so\s+/i, "")
+    .trim()
+    .slice(0, 600);
+}

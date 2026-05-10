@@ -935,15 +935,16 @@ function FirstCallPanel({
           className="text-[14px] font-semibold tracking-[-0.01em]"
           style={{ color: "#0A0A0A" }}
         >
-          Pay.sh gives your agent a credit card. Kyvern gives it a credit limit.
+          Your worker, on a leash.
         </h4>
         <p
           className="text-[12.5px] leading-[1.5]"
           style={{ color: "rgba(15,23,42,0.55)" }}
         >
-          Open the secure terminal — type a real prompt, watch a real LLM
-          parse the intent, and watch the policy program decide whether the
-          pay.sh CLI on the host VM gets to fire. No mocks at any step.
+          Type a real prompt. A real LLM parses the intent. The Kyvern
+          policy program decides on Solana devnet before any USDC moves.
+          Allowed → the agent answers; refused → real failed-tx with a
+          custom error code. No mocks anywhere.
         </p>
       </div>
 
@@ -1578,7 +1579,7 @@ interface SecureCliResponse {
     durationMs: number;
     error: string | null;
     url: string;
-  };
+  } | null;
   answer?: { text: string; error: string | null };
   totalDurationMs?: number;
   error?: string;
@@ -1638,7 +1639,7 @@ function SecureTerminal({
     setTranscript((t) => [
       ...t,
       { kind: "user", text: prompt },
-      { kind: "phase", text: "kyvern.runtime · parsing intent via Anthropic" },
+      { kind: "phase", text: "kyvern.runtime · parsing intent" },
     ]);
     setInput("");
     try {
@@ -1832,7 +1833,7 @@ function SecureTerminal({
                         color: "rgba(134,239,172,0.85)",
                       }}
                     >
-                      Kyvern × Pay.sh · Secure Sandbox
+                      Kyvern Secure Agent · Live
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5">
@@ -1884,14 +1885,15 @@ function SecureTerminal({
                   {transcript.length === 0 ? (
                     <div className="flex flex-col gap-2 py-6">
                       <span style={{ color: "rgba(134,239,172,0.85)" }}>
-                        &gt;_ Kyvern × Pay.sh Secure Sandbox.
+                        &gt;_ Kyvern Secure Agent.
                       </span>
                       <span style={{ color: "rgba(229,231,235,0.55)" }}>
-                        Type a real prompt below. Anthropic parses it. Kyvern
-                        gates it on Solana devnet. If allowed, the{" "}
-                        <span style={{ color: "#86EFAC" }}>pay</span> CLI
-                        runs on the host VM with --sandbox. Every step is
-                        real.
+                        Type a prompt below. A real LLM parses your intent.
+                        The{" "}
+                        <span style={{ color: "#86EFAC" }}>Kyvern policy
+                        program</span>{" "}
+                        decides on Solana before any USDC moves. If allowed,
+                        the agent acts. Every step is real on devnet.
                       </span>
                       <div className="mt-3 flex flex-wrap gap-1.5">
                         {SAMPLE_PROMPTS.map((p) => (
