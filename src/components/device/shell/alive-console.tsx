@@ -22,7 +22,6 @@ import { motion } from "framer-motion";
 import type { PanelKind } from "../home/affordance-row";
 import { AgentEventFeed } from "../feed/agent-event-feed";
 import { IntegrationWizard } from "../wizard/integration-wizard";
-import { HeistConsole } from "../heist/heist-console";
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
@@ -137,11 +136,6 @@ export function AliveConsole({
           Routes /app/agents/[id], /app/inbox stay alive for deep
           links and any pre-existing graph agents (Atlas + legacy).
           The canvas is off the stage. */}
-
-      {/* The Heist — the killer demo. User picks an attack, chain
-          refuses, real failed-tx with Explorer link. Mounted as
-          the protagonist surface above the wizard + feed. */}
-      <HeistConsole />
 
       {/* Whisper line */}
       <div className="text-center px-4">
