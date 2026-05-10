@@ -767,7 +767,7 @@ function SettingsTab({
               type="button"
               onClick={onPause}
               disabled={busy !== null}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-[10px] text-[12.5px] font-medium disabled:opacity-50"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] text-[12px] font-medium disabled:opacity-50"
               style={{
                 background: "rgba(245,158,11,0.10)",
                 border: "1px solid rgba(245,158,11,0.30)",
@@ -782,7 +782,7 @@ function SettingsTab({
               type="button"
               onClick={onResume}
               disabled={busy !== null}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-[10px] text-[12.5px] font-medium disabled:opacity-50"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] text-[12px] font-medium disabled:opacity-50"
               style={{
                 background: "rgba(34,197,94,0.10)",
                 border: "1px solid rgba(34,197,94,0.30)",

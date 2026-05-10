@@ -53,22 +53,39 @@ export async function GET(
       userFacingOnly: false,
     });
 
-    // Join agent names + emojis in one query — also pull the device's
-    // workers (for the filter dropdown) in case the inbox is empty.
-    const deviceWorkers = getDb()
+    // Join agent names + emojis in one query. We pull both alive AND
+    // retired agents because signals from retired agents (the legacy
+    // worker trio that ran before v1.1) still live in the inbox; we
+    // want to label them properly rather than show "Unknown ✨".
+    const allAgents = getDb()
       .prepare(
-        `SELECT id, name, emoji FROM agents WHERE device_id = ? AND status != 'retired' ORDER BY created_at ASC`,
+        `SELECT id, name, emoji, status FROM agents WHERE device_id = ? ORDER BY created_at ASC`,
       )
-      .all(params.id) as AgentLookupRow[];
+      .all(params.id) as Array<AgentLookupRow & { status: string }>;
 
     const agents: Record<string, { name: string; emoji: string }> = {};
-    for (const a of deviceWorkers) {
-      agents[a.id] = { name: a.name, emoji: a.emoji };
+    const deviceWorkers: AgentLookupRow[] = [];
+    for (const a of allAgents) {
+      const isRetired = a.status === "retired";
+      agents[a.id] = {
+        // Retired agents keep their original name + emoji; the UI can
+        // additionally render a "retired" pill if it wants. The name
+        // alone is more honest than "Unknown ✨".
+        name: a.name,
+        emoji: a.emoji,
+      };
+      if (!isRetired) {
+        deviceWorkers.push({ id: a.id, name: a.name, emoji: a.emoji });
+      }
     }
 
     const enriched = signals.map((s) => ({
       ...s,
-      worker: agents[s.agentId] ?? { name: "Unknown", emoji: "✨" },
+      // For genuinely orphaned signals (agent row deleted entirely,
+      // not just retired), label as "Legacy worker" instead of
+      // "Unknown" — every signal in the DB came from SOME agent that
+      // existed at the time of write.
+      worker: agents[s.agentId] ?? { name: "Legacy worker", emoji: "📜" },
     }));
 
     const unreadCount = countSignals(params.id, "unread");

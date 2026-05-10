@@ -153,12 +153,18 @@ function layoutGraph(
       draggable: false,
     });
 
-    // Default sequential edge to the next step. Light up green when
-    // the run state shows this transition succeeded.
+    // Default sequential edge to the next step. When both adjacent
+    // steps succeeded in the selected run, light up green with a
+    // 30%-opacity glow — completes the "data flowed through these
+    // steps" narrative. Quieter than the chain edge (which gets the
+    // loudest treatment because it's the gate).
     if (i < graph.steps.length - 1) {
       const fromStatus = runState?.get(step.id);
       const toStatus = runState?.get(graph.steps[i + 1].id);
-      const succeeded = fromStatus === "succeeded" && toStatus !== undefined;
+      const succeeded =
+        fromStatus === "succeeded" && toStatus === "succeeded";
+      const failed =
+        fromStatus === "failed" || toStatus === "failed";
       edges.push({
         id: `e-seq-${step.id}-${graph.steps[i + 1].id}`,
         source: step.id,
@@ -167,11 +173,17 @@ function layoutGraph(
         animated: false,
         style: succeeded
           ? {
-              stroke: "#22C55E",
+              stroke: "rgba(34,197,94,0.65)",
               strokeWidth: 2,
-              filter: "drop-shadow(0 0 4px rgba(34,197,94,0.45))",
+              filter: "drop-shadow(0 0 3px rgba(34,197,94,0.30))",
             }
-          : { stroke: "rgba(15,23,42,0.18)", strokeWidth: 2 },
+          : failed
+            ? {
+                stroke: "rgba(239,68,68,0.55)",
+                strokeWidth: 2,
+                filter: "drop-shadow(0 0 3px rgba(239,68,68,0.25))",
+              }
+            : { stroke: "rgba(15,23,42,0.18)", strokeWidth: 2 },
       });
     }
   });
@@ -269,9 +281,10 @@ function StepNode({ data }: NodeProps) {
     : status === "succeeded" ? "rgba(34,197,94,0.55)"
     : status === "failed" ? "rgba(239,68,68,0.55)"
     : "rgba(15,23,42,0.12)";
+  const hasOutputVar = "outputVar" in step && step.outputVar;
   return (
     <div
-      className="rounded-[12px] flex flex-col"
+      className="rounded-[12px] relative overflow-hidden"
       style={{
         width: NODE_WIDTH,
         minHeight: NODE_HEIGHT,
@@ -295,15 +308,32 @@ function StepNode({ data }: NodeProps) {
         position={Position.Top}
         style={{ background: "transparent", border: "none", width: 1, height: 1 }}
       />
-      {/* Header — type pill + status dot */}
-      <div className="flex items-center justify-between px-2.5 pt-2">
+
+      {/* Left-edge tinted band — gives the tile its color identity
+          and visual mass. The tile becomes one solid object with a
+          colored side, not a card-with-header. */}
+      <span
+        aria-hidden
+        style={{
+          position: "absolute",
+          left: 0,
+          top: 0,
+          bottom: 0,
+          width: 4,
+          background: palette.fg,
+          opacity: 0.85,
+          borderTopLeftRadius: 12,
+          borderBottomLeftRadius: 12,
+        }}
+      />
+
+      <div className="flex items-start justify-between gap-2 pl-3.5 pr-2 pt-2">
+        {/* Type label — small mono uppercase, sits in the tile's
+            tactile mass against the colored band, not as a separate
+            badge with its own background. */}
         <span
-          className="rounded px-1.5 py-0.5 font-mono uppercase tracking-[0.10em]"
-          style={{
-            fontSize: 8.5,
-            background: palette.bg,
-            color: palette.fg,
-          }}
+          className="font-mono uppercase tracking-[0.12em]"
+          style={{ fontSize: 8.5, color: palette.fg }}
         >
           {step.type}
         </span>
@@ -311,7 +341,7 @@ function StepNode({ data }: NodeProps) {
           <span
             className="font-mono"
             style={{
-              fontSize: 9,
+              fontSize: 9.5,
               color: status === "succeeded" ? "#15803D"
                 : status === "failed" ? "#B91C1C"
                 : status === "running" ? "#B45309"
@@ -322,30 +352,37 @@ function StepNode({ data }: NodeProps) {
           </span>
         )}
       </div>
-      {/* Label */}
+
+      {/* Label — primary content of the tile */}
       <div
-        className="text-[12.5px] font-semibold tracking-[-0.005em] truncate px-2.5 pt-0.5"
+        className="text-[12.5px] font-semibold tracking-[-0.005em] truncate pl-3.5 pr-2 pb-2"
         style={{ color: "#0A0A0A" }}
       >
         {step.label}
       </div>
-      {/* Footer — output var lives INSIDE the tile, not floating */}
-      {"outputVar" in step && step.outputVar && (
-        <div
-          className="font-mono px-2.5 pt-0.5 pb-1.5 truncate"
+
+      {/* Output var — small floating tag in the bottom-right corner
+          of the tile rather than a full hairline-divided footer.
+          Reads as an attribute of the tile, not a section. */}
+      {hasOutputVar && (
+        <span
+          className="font-mono"
           style={{
-            fontSize: 9.5,
-            color: "rgba(15,23,42,0.45)",
-            borderTop: "1px solid rgba(15,23,42,0.05)",
-            marginTop: 4,
+            position: "absolute",
+            right: 6,
+            bottom: 6,
+            fontSize: 9,
+            color: palette.fg,
+            background: palette.bg,
+            padding: "1.5px 5px",
+            borderRadius: 5,
+            letterSpacing: "0.02em",
           }}
         >
-          → {step.outputVar}
-        </div>
+          → {(step as { outputVar: string }).outputVar}
+        </span>
       )}
-      {!("outputVar" in step && step.outputVar) && (
-        <div style={{ height: 6 }} />
-      )}
+
       <Handle
         type="source"
         position={Position.Bottom}
@@ -401,9 +438,11 @@ function ChainNode() {
   );
 }
 
-/* Vault — quieter rest state. Neutral background with a small green
- * status dot showing it's live. Lets the chain glyph be the active
- * focal point of the diagram. */
+/* Vault — quieter rest state but with weight. Neutral capsule with
+ * a green status dot. The chain glyph is still the loudest element
+ * but the vault now feels grounded, not vestigial — slight border
+ * weight bump + soft inner shadow + a subtle outer ring give it
+ * physical presence as the destination. */
 function VaultNode({ data }: NodeProps) {
   const d = data as VaultNodeData;
   return (
@@ -411,11 +450,11 @@ function VaultNode({ data }: NodeProps) {
       className="rounded-[16px] flex flex-col items-center justify-center gap-0.5"
       style={{
         width: VAULT_WIDTH,
-        height: 64,
-        background: "linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%)",
-        border: "1px solid rgba(15,23,42,0.10)",
+        height: 68,
+        background: "linear-gradient(180deg, #FFFFFF 0%, #F1F5F9 100%)",
+        border: "1.5px solid rgba(15,23,42,0.14)",
         boxShadow:
-          "inset 0 1px 0 rgba(255,255,255,0.95), 0 1px 2px rgba(15,23,42,0.04), 0 8px 24px -12px rgba(15,23,42,0.18)",
+          "inset 0 1px 0 rgba(255,255,255,0.95), inset 0 -2px 4px rgba(15,23,42,0.04), 0 1px 2px rgba(15,23,42,0.05), 0 12px 28px -14px rgba(15,23,42,0.22)",
       }}
     >
       <Handle
