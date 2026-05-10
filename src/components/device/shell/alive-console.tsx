@@ -19,9 +19,12 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
+import { useRouter } from "next/navigation";
 import type { PanelKind } from "../home/affordance-row";
 import { AgentEventFeed } from "../feed/agent-event-feed";
 import { IntegrationWizard } from "../wizard/integration-wizard";
+import { GraphCanvas } from "../graph-canvas/canvas";
+import { BuilderModal } from "../builder/modal";
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
@@ -55,6 +58,11 @@ export function AliveConsole({
     spentTodayUsd: 0,
     lastEventTs: null,
   });
+
+  // Agent platform v1 — graph canvas + builder modal
+  const router = useRouter();
+  const [builderOpen, setBuilderOpen] = useState(false);
+  const [canvasRefreshKey, setCanvasRefreshKey] = useState(0);
 
   // Hydrate agent key prefix once
   useEffect(() => {
@@ -127,6 +135,20 @@ export function AliveConsole({
     <div className={`flex flex-col gap-3 h-full ${className ?? ""}`}>
       {/* T4 — live agent status line */}
       <AgentStatusLine keyPrefix={keyPrefix} lastEventTs={stats.lastEventTs} />
+
+      {/* Agent platform v1 — graph canvas. Empty state: deploy CTA.
+          Otherwise: tiles + strings to vault. Clicking a tile opens
+          the agent detail page. */}
+      <GraphCanvas
+        key={canvasRefreshKey}
+        vaultId={vaultId}
+        ownerWallet={ownerWallet}
+        usdcBalance={usdcBalance}
+        paused={paused}
+        network={network}
+        onDeployClick={() => setBuilderOpen(true)}
+        onAgentClick={(agentId) => router.push(`/app/agents/${agentId}`)}
+      />
 
       {/* Whisper line */}
       <div className="text-center px-4">
@@ -250,6 +272,19 @@ export function AliveConsole({
           </a>
         </p>
       </div>
+
+      {/* Builder modal — open from the canvas's deploy CTA */}
+      <BuilderModal
+        open={builderOpen}
+        vaultId={vaultId}
+        ownerWallet={ownerWallet}
+        onClose={() => setBuilderOpen(false)}
+        onDeployed={() => {
+          setBuilderOpen(false);
+          // Bump the canvas's key so it remounts + refetches
+          setCanvasRefreshKey((k) => k + 1);
+        }}
+      />
     </div>
   );
 }
