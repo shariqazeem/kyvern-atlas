@@ -51,8 +51,8 @@ export function AliveConsole({ className }: Props) {
           className="text-[12.5px] tracking-[-0.005em]"
           style={{ color: "rgba(15,23,42,0.55)" }}
         >
-          Atlas has run autonomously for 20 days · earning, spending, and
-          surviving attacks on Solana. Your worker can do the same.
+          Atlas is the reference autonomous worker — running for 20 days on
+          Solana devnet. Provision your own vault to build the next one.
         </p>
       </motion.div>
 

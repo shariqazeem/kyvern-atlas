@@ -204,13 +204,16 @@ export function SettingsPageShell({
         </Link>
       </DeviceCard>
 
-      {/* User devices */}
+      {/* User devices — clickable to per-vault mission control */}
       {myDevices.map((d) => {
         const s = deriveSerial(d.vault.id);
         const alive = !d.vault.pausedAt;
         return (
           <DeviceCard key={d.vault.id}>
-            <div className="flex items-center justify-between gap-3">
+            <Link
+              href={`/app/vaults/${d.vault.id}`}
+              className="flex items-center justify-between gap-3"
+            >
               <div className="flex-1 min-w-0">
                 <div className="flex items-baseline gap-2 mb-1 flex-wrap">
                   <span
@@ -249,7 +252,7 @@ export function SettingsPageShell({
                 strokeWidth={2}
                 style={{ color: "rgba(15,23,42,0.55)" }}
               />
-            </div>
+            </Link>
           </DeviceCard>
         );
       })}

@@ -40,13 +40,14 @@ interface Tpl {
 
 const templates: Tpl[] = [
   {
-    id: "clone-atlas",
-    title: "Clone Atlas",
-    subtitle: "Reference worker · spawn a vault in 60 seconds",
+    id: "provision-vault",
+    title: "Provision Worker Vault",
+    subtitle:
+      "Chain-enforced wallet for your worker · build behavior with the SDK",
     Icon: Compass,
     tone: "active",
     href: "/vault/new",
-    badge: "Live · 1-click",
+    badge: "Live · 60s",
   },
   {
     id: "research",
@@ -54,7 +55,7 @@ const templates: Tpl[] = [
     subtitle: "Monitors crypto / AI / governance · sells access via x402",
     Icon: Newspaper,
     tone: "roadmap",
-    badge: "Q3 2026",
+    badge: "Hosted · Q3 2026",
   },
   {
     id: "treasury",
@@ -62,7 +63,7 @@ const templates: Tpl[] = [
     subtitle: "Watches treasury risk · proposes actions under policy",
     Icon: BarChart3,
     tone: "roadmap",
-    badge: "Q3 2026",
+    badge: "Hosted · Q3 2026",
   },
   {
     id: "growth",
@@ -70,7 +71,7 @@ const templates: Tpl[] = [
     subtitle: "Generates content + signals · pays for inference, monetizes feeds",
     Icon: TrendingUp,
     tone: "roadmap",
-    badge: "Q3 2026",
+    badge: "Hosted · Q3 2026",
   },
   {
     id: "governance",
@@ -78,7 +79,7 @@ const templates: Tpl[] = [
     subtitle: "Tracks proposals · summarizes changes · sends premium alerts",
     Icon: Vote,
     tone: "roadmap",
-    badge: "Q3 2026",
+    badge: "Hosted · Q3 2026",
   },
 ];
 
@@ -90,18 +91,27 @@ export function WorkerTemplates() {
       transition={{ duration: 0.55, ease: EASE, delay: 0.1 }}
       className="flex flex-col gap-3"
     >
-      <div className="flex items-baseline justify-between gap-3 px-1">
-        <h3
-          className="text-[15px] font-semibold tracking-[-0.01em]"
-          style={{ color: "#0A0A0A" }}
-        >
-          Deploy a worker
-        </h3>
+      <div className="flex items-baseline justify-between gap-3 px-1 flex-wrap">
+        <div className="flex flex-col gap-0.5">
+          <h3
+            className="text-[15px] font-semibold tracking-[-0.01em]"
+            style={{ color: "#0A0A0A" }}
+          >
+            Build your worker
+          </h3>
+          <p
+            className="text-[11.5px] leading-[1.4]"
+            style={{ color: "rgba(15,23,42,0.55)" }}
+          >
+            Provision the chain-enforced wallet today. Wire behavior via the
+            SDK. Hosted autonomous workers ship Q3 2026.
+          </p>
+        </div>
         <span
           className="font-mono uppercase tracking-[0.14em]"
           style={{ fontSize: 9.5, color: "rgba(15,23,42,0.45)" }}
         >
-          1 live · 4 incoming
+          vault live · workers Q3
         </span>
       </div>
 
