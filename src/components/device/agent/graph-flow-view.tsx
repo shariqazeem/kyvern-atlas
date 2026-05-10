@@ -188,10 +188,21 @@ function layoutGraph(
     }
   });
 
-  // Find money-moving steps; they get routed through the chain glyph
-  const moneySteps = graph.steps.filter(
-    (s) => s.type === "vault.pay" || s.type === "transfer.usdc",
-  );
+  // Find every step that moves money — top-level OR nested inside
+  // a branch/loop. For nested money, we route the edge from the
+  // CONTAINING top-level step (the branch/loop tile) to the chain
+  // glyph — so the canvas honestly shows "money flows through this
+  // structure" without having to draw nested children.
+  const moneySteps: StepDef[] = [];
+  for (const step of graph.steps) {
+    if (step.type === "vault.pay" || step.type === "transfer.usdc") {
+      moneySteps.push(step);
+    } else if (subtreeHasMoneyStep(step)) {
+      // Push the container — its tile will get a money edge to the
+      // chain glyph even though its children are not separately rendered.
+      moneySteps.push(step);
+    }
+  }
 
   const lastStepY =
     graph.steps.length > 0
@@ -361,6 +372,47 @@ function StepNode({ data }: NodeProps) {
         {step.label}
       </div>
 
+      {/* Branch / loop — show nested step count so the user knows the
+          canvas is summarizing, not omitting. The SDK preview below
+          renders the full nested structure. v1.2 will expand these
+          inline. */}
+      {step.type === "branch" && (
+        <span
+          className="font-mono"
+          style={{
+            position: "absolute",
+            left: 12,
+            bottom: 6,
+            fontSize: 9,
+            color: "rgba(180,83,9,0.85)",
+            background: "rgba(245,158,11,0.10)",
+            padding: "1.5px 5px",
+            borderRadius: 5,
+            letterSpacing: "0.02em",
+          }}
+        >
+          if/else · {step.config.then.length}+{step.config.else.length} nested
+        </span>
+      )}
+      {step.type === "loop" && (
+        <span
+          className="font-mono"
+          style={{
+            position: "absolute",
+            left: 12,
+            bottom: 6,
+            fontSize: 9,
+            color: "rgba(180,83,9,0.85)",
+            background: "rgba(245,158,11,0.10)",
+            padding: "1.5px 5px",
+            borderRadius: 5,
+            letterSpacing: "0.02em",
+          }}
+        >
+          loop · {step.config.body.length} nested
+        </span>
+      )}
+
       {/* Output var — small floating tag in the bottom-right corner
           of the tile rather than a full hairline-divided footer.
           Reads as an attribute of the tile, not a section. */}
@@ -487,6 +539,23 @@ function VaultNode({ data }: NodeProps) {
       </span>
     </div>
   );
+}
+
+/** Walk a step tree (branch then/else, loop body) and return true if
+ *  any descendant moves money. Used so a branch tile can correctly
+ *  fan-in to the chain glyph even though its children aren't drawn. */
+function subtreeHasMoneyStep(step: StepDef): boolean {
+  if (step.type === "vault.pay" || step.type === "transfer.usdc") return true;
+  if (step.type === "branch") {
+    return (
+      step.config.then.some(subtreeHasMoneyStep) ||
+      step.config.else.some(subtreeHasMoneyStep)
+    );
+  }
+  if (step.type === "loop") {
+    return step.config.body.some(subtreeHasMoneyStep);
+  }
+  return false;
 }
 
 const TYPE_PALETTE: Record<StepType, { bg: string; fg: string }> = {
