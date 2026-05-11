@@ -15,35 +15,50 @@ violations. Not a security wall. Not a dashboard.
 
 > *"AI agents shouldn't hold private keys. They should have budgets."*
 >
-> *"We built that on Solana."*
+> *"On Solana, we built that."*
 
 **On screen:** Landing page `kyvernlabs.com` — the device hero, live
 trust bar showing Atlas's counters ticking. Hold for 3 seconds, then
 cut to `/atlas` to set the proof.
 
+**Voiceover note:** Grammatical inversion — ending the second
+sentence on "Solana" plants the platform as the destination. Same
+words, the platform becomes what judges remember.
+
 ### The proof (0:10–0:30)
 
-> *"Meet Atlas. It's a reference AI worker that's been running
-> autonomously on Solana devnet for 20 days."*
+> *"Meet Atlas. A reference AI worker that's been running autonomously
+> on Solana devnet for 20 days."*
 >
-> *"In that time, Atlas has paid 1,472 real merchants on-chain.
-> Refused 3,605 attempted violations. Earned $22.90 from real
-> subscribers. Lost zero dollars to any attack."*
+> *"One thousand four hundred seventy-two merchants — **paid**."*
+>
+> *"Three thousand six hundred five violations — **refused**."*
+>
+> *"Twenty days — **autonomous**."*
+>
+> *"Zero dollars — **lost**."*
 >
 > *"Every row in this timeline links to Solana Explorer. Anyone can
 > verify."*
 
 **On screen:** `/atlas` observatory. Scroll the timeline slowly. Click
-ONE settled row → Solana Explorer opens → custom-error-code-free
-transaction. Then cut back, click ONE refused row → Solana Explorer
-opens → `KyvernPolicy::AmountExceedsPerTxMax` visible in the program
-logs. Pause 1 second on each Explorer page so the viewer sees the tx
-hash and the program ID.
+ONE settled row → Solana Explorer opens → real on-chain settlement.
+Then cut back, click ONE refused row → Solana Explorer opens →
+`KyvernPolicy::AmountExceedsPerTxMax` visible in the program logs.
+Pause 1 second on each Explorer page so the viewer sees the tx hash
+and the program ID.
 
-### The category (0:30–0:40)
+**Voiceover note:** Two seconds per number. Eight seconds total. This
+is the section that earns the win. Stretch every word. Treat each
+number as its own beat. Don't run them together. The hyphen + bold
+verb at the end of each line is a beat marker — hit the pause, hit
+the verb.
 
-> *"This is what autonomous AI commerce looks like under policy. The
-> agent has economic agency. The chain decides every dollar."*
+### The category (0:30–0:40) · THE THESIS LINE
+
+> *"This is what autonomous AI commerce looks like under policy."*
+>
+> *"The agent has economic agency. The chain decides every dollar."*
 >
 > *"Kyvern is the authorization layer that makes this safe."*
 
@@ -52,13 +67,24 @@ card — Atlas live tape drifting at the top, runtime panel breathing,
 scenario buttons on the right. Don't narrate the UI elements — let
 the page speak for 3 seconds.
 
+**Voiceover note:** This is THE most important sentence in the entire
+video. It reframes Kyvern from security tool to commerce primitive.
+Say it slowly, slightly lower register, almost as a thesis statement.
+If you only land one sentence with conviction in the whole 90
+seconds, land *"The chain decides every dollar."*
+
 ### The interaction (0:40–1:05)
 
 > *"Here's a real test. We attempt a $5 payment — the per-tx cap is
 > 50 cents."*
 
-**On screen:** Click the "Try over-cap $5" scenario button. Wait the
-3 seconds. Refused-on-chain panel appears.
+**On screen:** Click the "Try over-cap $5" scenario button.
+
+**Hold silence here.** Three seconds. Do NOT narrate. Trust the
+product to land its own moment. Judges have watched a hundred demo
+videos — they can hear when a team trusts their product.
+
+Refused-on-chain panel appears.
 
 > *"Three seconds. Real Solana tx. Refused on-chain by the policy
 > program with error code 12002. Anyone can click through to
@@ -94,11 +120,16 @@ real pay.sh CLI invocation + real AAPL quote.
 > *"AI agents are going to spend trillions of dollars autonomously.
 > Kyvern is the authorization layer that makes that safe."*
 >
-> *"Devnet today. Mainnet soon. Atlas runs on it. The SDK ships."*
+> *"Atlas runs on it today. The SDK ships today. The future ships
+> now."*
 
 **On screen:** Cut to the landing page one last time. Hold on the
 tagline: *"Agents shouldn't have keys. They should have budgets."*
 Fade.
+
+**Voiceover note:** No hedging language. "The future ships now" is
+the kind of line that survives compression on Twitter when someone
+clips your demo. Land it with conviction.
 
 ---
 

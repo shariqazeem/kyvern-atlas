@@ -44,10 +44,17 @@ interface Props {
   vaults: VaultTileData[];
   selectedVaultId: string | null;
   onSelect: (id: string) => void;
+  direction?: "horizontal" | "vertical";
 }
 
-export function VaultStrip({ vaults, selectedVaultId, onSelect }: Props) {
+export function VaultStrip({
+  vaults,
+  selectedVaultId,
+  onSelect,
+  direction = "horizontal",
+}: Props) {
   const [atlas, setAtlas] = useState<AtlasStatus | null>(null);
+  const vertical = direction === "vertical";
 
   useEffect(() => {
     let alive = true;
@@ -79,18 +86,26 @@ export function VaultStrip({ vaults, selectedVaultId, onSelect }: Props) {
       initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: EASE }}
-      className="flex items-center gap-2.5 overflow-x-auto pb-1 -mx-1 px-1"
-      style={{
-        scrollbarWidth: "none" as const,
-        msOverflowStyle: "none" as const,
-      }}
+      className={
+        vertical
+          ? "flex flex-col gap-2"
+          : "flex items-center gap-2.5 overflow-x-auto pb-1 -mx-1 px-1"
+      }
+      style={
+        vertical
+          ? undefined
+          : {
+              scrollbarWidth: "none" as const,
+              msOverflowStyle: "none" as const,
+            }
+      }
     >
       {/* Atlas tile — reference worker, opens /atlas */}
       <Link
         href="/atlas"
         target="_blank"
         rel="noreferrer"
-        className="flex-shrink-0"
+        className={vertical ? "block" : "flex-shrink-0"}
       >
         <Tile
           variant="atlas"
@@ -105,6 +120,7 @@ export function VaultStrip({ vaults, selectedVaultId, onSelect }: Props) {
               : "loading…"
           }
           live={atlas?.running ?? false}
+          fullWidth={vertical}
         />
       </Link>
 
@@ -114,7 +130,7 @@ export function VaultStrip({ vaults, selectedVaultId, onSelect }: Props) {
           key={v.id}
           type="button"
           onClick={() => onSelect(v.id)}
-          className="flex-shrink-0"
+          className={vertical ? "block w-full text-left" : "flex-shrink-0"}
         >
           <Tile
             variant="user"
@@ -130,6 +146,7 @@ export function VaultStrip({ vaults, selectedVaultId, onSelect }: Props) {
             }
             live={!v.paused}
             selected={v.id === selectedVaultId}
+            fullWidth={vertical}
           />
         </button>
       ))}
@@ -137,9 +154,9 @@ export function VaultStrip({ vaults, selectedVaultId, onSelect }: Props) {
       {/* + Deploy tile */}
       <Link
         href="/vault/new"
-        className="flex-shrink-0"
+        className={vertical ? "block" : "flex-shrink-0"}
       >
-        <DeployTile />
+        <DeployTile fullWidth={vertical} />
       </Link>
     </motion.div>
   );
@@ -155,6 +172,7 @@ interface TileProps {
   subtitle: string;
   live: boolean;
   selected?: boolean;
+  fullWidth?: boolean;
 }
 
 function Tile({
@@ -165,6 +183,7 @@ function Tile({
   subtitle,
   live,
   selected,
+  fullWidth,
 }: TileProps) {
   const isAtlas = variant === "atlas";
 
@@ -174,7 +193,7 @@ function Tile({
       transition={{ duration: 0.18, ease: EASE }}
       className="relative flex flex-col gap-1.5 rounded-[14px] p-3 text-left transition-all"
       style={{
-        width: 224,
+        width: fullWidth ? "100%" : 224,
         height: 88,
         background: "#FFFFFF",
         border: selected
@@ -287,14 +306,14 @@ function Avatar({
   );
 }
 
-function DeployTile() {
+function DeployTile({ fullWidth }: { fullWidth?: boolean }) {
   return (
     <motion.div
       whileHover={{ y: -1 }}
       transition={{ duration: 0.18, ease: EASE }}
       className="flex flex-col items-center justify-center gap-1 rounded-[14px] transition-all"
       style={{
-        width: 168,
+        width: fullWidth ? "100%" : 168,
         height: 88,
         background: "rgba(15,23,42,0.02)",
         border: "1px dashed rgba(15,23,42,0.18)",

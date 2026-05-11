@@ -31,8 +31,10 @@ import {
   Allowlist,
   HeistOverlay,
   SecureTerminal,
+  ScenarioPanel,
   type VaultPayload,
 } from "../worker/user-vault-card";
+import { IntegrationWizard } from "../wizard/integration-wizard";
 import { PayShFlow } from "../worker/paysh-flow";
 import { VaultStrip, type VaultTileData } from "../worker/vault-strip";
 import type { PanelKind } from "../home/affordance-row";
@@ -190,20 +192,11 @@ export function AliveConsole({ vaultId, ownerWallet, className }: Props) {
     );
   }, [data]);
 
+  const resolvedOwner = data?.vault.ownerWallet ?? ownerWallet;
+
   return (
     <div className={`flex flex-col gap-4 sm:gap-5 ${className ?? ""}`}>
-      {/* Vault strip — Atlas + user vaults + Deploy CTA. The horizontal
-          row sits above the worker card; click a user vault to switch
-          the integration panel below to its data. */}
-      <VaultStrip
-        vaults={vaults}
-        selectedVaultId={selectedVaultId}
-        onSelect={setSelectedVaultId}
-      />
-
-      {/* First-visit orientation banner — surfaces the allowlist
-          editor for fresh vaults so SDK developers see they can
-          declare their merchants without re-provisioning. */}
+      {/* First-visit orientation banner (full-width, above the grid) */}
       <AnimatePresence>
         {showOrientBanner && (
           <motion.div
@@ -229,9 +222,8 @@ export function AliveConsole({ vaultId, ownerWallet, className }: Props) {
                 chain enforces.
               </span>{" "}
               <span style={{ color: "rgba(15,23,42,0.65)" }}>
-                Click any scenario in the worker card above to see the chain
-                refuse a violation in real time. Add merchants in{" "}
-                <span style={{ fontWeight: 600 }}>Policy → Add</span> below.
+                Click any scenario in the worker card to see the chain refuse
+                a violation in real time. Edit your merchants on the right.
               </span>
             </div>
             <button
@@ -251,45 +243,97 @@ export function AliveConsole({ vaultId, ownerWallet, className }: Props) {
         )}
       </AnimatePresence>
 
-      {/* Hero: USER's vault Worker Card. Tabs removed — integration
-          wizard mounts inside the card; policy + pay.sh live as
-          separate cards below. */}
-      {data ? (
-        <UserVaultCard data={data} ownerWallet={ownerWallet} now={now} />
-      ) : (
-        <UserVaultSkeleton />
-      )}
+      {/* 3-column grid on lg+; vertical stack below lg (mobile safety) */}
+      <div className="grid grid-cols-1 lg:grid-cols-[35%_40%_25%] gap-4 sm:gap-5 lg:gap-6">
+        {/* LEFT col — VaultStrip rendered vertically */}
+        <div className="flex flex-col gap-4 min-w-0">
+          <VaultStrip
+            vaults={vaults}
+            selectedVaultId={selectedVaultId}
+            onSelect={setSelectedVaultId}
+            direction="vertical"
+          />
+        </div>
 
-      {/* First-time orientation only — hidden once the user has a vault. */}
-      {!data && <WorkerTemplates />}
+        {/* CENTER col — Worker card hero (simplified, no internal 2-col) */}
+        <div className="flex flex-col gap-4 min-w-0">
+          {data ? (
+            <UserVaultCard
+              data={data}
+              ownerWallet={ownerWallet}
+              now={now}
+            />
+          ) : (
+            <UserVaultSkeleton />
+          )}
+          {!data && <WorkerTemplates />}
+        </div>
 
-      {/* Policy + Allowlist card — caps, stats, merchant editor */}
+        {/* RIGHT col — Scenarios on top, Policy 2x2 below, Pay.sh shrunk */}
+        {data && (
+          <div className="flex flex-col gap-4 min-w-0">
+            <SectionCard>
+              <ScenarioPanel
+                vaultId={data.vault.id}
+                ownerWallet={resolvedOwner}
+                perTxMaxUsd={data.budget.perTxMaxUsd}
+                network={data.vault.network}
+              />
+            </SectionCard>
+
+            <SectionCard>
+              <SectionHeader
+                eyebrow="Policy"
+                title="Enforced on-chain"
+              />
+              <div className="flex flex-col gap-3">
+                <PolicyRibbon budget={data.budget} layout="2x2" />
+                <StatsGrid
+                  vault={data.vault}
+                  payments={data.payments}
+                />
+                <Allowlist
+                  merchants={data.vault.allowedMerchants}
+                  vaultId={data.vault.id}
+                  ownerWallet={resolvedOwner}
+                  compact
+                />
+              </div>
+            </SectionCard>
+
+            <SectionCard>
+              <div
+                style={{
+                  transform: "scale(0.92)",
+                  transformOrigin: "top left",
+                  width: "108.7%",
+                  marginBottom: -28,
+                }}
+              >
+                <PayShFlow
+                  vaultId={data.vault.id}
+                  ownerWallet={resolvedOwner}
+                />
+              </div>
+            </SectionCard>
+          </div>
+        )}
+      </div>
+
+      {/* Below the grid — Integration wizard full-width, scrolls into view */}
       {data && (
         <SectionCard>
           <SectionHeader
-            eyebrow="Policy"
-            title="Enforced on-chain"
-            subtitle="Every payment validates against these rules before USDC moves."
+            eyebrow="Integration · next steps"
+            title="Wire your agent in 5 steps"
+            subtitle="Mint a key, install the SDK, run your first chain-enforced payment."
           />
-          <div className="flex flex-col gap-5">
-            <PolicyRibbon budget={data.budget} />
-            <StatsGrid vault={data.vault} payments={data.payments} />
-            <Allowlist
-              merchants={data.vault.allowedMerchants}
+          <div className="overflow-hidden rounded-[12px]">
+            <IntegrationWizard
               vaultId={data.vault.id}
-              ownerWallet={data.vault.ownerWallet ?? ownerWallet}
+              ownerWallet={resolvedOwner}
             />
           </div>
-        </SectionCard>
-      )}
-
-      {/* Network · Pay.sh interception card */}
-      {data && (
-        <SectionCard>
-          <PayShFlow
-            vaultId={data.vault.id}
-            ownerWallet={data.vault.ownerWallet ?? ownerWallet}
-          />
         </SectionCard>
       )}
 
@@ -297,7 +341,7 @@ export function AliveConsole({ vaultId, ownerWallet, className }: Props) {
       {data && (
         <DemosFooter
           vaultId={data.vault.id}
-          ownerWallet={data.vault.ownerWallet ?? ownerWallet}
+          ownerWallet={resolvedOwner}
           perTxMaxUsd={data.budget.perTxMaxUsd}
           network={data.vault.network}
         />

@@ -23,7 +23,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { IntegrationWizard } from "../wizard/integration-wizard";
 import {
   Activity,
   ArrowRight,
@@ -110,7 +109,7 @@ export function UserVaultCard({
   firstCall = true,
   className,
 }: Props) {
-  const resolvedOwner = data.vault.ownerWallet ?? ownerWallet;
+  void ownerWallet;
   void firstCall;
 
   return (
@@ -137,59 +136,24 @@ export function UserVaultCard({
         }}
       />
 
-      <div className="relative p-5 sm:p-6 flex flex-col gap-5">
+      <div className="relative p-5 sm:p-6 flex flex-col gap-4">
         <Identity vault={data.vault} payments={data.payments} now={now} />
         {/* Always-visible live tape — the constant "this is a runtime"
             signal. Atlas's chain events drift across the card constantly. */}
         <LiveTape />
 
-        {/* Two-column work surface: runtime+SDK on left, scenario
-            buttons on right. The right column becomes interactive —
-            a judge can produce a real failed-tx in 3 seconds without
-            scrolling. Integration wizard moves below as a sidecar. */}
-        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] gap-5">
-          <div className="flex flex-col gap-5 min-w-0">
-            <RuntimePanel vault={data.vault} now={now} />
-            <SdkPreview vaultId={data.vault.id} />
-          </div>
-          <ScenarioPanel
-            vaultId={data.vault.id}
-            ownerWallet={resolvedOwner}
-            perTxMaxUsd={data.budget.perTxMaxUsd}
-            network={data.vault.network}
-          />
-        </div>
+        {/* Center column stack — runtime + SDK preview + recent calls.
+            ScenarioPanel + IntegrationWizard are now mounted by
+            AliveConsole (right column + below-grid full-width). */}
+        <RuntimePanel vault={data.vault} now={now} compact />
+        <SdkPreview vaultId={data.vault.id} />
 
-        {/* Full-width row: Recent SDK Calls — the user's own activity */}
+        {/* Recent SDK Calls — capped at 3 rows in the dense 3-col layout */}
         <RecentActivity
           payments={data.payments}
           network={data.vault.network}
+          limit={3}
         />
-
-        {/* Integration wizard — moved below the demo surface. Next-steps
-            sidecar for developers ready to wire their own code, not a
-            co-hero competing with the runtime panel. */}
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-1.5">
-            <Sparkles
-              className="w-3 h-3"
-              strokeWidth={2}
-              style={{ color: "rgba(15,23,42,0.45)" }}
-            />
-            <span
-              className="font-mono uppercase tracking-[0.14em]"
-              style={{ fontSize: 9.5, color: "rgba(15,23,42,0.55)" }}
-            >
-              Integration · next steps
-            </span>
-          </div>
-          <div className="overflow-hidden rounded-[12px]">
-            <IntegrationWizard
-              vaultId={data.vault.id}
-              ownerWallet={resolvedOwner}
-            />
-          </div>
-        </div>
 
         <Footer network={data.vault.network} />
       </div>
@@ -228,7 +192,7 @@ const SCENARIOS = [
   },
 ];
 
-function ScenarioPanel({
+export function ScenarioPanel({
   vaultId,
   ownerWallet,
   network,
@@ -682,10 +646,15 @@ function LiveTape() {
         height: 38,
       }}
     >
-      {/* Left header label — always visible */}
+      {/* Left header label — solid plate sitting above the tape rail
+          so scrolling pills never bleed through underneath. */}
       <div
         aria-hidden
-        className="absolute top-0 left-3 bottom-0 z-20 flex items-center gap-1.5 pointer-events-none"
+        className="absolute top-0 left-0 bottom-0 z-20 flex items-center gap-1.5 pointer-events-none pl-3 pr-3"
+        style={{
+          background: "#FFFFFF",
+          borderRight: "1px solid rgba(15,23,42,0.06)",
+        }}
       >
         <motion.span
           className="rounded-full"
@@ -711,21 +680,14 @@ function LiveTape() {
         </span>
       </div>
 
-      {/* Edge fade masks */}
-      <div
-        aria-hidden
-        className="absolute inset-y-0 left-0 w-28 z-10 pointer-events-none"
-        style={{
-          background:
-            "linear-gradient(90deg, #FAFBFC 35%, rgba(250,251,252,0) 100%)",
-        }}
-      />
+      {/* Right edge fade — matches tape background exactly so pills
+          fade cleanly into nothing instead of cross-blending. */}
       <div
         aria-hidden
         className="absolute inset-y-0 right-0 w-16 z-10 pointer-events-none"
         style={{
           background:
-            "linear-gradient(270deg, #FAFBFC 0%, rgba(250,251,252,0) 100%)",
+            "linear-gradient(270deg, rgba(248,249,250,1) 0%, rgba(248,249,250,0) 100%)",
         }}
       />
 
@@ -810,7 +772,15 @@ function LiveTape() {
 
 /* ─── Runtime Panel (light Apple-glass) ──────────────────────────── */
 
-function RuntimePanel({ vault, now }: { vault: VaultRecord; now: number }) {
+function RuntimePanel({
+  vault,
+  now,
+  compact,
+}: {
+  vault: VaultRecord;
+  now: number;
+  compact?: boolean;
+}) {
   const phrases = useMemo(
     () => [
       "policy compiled",
@@ -839,7 +809,9 @@ function RuntimePanel({ vault, now }: { vault: VaultRecord; now: number }) {
         border: "1px solid rgba(15,23,42,0.05)",
       }}
     >
-      <div className="px-5 py-5 sm:py-6 flex flex-col gap-2.5">
+      <div
+        className={`flex flex-col gap-2.5 ${compact ? "px-4 py-3.5" : "px-5 py-5 sm:py-6"}`}
+      >
         <div className="flex items-center gap-2 flex-wrap">
           <span
             className="font-mono uppercase tracking-[0.18em]"
@@ -863,14 +835,18 @@ function RuntimePanel({ vault, now }: { vault: VaultRecord; now: number }) {
         <div className="flex items-start gap-2.5">
           <span
             className="font-mono mt-0.5 flex-shrink-0"
-            style={{ fontSize: 15, color: "#15803D", lineHeight: 1.6 }}
+            style={{
+              fontSize: compact ? 13.5 : 15,
+              color: "#15803D",
+              lineHeight: 1.6,
+            }}
           >
             &gt;
           </span>
           <span
             className="font-mono leading-[1.6]"
             style={{
-              fontSize: 15,
+              fontSize: compact ? 13.5 : 15,
               color: "rgba(15,23,42,0.85)",
               letterSpacing: "-0.005em",
             }}
@@ -2198,7 +2174,13 @@ function TranscriptLine({ line }: { line: TerminalLine }) {
 
 /* ─── Policy Ribbon ──────────────────────────────────────────────── */
 
-export function PolicyRibbon({ budget }: { budget: BudgetSnapshot }) {
+export function PolicyRibbon({
+  budget,
+  layout = "wide",
+}: {
+  budget: BudgetSnapshot;
+  layout?: "wide" | "2x2";
+}) {
   const utilPct = Math.min(100, Math.round(budget.dailyUtilization * 100));
 
   return (
@@ -2225,7 +2207,13 @@ export function PolicyRibbon({ budget }: { budget: BudgetSnapshot }) {
           border: "1px solid rgba(15,23,42,0.05)",
         }}
       >
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <div
+          className={
+            layout === "2x2"
+              ? "grid grid-cols-2 gap-2"
+              : "grid grid-cols-2 sm:grid-cols-4 gap-2"
+          }
+        >
           <RibbonCell
             label="Daily cap"
             value={`$${budget.dailyLimitUsd.toFixed(2)}`}
@@ -2482,9 +2470,11 @@ function useBootedNumber(value: string): string {
 function RecentActivity({
   payments,
   network,
+  limit = 5,
 }: {
   payments: Payment[];
   network: "devnet" | "mainnet";
+  limit?: number;
 }) {
   return (
     <div className="flex flex-col gap-2">
@@ -2519,7 +2509,7 @@ function RecentActivity({
       ) : (
         <div className="flex flex-col">
           <AnimatePresence initial={false}>
-            {payments.slice(0, 5).map((p) => (
+            {payments.slice(0, limit).map((p) => (
               <motion.div
                 key={p.id}
                 initial={{ opacity: 0, y: -4 }}
@@ -2621,10 +2611,12 @@ export function Allowlist({
   merchants,
   vaultId,
   ownerWallet,
+  compact,
 }: {
   merchants: string[];
   vaultId: string;
   ownerWallet: string | null;
+  compact?: boolean;
 }) {
   // Local mirror of the on-chain list — gets overwritten by the
   // parent on every poll, but updated optimistically on add/remove
@@ -2634,6 +2626,7 @@ export function Allowlist({
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(!compact);
 
   // Re-sync when parent payload changes.
   const remoteJson = JSON.stringify(merchants);
@@ -2704,6 +2697,41 @@ export function Allowlist({
   );
 
   const empty = list.length === 0;
+
+  // Compact collapsed mode — single-line summary that expands on click.
+  if (compact && !expanded) {
+    return (
+      <button
+        type="button"
+        onClick={() => setExpanded(true)}
+        className="flex items-center gap-1.5 px-3 py-2 rounded-[10px] transition-all hover:bg-[rgba(15,23,42,0.04)] text-left w-full"
+        style={{
+          background: "rgba(15,23,42,0.025)",
+          border: "1px solid rgba(15,23,42,0.05)",
+        }}
+      >
+        <Shield
+          className="w-3 h-3 flex-shrink-0"
+          style={{ color: empty ? "rgba(15,23,42,0.45)" : "#15803D" }}
+          strokeWidth={2.2}
+        />
+        <span
+          className="font-mono uppercase tracking-[0.14em]"
+          style={{ fontSize: 9.5, color: "rgba(15,23,42,0.55)" }}
+        >
+          {empty
+            ? "No merchants approved"
+            : `${list.length} merchant${list.length === 1 ? "" : "s"} enforced`}
+        </span>
+        <span
+          className="ml-auto font-mono"
+          style={{ fontSize: 10, color: "rgba(15,23,42,0.45)" }}
+        >
+          edit ↓
+        </span>
+      </button>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-2">
