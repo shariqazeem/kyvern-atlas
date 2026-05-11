@@ -225,12 +225,13 @@ export function AliveConsole({ vaultId, ownerWallet, className }: Props) {
             />
             <div className="flex-1 min-w-0 text-[12px] leading-[1.5]">
               <span style={{ color: "#0A0A0A", fontWeight: 500 }}>
-                Your worker is provisioned with 3 default merchants.
+                Your worker can earn and spend on Solana — within rules the
+                chain enforces.
               </span>{" "}
               <span style={{ color: "rgba(15,23,42,0.65)" }}>
-                Add your own in{" "}
-                <span style={{ fontWeight: 600 }}>Rules → Add</span> — the
-                policy program enforces every merchant before USDC moves.
+                Click any scenario in the worker card above to see the chain
+                refuse a violation in real time. Add merchants in{" "}
+                <span style={{ fontWeight: 600 }}>Policy → Add</span> below.
               </span>
             </div>
             <button

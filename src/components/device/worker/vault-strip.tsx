@@ -33,6 +33,7 @@ export interface VaultTileData {
 
 interface AtlasStatus {
   totalCycles: number;
+  totalSettled: number;
   totalAttacksBlocked: number;
   uptimeMs: number;
   fundsLostUsd: number;
@@ -98,9 +99,9 @@ export function VaultStrip({ vaults, selectedVaultId, onSelect }: Props) {
           eyebrow="REFERENCE · LIVE"
           subtitle={
             atlas
-              ? `${atlas.totalCycles.toLocaleString()} cycles${
-                  atlasDays !== null ? ` · ${atlasDays}d` : ""
-                } · $${atlas.fundsLostUsd.toFixed(2)} lost`
+              ? `${atlas.totalSettled.toLocaleString()} paid · ${atlas.totalAttacksBlocked.toLocaleString()} refused${
+                  atlasDays !== null ? ` · ${atlasDays}d autonomous` : ""
+                }`
               : "loading…"
           }
           live={atlas?.running ?? false}

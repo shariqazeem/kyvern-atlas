@@ -76,9 +76,9 @@ function lineFor(state: DeviceState): string {
   // integration-console flow: mint key → run snippet → watch events.
   switch (state) {
     case "empty":
-      return "Vault provisioned · click Watch the chain refuse for the proof.";
+      return "Your worker can earn and spend on Solana — within rules the chain enforces.";
     case "funded_default":
-      return "Vault provisioned · click Watch the chain refuse for the proof.";
+      return "Your worker can earn and spend on Solana — within rules the chain enforces.";
     case "partial":
       return "Integration in progress.";
     case "active":
