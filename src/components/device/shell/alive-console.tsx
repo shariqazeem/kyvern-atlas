@@ -523,11 +523,25 @@ function WorkerIdentityHero({
             margin: "20px 0 0",
           }}
         >
-          Your worker can{" "}
-          <span style={{ color: TOK.ink, fontWeight: 500 }}>
-            earn and spend on Solana
+          <span style={{ color: TOK.ink, fontWeight: 600 }}>
+            Your worker can earn and spend
           </span>{" "}
-          — within rules the chain itself enforces. Every{" "}
+          on Solana — within rules the chain itself enforces.
+        </p>
+        <blockquote
+          className="mt-3"
+          style={{
+            margin: 0,
+            paddingLeft: 14,
+            borderLeft: `2px solid ${TOK.greenLine}`,
+            fontSize: 14,
+            color: TOK.ink2,
+            lineHeight: 1.55,
+            letterSpacing: "-0.005em",
+            maxWidth: "58ch",
+          }}
+        >
+          Every{" "}
           <code
             style={{
               fontFamily: "var(--font-mono, ui-monospace), monospace",
@@ -539,7 +553,7 @@ function WorkerIdentityHero({
           </code>{" "}
           call routes through your policy program before a single lamport
           moves.
-        </p>
+        </blockquote>
 
         <div className="flex flex-wrap gap-2.5 mt-5">
           <PrimaryButton
@@ -1876,32 +1890,6 @@ function ScenariosCard({
   return (
     <Card pad>
       <div id="scenarios" />
-      <div className="flex items-center justify-between mb-1">
-        <Eyebrow>Demos</Eyebrow>
-        <span style={{ fontSize: 11.5, color: TOK.ink4 }}>~3 seconds each</span>
-      </div>
-      <h2
-        style={{
-          fontSize: 18,
-          fontWeight: 600,
-          letterSpacing: "-0.02em",
-          color: TOK.ink,
-          margin: "6px 0 0",
-        }}
-      >
-        Watch the chain refuse
-      </h2>
-      <p
-        style={{
-          margin: "6px 0 12px",
-          fontSize: 12.5,
-          color: TOK.ink3,
-          lineHeight: 1.5,
-        }}
-      >
-        Tap one. Your policy program rejects on-chain in three seconds. Real
-        Solana tx, real failure code.
-      </p>
       <ScenarioPanel
         vaultId={vaultId}
         ownerWallet={ownerWallet}
@@ -1921,22 +1909,7 @@ function PayShCard({
 }) {
   return (
     <Card pad>
-      <Eyebrow>Pay.sh · Interception</Eyebrow>
-      <h2
-        style={{
-          fontSize: 15,
-          fontWeight: 600,
-          letterSpacing: "-0.015em",
-          color: TOK.ink,
-          margin: "8px 0 0",
-          lineHeight: 1.35,
-        }}
-      >
-        Every paid API call routes through your policy program first.
-      </h2>
-      <div className="mt-3">
-        <PayShFlow vaultId={vaultId} ownerWallet={ownerWallet} />
-      </div>
+      <PayShFlow vaultId={vaultId} ownerWallet={ownerWallet} />
     </Card>
   );
 }
@@ -2008,74 +1981,61 @@ function FooterPills({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.5, ease: EASE, delay: 0.1 }}
-        className="flex flex-col items-center gap-3 pt-2"
+        className="flex items-center justify-center gap-3 flex-wrap pt-2"
       >
-        <div className="flex items-center justify-center gap-3 flex-wrap">
-          <Link
-            href="/app/developer"
-            className="inline-flex items-center gap-2 no-underline"
-            style={{
-              padding: "5px 11px",
-              borderRadius: 999,
-              border: `1px solid ${TOK.hairline}`,
-              background: TOK.surface,
-              color: TOK.ink3,
-              fontSize: 12,
-            }}
-          >
-            <Code2 className="w-3 h-3" strokeWidth={1.6} />
-            Developer mode
-          </Link>
-          <button
-            type="button"
-            onClick={() => ownerWallet && setTerminalOpen(true)}
-            disabled={!ownerWallet}
-            className="inline-flex items-center gap-2"
-            style={{
-              padding: "5px 11px",
-              borderRadius: 999,
-              border: `1px solid ${TOK.hairline}`,
-              background: TOK.surface,
-              color: TOK.ink3,
-              fontSize: 12,
-              cursor: ownerWallet ? "pointer" : "not-allowed",
-              opacity: ownerWallet ? 1 : 0.6,
-            }}
-          >
-            <Terminal className="w-3 h-3" strokeWidth={1.6} />
-            Secure terminal
-          </button>
-          <button
-            type="button"
-            onClick={() => ownerWallet && setHeistOpen(true)}
-            disabled={!ownerWallet}
-            className="inline-flex items-center gap-2"
-            style={{
-              padding: "5px 11px",
-              borderRadius: 999,
-              border: `1px solid ${TOK.hairline}`,
-              background: TOK.surface,
-              color: TOK.ink3,
-              fontSize: 12,
-              cursor: ownerWallet ? "pointer" : "not-allowed",
-              opacity: ownerWallet ? 1 : 0.6,
-            }}
-          >
-            <ShieldAlert className="w-3 h-3" strokeWidth={1.6} />
-            Watch the chain refuse
-          </button>
-        </div>
-        <div
+        <Link
+          href="/app/developer"
+          className="inline-flex items-center gap-2 no-underline"
           style={{
-            fontFamily: "var(--font-mono, ui-monospace), monospace",
-            fontSize: 10.5,
-            color: TOK.ink4,
-            textTransform: "uppercase",
-            letterSpacing: "0.10em",
+            padding: "5px 11px",
+            borderRadius: 999,
+            border: `1px solid ${TOK.hairline}`,
+            background: TOK.surface,
+            color: TOK.ink3,
+            fontSize: 12,
           }}
         >
-          $5 / day cap · Chain decides every dollar · Everything else stops
-        </div>
+          <Code2 className="w-3 h-3" strokeWidth={1.6} />
+          Developer mode
+        </Link>
+        <button
+          type="button"
+          onClick={() => ownerWallet && setTerminalOpen(true)}
+          disabled={!ownerWallet}
+          className="inline-flex items-center gap-2"
+          style={{
+            padding: "5px 11px",
+            borderRadius: 999,
+            border: `1px solid ${TOK.hairline}`,
+            background: TOK.surface,
+            color: TOK.ink3,
+            fontSize: 12,
+            cursor: ownerWallet ? "pointer" : "not-allowed",
+            opacity: ownerWallet ? 1 : 0.6,
+          }}
+        >
+          <Terminal className="w-3 h-3" strokeWidth={1.6} />
+          Secure terminal
+        </button>
+        <button
+          type="button"
+          onClick={() => ownerWallet && setHeistOpen(true)}
+          disabled={!ownerWallet}
+          className="inline-flex items-center gap-2"
+          style={{
+            padding: "5px 11px",
+            borderRadius: 999,
+            border: `1px solid ${TOK.hairline}`,
+            background: TOK.surface,
+            color: TOK.ink3,
+            fontSize: 12,
+            cursor: ownerWallet ? "pointer" : "not-allowed",
+            opacity: ownerWallet ? 1 : 0.6,
+          }}
+        >
+          <ShieldAlert className="w-3 h-3" strokeWidth={1.6} />
+          Watch the chain refuse
+        </button>
       </motion.div>
 
       <HeistOverlay

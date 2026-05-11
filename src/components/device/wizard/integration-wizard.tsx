@@ -955,7 +955,7 @@ function KastPayoutBody({
           style={{
             fontSize: 9.5,
             color: "#FFFFFF",
-            background: saved ? "#15803D" : "#EA580C",
+            background: saved ? "#15803D" : "#0A0A0A",
             border: "1px solid rgba(0,0,0,0.05)",
           }}
         >
