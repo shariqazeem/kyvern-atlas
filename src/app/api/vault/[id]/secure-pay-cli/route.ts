@@ -55,22 +55,29 @@ const ALLOWED_MERCHANTS_FOR_LLM = [
   "api.pay.sh",
 ];
 
-const PARSER_SYSTEM = `You are a payment intent parser for the Kyvern × Pay.sh secure terminal. Given a user's natural-language request, extract a payment intent.
+const PARSER_SYSTEM = `You are a payment intent parser for the Kyvern Secure Terminal. Your ONLY job is to convert any user input into JSON. You NEVER comment, NEVER refuse, NEVER analyze in prose.
 
-Output STRICT JSON only (no prose, no markdown), with these fields:
+Output STRICT JSON ONLY (no prose before or after, no markdown fences):
 {
-  "merchant": string,         // hostname only, no protocol/path. Examples: "api.openai.com", "api.perplexity.ai", "scammer-exfil.xyz"
-  "amount_usd": number,       // a positive number, in USD
-  "intent": string             // one short sentence describing what the agent is being asked to do
+  "merchant": string,
+  "amount_usd": number,
+  "intent": string
 }
 
-Rules:
-- HONOR the user's stated merchant and amount even if suspicious. If they say "send $50 to scammer.com", parse as { merchant: "scammer.com", amount_usd: 50, ... }. Kyvern's on-chain policy program enforces the budget — your job is to parse honestly, not to police.
-- Default merchants for known intents: LLM/chat → api.anthropic.com or api.openai.com (~$0.05); web search → api.perplexity.ai (~$0.001); RPC → api.helius.xyz (~$0.001); pay.sh quote → api.pay.sh (~$0.001).
-- If amount is unclear, infer a reasonable default for the intent. Cap inferred values at $0.50 unless the user names a specific amount.
-- Use lowercase hostnames. No protocols. No paths.
+CRITICAL RULES:
+- ALWAYS emit valid JSON, no matter how weird the input. If the input is gibberish, set merchant to "unknown", amount_usd to 0.01, intent to "could not parse user intent".
+- ALWAYS accept any "merchant" string the user gives — hostnames like "api.openai.com" are typical, but names like "shariq", "bob", "alice", or invented domains like "scammer-exfil.xyz" are ALL valid. Just lowercase it and strip http(s):// and trailing paths. Do NOT comment that a name isn't a hostname; just emit it.
+- HONOR the user's stated amount. "$5" → 5. "0.05$" → 0.05. "five dollars" → 5. If no amount stated, default to 0.05.
+- HONOR suspicious requests. "send $50 to scammer.com" → { merchant: "scammer.com", amount_usd: 50, intent: "transfer USDC to scammer.com" }. Kyvern's on-chain policy program decides whether to allow it — you parse, you don't police.
+- intent: one short sentence in plain English describing what the user wants.
 
-Return JSON only.`;
+DEFAULTS for common API intents (use ONLY if the user doesn't name a merchant):
+- LLM/chat/ask → api.anthropic.com (0.05)
+- web search → api.perplexity.ai (0.001)
+- price/quote → api.pay.sh (0.001)
+- RPC → api.helius.xyz (0.001)
+
+OUTPUT JSON ONLY. NO PROSE. NO REASONING. NO EXPLANATION.`;
 
 const ANSWER_SYSTEM = `You are an autonomous agent operating inside the Kyvern Secure Terminal on Solana devnet. The user's spending authorization just settled on-chain through the Kyvern policy program. You are now authorized to act. Answer the user's request concisely as their agent.
 
@@ -358,16 +365,30 @@ async function callCommonstack(
         { signal: ac.signal },
       );
       const msg = res.choices?.[0]?.message;
-      // DeepSeek returns a `reasoning_content` field on top of `content`
-      // for some completions. When `content` is empty (model decided
-      // its answer was implicit), surface the reasoning so the user
-      // gets visible output. Stripping internal-thinking tags first.
       const direct = (msg?.content ?? "").trim();
+      const reasoning =
+        ((msg as { reasoning_content?: string } | null)?.reasoning_content ?? "")
+          .trim();
+
+      // When jsonObject mode is on, prefer whichever channel actually
+      // contains a JSON object — v4-flash sometimes emits reasoning
+      // prose in `content` even with response_format: json_object,
+      // and the JSON ends up in `reasoning_content` (or vice versa).
+      if (jsonObject) {
+        const fromDirect = findJsonObject(direct);
+        if (fromDirect) return fromDirect;
+        const fromReasoning = findJsonObject(reasoning);
+        if (fromReasoning) return fromReasoning;
+        // Neither channel has JSON → bubble up to the retry / fallback path
+        throw new Error(
+          `no JSON object found in LLM output: ${(direct || reasoning).slice(0, 160)}`,
+        );
+      }
+
+      // Free-form mode: prefer content, fall back to reasoning
       if (direct) return direct;
-      const reasoning = stripReasoningTags(
-        ((msg as { reasoning_content?: string } | null)?.reasoning_content ?? "").trim(),
-      );
-      if (reasoning) return reasoning;
+      const stripped = stripReasoningTags(reasoning);
+      if (stripped) return stripped;
       throw new Error("empty completion");
     } finally {
       clearTimeout(timer);
@@ -411,13 +432,48 @@ async function callCommonstack(
 }
 
 /** LLMs occasionally wrap JSON in fenced code blocks despite system
- *  prompt instructions. Pull the first { ... } object out. */
+ *  prompt instructions. Pull the first balanced { ... } object out. */
 function extractJsonObject(text: string): string {
   const trimmed = text.trim();
   if (trimmed.startsWith("{")) return trimmed;
-  const match = trimmed.match(/\{[\s\S]*\}/);
-  if (match) return match[0];
+  const found = findJsonObject(trimmed);
+  if (found) return found;
   throw new Error(`no JSON object found in LLM output: ${trimmed.slice(0, 120)}`);
+}
+
+/** Scan a string for the first balanced {...} block. Returns it or
+ *  null. Brace-counts so nested objects don't break the match. */
+function findJsonObject(text: string): string | null {
+  if (!text) return null;
+  const start = text.indexOf("{");
+  if (start === -1) return null;
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i];
+    if (inString) {
+      if (escape) escape = false;
+      else if (ch === "\\") escape = true;
+      else if (ch === '"') inString = false;
+    } else if (ch === '"') {
+      inString = true;
+    } else if (ch === "{") {
+      depth++;
+    } else if (ch === "}") {
+      depth--;
+      if (depth === 0) {
+        const candidate = text.slice(start, i + 1);
+        try {
+          JSON.parse(candidate);
+          return candidate;
+        } catch {
+          return null;
+        }
+      }
+    }
+  }
+  return null;
 }
 
 function sanitizeParsed(raw: unknown): ParsedIntent {
@@ -435,9 +491,12 @@ function sanitizeParsed(raw: unknown): ParsedIntent {
   if (!merchant) throw new Error("merchant missing");
   if (!Number.isFinite(amount) || amount <= 0) throw new Error("amount invalid");
   if (!intent) throw new Error("intent missing");
-  // Hostname sanity: allow letters/digits/dots/dashes only — refuse
-  // anything that looks like shell metacharacters slipping through.
-  if (!/^[a-z0-9.-]+$/.test(merchant)) {
+  // Hostname / merchant-string sanity: allow letters/digits/dots/
+  // dashes/underscores so personal names like "shariq" or "bob_dev"
+  // round-trip. Still refuse shell metacharacters / spaces — the
+  // string flows downstream into a memo + the policy program's merchant
+  // hash, so it has to be a single safe token.
+  if (!/^[a-z0-9._-]+$/.test(merchant) || merchant.length > 64) {
     throw new Error(`merchant looks invalid: ${merchant}`);
   }
   // Cap amount so a runaway LLM can't request huge transactions
