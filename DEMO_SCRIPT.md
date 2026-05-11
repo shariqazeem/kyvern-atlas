@@ -43,7 +43,7 @@ Total target: **2:55–3:00**. If you run over 3:05 the YouTube upload will get 
 
 ## STEP 2 · 0:10–0:32 · Proof (Atlas)
 
-**DO** — Click into `/atlas` (or click "Watch Atlas" on the landing nav). Observatory loads.
+**DO** — Click into `/atlas` (or click "Watch Atlas" on the landing nav). Observatory loads. The four hero stats are visible at the top: **alive · merchants paid · attacks blocked · funds lost**.
 
 **SAY**
 
@@ -51,19 +51,19 @@ Total target: **2:55–3:00**. If you run over 3:05 the YouTube upload will get 
 >
 > *(pause 1s)*
 >
-> [PAID] merchants paid. [BLOCKED] attacks blocked. Zero dollars lost.
+> [PAID] real on-chain payments. [BLOCKED] attack attempts refused by the policy engine. Zero dollars lost.
 
-**DO** — Scroll down to the **Attack Wall**. Find any row with a short signature suffix (e.g. `3kR8…mN4v`) and the external-link icon at the right edge — that's a row whose tx landed on chain. Click it.
+**DO** — Scroll down to **Atlas Earned** / the **economic ledger** card (shows recent settled payments with short signature suffixes like `3kR8…mN4v` and an Explorer arrow). Click any one of those rows.
 
-Solana Explorer opens. The program logs show the failure code (e.g. `AmountExceedsPerTxMax`).
+Solana Explorer opens. Real `spendingLimitUse` instruction. Real signature. Real tx.
 
 **HOLD** — 2 seconds.
 
 **SAY**
 
-> Every refusal is a real on-chain enforcement event. Anyone can verify on Explorer.
+> Every settled payment is a real Solana transaction. Anyone can verify.
 
-*(Note: rows without a signature suffix were refused by the off-chain policy pre-check in under three milliseconds. They never hit the chain. They're still real refusals — just faster ones. Don't click them for this beat; the click target is a signature row.)*
+*(Don't click the attack-wall rows for this beat. They're real refusals, but the policy engine stops them before any tx is submitted, so they don't have Explorer links. The economic ledger is where the on-chain proof lives.)*
 
 ---
 
