@@ -1,238 +1,213 @@
-# Kyvern · Demo video script · 90 seconds
+# Kyvern · Demo video · read-aloud script (3:00)
 
-Three takes max. Stopwatch every sentence. Record fresh tomorrow
-morning — don't write your way into exhaustion at 4 AM.
+**Before recording — fill these in from `/api/atlas/status` ≤ 30 min before take 1:**
 
-**Framing rule:** Kyvern is the authorization layer for *autonomous AI
-commerce*. Atlas is an economic actor that pays merchants and refuses
-violations. Not a security wall. Not a dashboard.
+```
+DAYS          = ____
+PAID_COUNT    = ____
+BLOCKED_COUNT = ____
+```
 
----
+Use these **exact numbers** in the pitch script + Devpost writeup too.
+A viewer who watches both videos will catch any mismatch.
 
-## The script (~90 seconds)
-
-### Hook (0:00–0:10)
-
-> *"AI agents shouldn't hold private keys. They should have budgets."*
->
-> *"On Solana, we built that."*
-
-**On screen:** Landing page `kyvernlabs.com` — the device hero, live
-trust bar showing Atlas's counters ticking. Hold for 3 seconds, then
-cut to `/atlas` to set the proof.
-
-**Voiceover note:** Grammatical inversion — ending the second
-sentence on "Solana" plants the platform as the destination. Same
-words, the platform becomes what judges remember.
-
-### The proof (0:10–0:30)
-
-> *"Meet Atlas. A reference AI worker that's been running autonomously
-> on Solana devnet for 20 days."*
->
-> *"One thousand four hundred seventy-two merchants — **paid**."*
->
-> *"Three thousand six hundred five violations — **refused**."*
->
-> *"Twenty days — **autonomous**."*
->
-> *"Zero dollars — **lost**."*
->
-> *"Every row in this timeline links to Solana Explorer. Anyone can
-> verify."*
-
-**On screen:** `/atlas` observatory. Scroll the timeline slowly. Click
-ONE settled row → Solana Explorer opens → real on-chain settlement.
-Then cut back, click ONE refused row → Solana Explorer opens →
-`KyvernPolicy::AmountExceedsPerTxMax` visible in the program logs.
-Pause 1 second on each Explorer page so the viewer sees the tx hash
-and the program ID.
-
-**Voiceover note:** Two seconds per number. Eight seconds total. This
-is the section that earns the win. Stretch every word. Treat each
-number as its own beat. Don't run them together. The hyphen + bold
-verb at the end of each line is a beat marker — hit the pause, hit
-the verb.
-
-### The category (0:30–0:40) · THE THESIS LINE
-
-> *"This is what autonomous AI commerce looks like under policy."*
->
-> *"The agent has economic agency. The chain decides every dollar."*
->
-> *"Kyvern is the authorization layer that makes this safe."*
-
-**On screen:** Sign in to `/app`. The page loads. Hold on the worker
-card — Atlas live tape drifting at the top, runtime panel breathing,
-scenario buttons on the right. Don't narrate the UI elements — let
-the page speak for 3 seconds.
-
-**Voiceover note:** This is THE most important sentence in the entire
-video. It reframes Kyvern from security tool to commerce primitive.
-Say it slowly, slightly lower register, almost as a thesis statement.
-If you only land one sentence with conviction in the whole 90
-seconds, land *"The chain decides every dollar."*
-
-### The interaction (0:40–1:05)
-
-> *"Here's a real test. We attempt a $5 payment — the per-tx cap is
-> 50 cents."*
-
-**On screen:** Click the "Try over-cap $5" scenario button.
-
-**Hold silence here.** Three seconds. Do NOT narrate. Trust the
-product to land its own moment. Judges have watched a hundred demo
-videos — they can hear when a team trusts their product.
-
-Refused-on-chain panel appears.
-
-> *"Three seconds. Real Solana tx. Refused on-chain by the policy
-> program with error code 12002. Anyone can click through to
-> Explorer."*
-
-**On screen:** Click the Explorer link in the result panel. Solana
-Explorer opens — show the failed tx with `AmountExceedsPerTxMax` in
-the program logs. Hold 2 seconds.
-
-### The integration (1:05–1:20)
-
-> *"For developers, this ships as a four-line SDK."*
-
-**On screen:** Cut back to `/app`, hover the SDK preview block. Show
-the 4 lines. Click the copy button (the Check icon flicker
-acknowledges it).
-
-> *"npm install @kyvernlabs/sdk, plug in your agent key, and every
-> payment your code makes routes through this exact on-chain check."*
-
-### The ecosystem (1:20–1:30)
-
-> *"Kyvern plays nice with the rails — Pay.sh ships the x402 protocol;
-> Kyvern is the authorization layer above it."*
-
-**On screen:** Scroll to the Pay.sh network card. Click "Try $0.001
-settled call." Green pulse traverses all three nodes (Your Code →
-Kyvern → Pay.sh API). Result panel shows: real on-chain settlement +
-real pay.sh CLI invocation + real AAPL quote.
-
-### Close (1:30–1:38)
-
-> *"AI agents are going to spend trillions of dollars autonomously.
-> Kyvern is the authorization layer that makes that safe."*
->
-> *"Atlas runs on it today. The SDK ships today. The future ships
-> now."*
-
-**On screen:** Cut to the landing page one last time. Hold on the
-tagline: *"Agents shouldn't have keys. They should have budgets."*
-Fade.
-
-**Voiceover note:** No hedging language. "The future ships now" is
-the kind of line that survives compression on Twitter when someone
-clips your demo. Land it with conviction.
+Three takes max. Stopwatch every sentence.
 
 ---
 
-## Voiceover notes
+## BEAT 1 · HOOK · 0:00–0:10
 
-- Speak at ~140 wpm, no faster. Pauses earn weight.
-- "Real" appears 7 times. That's intentional. The product is real and
-  the word is what differentiates from every other agent demo.
-- Numbers in this order, every time: **1,472 paid · 3,605 refused ·
-  20 days · zero lost.** Paid first frames Atlas as a worker, not a
-  wall.
-- Don't say "policy program" alone. Say "the chain decides" or "the
-  policy program on Solana." The chain is the protagonist.
-- Don't say "demo" or "simulation" or "example" anywhere. Say
-  "real" instead.
+**SCREEN** — `https://kyvernlabs.com/` (landing page). Hero card, live trust bar ticking on the right. Hold steady, no scroll.
 
----
-
-## Screen-recording checklist
-
-- [ ] Quit every other app. Only Chrome with one tab.
-- [ ] Browser zoom at 110% so judges can read fonts on YouTube
-  compression.
-- [ ] Use the dedicated Kyvern Commonstack key (the new $25 one) —
-  not Atlas's key. Atlas's key may still be near its weekly cap.
-- [ ] Hard-refresh `/app` before recording so the first-visit banner
-  is dismissed cleanly and the page hits with no orient banner.
-- [ ] Record at 1920×1080. Keep cursor visible.
-- [ ] Three takes max. If you're past three, stop, sleep an hour,
-  resume.
-
----
-
-## The 280-character version (Twitter thread tweet 1)
+**SAY**
 
 > AI agents shouldn't hold private keys. They should have budgets.
 >
-> We built that on Solana. Atlas has been autonomous for 20 days:
-> 1,472 paid, 3,605 refused, $0 lost.
+> *(pause 1s)*
 >
-> The authorization layer for autonomous AI commerce.
->
-> Kyvern. Devnet today. ↓
+> On Solana, we built that.
+
+**HOLD** — 3 seconds of silence. Let the trust bar tick.
 
 ---
 
-## Submission writeup (Frontier portal, ~200 words)
+## BEAT 2 · ATLAS PROOF · 0:10–0:40
 
-**Kyvern is the authorization layer for autonomous AI commerce on Solana.**
+**DO** — Click to `https://app.kyvernlabs.com/atlas`. Observatory loads.
 
-AI agents are going to spend trillions of dollars autonomously. Today
-they do that by holding private keys — a jailbroken agent drains the
-wallet, a prompt-injected agent pays a scammer. Most agent wallets
-today are vanilla multisigs that trust the agent.
+**SAY**
 
-Kyvern flips that. Every agent gets a Squads v4 multisig vault wrapped
-in a custom Anchor program (`PpmZErWfT5zpeo1fJtTbpqezFGbRUamaNNRWViaMSqc`)
-that enforces budgets, allowlists, velocity caps, memo requirements,
-and a kill switch — *on-chain, before USDC moves.* Refusals are real
-failed Solana transactions with 12 custom error codes verifiable on
-Explorer.
+> Meet Atlas. A reference AI agent that's been running autonomously on Solana devnet for [DAYS] days.
+>
+> *(pause 1s · two seconds per number from here)*
+>
+> [PAID_COUNT] merchants — paid.
+>
+> [BLOCKED_COUNT] refusals — blocked on-chain.
+>
+> [DAYS] days autonomous. Zero dollars lost.
 
-Our reference worker, Atlas, has been autonomous on devnet since
-2026-04-20. In 20 days it has paid 1,472 real merchants on-chain,
-refused 3,605 attempted violations, earned $22.90 from real
-subscribers, and lost zero dollars to any attack. Every tx is on
-Explorer.
+**DO** — Click **one refused row** in the timeline. Solana Explorer opens. Show `AmountExceedsPerTxMax` in the program logs.
 
-The SDK (`@kyvernlabs/sdk`) ships in four lines. The scaffolder
-(`create-kyvern-agent`) ships a working agent in 60 seconds.
-Pay.sh+Kyvern is structurally complementary: pay.sh ships the x402
-rail, Kyvern ships the runtime that makes agents safe to put on it.
+**HOLD** — 2 seconds.
 
-Live at https://app.kyvernlabs.com. Atlas at /atlas.
+**DO** — Cut back to `/atlas`. Click **one settled row**. Real on-chain payment.
+
+**HOLD** — 1 second.
 
 ---
 
-## Q&A prep — the three questions judges will ask
+## BEAT 3 · CATEGORY · 0:40–0:55
 
-**1. "Why not just use Squads' spending limits directly?"**
+**DO** — Sign in to `/app`. Hero card loads. Atlas live tape drifts at top.
 
-> Squads enforces three things: per-tx max, daily cap, weekly cap.
-> That's it. Kyvern enforces those plus: merchant allowlist (hash-
-> based, on-chain), memo requirement, velocity rate-limiting, kill
-> switch, custom error codes for every refusal. We CPI into Squads —
-> we don't replace it. Squads is the audited primitive; Kyvern is the
-> policy layer above. Same pattern as IAM above a cloud provider.
+**SAY** *(lower register, slower than other beats)*
 
-**2. "Is Atlas a demo or a real agent?"**
+> The agent has economic agency. The chain decides every dollar.
+>
+> *(pause 1s)*
+>
+> This is what autonomous AI commerce looks like under policy.
+>
+> *(pause 1s)*
+>
+> Kyvern is the authorization layer that makes this safe.
 
-> Atlas runs in its own pm2 process on a Solana devnet RPC, makes
-> autonomous decisions every 3 minutes via a Commonstack LLM call,
-> attempts real payments through Kyvern's policy program. Every
-> action is verifiable on Solana Explorer. The action set is bounded
-> (5 verbs: reason / publish / buy_data / self_report / idle) and the
-> subscribers are simulated, but every chain transaction is real and
-> Atlas's failure rate at avoiding violations is the proof point.
-> Atlas isn't the product — Atlas is proof that the product works
-> for autonomous workloads.
+**HOLD** — 3 seconds of silence. Camera holds on the worker card.
 
-**3. "Why devnet and not mainnet?"**
+---
 
-> Devnet because the Anchor program hasn't been audited yet. The
-> program is feature-complete — same code would deploy to mainnet
-> tomorrow. We chose to ship a working reference + verifiable proof
-> over a rushed mainnet deploy. v1.1 ships to mainnet after audit pass.
+## BEAT 4 · SCENARIO REFUSAL · 0:55–1:25
+
+**DO** — Move camera to the right column ("Watch the chain refuse" card).
+
+**SAY**
+
+> Here's a real test. We attempt a five-dollar payment. The per-tx cap is fifty cents.
+
+**DO** — Click **"Try over-cap $5"**.
+
+**HOLD** — 3 full seconds of silence. Trust the product.
+
+The refused panel appears.
+
+**SAY**
+
+> Three seconds. Real Solana tx. Refused on-chain by the policy program with error code twelve thousand two. Anyone can click through to Explorer.
+
+**DO** — Click the Explorer link in the result panel. Show the failed tx with the error code in program logs.
+
+**HOLD** — 2 seconds.
+
+---
+
+## BEAT 5 ★ · BRING YOUR OWN AGENT · 1:25–2:25
+
+**This is the killer beat. Sixty seconds. Hit four artifacts in order:
+agent key → wrapper code → settled rows → Explorer page.**
+
+**DO** — Cut back to `/app`. Scroll down to the SDK card.
+
+**SAY**
+
+> Kyvern isn't just for our agents. Any agent fits in four lines.
+
+**DO** — Click the **`oracle.ts`** tab on the SDK card. The wrapped-fetch snippet shows.
+
+**HOLD** — 4 seconds. Long enough for a fast reader to catch line 5 (`vault.pay`).
+
+**SAY**
+
+> I built ParallaxPay last quarter — an x402 agent marketplace.
+>
+> Its market oracle predicts crypto prices using CoinGecko and DeepSeek. It used to run free. Now it runs under Kyvern.
+
+**DO** — Scroll to the "Bring your own agent" card directly below. BTC is selected by default.
+
+**SAY**
+
+> Live. Right now.
+
+**DO** — Click **"Run prediction agent"**.
+
+**HOLD** — 2 seconds, no narration. Button shows "Polling chain…"
+
+Result panel fills with price + prediction + two Explorer-linked payments.
+
+**SAY**
+
+> Two HTTP calls. Both routed through Kyvern's policy program. Both settled on-chain. Both visible right here.
+
+**DO** — Camera traces the result panel slowly: prediction text → confidence → both payment rows.
+
+**DO** — Click **"Explorer"** on the `api.coingecko.com` row. Real Solana tx opens with the agent's pubkey as signer.
+
+**HOLD** — 2 seconds.
+
+**DO** — Cut back. Point at the new row that just landed in Recent SDK Calls.
+
+**SAY**
+
+> This agent didn't know Kyvern existed when it was written. One import. One wrapped fetch. Now every call it makes is gated by consensus.
+
+---
+
+## BEAT 6 · PAY.SH INTEROP · 2:25–2:45
+
+**DO** — Scroll to the Pay.sh card on the right column.
+
+**SAY**
+
+> Kyvern is the authorization layer above the x402 rail.
+
+**DO** — Click **"Try $0.001 settled call"**. Pulse traverses Your Code → Kyvern → Pay.sh API. Settled signature appears.
+
+**HOLD** — 2 seconds.
+
+---
+
+## BEAT 7 · CLOSE · 2:45–3:00
+
+**DO** — Cut to the landing page one last time. The manifesto frame.
+
+**SAY**
+
+> AI agents are going to spend trillions of dollars autonomously.
+>
+> *(pause 1s)*
+>
+> Kyvern is the authorization layer that makes that safe.
+>
+> *(pause 1s)*
+>
+> Atlas runs on it today. The SDK ships today.
+
+**HOLD** — Fade on the tagline: *"Agents shouldn't have keys. They should have budgets."*
+
+**END** — 3:00 exactly.
+
+---
+
+## Reading discipline
+
+- ~140 words per minute, no faster. Pauses earn weight.
+- "Real" appears 7 times across the script. Lean on it every time.
+- Numbers always in this order: **paid → refused → days → lost.**
+  Paid first frames Atlas as a worker, not a wall.
+- Don't say "demo," "simulation," or "example." Say "real."
+- Don't say "policy program" alone. Say "the chain decides" or "the
+  policy program on Solana." The chain is the protagonist.
+
+## If the take goes wrong
+
+- **Beat 5 button hangs > 8s** — abort, top up SOL via faucet.solana.com, retry.
+- **Refused on-chain · merchant_not_allowed** — auto-allowlist failed; add `api.coingecko.com` + `api.commonstack.ai` manually in /app, retry.
+- **Empty prediction text** — Commonstack fallback engaged; the two settled txs still tell the policy story, just don't camera-pan to the prediction text.
+
+## Take log (fill during shoot)
+
+| Take | Time | Notes |
+|------|------|-------|
+| 1    |      |       |
+| 2    |      |       |
+| 3    |      |       |
