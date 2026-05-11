@@ -5,6 +5,35 @@ import { Keypair } from "@solana/web3.js";
 import bs58 from "bs58";
 
 /**
+ * Look up the vault's original Solana delegate keypair — the one
+ * /api/vault/create registered as authorized on the Squads spending
+ * limit. New agent keys must reuse this keypair, not generate a fresh
+ * one, otherwise vault.pay() fails with "Attempted to perform an
+ * unauthorized action" because Squads only knows about the original
+ * delegate.
+ */
+function getVaultOriginalDelegate(
+  vaultId: string,
+): { pubkey: string; secretB58: string } | null {
+  const row = getDb()
+    .prepare(
+      `SELECT solana_pubkey, solana_secret_b58
+         FROM vault_agent_keys
+        WHERE vault_id = ?
+          AND solana_pubkey IS NOT NULL
+          AND solana_secret_b58 IS NOT NULL
+        ORDER BY created_at ASC
+        LIMIT 1`,
+    )
+    .get(vaultId) as {
+    solana_pubkey: string | null;
+    solana_secret_b58: string | null;
+  } | undefined;
+  if (!row?.solana_pubkey || !row?.solana_secret_b58) return null;
+  return { pubkey: row.solana_pubkey, secretB58: row.solana_secret_b58 };
+}
+
+/**
  * GET  /api/devices/[id]/agent-key
  * POST /api/devices/[id]/agent-key
  *
@@ -63,11 +92,25 @@ export async function POST(
     );
   }
 
-  // Mint a fresh Solana keypair to bind to this agent key. Same shape
-  // as /api/vault/create's primary-key minting path.
-  const kp = Keypair.generate();
-  const pubkey = kp.publicKey.toBase58();
-  const secretB58 = bs58.encode(kp.secretKey);
+  // CRITICAL: reuse the vault's ORIGINAL Solana delegate (set up at
+  // /api/vault/create time) — it's the only keypair authorized on the
+  // on-chain Squads spending limit. Generating a fresh keypair here
+  // would mint a working bearer token whose tx attempts get rejected
+  // with "Attempted to perform an unauthorized action."
+  //
+  // Only fall back to a fresh keypair if no original exists (legacy
+  // pre-Solana-column rows). Those vaults can't pay-on-chain anyway.
+  const original = getVaultOriginalDelegate(params.id);
+  let pubkey: string;
+  let secretB58: string;
+  if (original) {
+    pubkey = original.pubkey;
+    secretB58 = original.secretB58;
+  } else {
+    const kp = Keypair.generate();
+    pubkey = kp.publicKey.toBase58();
+    secretB58 = bs58.encode(kp.secretKey);
+  }
 
   const { record, raw } = issueAgentKey(params.id, "in-app", {
     pubkey,
