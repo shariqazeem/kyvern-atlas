@@ -34,6 +34,7 @@ import {
   Plus,
   Radio,
   Shield,
+  ShieldAlert,
   Sparkles,
   X,
 } from "lucide-react";
@@ -142,34 +143,21 @@ export function UserVaultCard({
             signal. Atlas's chain events drift across the card constantly. */}
         <LiveTape />
 
-        {/* Two-column work surface: runtime+SDK on left, integration
-            wizard on right. Stacks on small screens. */}
+        {/* Two-column work surface: runtime+SDK on left, scenario
+            buttons on right. The right column becomes interactive —
+            a judge can produce a real failed-tx in 3 seconds without
+            scrolling. Integration wizard moves below as a sidecar. */}
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] gap-5">
           <div className="flex flex-col gap-5 min-w-0">
             <RuntimePanel vault={data.vault} now={now} />
             <SdkPreview vaultId={data.vault.id} />
           </div>
-          <div className="flex flex-col gap-2 min-w-0">
-            <div className="flex items-center gap-1.5">
-              <Sparkles
-                className="w-3 h-3"
-                strokeWidth={2}
-                style={{ color: "rgba(15,23,42,0.45)" }}
-              />
-              <span
-                className="font-mono uppercase tracking-[0.14em]"
-                style={{ fontSize: 9.5, color: "rgba(15,23,42,0.55)" }}
-              >
-                Integration · 5 steps
-              </span>
-            </div>
-            <div className="overflow-hidden rounded-[12px]">
-              <IntegrationWizard
-                vaultId={data.vault.id}
-                ownerWallet={resolvedOwner}
-              />
-            </div>
-          </div>
+          <ScenarioPanel
+            vaultId={data.vault.id}
+            ownerWallet={resolvedOwner}
+            perTxMaxUsd={data.budget.perTxMaxUsd}
+            network={data.vault.network}
+          />
         </div>
 
         {/* Full-width row: Recent SDK Calls — the user's own activity */}
@@ -178,9 +166,258 @@ export function UserVaultCard({
           network={data.vault.network}
         />
 
+        {/* Integration wizard — moved below the demo surface. Next-steps
+            sidecar for developers ready to wire their own code, not a
+            co-hero competing with the runtime panel. */}
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-1.5">
+            <Sparkles
+              className="w-3 h-3"
+              strokeWidth={2}
+              style={{ color: "rgba(15,23,42,0.45)" }}
+            />
+            <span
+              className="font-mono uppercase tracking-[0.14em]"
+              style={{ fontSize: 9.5, color: "rgba(15,23,42,0.55)" }}
+            >
+              Integration · next steps
+            </span>
+          </div>
+          <div className="overflow-hidden rounded-[12px]">
+            <IntegrationWizard
+              vaultId={data.vault.id}
+              ownerWallet={resolvedOwner}
+            />
+          </div>
+        </div>
+
         <Footer network={data.vault.network} />
       </div>
     </motion.div>
+  );
+}
+
+/* ─── ScenarioPanel (right-column interactive demo) ──────────────── */
+
+interface ScenarioResult {
+  scenario: string;
+  signature: string;
+  explorerUrl: string | null;
+  expectedErrorCode: number | null;
+  expectedErrorName: string | null;
+}
+
+const SCENARIOS = [
+  {
+    key: "amount_exceeds_per_tx",
+    label: "Try over-cap $5",
+    sub: "vs $0.50 per-tx max",
+    expectedCode: 12002,
+  },
+  {
+    key: "merchant_not_allowed",
+    label: "Try off-allowlist",
+    sub: "ranger.com · not approved",
+    expectedCode: 12003,
+  },
+  {
+    key: "missing_memo",
+    label: "Try missing memo",
+    sub: "vault requires memo",
+    expectedCode: 12004,
+  },
+];
+
+function ScenarioPanel({
+  vaultId,
+  ownerWallet,
+  network,
+}: {
+  vaultId: string;
+  ownerWallet: string | null;
+  perTxMaxUsd: number;
+  network: "devnet" | "mainnet";
+}) {
+  const [running, setRunning] = useState<string | null>(null);
+  const [result, setResult] = useState<ScenarioResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const fire = useCallback(
+    async (scenario: string) => {
+      if (!ownerWallet || running) return;
+      setRunning(scenario);
+      setError(null);
+      try {
+        const r = await fetch("/api/atlas/probe-scenarios", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-owner-wallet": ownerWallet,
+          },
+          body: JSON.stringify({ scenario, vaultId }),
+        });
+        const d = (await r.json()) as ScenarioResult & {
+          error?: string;
+          message?: string;
+          ok?: boolean;
+        };
+        if (!r.ok || d?.error) {
+          setError(d.message ?? d.error ?? `request failed (${r.status})`);
+        } else if (d.signature) {
+          const explorerUrl =
+            d.explorerUrl ??
+            `https://explorer.solana.com/tx/${d.signature}?cluster=${network}`;
+          setResult({ ...d, explorerUrl });
+        } else {
+          setError("no signature returned");
+        }
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "request failed");
+      } finally {
+        setRunning(null);
+      }
+    },
+    [ownerWallet, running, vaultId, network],
+  );
+
+  return (
+    <div className="flex flex-col gap-2.5 min-w-0">
+      <div className="flex items-center gap-1.5">
+        <ShieldAlert
+          className="w-3 h-3"
+          strokeWidth={2}
+          style={{ color: "rgba(15,23,42,0.45)" }}
+        />
+        <span
+          className="font-mono uppercase tracking-[0.14em]"
+          style={{ fontSize: 9.5, color: "rgba(15,23,42,0.55)" }}
+        >
+          Watch the chain refuse
+        </span>
+      </div>
+      <p
+        className="text-[11.5px] leading-[1.5]"
+        style={{ color: "rgba(15,23,42,0.55)" }}
+      >
+        Tap one. Your policy program refuses on-chain in three seconds.
+        Real Solana tx, real failure code.
+      </p>
+
+      <div className="flex flex-col gap-1.5">
+        {SCENARIOS.map((s) => {
+          const isRunning = running === s.key;
+          return (
+            <button
+              key={s.key}
+              type="button"
+              onClick={() => fire(s.key)}
+              disabled={!ownerWallet || running !== null}
+              className="group inline-flex items-center justify-between gap-2 px-3 py-2 rounded-[10px] text-left transition-all active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{
+                background: "rgba(15,23,42,0.025)",
+                border: "1px solid rgba(15,23,42,0.08)",
+              }}
+            >
+              <div className="flex flex-col min-w-0 flex-1">
+                <span
+                  className="text-[12.5px] font-medium tracking-[-0.005em]"
+                  style={{ color: "#0A0A0A" }}
+                >
+                  {s.label}
+                </span>
+                <span
+                  className="font-mono uppercase tracking-[0.10em]"
+                  style={{ fontSize: 8.5, color: "rgba(15,23,42,0.45)" }}
+                >
+                  {s.sub} · code {s.expectedCode}
+                </span>
+              </div>
+              {isRunning ? (
+                <span
+                  className="w-3.5 h-3.5 border-2 rounded-full animate-spin flex-shrink-0"
+                  style={{
+                    borderColor: "rgba(15,23,42,0.15)",
+                    borderTopColor: "rgba(15,23,42,0.55)",
+                  }}
+                />
+              ) : (
+                <ArrowRight
+                  className="w-3 h-3 flex-shrink-0 transition-transform group-hover:translate-x-0.5"
+                  strokeWidth={2}
+                  style={{ color: "rgba(15,23,42,0.40)" }}
+                />
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      <AnimatePresence>
+        {result?.signature && (
+          <motion.div
+            key={result.signature}
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3, ease: EASE }}
+            className="rounded-[10px] px-3 py-2 flex flex-col gap-1"
+            style={{
+              background: "rgba(245,158,11,0.06)",
+              border: "1px solid rgba(245,158,11,0.22)",
+            }}
+          >
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span
+                className="font-mono uppercase tracking-[0.12em]"
+                style={{ fontSize: 9, color: "#B45309" }}
+              >
+                Refused on-chain
+              </span>
+              {result.expectedErrorCode && (
+                <span
+                  className="font-mono"
+                  style={{ fontSize: 9.5, color: "rgba(180,83,9,0.65)" }}
+                >
+                  · code {result.expectedErrorCode}
+                </span>
+              )}
+            </div>
+            <p
+              className="font-mono leading-[1.45] truncate"
+              style={{ fontSize: 11, color: "rgba(15,23,42,0.75)" }}
+            >
+              {result.expectedErrorName ?? "policy refusal"}
+            </p>
+            {result.explorerUrl && (
+              <a
+                href={result.explorerUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 font-mono hover:underline"
+                style={{ fontSize: 10.5, color: "#0A0A0A" }}
+              >
+                <span className="truncate max-w-[180px]">
+                  {result.signature.slice(0, 6)}…{result.signature.slice(-6)}
+                </span>
+                <ExternalLink className="w-2.5 h-2.5" strokeWidth={2.2} />
+              </a>
+            )}
+          </motion.div>
+        )}
+        {error && (
+          <motion.div
+            key="err"
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="text-[11px]"
+            style={{ color: "#B45309" }}
+          >
+            {error}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
 
