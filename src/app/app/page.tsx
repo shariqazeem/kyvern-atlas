@@ -310,7 +310,8 @@ export default function DeviceHome() {
         />
 
         <main
-          className="flex-1 min-h-0 flex flex-col gap-4 sm:gap-6 p-4 sm:p-6 mx-auto w-full max-w-[760px] lg:max-w-[1280px]"
+          className="flex-1 min-h-0 flex flex-col gap-4 sm:gap-6 p-4 sm:p-6 mx-auto w-full max-w-[760px] lg:max-w-[1320px]"
+          style={{ background: "#FBFBFD" }}
         >
           {/* STATE STRIP — only when not active. Shrunk to a single
               centered column now that the right sidebar is gone. */}

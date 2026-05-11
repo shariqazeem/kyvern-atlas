@@ -1,47 +1,75 @@
 "use client";
 
 /**
- * AliveConsole — /app's mission-control stage.
+ * AliveConsole — /app canvas. Apple-feel rebuild (P12.25).
  *
- * The user's signed-in surface. After the 2026-05-10 swap, the hero
- * is the user's OWN vault as a Worker Card (not Atlas). Atlas is
- * demoted to a small reference strip — still the inevitability proof,
- * but no longer the protagonist on the user's device.
+ * Structure (top → bottom):
+ *   1. Hero band (2-col) — Worker identity + Vault balance
+ *   2. Three-column grid:
+ *      LEFT  (280px): Workers sidebar (Atlas + user vaults + Deploy)
+ *      MID   (1fr):   Runtime status · SDK Xcode card · Recent calls
+ *      RIGHT (320px): Policy · Watch the chain refuse · Pay.sh flow
+ *   3. Wire your agent — full-width steps card
+ *   4. Footer — interactive demo pills
  *
- * Layout, top-to-bottom:
- *   1. Whisper line
- *   2. <UserVaultCard> — hero, mounted with the user's primary vault
- *   3. <AtlasReferenceStrip> — one-line callout to /atlas
- *   4. <WorkerTemplates> — provision-vault + roadmap cards
- *   5. Developer mode link
- *
- * Data: /api/vault/[id] for the user's vault (same endpoint as the
- * per-vault page). Polls every 5s.
+ * Colors stay on our brand (greens + ink #0A0A0A). The design's
+ * Apple-blue accent maps to our green.
  */
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowRight, Code2, ShieldAlert, ShieldCheck, Terminal, X } from "lucide-react";
+import {
+  Check,
+  ChevronRight,
+  Code2,
+  Copy,
+  ExternalLink,
+  Plus,
+  ShieldAlert,
+  Terminal,
+} from "lucide-react";
 import { WorkerTemplates } from "../worker/worker-templates";
 import {
-  UserVaultCard,
   PolicyRibbon,
-  StatsGrid,
   Allowlist,
   HeistOverlay,
   SecureTerminal,
   ScenarioPanel,
+  deriveSerial,
   type VaultPayload,
 } from "../worker/user-vault-card";
 import { IntegrationWizard } from "../wizard/integration-wizard";
 import { PayShFlow } from "../worker/paysh-flow";
-import { VaultStrip, type VaultTileData } from "../worker/vault-strip";
 import type { PanelKind } from "../home/affordance-row";
 
-const ORIENT_BANNER_KEY = "kyvern:orient-allowlist-dismissed";
-
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
+
+/* Design tokens — kept inline to scope to this surface */
+const TOK = {
+  surface: "#FFFFFF",
+  surface2: "#F7F7F9",
+  bg: "#FBFBFD",
+  hairline: "rgba(15,23,42,0.07)",
+  hairline2: "rgba(15,23,42,0.04)",
+  ink: "#0A0A0A",
+  ink2: "rgba(15,23,42,0.72)",
+  ink3: "rgba(15,23,42,0.55)",
+  ink4: "rgba(15,23,42,0.40)",
+  ink5: "rgba(15,23,42,0.28)",
+  green: "#16A34A",
+  greenSoft: "rgba(34,197,94,0.10)",
+  greenLine: "rgba(34,197,94,0.20)",
+  greenPress: "#15803D",
+  amber: "#B45309",
+  amberSoft: "rgba(245,158,11,0.10)",
+  amberLine: "rgba(245,158,11,0.22)",
+  red: "#DC2626",
+  shadowCard:
+    "0 1px 1.5px rgba(15,23,42,0.04), 0 6px 20px -8px rgba(15,23,42,0.08)",
+  shadowHi:
+    "0 1px 2px rgba(15,23,42,0.05), 0 18px 40px -16px rgba(15,23,42,0.12)",
+};
 
 interface Props {
   vaultId: string | null;
@@ -54,48 +82,44 @@ interface Props {
   className?: string;
 }
 
-export function AliveConsole({ vaultId, ownerWallet, className }: Props) {
+interface VaultTile {
+  id: string;
+  name: string;
+  network: "devnet" | "mainnet";
+  paused: boolean;
+  lastCallRel: string | null;
+}
+
+interface AtlasStatus {
+  totalSettled: number;
+  totalAttacksBlocked: number;
+  uptimeMs: number;
+  running: boolean;
+}
+
+export function AliveConsole({
+  vaultId,
+  ownerWallet,
+  usdcBalance,
+  className,
+}: Props) {
   const [data, setData] = useState<VaultPayload | null>(null);
   const [now, setNow] = useState<number>(() => Date.now());
-  const [bannerDismissed, setBannerDismissed] = useState(true);
-  const [vaults, setVaults] = useState<VaultTileData[]>([]);
+  const [vaults, setVaults] = useState<VaultTile[]>([]);
   const [selectedVaultId, setSelectedVaultId] = useState<string | null>(
     vaultId,
   );
+  const [atlas, setAtlas] = useState<AtlasStatus | null>(null);
 
-  // Default selection to the primary vault when it first arrives
   useEffect(() => {
     if (!selectedVaultId && vaultId) setSelectedVaultId(vaultId);
   }, [vaultId, selectedVaultId]);
 
-  // First-visit allowlist orientation banner. Only renders when:
-  //   (a) the user has a vault (so it's not a cold-start screen)
-  //   (b) the vault has exactly the 3 default merchants (untouched)
-  //   (c) the dismissed flag isn't set in localStorage
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const dismissed = window.localStorage.getItem(ORIENT_BANNER_KEY);
-    setBannerDismissed(!!dismissed);
-  }, []);
-  const showOrientBanner =
-    !bannerDismissed &&
-    !!data &&
-    data.payments.length === 0 &&
-    data.vault.allowedMerchants.length <= 3;
-  const dismissBanner = useCallback(() => {
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(ORIENT_BANNER_KEY, "1");
-    }
-    setBannerDismissed(true);
-  }, []);
-
-  // Local clock — drives "last call 17s ago" + age timer
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
   }, []);
 
-  // Load the SELECTED vault's payload + poll
   const load = useCallback(async () => {
     const targetId = selectedVaultId ?? vaultId;
     if (!targetId) return;
@@ -118,13 +142,10 @@ export function AliveConsole({ vaultId, ownerWallet, className }: Props) {
     return () => clearInterval(t);
   }, [load, selectedVaultId, vaultId]);
 
-  // Reset detail data when switching vaults so the worker card shows
-  // a skeleton briefly instead of flashing the previous vault's data.
   useEffect(() => {
     setData(null);
   }, [selectedVaultId]);
 
-  // Poll the user's vault list for the strip
   useEffect(() => {
     if (!ownerWallet) return;
     let alive = true;
@@ -146,12 +167,12 @@ export function AliveConsole({ vaultId, ownerWallet, className }: Props) {
           }>;
         };
         if (!alive) return;
-        const tiles: VaultTileData[] = (d.vaults ?? []).map((v) => ({
+        const tiles: VaultTile[] = (d.vaults ?? []).map((v) => ({
           id: v.vault.id,
           name: v.vault.name,
           network: v.vault.network ?? "devnet",
           paused: !!v.vault.pausedAt,
-          lastCallRel: null, // populated lazily when this vault is selected
+          lastCallRel: null,
         }));
         setVaults(tiles);
       } catch {
@@ -166,13 +187,32 @@ export function AliveConsole({ vaultId, ownerWallet, className }: Props) {
     };
   }, [ownerWallet]);
 
-  // When the currently-selected vault has fresh payment data, mirror
-  // its latest call timestamp onto the tile so the strip stays in sync.
+  /* Atlas counters for the reference workers tile */
+  useEffect(() => {
+    let alive = true;
+    const tick = async () => {
+      try {
+        const r = await fetch("/api/atlas/status", { cache: "no-store" });
+        if (!r.ok) return;
+        const d = (await r.json()) as AtlasStatus;
+        if (alive) setAtlas(d);
+      } catch {
+        /* swallow */
+      }
+    };
+    void tick();
+    const iv = setInterval(tick, 8_000);
+    return () => {
+      alive = false;
+      clearInterval(iv);
+    };
+  }, []);
+
   useEffect(() => {
     if (!data) return;
     const latest = data.payments[0]?.createdAt;
     if (!latest) return;
-    const relCall = (() => {
+    const rel = (() => {
       const ms = Date.parse(
         typeof latest === "string" && !latest.includes("T")
           ? latest.replace(" ", "T") + "Z"
@@ -187,183 +227,103 @@ export function AliveConsole({ vaultId, ownerWallet, className }: Props) {
     })();
     setVaults((prev) =>
       prev.map((v) =>
-        v.id === data.vault.id ? { ...v, lastCallRel: relCall } : v,
+        v.id === data.vault.id ? { ...v, lastCallRel: rel } : v,
       ),
     );
   }, [data]);
 
   const resolvedOwner = data?.vault.ownerWallet ?? ownerWallet;
 
+  if (!data) {
+    return (
+      <div className={`flex flex-col gap-4 ${className ?? ""}`}>
+        <SkeletonHero />
+        {!data && <WorkerTemplates />}
+      </div>
+    );
+  }
+
   return (
-    <div className={`flex flex-col gap-4 sm:gap-5 ${className ?? ""}`}>
-      {/* First-visit orientation banner (full-width, above the grid) */}
-      <AnimatePresence>
-        {showOrientBanner && (
-          <motion.div
-            initial={{ opacity: 0, y: -6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.4, ease: EASE }}
-            className="flex items-center gap-3 rounded-[12px] px-4 py-2.5"
-            style={{
-              background:
-                "linear-gradient(180deg, rgba(34,197,94,0.06) 0%, rgba(34,197,94,0.02) 100%)",
-              border: "1px solid rgba(34,197,94,0.20)",
-            }}
-          >
-            <ShieldCheck
-              className="w-4 h-4 flex-shrink-0"
-              strokeWidth={2}
-              style={{ color: "#15803D" }}
-            />
-            <div className="flex-1 min-w-0 text-[12px] leading-[1.5]">
-              <span style={{ color: "#0A0A0A", fontWeight: 500 }}>
-                Your worker can earn and spend on Solana — within rules the
-                chain enforces.
-              </span>{" "}
-              <span style={{ color: "rgba(15,23,42,0.65)" }}>
-                Click any scenario in the worker card to see the chain refuse
-                a violation in real time. Edit your merchants on the right.
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={dismissBanner}
-              aria-label="Dismiss"
-              className="inline-flex items-center justify-center rounded-md transition-all hover:bg-[rgba(15,23,42,0.06)]"
-              style={{
-                width: 22,
-                height: 22,
-                color: "rgba(15,23,42,0.45)",
-              }}
-            >
-              <X className="w-3 h-3" strokeWidth={2.2} />
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* 3-column grid on lg+; vertical stack below lg (mobile safety) */}
-      <div className="grid grid-cols-1 lg:grid-cols-[35%_40%_25%] gap-4 sm:gap-5 lg:gap-6">
-        {/* LEFT col — VaultStrip rendered vertically */}
-        <div className="flex flex-col gap-4 min-w-0">
-          <VaultStrip
-            vaults={vaults}
-            selectedVaultId={selectedVaultId}
-            onSelect={setSelectedVaultId}
-            direction="vertical"
-          />
-        </div>
-
-        {/* CENTER col — Worker card hero (simplified, no internal 2-col) */}
-        <div className="flex flex-col gap-4 min-w-0">
-          {data ? (
-            <UserVaultCard
-              data={data}
-              ownerWallet={ownerWallet}
-              now={now}
-            />
-          ) : (
-            <UserVaultSkeleton />
-          )}
-          {!data && <WorkerTemplates />}
-        </div>
-
-        {/* RIGHT col — Scenarios on top, Policy 2x2 below, Pay.sh shrunk */}
-        {data && (
-          <div className="flex flex-col gap-4 min-w-0">
-            <SectionCard>
-              <ScenarioPanel
-                vaultId={data.vault.id}
-                ownerWallet={resolvedOwner}
-                perTxMaxUsd={data.budget.perTxMaxUsd}
-                network={data.vault.network}
-              />
-            </SectionCard>
-
-            <SectionCard>
-              <SectionHeader
-                eyebrow="Policy"
-                title="Enforced on-chain"
-              />
-              <div className="flex flex-col gap-3">
-                <PolicyRibbon budget={data.budget} layout="2x2" />
-                <StatsGrid
-                  vault={data.vault}
-                  payments={data.payments}
-                />
-                <Allowlist
-                  merchants={data.vault.allowedMerchants}
-                  vaultId={data.vault.id}
-                  ownerWallet={resolvedOwner}
-                  compact
-                />
-              </div>
-            </SectionCard>
-
-            <SectionCard>
-              <div
-                style={{
-                  transform: "scale(0.92)",
-                  transformOrigin: "top left",
-                  width: "108.7%",
-                  marginBottom: -28,
-                }}
-              >
-                <PayShFlow
-                  vaultId={data.vault.id}
-                  ownerWallet={resolvedOwner}
-                />
-              </div>
-            </SectionCard>
-          </div>
-        )}
+    <div
+      className={`flex flex-col gap-6 ${className ?? ""}`}
+      style={{ color: TOK.ink }}
+    >
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━ HERO ━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.42fr)_minmax(0,1fr)] gap-5">
+        <WorkerIdentityHero data={data} now={now} />
+        <VaultBalanceHero data={data} usdcBalance={usdcBalance} />
       </div>
 
-      {/* Below the grid — Integration wizard full-width, scrolls into view */}
-      {data && (
-        <SectionCard>
-          <SectionHeader
-            eyebrow="Integration · next steps"
-            title="Wire your agent in 5 steps"
-            subtitle="Mint a key, install the SDK, run your first chain-enforced payment."
-          />
-          <div className="overflow-hidden rounded-[12px]">
-            <IntegrationWizard
-              vaultId={data.vault.id}
-              ownerWallet={resolvedOwner}
-            />
-          </div>
-        </SectionCard>
-      )}
-
-      {/* Footer: interactive demos + developer mode */}
-      {data && (
-        <DemosFooter
-          vaultId={data.vault.id}
-          ownerWallet={resolvedOwner}
-          perTxMaxUsd={data.budget.perTxMaxUsd}
-          network={data.vault.network}
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━ MAIN GRID ━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <div className="grid grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)_320px] gap-5 items-start">
+        {/* LEFT — Workers sidebar */}
+        <WorkersSidebar
+          vaults={vaults}
+          selectedVaultId={selectedVaultId}
+          onSelect={setSelectedVaultId}
+          atlas={atlas}
         />
-      )}
+
+        {/* CENTER — Runtime · SDK · Recent calls */}
+        <div className="flex flex-col gap-5 min-w-0">
+          <RuntimeCard data={data} />
+          <SdkXcodeCard vaultId={data.vault.id} />
+          <RecentCallsCard data={data} />
+        </div>
+
+        {/* RIGHT — Policy · Scenarios · Pay.sh */}
+        <div className="flex flex-col gap-5 min-w-0">
+          <PolicyCard data={data} ownerWallet={resolvedOwner} />
+          <ScenariosCard
+            vaultId={data.vault.id}
+            ownerWallet={resolvedOwner}
+            perTxMaxUsd={data.budget.perTxMaxUsd}
+            network={data.vault.network}
+          />
+          <PayShCard vaultId={data.vault.id} ownerWallet={resolvedOwner} />
+        </div>
+      </div>
+
+      {/* ━━━━━━━━━━━━━━━━━━━━━━ WIRE YOUR AGENT ━━━━━━━━━━━━━━━━━━━━━ */}
+      <WireSection vaultId={data.vault.id} ownerWallet={resolvedOwner} />
+
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━ FOOTER ━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <FooterPills
+        vaultId={data.vault.id}
+        ownerWallet={resolvedOwner}
+        perTxMaxUsd={data.budget.perTxMaxUsd}
+        network={data.vault.network}
+      />
     </div>
   );
 }
 
-/* ─── Section primitives ─────────────────────────────────────────── */
+/* ════════════════════════════ Card primitive ════════════════════════════ */
 
-function SectionCard({ children }: { children: React.ReactNode }) {
+function Card({
+  children,
+  className,
+  style,
+  pad,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  style?: React.CSSProperties;
+  pad?: boolean;
+}) {
   return (
     <motion.section
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, ease: EASE, delay: 0.05 }}
-      className="rounded-[20px] p-5 sm:p-6 flex flex-col gap-4"
+      transition={{ duration: 0.45, ease: EASE }}
+      className={`relative overflow-hidden ${className ?? ""}`}
       style={{
-        background: "#FFFFFF",
-        border: "1px solid rgba(15,23,42,0.06)",
-        boxShadow:
-          "0 1px 2px rgba(15,23,42,0.04), 0 16px 40px -24px rgba(15,23,42,0.12)",
+        background: TOK.surface,
+        border: `1px solid ${TOK.hairline}`,
+        borderRadius: 18,
+        boxShadow: TOK.shadowCard,
+        padding: pad ? 22 : 0,
+        ...style,
       }}
     >
       {children}
@@ -371,44 +331,1664 @@ function SectionCard({ children }: { children: React.ReactNode }) {
   );
 }
 
-function SectionHeader({
-  eyebrow,
+function CardHead({
   title,
-  subtitle,
+  sub,
+  right,
 }: {
-  eyebrow: string;
   title: string;
-  subtitle?: string;
+  sub?: string;
+  right?: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-0.5">
-      <span
-        className="font-mono uppercase tracking-[0.18em]"
-        style={{ fontSize: 10, color: "rgba(15,23,42,0.45)" }}
-      >
-        {eyebrow}
-      </span>
-      <h3
-        className="text-[16px] font-semibold tracking-[-0.01em]"
-        style={{ color: "#0A0A0A" }}
-      >
-        {title}
-      </h3>
-      {subtitle && (
-        <p
-          className="text-[12.5px] mt-0.5"
-          style={{ color: "rgba(15,23,42,0.55)" }}
+    <div
+      className="flex items-center justify-between"
+      style={{
+        padding: "16px 22px 14px",
+        borderBottom: `1px solid ${TOK.hairline}`,
+      }}
+    >
+      <div className="flex items-center gap-3 min-w-0">
+        <span
+          style={{
+            fontSize: 13,
+            fontWeight: 600,
+            color: TOK.ink,
+            letterSpacing: "-0.005em",
+          }}
         >
-          {subtitle}
-        </p>
-      )}
+          {title}
+        </span>
+        {sub && (
+          <span
+            style={{
+              fontSize: 11.5,
+              color: TOK.ink4,
+            }}
+          >
+            {sub}
+          </span>
+        )}
+      </div>
+      {right}
     </div>
   );
 }
 
-/* ─── Demos footer (Heist + Secure Terminal as small links) ─────── */
+function Eyebrow({
+  children,
+  tone,
+}: {
+  children: React.ReactNode;
+  tone?: "green";
+}) {
+  return (
+    <span
+      style={{
+        fontSize: 10.5,
+        textTransform: "uppercase",
+        letterSpacing: "0.10em",
+        color: tone === "green" ? TOK.green : TOK.ink4,
+        fontWeight: 600,
+      }}
+    >
+      {children}
+    </span>
+  );
+}
 
-function DemosFooter({
+/* ════════════════════════════ HERO — left ════════════════════════════ */
+
+function WorkerIdentityHero({
+  data,
+  now,
+}: {
+  data: VaultPayload;
+  now: number;
+}) {
+  const serial = deriveSerial(data.vault.id);
+  const paused = !!data.vault.pausedAt;
+  const ageMs = Math.max(0, now - Date.parse(data.vault.createdAt));
+  const ageStr = formatDur(ageMs);
+  const lastCallRel = lastCallRelFrom(data.payments[0]?.createdAt ?? null, now);
+  const callsToday = todayCount(data.payments);
+  const blockedToday = todayCount(data.payments, "blocked");
+  const allowedToday = callsToday - blockedToday;
+  const merchants = data.vault.allowedMerchants.length;
+  const pdaShort = data.vault.vaultPda
+    ? `${data.vault.vaultPda.slice(0, 4)}…${data.vault.vaultPda.slice(-4)}`
+    : "—";
+
+  const initial = (data.vault.name.match(/[A-Za-z]/)?.[0] ?? "K").toUpperCase();
+
+  return (
+    <Card style={{ padding: "30px 32px 26px" }}>
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            "linear-gradient(180deg, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0) 30%)",
+        }}
+      />
+      <div className="relative">
+        <Eyebrow>Your worker</Eyebrow>
+
+        <div className="flex items-center gap-4 mt-2.5">
+          <WorkerMark letter={initial} />
+          <div className="min-w-0">
+            <h1
+              className="m-0"
+              style={{
+                fontSize: 32,
+                fontWeight: 600,
+                letterSpacing: "-0.025em",
+                lineHeight: 1.05,
+                color: TOK.ink,
+              }}
+            >
+              {data.vault.name}
+            </h1>
+            <div
+              className="flex items-center flex-wrap gap-2 mt-1.5"
+              style={{ fontSize: 12.5, color: TOK.ink3 }}
+            >
+              <span
+                style={{
+                  fontFamily: "var(--font-mono, ui-monospace), monospace",
+                  fontSize: 11.5,
+                  color: TOK.ink3,
+                }}
+              >
+                {serial}
+              </span>
+              <Dot />
+              <span className="inline-flex items-center gap-1.5">
+                <span
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: 999,
+                    background: paused ? TOK.amber : TOK.green,
+                    boxShadow: `0 0 0 3px ${paused ? TOK.amberSoft : TOK.greenSoft}`,
+                    display: "inline-block",
+                  }}
+                />
+                {paused ? "Paused" : "Runtime online"}
+              </span>
+              <Dot />
+              <span>Last call {lastCallRel}</span>
+              <Dot />
+              <span>Age {ageStr}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* 4-stat bar */}
+        <div
+          className="mt-6 grid grid-cols-4 overflow-hidden"
+          style={{
+            border: `1px solid ${TOK.hairline}`,
+            borderRadius: 14,
+            background: TOK.surface2,
+          }}
+        >
+          <Stat
+            label="Calls today"
+            value={String(callsToday)}
+            foot={`${blockedToday} blocked · ${allowedToday} allowed`}
+          />
+          <Stat
+            label="Blocked"
+            value={String(blockedToday)}
+            valueColor={blockedToday > 0 ? TOK.amber : TOK.ink}
+            foot="over-cap, off-allowlist"
+          />
+          <Stat
+            label="Merchants"
+            value={String(merchants)}
+            foot="allowlisted"
+          />
+          <Stat label="Vault PDA" valueMono={pdaShort} foot="on-chain account" />
+        </div>
+
+        <p
+          className="mt-5"
+          style={{
+            fontSize: 14.5,
+            color: TOK.ink2,
+            lineHeight: 1.55,
+            letterSpacing: "-0.005em",
+            maxWidth: "58ch",
+            margin: "20px 0 0",
+          }}
+        >
+          Your worker can{" "}
+          <span style={{ color: TOK.ink, fontWeight: 500 }}>
+            earn and spend on Solana
+          </span>{" "}
+          — within rules the chain itself enforces. Every{" "}
+          <code
+            style={{
+              fontFamily: "var(--font-mono, ui-monospace), monospace",
+              fontSize: 13,
+              color: TOK.ink,
+            }}
+          >
+            vault.pay()
+          </code>{" "}
+          call routes through your policy program before a single lamport
+          moves.
+        </p>
+
+        <div className="flex flex-wrap gap-2.5 mt-5">
+          <PrimaryButton
+            href="#scenarios"
+            onClick={(e) => {
+              e.preventDefault();
+              const el = document.getElementById("scenarios");
+              el?.scrollIntoView({ behavior: "smooth", block: "center" });
+            }}
+            label="Watch the chain refuse"
+          />
+          <GhostButton
+            href={
+              data.vault.vaultPda
+                ? `https://explorer.solana.com/address/${data.vault.vaultPda}?cluster=${data.vault.network}`
+                : "#"
+            }
+            external
+            label="Open in Solana Explorer"
+            icon={<ExternalLink className="w-3 h-3" strokeWidth={1.6} />}
+          />
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function WorkerMark({ letter }: { letter: string }) {
+  return (
+    <div
+      className="grid place-items-center flex-shrink-0"
+      style={{
+        width: 56,
+        height: 56,
+        borderRadius: 14,
+        background: "linear-gradient(160deg, #2A2A2C 0%, #0A0A0C 100%)",
+        boxShadow:
+          "0 8px 24px -10px rgba(0,0,0,0.42), inset 0 1px 0 rgba(255,255,255,0.12)",
+        color: "#FFFFFF",
+        fontWeight: 600,
+        fontSize: 24,
+        letterSpacing: "-0.02em",
+        fontFamily:
+          "ui-serif, Georgia, 'New York', 'Times New Roman', serif",
+      }}
+    >
+      {letter}
+    </div>
+  );
+}
+
+function Stat({
+  label,
+  value,
+  valueMono,
+  valueColor,
+  foot,
+}: {
+  label: string;
+  value?: string;
+  valueMono?: string;
+  valueColor?: string;
+  foot: string;
+}) {
+  return (
+    <div
+      style={{
+        padding: "14px 18px",
+        borderRight: `1px solid ${TOK.hairline}`,
+      }}
+      className="last:border-r-0"
+    >
+      <div
+        style={{
+          fontSize: 10.5,
+          textTransform: "uppercase",
+          letterSpacing: "0.08em",
+          color: TOK.ink4,
+          fontWeight: 600,
+        }}
+      >
+        {label}
+      </div>
+      <div
+        className="mt-1.5"
+        style={{
+          fontSize: valueMono ? 15 : 22,
+          fontWeight: 600,
+          letterSpacing: valueMono ? 0 : "-0.02em",
+          fontVariantNumeric: "tabular-nums",
+          color: valueColor ?? TOK.ink,
+          fontFamily: valueMono
+            ? "var(--font-mono, ui-monospace), monospace"
+            : "inherit",
+        }}
+      >
+        {valueMono ?? value}
+      </div>
+      <div
+        className="mt-1"
+        style={{ fontSize: 11.5, color: TOK.ink3 }}
+      >
+        {foot}
+      </div>
+    </div>
+  );
+}
+
+/* ════════════════════════════ HERO — right ════════════════════════════ */
+
+function VaultBalanceHero({
+  data,
+  usdcBalance,
+}: {
+  data: VaultPayload;
+  usdcBalance: number;
+}) {
+  const bal = usdcBalance ?? 0;
+  const [dollars, cents] = bal.toFixed(2).split(".");
+  const util = Math.min(100, Math.round(data.budget.dailyUtilization * 100));
+
+  return (
+    <Card style={{ padding: "28px 28px 22px" }}>
+      <div
+        aria-hidden
+        className="pointer-events-none absolute"
+        style={{
+          inset: "-30% -15% auto auto",
+          width: 320,
+          height: 320,
+          background:
+            "radial-gradient(closest-side, rgba(34,197,94,0.16) 0%, rgba(34,197,94,0) 70%)",
+        }}
+      />
+      <div className="relative">
+        <Eyebrow tone="green">Vault balance</Eyebrow>
+        <div
+          className="mt-3"
+          style={{
+            fontSize: 60,
+            fontWeight: 600,
+            letterSpacing: "-0.04em",
+            lineHeight: 1,
+            fontVariantNumeric: "tabular-nums",
+            color: TOK.ink,
+          }}
+        >
+          <span
+            style={{
+              fontSize: 18,
+              color: TOK.ink3,
+              fontWeight: 500,
+              verticalAlign: 14,
+              marginRight: 6,
+              letterSpacing: "-0.01em",
+            }}
+          >
+            $
+          </span>
+          {dollars}
+          <span style={{ color: TOK.ink3, fontWeight: 500 }}>.{cents}</span>
+        </div>
+
+        <div className="flex flex-col gap-2.5 mt-5">
+          <Row label="Solana USDC" value={`${bal.toFixed(2)} USDC`} />
+          <Row
+            label="Daily cap"
+            value={`$${data.budget.spentToday.toFixed(2)} / $${data.budget.dailyLimitUsd.toFixed(2)}`}
+          />
+          <Row
+            label="Weekly cap"
+            value={`$${data.budget.spentThisWeek.toFixed(2)} / $${data.budget.weeklyLimitUsd.toFixed(2)}`}
+          />
+          <Row
+            label="Per-transaction max"
+            value={`$${data.budget.perTxMaxUsd.toFixed(2)}`}
+          />
+        </div>
+
+        {/* Daily utilization */}
+        <div
+          className="mt-4"
+          style={{
+            height: 6,
+            background: TOK.surface2,
+            borderRadius: 999,
+            overflow: "hidden",
+          }}
+        >
+          <motion.span
+            initial={{ width: 0 }}
+            animate={{ width: `${Math.max(2, util)}%` }}
+            transition={{ duration: 0.6, ease: EASE }}
+            style={{
+              display: "block",
+              height: "100%",
+              background: `linear-gradient(90deg, ${TOK.green}, #4ADE80)`,
+              borderRadius: "inherit",
+            }}
+          />
+        </div>
+        <div className="flex justify-between mt-2">
+          <span style={{ fontSize: 11.5, color: TOK.ink4 }}>
+            Today&apos;s utilization
+          </span>
+          <span style={{ fontSize: 11.5, color: TOK.ink2, fontWeight: 500 }}>
+            {util}%
+          </span>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div
+      className="flex justify-between items-center"
+      style={{ fontSize: 12.5, color: TOK.ink3 }}
+    >
+      <span>{label}</span>
+      <span
+        style={{
+          color: TOK.ink,
+          fontWeight: 500,
+          fontVariantNumeric: "tabular-nums",
+        }}
+      >
+        {value}
+      </span>
+    </div>
+  );
+}
+
+/* ════════════════════════════ Workers sidebar ════════════════════════════ */
+
+function WorkersSidebar({
+  vaults,
+  selectedVaultId,
+  onSelect,
+  atlas,
+}: {
+  vaults: VaultTile[];
+  selectedVaultId: string | null;
+  onSelect: (id: string) => void;
+  atlas: AtlasStatus | null;
+}) {
+  const atlasDays =
+    atlas && atlas.uptimeMs > 0
+      ? Math.floor(atlas.uptimeMs / (24 * 60 * 60 * 1000))
+      : null;
+
+  return (
+    <Card>
+      <CardHead title="Workers" sub={`${vaults.length + 1} attached`} />
+
+      <div className="flex flex-col">
+        {/* Atlas reference */}
+        <Link
+          href="/atlas"
+          target="_blank"
+          className="flex gap-3 items-start cursor-pointer"
+          style={{
+            padding: "14px 18px",
+            borderBottom: `1px solid ${TOK.hairline2}`,
+            textDecoration: "none",
+            color: "inherit",
+          }}
+        >
+          <WorkerSidebarMark letter="A" selected={false} />
+          <div className="min-w-0 flex-1">
+            <div
+              className="flex items-center gap-1.5"
+              style={{
+                fontSize: 13,
+                fontWeight: 600,
+                letterSpacing: "-0.005em",
+                color: TOK.ink,
+              }}
+            >
+              Atlas
+              <span
+                style={{
+                  fontSize: 9.5,
+                  fontWeight: 600,
+                  padding: "1px 7px",
+                  background: TOK.surface2,
+                  border: `1px solid ${TOK.hairline}`,
+                  borderRadius: 999,
+                  color: TOK.ink3,
+                  letterSpacing: "0.04em",
+                }}
+              >
+                REFERENCE
+              </span>
+            </div>
+            <div
+              style={{
+                fontSize: 10.5,
+                fontFamily: "var(--font-mono, ui-monospace), monospace",
+                color: TOK.ink4,
+                marginTop: 2,
+              }}
+            >
+              KVN-ATLAS01
+            </div>
+            <div
+              className="mt-2"
+              style={{ fontSize: 11.5, color: TOK.ink3 }}
+            >
+              {atlas ? (
+                <>
+                  <b style={{ color: TOK.ink, fontWeight: 600 }}>
+                    {atlas.totalSettled.toLocaleString()}
+                  </b>{" "}
+                  paid ·{" "}
+                  <b style={{ color: TOK.ink, fontWeight: 600 }}>
+                    {atlas.totalAttacksBlocked.toLocaleString()}
+                  </b>{" "}
+                  refused
+                  {atlasDays !== null && (
+                    <>
+                      {" "}
+                      ·{" "}
+                      <b style={{ color: TOK.ink, fontWeight: 600 }}>
+                        {atlasDays}d
+                      </b>{" "}
+                      autonomous
+                    </>
+                  )}
+                </>
+              ) : (
+                "loading…"
+              )}
+            </div>
+          </div>
+          <span
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: 999,
+              background: atlas?.running ? TOK.green : TOK.ink5,
+              boxShadow: atlas?.running
+                ? `0 0 0 3px ${TOK.greenSoft}`
+                : "none",
+              flexShrink: 0,
+              marginTop: 8,
+            }}
+          />
+        </Link>
+
+        {/* User vaults */}
+        {vaults.map((v) => {
+          const sel = v.id === selectedVaultId;
+          return (
+            <button
+              key={v.id}
+              type="button"
+              onClick={() => onSelect(v.id)}
+              className="text-left cursor-pointer"
+              style={{
+                padding: "14px 18px",
+                borderBottom: `1px solid ${TOK.hairline2}`,
+                background: sel ? TOK.greenSoft : "transparent",
+                display: "flex",
+                gap: 12,
+                alignItems: "flex-start",
+                border: "none",
+                width: "100%",
+              }}
+            >
+              <WorkerSidebarMark
+                letter={(v.name.match(/[A-Za-z]/)?.[0] ?? "K").toUpperCase()}
+                selected={sel}
+              />
+              <div className="min-w-0 flex-1">
+                <div
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 600,
+                    letterSpacing: "-0.005em",
+                    color: TOK.ink,
+                  }}
+                  className="truncate"
+                >
+                  {v.name}
+                </div>
+                <div
+                  style={{
+                    fontSize: 10.5,
+                    fontFamily: "var(--font-mono, ui-monospace), monospace",
+                    color: TOK.ink4,
+                    marginTop: 2,
+                  }}
+                >
+                  {deriveSerial(v.id)}
+                </div>
+                <div
+                  className="mt-2"
+                  style={{ fontSize: 11.5, color: TOK.ink3 }}
+                >
+                  {v.lastCallRel
+                    ? `last call ${v.lastCallRel}`
+                    : v.paused
+                      ? "paused"
+                      : "no calls yet"}
+                </div>
+              </div>
+              <span
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: 999,
+                  background: v.paused ? TOK.amber : TOK.green,
+                  boxShadow: v.paused
+                    ? `0 0 0 3px ${TOK.amberSoft}`
+                    : `0 0 0 3px ${TOK.greenSoft}`,
+                  flexShrink: 0,
+                  marginTop: 8,
+                }}
+              />
+            </button>
+          );
+        })}
+
+        {/* Deploy CTA */}
+        <Link
+          href="/vault/new"
+          className="flex items-center gap-3 cursor-pointer no-underline"
+          style={{
+            padding: 18,
+            borderTop: `1px dashed ${TOK.hairline}`,
+            color: TOK.green,
+            fontSize: 13,
+            fontWeight: 500,
+          }}
+        >
+          <span
+            className="grid place-items-center flex-shrink-0"
+            style={{
+              width: 26,
+              height: 26,
+              borderRadius: 7,
+              background: TOK.greenSoft,
+              color: TOK.green,
+            }}
+          >
+            <Plus className="w-3.5 h-3.5" strokeWidth={2.4} />
+          </span>
+          <span>
+            Deploy a vault
+            <div
+              style={{
+                fontSize: 11,
+                color: TOK.ink4,
+                fontWeight: 400,
+                marginTop: 2,
+              }}
+            >
+              60-second clone
+            </div>
+          </span>
+        </Link>
+      </div>
+    </Card>
+  );
+}
+
+function WorkerSidebarMark({
+  letter,
+  selected,
+}: {
+  letter: string;
+  selected: boolean;
+}) {
+  return (
+    <div
+      className="grid place-items-center flex-shrink-0"
+      style={{
+        width: 32,
+        height: 32,
+        borderRadius: 9,
+        background: selected ? TOK.ink : TOK.surface2,
+        color: selected ? "#FFFFFF" : TOK.ink2,
+        border: `1px solid ${selected ? TOK.ink : TOK.hairline}`,
+        fontWeight: 600,
+        fontSize: 13,
+        fontFamily:
+          "ui-serif, Georgia, 'New York', 'Times New Roman', serif",
+      }}
+    >
+      {letter}
+    </div>
+  );
+}
+
+/* ════════════════════════════ Runtime card ════════════════════════════ */
+
+interface TapeItem {
+  id: string;
+  whenMs: number;
+  label: string;
+  tone: "green" | "amber";
+  ts: string;
+}
+
+function RuntimeCard({ data }: { data: VaultPayload }) {
+  const ageMs = Math.max(0, Date.now() - Date.parse(data.vault.createdAt));
+  const ageStr = formatDur(ageMs);
+  const [tape, setTape] = useState<TapeItem[]>([]);
+
+  useEffect(() => {
+    let alive = true;
+    const tick = async () => {
+      try {
+        const r = await fetch("/api/atlas/decisions?kind=both&limit=14", {
+          cache: "no-store",
+        });
+        if (!r.ok) return;
+        const d = (await r.json()) as {
+          feed?: Array<{
+            id: string;
+            _kind: "decision" | "attack";
+            _when: string;
+            outcome?: string;
+            amountUsd?: number;
+            type?: string;
+            description?: string;
+          }>;
+        };
+        if (!alive) return;
+        const items: TapeItem[] = (d.feed ?? []).slice(0, 14).map((f) => {
+          const whenMs = Date.parse(f._when);
+          const ts = new Date(whenMs).toLocaleTimeString("en-US", {
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: false,
+          });
+          if (f._kind === "decision") {
+            const allowed = f.outcome === "allowed";
+            return {
+              id: f.id,
+              whenMs,
+              tone: allowed ? "green" : "amber",
+              ts,
+              label: allowed
+                ? `+$${(f.amountUsd ?? 0).toFixed(2)} paid`
+                : `$${(f.amountUsd ?? 0).toFixed(2)} refused`,
+            };
+          }
+          return {
+            id: f.id,
+            whenMs,
+            tone: "amber",
+            ts,
+            label: (f.type ?? "attack").replace(/_/g, " ") + " refused",
+          };
+        });
+        setTape(items);
+      } catch {
+        /* swallow */
+      }
+    };
+    void tick();
+    const iv = setInterval(tick, 4_000);
+    return () => {
+      alive = false;
+      clearInterval(iv);
+    };
+  }, []);
+
+  return (
+    <Card>
+      <CardHead
+        title="Runtime status"
+        sub={`Attached · Age ${ageStr}`}
+        right={
+          <span
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full"
+            style={{
+              background: TOK.greenSoft,
+              color: TOK.green,
+              fontSize: 11,
+              fontWeight: 600,
+            }}
+          >
+            <span
+              style={{
+                width: 5,
+                height: 5,
+                borderRadius: 999,
+                background: TOK.green,
+                display: "inline-block",
+              }}
+            />
+            Atlas · Live
+          </span>
+        }
+      />
+      <div style={{ padding: "20px 22px" }}>
+        <div
+          className="rounded-[14px]"
+          style={{
+            background: TOK.surface2,
+            border: `1px solid ${TOK.hairline}`,
+            padding: "14px 18px",
+            fontFamily: "var(--font-mono, ui-monospace), monospace",
+            fontSize: 12.5,
+            color: TOK.ink2,
+            lineHeight: 1.6,
+          }}
+        >
+          <span style={{ color: TOK.green, marginRight: 8 }}>›</span>
+          Awaiting strategy. Wire your code via{" "}
+          <span style={{ color: TOK.green }}>@kyvernlabs/sdk</span> to define
+          this worker&apos;s behavior — every call routes through the policy
+          program.
+          <br />
+          <span style={{ color: TOK.ink4 }}>• vault on-chain</span>
+          <span
+            style={{
+              display: "inline-block",
+              width: 8,
+              height: 13,
+              background: TOK.green,
+              verticalAlign: -2,
+              marginLeft: 4,
+              animation: "kyvernBlink 1.2s steps(1) infinite",
+            }}
+          />
+        </div>
+
+        <div
+          className="mt-5"
+          style={{
+            fontSize: 10.5,
+            textTransform: "uppercase",
+            letterSpacing: "0.08em",
+            color: TOK.ink4,
+            fontWeight: 600,
+          }}
+        >
+          Atlas · live tape
+        </div>
+        <div
+          className="mt-2 relative overflow-hidden"
+          style={{
+            height: 42,
+            background: TOK.surface2,
+            border: `1px solid ${TOK.hairline}`,
+            borderRadius: 14,
+          }}
+        >
+          {/* edge fades */}
+          <div
+            aria-hidden
+            className="absolute inset-y-0 left-0 z-10 pointer-events-none"
+            style={{
+              width: 36,
+              background: `linear-gradient(90deg, ${TOK.surface2}, transparent)`,
+            }}
+          />
+          <div
+            aria-hidden
+            className="absolute inset-y-0 right-0 z-10 pointer-events-none"
+            style={{
+              width: 36,
+              background: `linear-gradient(270deg, ${TOK.surface2}, transparent)`,
+            }}
+          />
+          <motion.div
+            className="flex items-center gap-1.5 h-full px-4 whitespace-nowrap"
+            animate={{ x: [0, -600] }}
+            transition={{
+              x: {
+                repeat: Infinity,
+                repeatType: "loop",
+                duration: 38,
+                ease: "linear",
+              },
+            }}
+          >
+            <AnimatePresence initial={false}>
+              {tape.map((it) => (
+                <motion.span
+                  key={it.id}
+                  initial={{ opacity: 0, scale: 0.96 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.3 }}
+                  className="inline-flex items-center"
+                  style={{
+                    height: 28,
+                    padding: "0 10px",
+                    borderRadius: 8,
+                    fontFamily: "var(--font-mono, ui-monospace), monospace",
+                    fontSize: 11,
+                    background:
+                      it.tone === "green" ? TOK.greenSoft : TOK.amberSoft,
+                    color: it.tone === "green" ? TOK.green : TOK.amber,
+                    border: `1px solid ${
+                      it.tone === "green" ? TOK.greenLine : TOK.amberLine
+                    }`,
+                  }}
+                >
+                  {it.ts} · {it.label}
+                </motion.span>
+              ))}
+            </AnimatePresence>
+            <span
+              style={{
+                height: 28,
+                padding: "0 10px",
+                borderRadius: 8,
+                fontFamily: "var(--font-mono, ui-monospace), monospace",
+                fontSize: 11,
+                background: TOK.ink,
+                color: "#FFFFFF",
+                border: `1px solid ${TOK.ink}`,
+                display: "inline-flex",
+                alignItems: "center",
+              }}
+            >
+              now
+            </span>
+          </motion.div>
+        </div>
+      </div>
+      <style jsx global>{`
+        @keyframes kyvernBlink {
+          50% {
+            opacity: 0;
+          }
+        }
+      `}</style>
+    </Card>
+  );
+}
+
+/* ════════════════════════════ SDK Xcode card ════════════════════════════ */
+
+function SdkXcodeCard({ vaultId }: { vaultId: string }) {
+  const [keyPrefix, setKeyPrefix] = useState<string | null>(null);
+  const [copied, setCopied] = useState<"snippet" | "install" | null>(null);
+  const [activeTab, setActiveTab] = useState<"vault" | "policy" | "env">(
+    "vault",
+  );
+
+  useEffect(() => {
+    if (!vaultId) return;
+    fetch(`/api/devices/${vaultId}/agent-key`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then(
+        (d: { keyPrefix?: string | null } | null) =>
+          d?.keyPrefix && setKeyPrefix(d.keyPrefix),
+      )
+      .catch(() => {});
+  }, [vaultId]);
+
+  const apiKey = keyPrefix ? `"${keyPrefix}…"` : `process.env.KYVERN_AGENT_KEY`;
+
+  const snippet = `import { Vault } from "@kyvernlabs/sdk";
+
+const vault = new Vault({ agentKey: ${apiKey} });
+const res   = await vault.pay({
+  merchant: "api.openai.com",
+  amount:   0.02,
+  memo:     "chat-completion · session_a91f",
+});
+
+console.log(res.decision);  // "allowed" or "refused"`;
+
+  const copy = (which: "snippet" | "install", text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopied(which);
+    setTimeout(() => setCopied(null), 1500);
+  };
+
+  return (
+    <Card>
+      {/* Tabs row with traffic-light dots */}
+      <div
+        className="flex items-center gap-1"
+        style={{
+          padding: "10px 14px 0",
+          borderBottom: `1px solid ${TOK.hairline}`,
+          background: TOK.surface2,
+        }}
+      >
+        <div
+          className="flex items-center gap-1.5 self-center"
+          style={{
+            paddingRight: 12,
+            marginRight: 6,
+            borderRight: `1px solid ${TOK.hairline}`,
+            height: 14,
+          }}
+        >
+          <span
+            style={{
+              width: 10,
+              height: 10,
+              borderRadius: 999,
+              background: "#FF5F57",
+              display: "inline-block",
+            }}
+          />
+          <span
+            style={{
+              width: 10,
+              height: 10,
+              borderRadius: 999,
+              background: "#FEBC2E",
+              display: "inline-block",
+            }}
+          />
+          <span
+            style={{
+              width: 10,
+              height: 10,
+              borderRadius: 999,
+              background: "#28C840",
+              display: "inline-block",
+            }}
+          />
+        </div>
+        {(
+          [
+            ["vault", "vault.ts"],
+            ["policy", "policy.ts"],
+            ["env", ".env"],
+          ] as const
+        ).map(([k, label]) => {
+          const a = activeTab === k;
+          return (
+            <button
+              key={k}
+              type="button"
+              onClick={() => setActiveTab(k)}
+              style={{
+                padding: "8px 14px",
+                fontSize: 12,
+                fontWeight: 500,
+                color: a ? TOK.ink : TOK.ink3,
+                background: a ? TOK.surface : "transparent",
+                border: a ? `1px solid ${TOK.hairline}` : "1px solid transparent",
+                borderBottom: a ? "1px solid " + TOK.surface : "1px solid transparent",
+                borderRadius: "8px 8px 0 0",
+                position: "relative",
+                top: 1,
+                cursor: "pointer",
+              }}
+            >
+              {label}
+            </button>
+          );
+        })}
+        <span
+          className="ml-auto"
+          style={{
+            padding: "8px 12px",
+            fontSize: 11,
+            color: TOK.ink4,
+            fontFamily: "var(--font-mono, ui-monospace), monospace",
+          }}
+        >
+          @kyvernlabs/sdk · 0.4.2
+        </span>
+      </div>
+
+      {/* Code body */}
+      <div
+        style={{
+          fontFamily: "var(--font-mono, ui-monospace), monospace",
+          fontSize: 12.5,
+          lineHeight: 1.7,
+          color: TOK.ink,
+          background: TOK.surface,
+          padding: "18px 22px",
+          overflowX: "auto",
+        }}
+      >
+        {activeTab === "vault" && <SnippetVault apiKey={apiKey} />}
+        {activeTab === "policy" && <SnippetPolicy />}
+        {activeTab === "env" && <SnippetEnv keyPrefix={keyPrefix} />}
+      </div>
+
+      {/* Footer */}
+      <div
+        className="flex items-center justify-between"
+        style={{
+          padding: "12px 18px",
+          borderTop: `1px solid ${TOK.hairline}`,
+          background: TOK.surface2,
+          fontSize: 12,
+          color: TOK.ink3,
+        }}
+      >
+        <span>Run this in your terminal</span>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => copy("snippet", snippet)}
+            className="inline-flex items-center gap-1.5 rounded-md transition-all hover:bg-[rgba(15,23,42,0.04)]"
+            style={{
+              padding: "5px 9px",
+              border: `1px solid ${TOK.hairline}`,
+              background: TOK.surface,
+              fontSize: 11,
+              color: TOK.ink2,
+            }}
+          >
+            {copied === "snippet" ? (
+              <Check className="w-3 h-3" strokeWidth={2} />
+            ) : (
+              <Copy className="w-3 h-3" strokeWidth={1.8} />
+            )}
+            Copy code
+          </button>
+          <div
+            className="inline-flex items-center gap-2.5"
+            style={{
+              padding: "5px 9px 5px 14px",
+              borderRadius: 999,
+              background: TOK.surface,
+              border: `1px solid ${TOK.hairline}`,
+              fontFamily: "var(--font-mono, ui-monospace), monospace",
+              fontSize: 11.5,
+              color: TOK.ink2,
+            }}
+          >
+            <span style={{ color: TOK.ink4 }}>$</span>
+            npm install @kyvernlabs/sdk
+            <button
+              type="button"
+              onClick={() => copy("install", "npm install @kyvernlabs/sdk")}
+              className="grid place-items-center"
+              style={{
+                width: 22,
+                height: 22,
+                borderRadius: 6,
+                border: `1px solid ${TOK.hairline}`,
+                background: TOK.surface2,
+                color: TOK.ink3,
+                cursor: "pointer",
+              }}
+            >
+              {copied === "install" ? (
+                <Check className="w-3 h-3" strokeWidth={2} />
+              ) : (
+                <Copy className="w-3 h-3" strokeWidth={1.8} />
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+const TK = {
+  kw: "#AD3DA4",
+  str: "#D12F1B",
+  fn: "#3900A0",
+  type: "#1F6FEB",
+  cmt: "#65737E",
+  num: "#1C00CF",
+  punct: TOK.ink2,
+};
+
+function LineNo({ n }: { n: number }) {
+  return (
+    <span
+      style={{
+        display: "inline-block",
+        width: 22,
+        color: TOK.ink5,
+        userSelect: "none",
+        textAlign: "right",
+        marginRight: 16,
+        fontSize: 11.5,
+      }}
+    >
+      {n}
+    </span>
+  );
+}
+
+function SnippetVault({ apiKey }: { apiKey: string }) {
+  return (
+    <code>
+      <div>
+        <LineNo n={1} />
+        <span style={{ color: TK.kw }}>import</span>
+        <span style={{ color: TK.punct }}> {"{ "}</span>
+        <span style={{ color: TK.type }}>Vault</span>
+        <span style={{ color: TK.punct }}> {"}"} </span>
+        <span style={{ color: TK.kw }}>from</span>{" "}
+        <span style={{ color: TK.str }}>&quot;@kyvernlabs/sdk&quot;</span>
+        <span style={{ color: TK.punct }}>;</span>
+      </div>
+      <div>
+        <LineNo n={2} />
+      </div>
+      <div>
+        <LineNo n={3} />
+        <span style={{ color: TK.kw }}>const</span> vault{" "}
+        <span style={{ color: TK.punct }}>=</span>{" "}
+        <span style={{ color: TK.kw }}>new</span>{" "}
+        <span style={{ color: TK.type }}>Vault</span>
+        <span style={{ color: TK.punct }}>({"{ "}</span>
+        agentKey<span style={{ color: TK.punct }}>:</span>{" "}
+        <span style={{ color: TK.str }}>{apiKey}</span>
+        <span style={{ color: TK.punct }}> {"}"});</span>
+      </div>
+      <div>
+        <LineNo n={4} />
+        <span style={{ color: TK.kw }}>const</span> res{"   "}
+        <span style={{ color: TK.punct }}>=</span>{" "}
+        <span style={{ color: TK.kw }}>await</span> vault
+        <span style={{ color: TK.punct }}>.</span>
+        <span style={{ color: TK.fn }}>pay</span>
+        <span style={{ color: TK.punct }}>({"{"}</span>
+      </div>
+      <div>
+        <LineNo n={5} />
+        {"  "}merchant<span style={{ color: TK.punct }}>:</span>{" "}
+        <span style={{ color: TK.str }}>&quot;api.openai.com&quot;</span>
+        <span style={{ color: TK.punct }}>,</span>
+      </div>
+      <div>
+        <LineNo n={6} />
+        {"  "}amount<span style={{ color: TK.punct }}>:{"   "}</span>
+        <span style={{ color: TK.num }}>0.02</span>
+        <span style={{ color: TK.punct }}>,</span>
+      </div>
+      <div>
+        <LineNo n={7} />
+        {"  "}memo<span style={{ color: TK.punct }}>:{"     "}</span>
+        <span style={{ color: TK.str }}>
+          &quot;chat-completion · session_a91f&quot;
+        </span>
+        <span style={{ color: TK.punct }}>,</span>
+      </div>
+      <div>
+        <LineNo n={8} />
+        <span style={{ color: TK.punct }}>{"}"});</span>
+      </div>
+      <div>
+        <LineNo n={9} />
+      </div>
+      <div>
+        <LineNo n={10} />
+        console<span style={{ color: TK.punct }}>.</span>
+        <span style={{ color: TK.fn }}>log</span>
+        <span style={{ color: TK.punct }}>(</span>res
+        <span style={{ color: TK.punct }}>.</span>decision
+        <span style={{ color: TK.punct }}>);</span>{"  "}
+        <span style={{ color: TK.cmt, fontStyle: "italic" }}>
+          {`// "allowed" or "refused"`}
+        </span>
+      </div>
+    </code>
+  );
+}
+
+function SnippetPolicy() {
+  return (
+    <code>
+      <div>
+        <LineNo n={1} />
+        <span style={{ color: TK.cmt, fontStyle: "italic" }}>
+          {`// policy.ts — declarative, mirrors on-chain enforcement`}
+        </span>
+      </div>
+      <div>
+        <LineNo n={2} />
+        <span style={{ color: TK.kw }}>export const</span> policy{" "}
+        <span style={{ color: TK.punct }}>=</span>{" "}
+        <span style={{ color: TK.punct }}>{"{"}</span>
+      </div>
+      <div>
+        <LineNo n={3} />
+        {"  "}dailyCapUsd<span style={{ color: TK.punct }}>:</span>{" "}
+        <span style={{ color: TK.num }}>5.00</span>
+        <span style={{ color: TK.punct }}>,</span>
+      </div>
+      <div>
+        <LineNo n={4} />
+        {"  "}weeklyCapUsd<span style={{ color: TK.punct }}>:</span>{" "}
+        <span style={{ color: TK.num }}>25.00</span>
+        <span style={{ color: TK.punct }}>,</span>
+      </div>
+      <div>
+        <LineNo n={5} />
+        {"  "}perTxMaxUsd<span style={{ color: TK.punct }}>:</span>{" "}
+        <span style={{ color: TK.num }}>0.50</span>
+        <span style={{ color: TK.punct }}>,</span>
+      </div>
+      <div>
+        <LineNo n={6} />
+        {"  "}allowlist<span style={{ color: TK.punct }}>:</span>{" "}
+        <span style={{ color: TK.punct }}>[</span>
+        <span style={{ color: TK.str }}>&quot;api.openai.com&quot;</span>
+        <span style={{ color: TK.punct }}>],</span>
+      </div>
+      <div>
+        <LineNo n={7} />
+        {"  "}requireMemo<span style={{ color: TK.punct }}>:</span>{" "}
+        <span style={{ color: TK.kw }}>true</span>
+        <span style={{ color: TK.punct }}>,</span>
+      </div>
+      <div>
+        <LineNo n={8} />
+        <span style={{ color: TK.punct }}>{"}"};</span>
+      </div>
+    </code>
+  );
+}
+
+function SnippetEnv({ keyPrefix }: { keyPrefix: string | null }) {
+  return (
+    <code>
+      <div>
+        <LineNo n={1} />
+        <span style={{ color: TK.cmt, fontStyle: "italic" }}>
+          # .env — chain-enforced; the SDK reads these
+        </span>
+      </div>
+      <div>
+        <LineNo n={2} />
+        KYVERN_AGENT_KEY
+        <span style={{ color: TK.punct }}>=</span>
+        <span style={{ color: TK.str }}>
+          {keyPrefix ? `${keyPrefix}…` : "kv_live_273e03…"}
+        </span>
+      </div>
+      <div>
+        <LineNo n={3} />
+        KYVERN_NETWORK<span style={{ color: TK.punct }}>=</span>
+        <span style={{ color: TK.str }}>devnet</span>
+      </div>
+    </code>
+  );
+}
+
+/* ════════════════════════════ Recent calls card ════════════════════════════ */
+
+function RecentCallsCard({ data }: { data: VaultPayload }) {
+  const items = data.payments.slice(0, 4);
+
+  return (
+    <Card>
+      <CardHead
+        title="Recent SDK calls"
+        sub={`Last 24 hours · ${items.length} ${items.length === 1 ? "event" : "events"}`}
+      />
+      <div>
+        {items.length === 0 && (
+          <div
+            style={{
+              padding: "22px",
+              fontSize: 12.5,
+              color: TOK.ink4,
+              textAlign: "center",
+            }}
+          >
+            No calls yet — wire the SDK above and they appear here.
+          </div>
+        )}
+        {items.map((p) => {
+          const blocked =
+            p.status === "blocked" || p.status === "failed";
+          const ts = new Date(
+            typeof p.createdAt === "string" && !p.createdAt.includes("T")
+              ? p.createdAt.replace(" ", "T") + "Z"
+              : String(p.createdAt),
+          ).toLocaleTimeString("en-US", {
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: false,
+          });
+          return (
+            <div
+              key={p.id}
+              className="grid items-center gap-3"
+              style={{
+                gridTemplateColumns: "60px 1fr auto auto",
+                padding: "13px 22px",
+                borderBottom: `1px solid ${TOK.hairline2}`,
+                fontSize: 13,
+              }}
+            >
+              <span
+                style={{
+                  fontFamily: "var(--font-mono, ui-monospace), monospace",
+                  fontSize: 11.5,
+                  color: TOK.ink4,
+                }}
+              >
+                {ts}
+              </span>
+              <span
+                style={{
+                  color: TOK.ink,
+                  fontWeight: 500,
+                  letterSpacing: "-0.005em",
+                }}
+                className="truncate"
+              >
+                {p.merchant}
+                {p.memo && (
+                  <span
+                    style={{ color: TOK.ink4, fontSize: 11.5, marginLeft: 6 }}
+                  >
+                    · {p.memo.slice(0, 32)}
+                  </span>
+                )}
+              </span>
+              <span
+                style={{
+                  fontVariantNumeric: "tabular-nums",
+                  color: TOK.ink3,
+                  fontSize: 12.5,
+                }}
+              >
+                ${p.amountUsd.toFixed(2)}
+              </span>
+              <span
+                className="inline-flex items-center gap-1.5"
+                style={{
+                  height: 22,
+                  padding: "0 9px",
+                  borderRadius: 999,
+                  fontSize: 11,
+                  fontWeight: 500,
+                  background: blocked ? TOK.amberSoft : TOK.greenSoft,
+                  color: blocked ? TOK.amber : TOK.green,
+                }}
+              >
+                <span
+                  style={{
+                    width: 5,
+                    height: 5,
+                    borderRadius: 999,
+                    background: "currentColor",
+                    display: "inline-block",
+                  }}
+                />
+                {blocked
+                  ? `Blocked${p.reason ? ` · ${p.reason}` : ""}`
+                  : "Allowed"}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </Card>
+  );
+}
+
+/* ════════════════════════════ Right column ════════════════════════════ */
+
+function PolicyCard({
+  data,
+  ownerWallet,
+}: {
+  data: VaultPayload;
+  ownerWallet: string | null;
+}) {
+  return (
+    <Card pad>
+      <Eyebrow>Policy</Eyebrow>
+      <h2
+        className="mt-2"
+        style={{
+          fontSize: 18,
+          fontWeight: 600,
+          letterSpacing: "-0.02em",
+          color: TOK.ink,
+          margin: "6px 0 0",
+        }}
+      >
+        Enforced on-chain
+      </h2>
+      <p
+        style={{
+          margin: "6px 0 14px",
+          fontSize: 12.5,
+          color: TOK.ink3,
+          lineHeight: 1.5,
+        }}
+      >
+        A Squads v4 multisig program —{" "}
+        <code
+          style={{
+            fontFamily: "var(--font-mono, ui-monospace), monospace",
+            fontSize: 11.5,
+            color: TOK.ink,
+          }}
+        >
+          PpmZ…MSqc
+        </code>{" "}
+        — gates every transfer.
+      </p>
+
+      <div className="mt-1">
+        <PolicyRibbon budget={data.budget} layout="2x2" />
+      </div>
+
+      <div className="mt-3">
+        <Allowlist
+          merchants={data.vault.allowedMerchants}
+          vaultId={data.vault.id}
+          ownerWallet={ownerWallet}
+          compact
+        />
+      </div>
+    </Card>
+  );
+}
+
+function ScenariosCard({
+  vaultId,
+  ownerWallet,
+  perTxMaxUsd,
+  network,
+}: {
+  vaultId: string;
+  ownerWallet: string | null;
+  perTxMaxUsd: number;
+  network: "devnet" | "mainnet";
+}) {
+  return (
+    <Card pad>
+      <div id="scenarios" />
+      <div className="flex items-center justify-between mb-1">
+        <Eyebrow>Demos</Eyebrow>
+        <span style={{ fontSize: 11.5, color: TOK.ink4 }}>~3 seconds each</span>
+      </div>
+      <h2
+        style={{
+          fontSize: 18,
+          fontWeight: 600,
+          letterSpacing: "-0.02em",
+          color: TOK.ink,
+          margin: "6px 0 0",
+        }}
+      >
+        Watch the chain refuse
+      </h2>
+      <p
+        style={{
+          margin: "6px 0 12px",
+          fontSize: 12.5,
+          color: TOK.ink3,
+          lineHeight: 1.5,
+        }}
+      >
+        Tap one. Your policy program rejects on-chain in three seconds. Real
+        Solana tx, real failure code.
+      </p>
+      <ScenarioPanel
+        vaultId={vaultId}
+        ownerWallet={ownerWallet}
+        perTxMaxUsd={perTxMaxUsd}
+        network={network}
+      />
+    </Card>
+  );
+}
+
+function PayShCard({
+  vaultId,
+  ownerWallet,
+}: {
+  vaultId: string;
+  ownerWallet: string | null;
+}) {
+  return (
+    <Card pad>
+      <Eyebrow>Pay.sh · Interception</Eyebrow>
+      <h2
+        style={{
+          fontSize: 15,
+          fontWeight: 600,
+          letterSpacing: "-0.015em",
+          color: TOK.ink,
+          margin: "8px 0 0",
+          lineHeight: 1.35,
+        }}
+      >
+        Every paid API call routes through your policy program first.
+      </h2>
+      <div className="mt-3">
+        <PayShFlow vaultId={vaultId} ownerWallet={ownerWallet} />
+      </div>
+    </Card>
+  );
+}
+
+/* ════════════════════════════ Wire your agent ════════════════════════════ */
+
+function WireSection({
+  vaultId,
+  ownerWallet,
+}: {
+  vaultId: string;
+  ownerWallet: string | null;
+}) {
+  return (
+    <Card style={{ padding: "30px 32px" }}>
+      <div className="flex items-end justify-between gap-6 flex-wrap mb-5">
+        <div>
+          <Eyebrow>Integration · Next steps</Eyebrow>
+          <h2
+            style={{
+              fontSize: 24,
+              fontWeight: 600,
+              letterSpacing: "-0.025em",
+              color: TOK.ink,
+              margin: "6px 0 4px",
+            }}
+          >
+            Wire your agent in five steps
+          </h2>
+          <p
+            style={{
+              fontSize: 13.5,
+              color: TOK.ink3,
+              maxWidth: "58ch",
+              lineHeight: 1.5,
+            }}
+          >
+            Mint a key, install the SDK, run your first chain-enforced payment.
+            We&apos;ll watch the policy program respond live.
+          </p>
+        </div>
+      </div>
+      <div className="overflow-hidden rounded-[14px]">
+        <IntegrationWizard vaultId={vaultId} ownerWallet={ownerWallet} />
+      </div>
+    </Card>
+  );
+}
+
+/* ════════════════════════════ Footer pills ════════════════════════════ */
+
+function FooterPills({
   vaultId,
   ownerWallet,
   perTxMaxUsd,
@@ -427,89 +2007,75 @@ function DemosFooter({
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ duration: 0.5, ease: EASE, delay: 0.15 }}
-        className="flex items-center justify-center gap-2 flex-wrap pt-1"
+        transition={{ duration: 0.5, ease: EASE, delay: 0.1 }}
+        className="flex flex-col items-center gap-3 pt-2"
       >
-        <Link
-          href="/app/developer"
-          className="group inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-all hover:bg-[rgba(15,23,42,0.04)]"
-        >
-          <Code2
-            className="w-3 h-3"
-            strokeWidth={2}
-            style={{ color: "rgba(15,23,42,0.55)" }}
-          />
-          <span
-            className="font-mono uppercase tracking-[0.14em]"
-            style={{ fontSize: 9.5, color: "rgba(15,23,42,0.55)" }}
+        <div className="flex items-center justify-center gap-3 flex-wrap">
+          <Link
+            href="/app/developer"
+            className="inline-flex items-center gap-2 no-underline"
+            style={{
+              padding: "5px 11px",
+              borderRadius: 999,
+              border: `1px solid ${TOK.hairline}`,
+              background: TOK.surface,
+              color: TOK.ink3,
+              fontSize: 12,
+            }}
           >
+            <Code2 className="w-3 h-3" strokeWidth={1.6} />
             Developer mode
-          </span>
-          <ArrowRight
-            className="w-2.5 h-2.5 transition-transform group-hover:translate-x-0.5"
-            strokeWidth={2}
-            style={{ color: "rgba(15,23,42,0.55)" }}
-          />
-        </Link>
-
-        <span
-          style={{
-            width: 1,
-            height: 14,
-            background: "rgba(15,23,42,0.10)",
-          }}
-        />
-
-        <span
-          className="font-mono uppercase tracking-[0.14em]"
-          style={{ fontSize: 9.5, color: "rgba(15,23,42,0.45)" }}
-        >
-          Interactive demos
-        </span>
-
-        <button
-          type="button"
-          onClick={() => ownerWallet && setTerminalOpen(true)}
-          disabled={!ownerWallet}
-          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-all hover:bg-[rgba(15,23,42,0.04)] disabled:opacity-50"
-          style={{
-            border: "1px solid rgba(15,23,42,0.10)",
-          }}
-        >
-          <Terminal
-            className="w-3 h-3"
-            strokeWidth={2}
-            style={{ color: "rgba(15,23,42,0.55)" }}
-          />
-          <span
-            className="text-[11px]"
-            style={{ color: "rgba(15,23,42,0.65)" }}
+          </Link>
+          <button
+            type="button"
+            onClick={() => ownerWallet && setTerminalOpen(true)}
+            disabled={!ownerWallet}
+            className="inline-flex items-center gap-2"
+            style={{
+              padding: "5px 11px",
+              borderRadius: 999,
+              border: `1px solid ${TOK.hairline}`,
+              background: TOK.surface,
+              color: TOK.ink3,
+              fontSize: 12,
+              cursor: ownerWallet ? "pointer" : "not-allowed",
+              opacity: ownerWallet ? 1 : 0.6,
+            }}
           >
-            Secure Terminal
-          </span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => ownerWallet && setHeistOpen(true)}
-          disabled={!ownerWallet}
-          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-all hover:bg-[rgba(15,23,42,0.04)] disabled:opacity-50"
-          style={{
-            border: "1px solid rgba(15,23,42,0.10)",
-          }}
-        >
-          <ShieldAlert
-            className="w-3 h-3"
-            strokeWidth={2}
-            style={{ color: "rgba(15,23,42,0.55)" }}
-          />
-          <span
-            className="text-[11px]"
-            style={{ color: "rgba(15,23,42,0.65)" }}
+            <Terminal className="w-3 h-3" strokeWidth={1.6} />
+            Secure terminal
+          </button>
+          <button
+            type="button"
+            onClick={() => ownerWallet && setHeistOpen(true)}
+            disabled={!ownerWallet}
+            className="inline-flex items-center gap-2"
+            style={{
+              padding: "5px 11px",
+              borderRadius: 999,
+              border: `1px solid ${TOK.hairline}`,
+              background: TOK.surface,
+              color: TOK.ink3,
+              fontSize: 12,
+              cursor: ownerWallet ? "pointer" : "not-allowed",
+              opacity: ownerWallet ? 1 : 0.6,
+            }}
           >
+            <ShieldAlert className="w-3 h-3" strokeWidth={1.6} />
             Watch the chain refuse
-          </span>
-        </button>
+          </button>
+        </div>
+        <div
+          style={{
+            fontFamily: "var(--font-mono, ui-monospace), monospace",
+            fontSize: 10.5,
+            color: TOK.ink4,
+            textTransform: "uppercase",
+            letterSpacing: "0.10em",
+          }}
+        >
+          $5 / day cap · Chain decides every dollar · Everything else stops
+        </div>
       </motion.div>
 
       <HeistOverlay
@@ -531,48 +2097,157 @@ function DemosFooter({
   );
 }
 
-function UserVaultSkeleton() {
+/* ════════════════════════════ Small bits ════════════════════════════ */
+
+function Dot() {
   return (
-    <div
-      className="relative w-full"
+    <span
       style={{
-        background: "#FFFFFF",
-        borderRadius: 20,
-        border: "1px solid rgba(15,23,42,0.06)",
-        minHeight: 420,
+        width: 3,
+        height: 3,
+        borderRadius: 999,
+        background: TOK.ink5,
+        display: "inline-block",
+      }}
+    />
+  );
+}
+
+function PrimaryButton({
+  href,
+  onClick,
+  label,
+}: {
+  href: string;
+  onClick?: (e: React.MouseEvent) => void;
+  label: string;
+}) {
+  return (
+    <a
+      href={href}
+      onClick={onClick}
+      className="inline-flex items-center gap-1.5 no-underline transition-all active:scale-[0.98]"
+      style={{
+        height: 34,
+        padding: "0 16px",
+        borderRadius: 10,
+        background: TOK.ink,
+        color: "#FFFFFF",
+        border: `1px solid ${TOK.ink}`,
+        fontSize: 13,
+        fontWeight: 500,
+        boxShadow:
+          "0 1px 0 rgba(0,0,0,0.05), 0 4px 10px -4px rgba(0,0,0,0.18)",
       }}
     >
-      <div className="p-6 flex flex-col gap-5">
-        <div className="flex items-center gap-3">
-          <div
-            className="w-14 h-14 rounded-[14px]"
-            style={{ background: "rgba(15,23,42,0.05)" }}
-          />
-          <div className="flex flex-col gap-2 flex-1">
-            <div
-              className="h-5 rounded w-32"
-              style={{ background: "rgba(15,23,42,0.05)" }}
-            />
-            <div
-              className="h-3 rounded w-48"
-              style={{ background: "rgba(15,23,42,0.04)" }}
-            />
-          </div>
-        </div>
+      {label}
+      <ChevronRight className="w-3 h-3" strokeWidth={1.8} />
+    </a>
+  );
+}
+
+function GhostButton({
+  href,
+  external,
+  label,
+  icon,
+}: {
+  href: string;
+  external?: boolean;
+  label: string;
+  icon?: React.ReactNode;
+}) {
+  return (
+    <a
+      href={href}
+      target={external ? "_blank" : undefined}
+      rel={external ? "noreferrer" : undefined}
+      className="inline-flex items-center gap-1.5 no-underline transition-colors"
+      style={{
+        height: 34,
+        padding: "0 16px",
+        borderRadius: 10,
+        border: `1px solid ${TOK.hairline}`,
+        background: TOK.surface,
+        color: TOK.ink,
+        fontSize: 13,
+        fontWeight: 500,
+      }}
+    >
+      {label}
+      {icon}
+    </a>
+  );
+}
+
+/* ════════════════════════════ Skeleton ════════════════════════════ */
+
+function SkeletonHero() {
+  return (
+    <div
+      className="grid gap-5"
+      style={{ gridTemplateColumns: "minmax(0,1.42fr) minmax(0,1fr)" }}
+    >
+      {[0, 1].map((i) => (
         <div
-          className="h-20 rounded-[14px]"
-          style={{ background: "rgba(15,23,42,0.04)" }}
+          key={i}
+          style={{
+            background: TOK.surface,
+            border: `1px solid ${TOK.hairline}`,
+            borderRadius: 18,
+            boxShadow: TOK.shadowCard,
+            minHeight: 320,
+          }}
         />
-        <div className="grid grid-cols-4 gap-2">
-          {[0, 1, 2, 3].map((i) => (
-            <div
-              key={i}
-              className="h-16 rounded-[12px]"
-              style={{ background: "rgba(15,23,42,0.03)" }}
-            />
-          ))}
-        </div>
-      </div>
+      ))}
     </div>
   );
+}
+
+/* ════════════════════════════ Helpers ════════════════════════════ */
+
+function formatDur(ms: number): string {
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ${m % 60}m`;
+  const d = Math.floor(h / 24);
+  return `${d}d ${h % 24}h`;
+}
+
+function lastCallRelFrom(raw: string | null, now: number): string {
+  if (!raw) return "no calls yet";
+  const ms = Date.parse(
+    typeof raw === "string" && !raw.includes("T")
+      ? raw.replace(" ", "T") + "Z"
+      : String(raw),
+  );
+  if (isNaN(ms)) return "no calls yet";
+  const diff = now - ms;
+  if (diff < 5_000) return "just now";
+  if (diff < 60_000) return `${Math.floor(diff / 1000)}s ago`;
+  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`;
+  return `${Math.floor(diff / 3_600_000)}h ago`;
+}
+
+function todayCount(
+  payments: Array<{ createdAt: string; status: string }>,
+  filterStatus?: "blocked",
+): number {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const startMs = today.getTime();
+  return payments.filter((p) => {
+    const t = Date.parse(
+      typeof p.createdAt === "string" && !p.createdAt.includes("T")
+        ? p.createdAt.replace(" ", "T") + "Z"
+        : String(p.createdAt),
+    );
+    if (isNaN(t) || t < startMs) return false;
+    if (filterStatus === "blocked")
+      return p.status === "blocked" || p.status === "failed";
+    return true;
+  }).length;
 }
