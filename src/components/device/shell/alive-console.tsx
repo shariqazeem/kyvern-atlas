@@ -1448,16 +1448,24 @@ function SdkXcodeCard({ vaultId }: { vaultId: string }) {
 
   const apiKey = keyPrefix ? `"${keyPrefix}…"` : `process.env.KYVERN_AGENT_KEY`;
 
-  const snippet = `import { Vault } from "@kyvernlabs/sdk";
+  const snippet = `// 1. Add at the top of your agent file:
+import { Vault } from "@kyvernlabs/sdk";
 
+// 2. Create the client once:
 const vault = new Vault({ agentKey: ${apiKey} });
-const res   = await vault.pay({
-  merchant: "api.openai.com",
-  amount:   0.02,
-  memo:     "chat-completion · session_a91f",
-});
 
-console.log(res.decision);  // "allowed" or "refused"`;
+// 3. BEFORE each external API call your agent makes,
+//    gate it through vault.pay():
+const gate = await vault.pay({
+  merchant: "api.openai.com",
+  recipientPubkey: "GZCnHuFtswvsJftSDmtoHEve8amqNLzAAPvYy8NU3ZNZ",
+  amount: 0.02,
+  memo: "chat-completion",
+});
+if (gate.decision !== "allowed") throw new Error(gate.reason);
+
+// 4. Now safe to call the merchant. Real on-chain settled.
+// const data = await fetch("https://api.openai.com/...");`;
 
   const copy = (which: "snippet" | "install", text: string) => {
     navigator.clipboard.writeText(text);
@@ -1682,6 +1690,12 @@ function SnippetVault({ apiKey }: { apiKey: string }) {
     <code>
       <div>
         <LineNo n={1} />
+        <span style={{ color: TK.cmt, fontStyle: "italic" }}>
+          {`// 1. Add at the top of your agent file:`}
+        </span>
+      </div>
+      <div>
+        <LineNo n={2} />
         <span style={{ color: TK.kw }}>import</span>
         <span style={{ color: TK.punct }}> {"{ "}</span>
         <span style={{ color: TK.type }}>Vault</span>
@@ -1691,10 +1705,16 @@ function SnippetVault({ apiKey }: { apiKey: string }) {
         <span style={{ color: TK.punct }}>;</span>
       </div>
       <div>
-        <LineNo n={2} />
+        <LineNo n={3} />
       </div>
       <div>
-        <LineNo n={3} />
+        <LineNo n={4} />
+        <span style={{ color: TK.cmt, fontStyle: "italic" }}>
+          {`// 2. Create the client once:`}
+        </span>
+      </div>
+      <div>
+        <LineNo n={5} />
         <span style={{ color: TK.kw }}>const</span> vault{" "}
         <span style={{ color: TK.punct }}>=</span>{" "}
         <span style={{ color: TK.kw }}>new</span>{" "}
@@ -1705,8 +1725,23 @@ function SnippetVault({ apiKey }: { apiKey: string }) {
         <span style={{ color: TK.punct }}> {"}"});</span>
       </div>
       <div>
-        <LineNo n={4} />
-        <span style={{ color: TK.kw }}>const</span> res{"   "}
+        <LineNo n={6} />
+      </div>
+      <div>
+        <LineNo n={7} />
+        <span style={{ color: TK.cmt, fontStyle: "italic" }}>
+          {`// 3. BEFORE each external API call your agent makes,`}
+        </span>
+      </div>
+      <div>
+        <LineNo n={8} />
+        <span style={{ color: TK.cmt, fontStyle: "italic" }}>
+          {`//    gate it through vault.pay():`}
+        </span>
+      </div>
+      <div>
+        <LineNo n={9} />
+        <span style={{ color: TK.kw }}>const</span> gate{" "}
         <span style={{ color: TK.punct }}>=</span>{" "}
         <span style={{ color: TK.kw }}>await</span> vault
         <span style={{ color: TK.punct }}>.</span>
@@ -1714,41 +1749,52 @@ function SnippetVault({ apiKey }: { apiKey: string }) {
         <span style={{ color: TK.punct }}>({"{"}</span>
       </div>
       <div>
-        <LineNo n={5} />
+        <LineNo n={10} />
         {"  "}merchant<span style={{ color: TK.punct }}>:</span>{" "}
         <span style={{ color: TK.str }}>&quot;api.openai.com&quot;</span>
         <span style={{ color: TK.punct }}>,</span>
       </div>
       <div>
-        <LineNo n={6} />
-        {"  "}amount<span style={{ color: TK.punct }}>:{"   "}</span>
+        <LineNo n={11} />
+        {"  "}recipientPubkey<span style={{ color: TK.punct }}>:</span>{" "}
+        <span style={{ color: TK.str }}>&quot;GZCnHu…U3ZNZ&quot;</span>
+        <span style={{ color: TK.punct }}>,</span>
+      </div>
+      <div>
+        <LineNo n={12} />
+        {"  "}amount<span style={{ color: TK.punct }}>:</span>{" "}
         <span style={{ color: TK.num }}>0.02</span>
         <span style={{ color: TK.punct }}>,</span>
       </div>
       <div>
-        <LineNo n={7} />
-        {"  "}memo<span style={{ color: TK.punct }}>:{"     "}</span>
-        <span style={{ color: TK.str }}>
-          &quot;chat-completion · session_a91f&quot;
-        </span>
+        <LineNo n={13} />
+        {"  "}memo<span style={{ color: TK.punct }}>:</span>{" "}
+        <span style={{ color: TK.str }}>&quot;chat-completion&quot;</span>
         <span style={{ color: TK.punct }}>,</span>
       </div>
       <div>
-        <LineNo n={8} />
+        <LineNo n={14} />
         <span style={{ color: TK.punct }}>{"}"});</span>
       </div>
       <div>
-        <LineNo n={9} />
+        <LineNo n={15} />
+        <span style={{ color: TK.kw }}>if</span>
+        <span style={{ color: TK.punct }}>{" ("}</span>gate
+        <span style={{ color: TK.punct }}>.</span>decision{" "}
+        <span style={{ color: TK.punct }}>{"!=="}</span>{" "}
+        <span style={{ color: TK.str }}>&quot;allowed&quot;</span>
+        <span style={{ color: TK.punct }}>)</span>{" "}
+        <span style={{ color: TK.kw }}>throw new</span>{" "}
+        <span style={{ color: TK.type }}>Error</span>
+        <span style={{ color: TK.punct }}>(gate.reason);</span>
       </div>
       <div>
-        <LineNo n={10} />
-        console<span style={{ color: TK.punct }}>.</span>
-        <span style={{ color: TK.fn }}>log</span>
-        <span style={{ color: TK.punct }}>(</span>res
-        <span style={{ color: TK.punct }}>.</span>decision
-        <span style={{ color: TK.punct }}>);</span>{"  "}
+        <LineNo n={16} />
+      </div>
+      <div>
+        <LineNo n={17} />
         <span style={{ color: TK.cmt, fontStyle: "italic" }}>
-          {`// "allowed" or "refused"`}
+          {`// 4. Now safe to call the merchant. Real on-chain settled.`}
         </span>
       </div>
     </code>
