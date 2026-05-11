@@ -166,9 +166,9 @@ Two paths (Shariq's call):
 
 ## Founder context (skim, don't need to re-read)
 
-- **Shariq Azeem** ([@shariqshkt](https://x.com/shariqshkt)) — solo founder
+- **Shariq Shaukat** ([@shariqshkt](https://x.com/shariqshkt)) — solo founder
 - Building toward Colosseum Frontier submission (deadline May 11, 2026)
-- 5 prior hackathon wins ($4,250), 3 prior x402 projects (ParallaxPay, TrendSurfer, x402-Oracle)
+- 3 prior x402 projects (ParallaxPay, TrendSurfer, x402-Oracle)
 - Strength: shipping premium UI fast. Weakness: over-engineering, hitting too many tracks. Fix in this repo: one product, one user, one story.
 - Strategic guidance lives in `/Users/macbookair/.claude/projects/-Users-macbookair-projects-myowncompany-kyvernlabs/memory/` — especially `colosseum_playbook.md` (Volki's 2x-winner red-flag list) and `kyvern_deploy_learnings.md` (the deploy land mines above in more detail).
 

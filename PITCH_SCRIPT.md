@@ -50,7 +50,7 @@ Three takes max.
 
 **SAY** *(slightly warmer, but still no smile)*
 
-> I'm Shariq Azeem. I'm building from Pakistan.
+> I'm Shariq Shaukat. I'm building from Pakistan.
 >
 > *(pause 1s)*
 >

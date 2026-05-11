@@ -16,7 +16,7 @@
 > They should have budgets.
 > Earnings should land on a card you can spend.*
 
-— Shariq Azeem · [@shariqshkt](https://x.com/shariqshkt) · 🇵🇰 Made in Pakistan
+— Shariq Shaukat · [@shariqshkt](https://x.com/shariqshkt) · 🇵🇰 Made in Pakistan
 [kyvernlabs.com](https://kyvernlabs.com) · `npx create-kyvern-agent`
 
 `Solana · Squads · pay.sh · KAST · npm`
@@ -177,9 +177,9 @@ Three commands away from any Pakistani builder's hot path:
 
 ## Slide 8 — Team
 
-**Shariq Azeem** — solo Pakistani builder
+**Shariq Shaukat** — solo Pakistani builder
 
-- 5 prior hackathon wins ($4,250+)
+- 3 prior x402 agent projects shipped on Solana
 - 3 prior x402 projects (Solana payment layer experience)
 - Built Kyvern after losing time to AI-agent loss vectors firsthand
 - This sprint: shipped real on-chain Kyvern enforcement, full pay.sh
@@ -227,4 +227,4 @@ AI x Solana + Infrastructure)
 > They should have budgets.
 > Earnings should land on a card you can spend.*
 
-— Shariq Azeem · 🇵🇰
+— Shariq Shaukat · 🇵🇰

@@ -207,7 +207,7 @@ Open on the problem. Earned authority, not claimed authority. Lean slightly forw
 
 ### Beat 2 — Who (0:30–0:50)
 
-> "I'm Shariq Azeem. I'm building from Pakistan.
+> "I'm Shariq Shaukat. I'm building from Pakistan.
 >
 > I've shipped three x402 agent projects on Solana — I've watched this problem from inside the agent layer for a year. Kyvern is the missing piece I've been preparing to build."
 

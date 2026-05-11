@@ -14,7 +14,7 @@
 > *AI agents shouldn't have private keys.
 > They should have budgets.*
 
-— Shariq Azeem · [@shariqshkt](https://x.com/shariqshkt) · 🇵🇰 Pakistan
+— Shariq Shaukat · [@shariqshkt](https://x.com/shariqshkt) · 🇵🇰 Pakistan
 [kyvernlabs.com](https://kyvernlabs.com) · `npm install @kyvernlabs/sdk`
 
 `Solana · Squads · pay.sh · KAST · npm`
@@ -163,9 +163,9 @@ Two sentences in the hands of any builder:
 
 ## Slide 8 — Team
 
-**Shariq Azeem** — solo Pakistani builder
+**Shariq Shaukat** — solo Pakistani builder
 
-- 5 prior hackathon wins ($4,250+)
+- 3 prior x402 agent projects shipped on Solana
 - 3 prior x402 projects: ParallaxPay, TrendSurfer, x402-Oracle
 - This sprint: collapsed Kyvern from "agent OS" to "financial safety
   infrastructure" in 48 hours. Real on-chain enforcement landed today
@@ -213,4 +213,4 @@ pay.sh ecosystem composability bonus.
 > *AI agents shouldn't have private keys. They should have budgets.
 > The chain has the receipts.*
 
-— Shariq Azeem · 🇵🇰
+— Shariq Shaukat · 🇵🇰

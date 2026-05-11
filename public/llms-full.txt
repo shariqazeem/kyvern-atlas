@@ -125,4 +125,4 @@ Deployed: Ubuntu + nginx + PM2 + Let's Encrypt SSL
 
 ## Founder
 
-Shariq Azeem (@shariqshkt) — 5 hackathon wins, deep x402 expertise, solo founder
+Shariq Shaukat (@shariqshkt) — 3 prior x402 agent projects shipped on Solana, deep x402 expertise, solo founder

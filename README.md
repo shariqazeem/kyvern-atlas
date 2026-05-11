@@ -139,7 +139,7 @@ classes + a kill switch, an SDK, and a scaffolder.
 
 ## Built by
 
-[Shariq Azeem](https://x.com/shariqshkt) · solo Pakistani builder · 3 prior x402 agent projects shipped on Solana · Made in Pakistan for Solana Frontier 2026.
+[Shariq Shaukat](https://x.com/shariqshkt) · solo Pakistani builder · 3 prior x402 agent projects shipped on Solana · Made in Pakistan for Solana Frontier 2026.
 
 ## License
 

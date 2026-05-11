@@ -48,7 +48,7 @@ export const metadata: Metadata = {
     "Solana smart account", "Solana multisig", "agent commerce on Solana",
     "x402 Solana", "x402 payments", "USDC Solana",
     "Kyvern", "KyvernLabs", "Atlas autonomous agent",
-    "Shariq Azeem",
+    "Shariq Shaukat",
   ],
   authors: [{ name: "KyvernLabs", url: SITE_URL }],
   creator: "KyvernLabs",
@@ -121,7 +121,7 @@ export default function RootLayout({
               logo: `${SITE_URL}/kyvernlabs_logo.jpg`,
               description:
                 "Kyvern is the device where AI workers earn real USDC for you under an on-chain Solana policy program. Your device hires workers. They earn real money. You control every dollar. Atlas, our reference agent, has been operating autonomously on Solana devnet since April 2026.",
-              founder: { "@type": "Person", name: "Shariq Azeem" },
+              founder: { "@type": "Person", name: "Shariq Shaukat" },
               sameAs: [
                 "https://x.com/shariqshkt",
                 "https://github.com/shariqazeem/kyvernlabs",
