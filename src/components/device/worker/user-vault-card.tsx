@@ -1222,88 +1222,69 @@ export function HeistOverlay({
               onClick={(e) => e.stopPropagation()}
             >
               <div
-                className="relative rounded-[18px] overflow-hidden"
+                className="relative rounded-[12px] overflow-hidden"
                 style={{
-                  background:
-                    "linear-gradient(180deg, #0A0E1A 0%, #0F1426 100%)",
-                  border:
-                    phase === "flashing" || phase === "settled"
-                      ? "1.5px solid rgba(248,113,113,0.55)"
-                      : "1.5px solid rgba(34,197,94,0.28)",
+                  background: "#0A0A0A",
+                  border: "1px solid rgba(255,255,255,0.08)",
                   boxShadow:
-                    phase === "flashing" || phase === "settled"
-                      ? "0 0 0 4px rgba(248,113,113,0.10), 0 40px 100px -24px rgba(248,113,113,0.35), inset 0 1px 0 rgba(255,255,255,0.05)"
-                      : "0 0 0 4px rgba(34,197,94,0.06), 0 40px 100px -24px rgba(34,197,94,0.25), inset 0 1px 0 rgba(255,255,255,0.05)",
-                  transition:
-                    "border-color 250ms ease, box-shadow 250ms ease",
+                    "0 40px 100px -24px rgba(0,0,0,0.55), 0 1px 0 rgba(255,255,255,0.04) inset",
                 }}
               >
-                {/* Top scanline accent */}
+                {/* macOS-style title bar */}
                 <div
-                  aria-hidden
-                  className="absolute inset-x-0 top-0 h-px pointer-events-none"
+                  className="flex items-center px-3 py-2.5 select-none"
                   style={{
                     background:
-                      phase === "flashing" || phase === "settled"
-                        ? "linear-gradient(90deg, transparent, rgba(248,113,113,0.7), transparent)"
-                        : "linear-gradient(90deg, transparent, rgba(134,239,172,0.55), transparent)",
-                    transition: "background 250ms ease",
+                      "linear-gradient(180deg, #2A2A2C 0%, #1E1E1F 100%)",
+                    borderBottom: "1px solid rgba(0,0,0,0.4)",
                   }}
-                />
-
-                {/* Header */}
-                <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/[0.05]">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <motion.span
-                      className="rounded-full flex-shrink-0"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={onClose}
+                      aria-label="Close"
                       style={{
-                        width: 6,
-                        height: 6,
-                        background:
-                          phase === "flashing" || phase === "settled"
-                            ? "#F87171"
-                            : "#22C55E",
-                        boxShadow:
-                          phase === "flashing" || phase === "settled"
-                            ? "0 0 10px #F87171"
-                            : "0 0 10px #22C55E",
-                      }}
-                      animate={{ opacity: [0.5, 1, 0.5] }}
-                      transition={{
-                        duration: 1.2,
-                        repeat: Infinity,
-                        ease: "easeInOut",
+                        width: 12,
+                        height: 12,
+                        borderRadius: 999,
+                        background: "#FF5F57",
+                        border: "0.5px solid rgba(0,0,0,0.20)",
+                        cursor: "pointer",
                       }}
                     />
                     <span
-                      className="font-mono uppercase tracking-[0.18em] truncate"
+                      aria-hidden
                       style={{
-                        fontSize: 9.5,
-                        color:
-                          phase === "flashing" || phase === "settled"
-                            ? "rgba(252,165,165,0.85)"
-                            : "rgba(134,239,172,0.85)",
-                        transition: "color 250ms ease",
+                        width: 12,
+                        height: 12,
+                        borderRadius: 999,
+                        background: "#FEBC2E",
+                        border: "0.5px solid rgba(0,0,0,0.20)",
                       }}
-                    >
-                      Kyvern Policy · Interception
-                    </span>
+                    />
+                    <span
+                      aria-hidden
+                      style={{
+                        width: 12,
+                        height: 12,
+                        borderRadius: 999,
+                        background: "#28C840",
+                        border: "0.5px solid rgba(0,0,0,0.20)",
+                      }}
+                    />
                   </div>
-                  <button
-                    type="button"
-                    onClick={onClose}
-                    className="inline-flex items-center justify-center rounded-md transition-all hover:bg-white/10 active:scale-95"
+                  <span
+                    className="font-mono mx-auto"
                     style={{
-                      width: 26,
-                      height: 26,
-                      background: "rgba(255,255,255,0.04)",
-                      border: "1px solid rgba(255,255,255,0.08)",
-                      color: "rgba(229,231,235,0.55)",
+                      fontSize: 11.5,
+                      color: "rgba(229,231,235,0.65)",
+                      letterSpacing: "-0.005em",
                     }}
-                    aria-label="Close"
                   >
-                    <X className="w-3.5 h-3.5" strokeWidth={2} />
-                  </button>
+                    kyvern-policy — heist.sh — 96×24
+                  </span>
+                  <span style={{ width: 36 }} />
                 </div>
 
                 {/* Terminal body */}
@@ -1821,76 +1802,85 @@ export function SecureTerminal({
               onClick={(e) => e.stopPropagation()}
             >
               <div
-                className="relative rounded-t-[18px] sm:rounded-[18px] overflow-hidden flex flex-col"
+                className="relative rounded-t-[12px] sm:rounded-[12px] overflow-hidden flex flex-col"
                 style={{
-                  background:
-                    "linear-gradient(180deg, #0A0E1A 0%, #0F1426 100%)",
-                  border: "1.5px solid rgba(34,197,94,0.28)",
+                  background: "#0A0A0A",
+                  border: "1px solid rgba(255,255,255,0.08)",
                   boxShadow:
-                    "0 0 0 4px rgba(34,197,94,0.06), 0 40px 100px -24px rgba(34,197,94,0.25), inset 0 1px 0 rgba(255,255,255,0.05)",
+                    "0 40px 100px -24px rgba(0,0,0,0.55), 0 1px 0 rgba(255,255,255,0.04) inset",
                   maxHeight: "92vh",
                 }}
               >
-                {/* Header */}
-                <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/[0.05]">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <motion.span
-                      className="rounded-full flex-shrink-0"
+                {/* Title bar — macOS Terminal style */}
+                <div
+                  className="flex items-center px-3 py-2.5 select-none"
+                  style={{
+                    background:
+                      "linear-gradient(180deg, #2A2A2C 0%, #1E1E1F 100%)",
+                    borderBottom: "1px solid rgba(0,0,0,0.4)",
+                  }}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={!running ? onClose : undefined}
+                      aria-label="Close"
                       style={{
-                        width: 6,
-                        height: 6,
-                        background: "#22C55E",
-                        boxShadow: "0 0 10px #22C55E",
-                      }}
-                      animate={{ opacity: [0.5, 1, 0.5] }}
-                      transition={{
-                        duration: 1.2,
-                        repeat: Infinity,
-                        ease: "easeInOut",
+                        width: 12,
+                        height: 12,
+                        borderRadius: 999,
+                        background: "#FF5F57",
+                        border: "0.5px solid rgba(0,0,0,0.20)",
+                        cursor: running ? "not-allowed" : "pointer",
                       }}
                     />
                     <span
-                      className="font-mono uppercase tracking-[0.18em] truncate"
+                      aria-hidden
                       style={{
-                        fontSize: 9.5,
-                        color: "rgba(134,239,172,0.85)",
+                        width: 12,
+                        height: 12,
+                        borderRadius: 999,
+                        background: "#FEBC2E",
+                        border: "0.5px solid rgba(0,0,0,0.20)",
                       }}
-                    >
-                      Kyvern Secure Agent · Live
-                    </span>
+                    />
+                    <span
+                      aria-hidden
+                      style={{
+                        width: 12,
+                        height: 12,
+                        borderRadius: 999,
+                        background: "#28C840",
+                        border: "0.5px solid rgba(0,0,0,0.20)",
+                      }}
+                    />
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    {transcript.length > 0 && !running && (
-                      <button
-                        type="button"
-                        onClick={clearTranscript}
-                        className="font-mono uppercase tracking-[0.10em] px-2 py-1 rounded-md transition-all hover:bg-white/10"
-                        style={{
-                          fontSize: 9,
-                          color: "rgba(229,231,235,0.55)",
-                          border: "1px solid rgba(255,255,255,0.08)",
-                        }}
-                      >
-                        Clear
-                      </button>
-                    )}
+                  <span
+                    className="font-mono mx-auto"
+                    style={{
+                      fontSize: 11.5,
+                      color: "rgba(229,231,235,0.65)",
+                      letterSpacing: "-0.005em",
+                    }}
+                  >
+                    kyvern@solana-{network} — zsh — 96×24
+                  </span>
+                  {transcript.length > 0 && !running && (
                     <button
                       type="button"
-                      onClick={onClose}
-                      disabled={running}
-                      className="inline-flex items-center justify-center rounded-md transition-all hover:bg-white/10 active:scale-95 disabled:opacity-50"
+                      onClick={clearTranscript}
+                      className="font-mono"
                       style={{
-                        width: 26,
-                        height: 26,
+                        fontSize: 10.5,
+                        color: "rgba(229,231,235,0.50)",
+                        padding: "2px 6px",
+                        borderRadius: 4,
                         background: "rgba(255,255,255,0.04)",
-                        border: "1px solid rgba(255,255,255,0.08)",
-                        color: "rgba(229,231,235,0.55)",
                       }}
-                      aria-label="Close"
                     >
-                      <X className="w-3.5 h-3.5" strokeWidth={2} />
+                      clear
                     </button>
-                  </div>
+                  )}
                 </div>
 
                 {/* Transcript */}
@@ -1906,17 +1896,27 @@ export function SecureTerminal({
                   }}
                 >
                   {transcript.length === 0 ? (
-                    <div className="flex flex-col gap-2 py-6">
-                      <span style={{ color: "rgba(134,239,172,0.85)" }}>
-                        &gt;_ Kyvern Secure Agent.
+                    <div className="flex flex-col gap-1 py-2">
+                      <span style={{ color: "rgba(229,231,235,0.55)" }}>
+                        Last login: {new Date().toUTCString().slice(5, 22)} on
+                        ttys001
                       </span>
                       <span style={{ color: "rgba(229,231,235,0.55)" }}>
-                        Type a prompt below. A real LLM parses your intent.
-                        The{" "}
-                        <span style={{ color: "#86EFAC" }}>Kyvern policy
-                        program</span>{" "}
-                        decides on Solana before any USDC moves. If allowed,
-                        the agent acts. Every step is real on devnet.
+                        connected to api.{network}.solana.com
+                      </span>
+                      <span
+                        className="mt-2"
+                        style={{ color: "rgba(229,231,235,0.85)" }}
+                      >
+                        <span style={{ color: "#86EFAC" }}>kyvern</span>
+                        <span style={{ color: "rgba(229,231,235,0.5)" }}>@</span>
+                        <span style={{ color: "#7FB8FF" }}>solana-{network}</span>{" "}
+                        ~ % <span style={{ color: "rgba(229,231,235,0.45)" }}>kyvern --help</span>
+                      </span>
+                      <span style={{ color: "rgba(229,231,235,0.65)" }}>
+                        Type a natural-language command below. A real LLM
+                        parses intent; the on-chain policy program decides
+                        before any USDC moves. Every step settles on devnet.
                       </span>
                       <div className="mt-3 flex flex-wrap gap-1.5">
                         {SAMPLE_PROMPTS.map((p) => (
@@ -1944,15 +1944,22 @@ export function SecureTerminal({
                   )}
                   {running && (
                     <div className="flex items-center gap-2 mt-1">
-                      <DotPulse />
+                      <span
+                        className="w-3 h-3 border rounded-full animate-spin flex-shrink-0"
+                        style={{
+                          borderColor: "rgba(229,231,235,0.15)",
+                          borderTopColor: "#86EFAC",
+                          borderWidth: 1.5,
+                        }}
+                      />
                       <span
                         className="font-mono"
                         style={{
-                          fontSize: 11,
-                          color: "rgba(134,239,172,0.65)",
+                          fontSize: 11.5,
+                          color: "rgba(229,231,235,0.55)",
                         }}
                       >
-                        executing...
+                        awaiting Solana confirmation…
                       </span>
                     </div>
                   )}
@@ -1968,15 +1975,19 @@ export function SecureTerminal({
                 >
                   <span
                     className="font-mono flex-shrink-0"
-                    style={{ fontSize: 13, color: "#86EFAC" }}
+                    style={{ fontSize: 13 }}
                   >
-                    &gt;
+                    <span style={{ color: "#86EFAC" }}>kyvern</span>
+                    <span style={{ color: "rgba(229,231,235,0.5)" }}>@</span>
+                    <span style={{ color: "#7FB8FF" }}>solana</span>{" "}
+                    <span style={{ color: "rgba(229,231,235,0.45)" }}>~</span>{" "}
+                    <span style={{ color: "#86EFAC" }}>%</span>
                   </span>
                   <input
                     type="text"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    placeholder="Give your agent a command…"
+                    placeholder="kyvern pay 0.02 to api.openai.com"
                     disabled={running}
                     autoFocus
                     className="flex-1 font-mono bg-transparent outline-none disabled:opacity-50"

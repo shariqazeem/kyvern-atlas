@@ -28,7 +28,10 @@ import {
   Plus,
   ShieldAlert,
   Terminal,
+  Wallet,
 } from "lucide-react";
+import { KyvernMark } from "@/components/brand/kyvern-mark";
+import { TopUpDrawer } from "@/components/device/top-up-drawer";
 import { WorkerTemplates } from "../worker/worker-templates";
 import {
   PolicyRibbon,
@@ -45,30 +48,30 @@ import type { PanelKind } from "../home/affordance-row";
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
-/* Design tokens — kept inline to scope to this surface */
+/* Design tokens — matched to landing page (#FAFAFA bg, ink #0A0A0A) */
 const TOK = {
   surface: "#FFFFFF",
-  surface2: "#F7F7F9",
-  bg: "#FBFBFD",
-  hairline: "rgba(15,23,42,0.07)",
-  hairline2: "rgba(15,23,42,0.04)",
+  surface2: "#F6F6F7",
+  bg: "#FAFAFA",
+  hairline: "rgba(0,0,0,0.08)",
+  hairline2: "rgba(0,0,0,0.05)",
   ink: "#0A0A0A",
-  ink2: "rgba(15,23,42,0.72)",
-  ink3: "rgba(15,23,42,0.55)",
-  ink4: "rgba(15,23,42,0.40)",
-  ink5: "rgba(15,23,42,0.28)",
-  green: "#16A34A",
-  greenSoft: "rgba(34,197,94,0.10)",
-  greenLine: "rgba(34,197,94,0.20)",
-  greenPress: "#15803D",
+  ink2: "#374151",
+  ink3: "#475569",
+  ink4: "#6B7280",
+  ink5: "#9CA3AF",
+  green: "#15803D",
+  greenSoft: "rgba(22,163,74,0.10)",
+  greenLine: "rgba(22,163,74,0.22)",
+  greenPress: "#166534",
   amber: "#B45309",
-  amberSoft: "rgba(245,158,11,0.10)",
-  amberLine: "rgba(245,158,11,0.22)",
+  amberSoft: "rgba(180,83,9,0.08)",
+  amberLine: "rgba(180,83,9,0.20)",
   red: "#DC2626",
   shadowCard:
-    "0 1px 1.5px rgba(15,23,42,0.04), 0 6px 20px -8px rgba(15,23,42,0.08)",
+    "0 1px 1.5px rgba(0,0,0,0.03), 0 8px 24px -10px rgba(0,0,0,0.06)",
   shadowHi:
-    "0 1px 2px rgba(15,23,42,0.05), 0 18px 40px -16px rgba(15,23,42,0.12)",
+    "0 1px 2px rgba(0,0,0,0.04), 0 18px 40px -16px rgba(0,0,0,0.10)",
 };
 
 interface Props {
@@ -294,7 +297,173 @@ export function AliveConsole({
         perTxMaxUsd={data.budget.perTxMaxUsd}
         network={data.vault.network}
       />
+
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━ FAB ━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <ActionFab data={data} usdcBalance={usdcBalance} />
     </div>
+  );
+}
+
+/* ════════════════════════════ Floating Action FAB ═══════════════════════ */
+
+function ActionFab({
+  data,
+  usdcBalance,
+}: {
+  data: VaultPayload;
+  usdcBalance: number;
+}) {
+  const [open, setOpen] = useState(false);
+  const [topUpOpen, setTopUpOpen] = useState(false);
+
+  const usdcAta = data.vault.vaultPda ?? "";
+
+  return (
+    <>
+      <div
+        className="fixed z-40"
+        style={{ right: 28, bottom: 100 }}
+      >
+        <AnimatePresence>
+          {open && (
+            <motion.div
+              initial={{ opacity: 0, y: 12, scale: 0.94 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 8, scale: 0.96 }}
+              transition={{ duration: 0.22, ease: EASE }}
+              className="absolute right-0 flex flex-col gap-2"
+              style={{ bottom: 64 }}
+            >
+              <FabItem
+                icon={<Wallet className="w-3.5 h-3.5" strokeWidth={1.8} />}
+                label="Top up vault"
+                onClick={() => {
+                  setTopUpOpen(true);
+                  setOpen(false);
+                }}
+              />
+              <FabItem
+                icon={<Code2 className="w-3.5 h-3.5" strokeWidth={1.8} />}
+                label="Developer mode"
+                href="/app/developer"
+              />
+              <FabItem
+                icon={<Plus className="w-3.5 h-3.5" strokeWidth={2.2} />}
+                label="Deploy a vault"
+                href="/vault/new"
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+        <motion.button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          whileHover={{ scale: 1.04 }}
+          whileTap={{ scale: 0.94 }}
+          className="grid place-items-center"
+          style={{
+            width: 52,
+            height: 52,
+            borderRadius: 999,
+            background: TOK.ink,
+            color: "#FFFFFF",
+            border: `1px solid ${TOK.ink}`,
+            boxShadow:
+              "0 4px 14px rgba(0,0,0,0.18), 0 12px 32px -10px rgba(0,0,0,0.28)",
+            cursor: "pointer",
+          }}
+          aria-label={open ? "Close actions" : "Open actions"}
+        >
+          <motion.span
+            animate={{ rotate: open ? 45 : 0 }}
+            transition={{ duration: 0.2, ease: EASE }}
+            style={{ display: "inline-flex" }}
+          >
+            <Plus className="w-5 h-5" strokeWidth={2.2} />
+          </motion.span>
+        </motion.button>
+      </div>
+
+      <TopUpDrawer
+        open={topUpOpen}
+        onClose={() => setTopUpOpen(false)}
+        vaultPda={data.vault.vaultPda}
+        usdcAta={usdcAta}
+        network={data.vault.network}
+        solBalance={0}
+        usdcBalance={usdcBalance}
+      />
+    </>
+  );
+}
+
+function FabItem({
+  icon,
+  label,
+  href,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  href?: string;
+  onClick?: () => void;
+}) {
+  const inner = (
+    <>
+      <span
+        className="grid place-items-center flex-shrink-0"
+        style={{
+          width: 26,
+          height: 26,
+          borderRadius: 8,
+          background: TOK.surface2,
+          color: TOK.ink2,
+        }}
+      >
+        {icon}
+      </span>
+      <span
+        style={{
+          fontSize: 12.5,
+          fontWeight: 500,
+          color: TOK.ink,
+          letterSpacing: "-0.005em",
+        }}
+      >
+        {label}
+      </span>
+    </>
+  );
+  const sx: React.CSSProperties = {
+    padding: "8px 14px 8px 10px",
+    borderRadius: 12,
+    background: TOK.surface,
+    border: `1px solid ${TOK.hairline}`,
+    boxShadow: TOK.shadowHi,
+    color: TOK.ink,
+    cursor: "pointer",
+    minWidth: 178,
+  };
+  if (href) {
+    return (
+      <Link
+        href={href}
+        className="inline-flex items-center gap-2.5 no-underline"
+        style={sx}
+      >
+        {inner}
+      </Link>
+    );
+  }
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex items-center gap-2.5"
+      style={sx}
+    >
+      {inner}
+    </button>
   );
 }
 
@@ -419,23 +588,13 @@ function WorkerIdentityHero({
     ? `${data.vault.vaultPda.slice(0, 4)}…${data.vault.vaultPda.slice(-4)}`
     : "—";
 
-  const initial = (data.vault.name.match(/[A-Za-z]/)?.[0] ?? "K").toUpperCase();
-
   return (
     <Card style={{ padding: "30px 32px 26px" }}>
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0"
-        style={{
-          background:
-            "linear-gradient(180deg, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0) 30%)",
-        }}
-      />
       <div className="relative">
         <Eyebrow>Your worker</Eyebrow>
 
         <div className="flex items-center gap-4 mt-2.5">
-          <WorkerMark letter={initial} />
+          <KyvernMark size={56} radius={14} layoutId={false} />
           <div className="min-w-0">
             <h1
               className="m-0"
@@ -526,16 +685,14 @@ function WorkerIdentityHero({
           <span style={{ color: TOK.ink, fontWeight: 600 }}>
             Your worker can earn and spend
           </span>{" "}
-          on Solana — within rules the chain itself enforces.
+          on Solana, within rules the chain itself enforces.
         </p>
-        <blockquote
-          className="mt-3"
+        <p
+          className="mt-2.5"
           style={{
             margin: 0,
-            paddingLeft: 14,
-            borderLeft: `2px solid ${TOK.greenLine}`,
             fontSize: 14,
-            color: TOK.ink2,
+            color: TOK.ink3,
             lineHeight: 1.55,
             letterSpacing: "-0.005em",
             maxWidth: "58ch",
@@ -553,7 +710,7 @@ function WorkerIdentityHero({
           </code>{" "}
           call routes through your policy program before a single lamport
           moves.
-        </blockquote>
+        </p>
 
         <div className="flex flex-wrap gap-2.5 mt-5">
           <PrimaryButton
@@ -578,30 +735,6 @@ function WorkerIdentityHero({
         </div>
       </div>
     </Card>
-  );
-}
-
-function WorkerMark({ letter }: { letter: string }) {
-  return (
-    <div
-      className="grid place-items-center flex-shrink-0"
-      style={{
-        width: 56,
-        height: 56,
-        borderRadius: 14,
-        background: "linear-gradient(160deg, #2A2A2C 0%, #0A0A0C 100%)",
-        boxShadow:
-          "0 8px 24px -10px rgba(0,0,0,0.42), inset 0 1px 0 rgba(255,255,255,0.12)",
-        color: "#FFFFFF",
-        fontWeight: 600,
-        fontSize: 24,
-        letterSpacing: "-0.02em",
-        fontFamily:
-          "ui-serif, Georgia, 'New York', 'Times New Roman', serif",
-      }}
-    >
-      {letter}
-    </div>
   );
 }
 
@@ -677,17 +810,6 @@ function VaultBalanceHero({
 
   return (
     <Card style={{ padding: "28px 28px 22px" }}>
-      <div
-        aria-hidden
-        className="pointer-events-none absolute"
-        style={{
-          inset: "-30% -15% auto auto",
-          width: 320,
-          height: 320,
-          background:
-            "radial-gradient(closest-side, rgba(34,197,94,0.16) 0%, rgba(34,197,94,0) 70%)",
-        }}
-      />
       <div className="relative">
         <Eyebrow tone="green">Vault balance</Eyebrow>
         <div
@@ -750,7 +872,7 @@ function VaultBalanceHero({
             style={{
               display: "block",
               height: "100%",
-              background: `linear-gradient(90deg, ${TOK.green}, #4ADE80)`,
+              background: TOK.green,
               borderRadius: "inherit",
             }}
           />
@@ -925,10 +1047,16 @@ function WorkersSidebar({
                 width: "100%",
               }}
             >
-              <WorkerSidebarMark
-                letter={(v.name.match(/[A-Za-z]/)?.[0] ?? "K").toUpperCase()}
-                selected={sel}
-              />
+              <div
+                className="flex-shrink-0"
+                style={{
+                  filter: sel
+                    ? "none"
+                    : "grayscale(20%) brightness(0.96)",
+                }}
+              >
+                <KyvernMark size={32} radius={9} layoutId={false} />
+              </div>
               <div className="min-w-0 flex-1">
                 <div
                   style={{
@@ -1169,7 +1297,7 @@ function RuntimeCard({ data }: { data: VaultPayload }) {
           <span style={{ color: TOK.green, marginRight: 8 }}>›</span>
           Awaiting strategy. Wire your code via{" "}
           <span style={{ color: TOK.green }}>@kyvernlabs/sdk</span> to define
-          this worker&apos;s behavior — every call routes through the policy
+          this worker&apos;s behavior. Every call routes through the policy
           program.
           <br />
           <span style={{ color: TOK.ink4 }}>• vault on-chain</span>
@@ -1721,7 +1849,7 @@ function RecentCallsCard({ data }: { data: VaultPayload }) {
               textAlign: "center",
             }}
           >
-            No calls yet — wire the SDK above and they appear here.
+            No calls yet. Wire the SDK above and they appear here.
           </div>
         )}
         {items.map((p) => {
@@ -1847,7 +1975,7 @@ function PolicyCard({
           lineHeight: 1.5,
         }}
       >
-        A Squads v4 multisig program —{" "}
+        A Squads v4 multisig program{" "}
         <code
           style={{
             fontFamily: "var(--font-mono, ui-monospace), monospace",
@@ -1855,9 +1983,9 @@ function PolicyCard({
             color: TOK.ink,
           }}
         >
-          PpmZ…MSqc
+          (PpmZ…MSqc)
         </code>{" "}
-        — gates every transfer.
+        gates every transfer.
       </p>
 
       <div className="mt-1">

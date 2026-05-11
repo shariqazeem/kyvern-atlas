@@ -183,23 +183,23 @@ export function AgentEventFeed({
     >
       {/* Header */}
       <div
-        className="flex items-center justify-between px-3.5 py-2.5"
+        className="flex items-center justify-between gap-2 px-3.5 py-2.5 flex-wrap"
         style={{ borderBottom: "1px solid rgba(15,23,42,0.05)" }}
       >
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 min-w-0">
           <Radio
-            className="w-3.5 h-3.5"
+            className="w-3.5 h-3.5 flex-shrink-0"
             strokeWidth={2}
             style={{ color: empty ? "#9CA3AF" : "#22C55E" }}
           />
           <h3
-            className="text-[13px] font-semibold tracking-[-0.005em]"
+            className="text-[13px] font-semibold tracking-[-0.005em] whitespace-nowrap"
             style={{ color: "#0A0A0A" }}
           >
-            Your agent&apos;s events
+            Live events
           </h3>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 flex-shrink-0">
           <FilterChip label="All" active={filter === "all"} onClick={() => setFilter("all")} />
           <FilterChip
             label="Allowed"
