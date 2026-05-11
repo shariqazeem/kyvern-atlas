@@ -211,7 +211,7 @@ export function SettingsPageShell({
         return (
           <DeviceCard key={d.vault.id}>
             <Link
-              href={`/app/vaults/${d.vault.id}`}
+              href={`/app?vault=${d.vault.id}`}
               className="flex items-center justify-between gap-3"
             >
               <div className="flex-1 min-w-0">

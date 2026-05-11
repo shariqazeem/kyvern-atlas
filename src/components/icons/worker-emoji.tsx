@@ -19,11 +19,15 @@
 import {
   Activity,
   Bot,
+  Cog,
   Compass,
   Crosshair,
   Fish,
+  Link as LinkIcon,
+  PenTool,
   Repeat,
   Satellite,
+  TrendingUp,
   type LucideIcon,
 } from "lucide-react";
 
@@ -31,13 +35,21 @@ const EMOJI_TO_ICON: Record<string, LucideIcon> = {
   // Trio
   "🎯": Crosshair, // Sentinel · bounty scout
   "🐋": Fish, // Wren · whale tracker (Lucide has no Whale; Fish reads close)
-  "📈": Activity, // Pulse · the literal heartbeat-line glyph
+  "📈": TrendingUp, // Pulse / trader · upward chart line
+  // Wizard picker (kept in sync with EMOJI_CHOICES)
+  "🧭": Compass, // research / default
+  "⚙️": Cog, // devtools / operations
+  "⚙": Cog,
+  "🔗": LinkIcon, // integrator / connector
+  "✍️": PenTool, // content / writer
+  "✍": PenTool,
+  "🤖": Bot, // generic agent
   // Other UI emojis
-  "🧭": Compass, // empty / device default
   "🛰️": Satellite,
   "🛰": Satellite,
   "↻": Repeat,
-  "🤖": Bot,
+  // Legacy fallback for any callsite still expecting Activity
+  "💓": Activity,
 };
 
 interface Props {

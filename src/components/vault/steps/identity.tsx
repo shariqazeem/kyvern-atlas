@@ -27,6 +27,7 @@ import { motion } from "framer-motion";
 import type { VaultConfig } from "../types";
 import { EASE_PREMIUM as ease } from "@/lib/motion";
 import { WizardPreviewDrawer } from "../wizard-preview-drawer";
+import { WorkerEmoji } from "@/components/icons/worker-emoji";
 
 const EMOJI_CHOICES = ["🧭", "📈", "⚙️", "🔗", "✍️", "🤖"];
 
@@ -59,10 +60,13 @@ export function IdentityStep({ config, setConfig }: IdentityStepProps) {
             }}
           >
             <div
-              className="ml-2 my-2 w-11 h-11 rounded-[10px] flex items-center justify-center text-[22px] shrink-0"
-              style={{ background: "var(--surface-2)" }}
+              className="ml-2 my-2 w-11 h-11 rounded-[10px] flex items-center justify-center shrink-0"
+              style={{
+                background: "var(--surface-2)",
+                color: "var(--text-primary)",
+              }}
             >
-              {config.emoji}
+              <WorkerEmoji emoji={config.emoji} size={22} strokeWidth={1.7} />
             </div>
             <input
               id="vault-name"
@@ -124,7 +128,7 @@ export function IdentityStep({ config, setConfig }: IdentityStepProps) {
                   onClick={() =>
                     setConfig((c) => ({ ...c, emoji: em }))
                   }
-                  className="relative w-12 h-12 rounded-[12px] flex items-center justify-center text-[22px] transition-all"
+                  className="relative w-12 h-12 rounded-[12px] flex items-center justify-center transition-all"
                   style={{
                     background: selected
                       ? "var(--surface)"
@@ -135,9 +139,10 @@ export function IdentityStep({ config, setConfig }: IdentityStepProps) {
                     boxShadow: selected
                       ? "0 1px 2px rgba(0,0,0,0.06), 0 6px 18px rgba(0,0,0,0.05)"
                       : "none",
+                    color: "var(--text-primary)",
                   }}
                 >
-                  {em}
+                  <WorkerEmoji emoji={em} size={22} strokeWidth={1.7} />
                   {selected && (
                     <motion.span
                       layoutId="emoji-ring"
@@ -244,10 +249,13 @@ function LiveNameplate({ config }: { config: VaultConfig }) {
               initial={{ scale: 0.85, rotate: -8 }}
               animate={{ scale: 1, rotate: 0 }}
               transition={{ duration: 0.5, ease }}
-              className="w-12 h-12 rounded-[12px] flex items-center justify-center text-[26px] shrink-0"
-              style={{ background: "var(--surface-2)" }}
+              className="w-12 h-12 rounded-[12px] flex items-center justify-center shrink-0"
+              style={{
+                background: "var(--surface-2)",
+                color: "var(--text-primary)",
+              }}
             >
-              {config.emoji}
+              <WorkerEmoji emoji={config.emoji} size={24} strokeWidth={1.7} />
             </motion.div>
             <div className="min-w-0">
               <p

@@ -13,6 +13,7 @@ import { useEffect, useState } from "react";
 import { Check, ShieldCheck } from "lucide-react";
 import { PURPOSE_PRESETS, type VaultConfig } from "../types";
 import { EASE_PREMIUM as ease } from "@/lib/motion";
+import { WorkerEmoji } from "@/components/icons/worker-emoji";
 
 export interface ReviewStepProps {
   config: VaultConfig;
@@ -54,10 +55,13 @@ export function ReviewStep({
           style={{ borderBottom: "0.5px solid var(--border-subtle)" }}
         >
           <div
-            className="w-12 h-12 rounded-[12px] flex items-center justify-center text-[24px] shrink-0"
-            style={{ background: "var(--surface-2)" }}
+            className="w-12 h-12 rounded-[12px] flex items-center justify-center shrink-0"
+            style={{
+              background: "var(--surface-2)",
+              color: "var(--text-primary)",
+            }}
           >
-            {config.emoji}
+            <WorkerEmoji emoji={config.emoji} size={24} strokeWidth={1.7} />
           </div>
           <div className="flex-1 min-w-0">
             <div
@@ -381,8 +385,8 @@ function DeployingView({ config }: { config: VaultConfig }) {
               "radial-gradient(circle, transparent 32px, black 34px)",
           }}
         />
-        <span className="relative text-white text-[32px] font-bold tracking-tight">
-          {config.emoji}
+        <span className="relative text-white inline-flex">
+          <WorkerEmoji emoji={config.emoji} size={32} strokeWidth={1.8} />
         </span>
       </motion.div>
 

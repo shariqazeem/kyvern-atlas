@@ -16,6 +16,7 @@ import type { VaultConfig } from "../types";
 // narrative. Re-introduce if a distinct merchant-side product returns.
 import { SignatureReveal } from "@/components/atlas/signature-reveal";
 import { EASE_PREMIUM as ease } from "@/lib/motion";
+import { WorkerEmoji } from "@/components/icons/worker-emoji";
 
 export interface SuccessStepProps {
   config: VaultConfig;
@@ -182,10 +183,13 @@ await vault.pay({
         }}
       >
         <div
-          className="w-11 h-11 rounded-[10px] flex items-center justify-center text-[22px] shrink-0"
-          style={{ background: "var(--surface-2)" }}
+          className="w-11 h-11 rounded-[10px] flex items-center justify-center shrink-0"
+          style={{
+            background: "var(--surface-2)",
+            color: "var(--text-primary)",
+          }}
         >
-          {config.emoji}
+          <WorkerEmoji emoji={config.emoji} size={22} strokeWidth={1.7} />
         </div>
         <div className="flex-1 min-w-0">
           <div
