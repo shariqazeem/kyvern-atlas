@@ -185,29 +185,36 @@ export async function POST(
     );
   }
 
-  // ─── Step 1: Parse the user's intent via real LLM ──────────────
-  let parsed: ParsedIntent;
-  let parserModelUsed = PRIMARY_MODEL;
-  try {
-    const { text, modelUsed } = await callCommonstack(
-      apiKey,
-      PARSER_SYSTEM,
-      prompt,
-      220,
-      true,
-    );
-    parserModelUsed = modelUsed;
-    parsed = sanitizeParsed(JSON.parse(extractJsonObject(text)));
-  } catch (e) {
-    return NextResponse.json(
-      {
-        ok: false,
-        stage: "parse",
-        error: "parse_failed",
-        message: e instanceof Error ? e.message : "LLM parse failed",
-      },
-      { status: 502 },
-    );
+  // ─── Step 1: Parse intent ──────────────────────────────────────
+  // Pre-parser: for obvious "send/pay $X to Y" inputs, skip the LLM
+  // entirely. DeepSeek v4-flash sometimes ignores response_format and
+  // emits reasoning prose — the deterministic regex parser dodges
+  // that whole failure mode for the most common demo case.
+  let parsed: ParsedIntent | null = parseDeterministic(prompt);
+  let parserModelUsed: string = parsed ? "regex" : PRIMARY_MODEL;
+
+  if (!parsed) {
+    try {
+      const { text, modelUsed } = await callCommonstack(
+        apiKey,
+        PARSER_SYSTEM,
+        prompt,
+        300,
+        true,
+      );
+      parserModelUsed = modelUsed;
+      parsed = sanitizeParsed(JSON.parse(extractJsonObject(text)));
+    } catch (e) {
+      return NextResponse.json(
+        {
+          ok: false,
+          stage: "parse",
+          error: "parse_failed",
+          message: e instanceof Error ? e.message : "LLM parse failed",
+        },
+        { status: 502 },
+      );
+    }
   }
 
   // ─── Step 2: Chain gate via Kyvern policy program (REAL) ───────
@@ -478,7 +485,7 @@ function findJsonObject(text: string): string | null {
 
 function sanitizeParsed(raw: unknown): ParsedIntent {
   const obj = raw as Record<string, unknown>;
-  const merchant = String(obj.merchant ?? "")
+  let merchant = String(obj.merchant ?? "")
     .trim()
     .toLowerCase()
     .replace(/^https?:\/\//, "")
@@ -487,22 +494,59 @@ function sanitizeParsed(raw: unknown): ParsedIntent {
     typeof obj.amount_usd === "number"
       ? obj.amount_usd
       : parseFloat(String(obj.amount_usd ?? "0"));
-  const intent = String(obj.intent ?? "").trim().slice(0, 200);
+  const intent = String(obj.intent ?? "").trim().slice(0, 200) ||
+    "transfer authorized via Kyvern Secure Terminal";
   if (!merchant) throw new Error("merchant missing");
   if (!Number.isFinite(amount) || amount <= 0) throw new Error("amount invalid");
-  if (!intent) throw new Error("intent missing");
-  // Hostname / merchant-string sanity: allow letters/digits/dots/
-  // dashes/underscores so personal names like "shariq" or "bob_dev"
-  // round-trip. Still refuse shell metacharacters / spaces — the
-  // string flows downstream into a memo + the policy program's merchant
-  // hash, so it has to be a single safe token.
+  // Hostname / merchant-string sanity: letters/digits/dots/dashes/
+  // underscores only. Cap at 64 chars. Refuse shell metacharacters /
+  // whitespace — the string flows downstream into a memo and the
+  // policy program's merchant hash.
   if (!/^[a-z0-9._-]+$/.test(merchant) || merchant.length > 64) {
     throw new Error(`merchant looks invalid: ${merchant}`);
   }
-  // Cap amount so a runaway LLM can't request huge transactions
-  // (Squads' fee-payer would refuse anyway; this is just defence in depth)
+  // policy-engine.normalizeMerchant requires a dot or "localhost".
+  // Bare names like "shariq" get a synthetic ".local" suffix so they
+  // pass the normalizer and reach the on-chain allowlist check — the
+  // chain then refuses with code 12003 (MerchantNotAllowlisted), which
+  // is the correct outcome we want to demonstrate.
+  if (!merchant.includes(".") && merchant !== "localhost") {
+    merchant = `${merchant}.local`;
+  }
+  // Cap amount so a runaway LLM can't request huge transactions.
   const cappedAmount = Math.min(amount, 1000);
   return { merchant, amount_usd: cappedAmount, intent };
+}
+
+/** Deterministic pre-parser for the most common demo prompt shapes:
+ *
+ *   pay $0.05 to api.openai.com
+ *   send 5 usdc to scammer.io
+ *   pay 0.05$ to shariq
+ *   transfer $50 to attacker-exfil.xyz
+ *
+ * Returns null when the prompt doesn't clearly match a payment shape;
+ * the LLM parser then handles it. */
+function parseDeterministic(prompt: string): ParsedIntent | null {
+  const cleaned = prompt.trim().toLowerCase();
+  // Matches: (pay|send|transfer) <amount> [$] [usdc] to <merchant>
+  // Where amount can be $X.XX, X.XX$, X.XX, X
+  const re =
+    /^(?:pay|send|transfer)\s+(?:\$\s*)?(\d+(?:\.\d+)?)(?:\s*\$)?(?:\s+usdc?)?\s+(?:to\s+)([a-z0-9._-]{1,64})\b/i;
+  const m = cleaned.match(re);
+  if (!m) return null;
+  const amount = parseFloat(m[1]);
+  if (!Number.isFinite(amount) || amount <= 0) return null;
+  const rawMerchant = m[2].toLowerCase();
+  try {
+    return sanitizeParsed({
+      merchant: rawMerchant,
+      amount_usd: amount,
+      intent: `transfer $${amount.toFixed(amount < 0.01 ? 4 : 2)} to ${rawMerchant}`,
+    });
+  } catch {
+    return null;
+  }
 }
 
 // Keep the LLM-allowlist export referenced for clarity even though we
