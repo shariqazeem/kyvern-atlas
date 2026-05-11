@@ -2402,33 +2402,70 @@ function RecentCallsCard({ data }: { data: VaultPayload }) {
                   fontSize: 12.5,
                 }}
               >
-                ${p.amountUsd.toFixed(2)}
+                ${
+                  p.amountUsd < 0.01
+                    ? p.amountUsd.toFixed(3)
+                    : p.amountUsd.toFixed(2)
+                }
               </span>
-              <span
-                className="inline-flex items-center gap-1.5"
-                style={{
-                  height: 22,
-                  padding: "0 9px",
-                  borderRadius: 999,
-                  fontSize: 11,
-                  fontWeight: 500,
-                  background: blocked ? TOK.amberSoft : TOK.greenSoft,
-                  color: blocked ? TOK.amber : TOK.green,
-                }}
-              >
-                <span
+              {p.txSignature ? (
+                <a
+                  href={`https://explorer.solana.com/tx/${p.txSignature}?cluster=${data.vault.network}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 no-underline transition hover:opacity-80"
                   style={{
-                    width: 5,
-                    height: 5,
+                    height: 22,
+                    padding: "0 9px",
                     borderRadius: 999,
-                    background: "currentColor",
-                    display: "inline-block",
+                    fontSize: 11,
+                    fontWeight: 500,
+                    background: blocked ? TOK.amberSoft : TOK.greenSoft,
+                    color: blocked ? TOK.amber : TOK.green,
                   }}
-                />
-                {blocked
-                  ? `Blocked${p.reason ? ` · ${p.reason}` : ""}`
-                  : "Allowed"}
-              </span>
+                  title="Open this transaction on Solana Explorer"
+                >
+                  <span
+                    style={{
+                      width: 5,
+                      height: 5,
+                      borderRadius: 999,
+                      background: "currentColor",
+                      display: "inline-block",
+                    }}
+                  />
+                  {blocked
+                    ? `Blocked${p.reason ? ` · ${p.reason}` : ""}`
+                    : "Allowed"}
+                  <ExternalLink className="w-2.5 h-2.5" strokeWidth={2} />
+                </a>
+              ) : (
+                <span
+                  className="inline-flex items-center gap-1.5"
+                  style={{
+                    height: 22,
+                    padding: "0 9px",
+                    borderRadius: 999,
+                    fontSize: 11,
+                    fontWeight: 500,
+                    background: blocked ? TOK.amberSoft : TOK.greenSoft,
+                    color: blocked ? TOK.amber : TOK.green,
+                  }}
+                >
+                  <span
+                    style={{
+                      width: 5,
+                      height: 5,
+                      borderRadius: 999,
+                      background: "currentColor",
+                      display: "inline-block",
+                    }}
+                  />
+                  {blocked
+                    ? `Blocked${p.reason ? ` · ${p.reason}` : ""}`
+                    : "Allowed"}
+                </span>
+              )}
             </div>
           );
         })}
