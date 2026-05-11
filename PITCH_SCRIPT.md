@@ -54,7 +54,7 @@ Three takes max.
 >
 > *(pause 1s)*
 >
-> I've shipped three x402 agent projects on Solana — I've watched this problem from inside the agent layer for a year. Kyvern is the missing piece I've been preparing to build.
+> I've shipped three x402 agent projects on Solana. I've watched this problem from inside the agent layer for a year. Kyvern is the missing piece I've been preparing to build.
 
 ---
 
@@ -66,7 +66,7 @@ Three takes max.
 >
 > *(pause 1.5s)*
 >
-> Kyvern wraps every agent in a Squads v4 smart account with a custom Solana policy program that enforces budgets, allowlists, velocity caps, and a kill switch — on-chain, before any USDC moves.
+> Kyvern wraps every agent in a Squads v4 smart account with a custom Solana policy program that enforces budgets, allowlists, velocity caps, and a kill switch. On-chain. Before any USDC moves.
 >
 > *(pause 1s)*
 >
@@ -102,7 +102,7 @@ Three takes max.
 
 **SAY**
 
-> I built ParallaxPay — an x402 agent marketplace — last quarter on Solana. It works fine, but every agent in it holds keys.
+> I built ParallaxPay, an x402 agent marketplace, last quarter on Solana. It works fine, but every agent in it holds keys.
 >
 > *(pause 1s)*
 >

@@ -39,13 +39,15 @@ Three takes max. Stopwatch every sentence.
 
 > Meet Atlas. A reference AI agent that's been running autonomously on Solana devnet for [DAYS] days.
 >
-> *(pause 1s · two seconds per number from here)*
+> *(pause 1s · land each line as its own breath)*
 >
-> [PAID_COUNT] merchants — paid.
+> [PAID_COUNT] merchants paid.
 >
-> [BLOCKED_COUNT] refusals — blocked on-chain.
+> [BLOCKED_COUNT] attacks blocked on-chain.
 >
-> [DAYS] days autonomous. Zero dollars lost.
+> [DAYS] days autonomous.
+>
+> Zero dollars lost.
 
 **DO** — Click **one refused row** in the timeline. Solana Explorer opens. Show `AmountExceedsPerTxMax` in the program logs.
 
@@ -118,9 +120,9 @@ agent key → wrapper code → settled rows → Explorer page.**
 
 **SAY**
 
-> I built ParallaxPay last quarter — an x402 agent marketplace.
+> I built ParallaxPay last quarter. An x402 agent marketplace.
 >
-> Its market oracle predicts crypto prices using CoinGecko and DeepSeek. It used to run free. Now it runs under Kyvern.
+> Its market oracle ran free. Now it runs under Kyvern.
 
 **DO** — Scroll to the "Bring your own agent" card directly below. BTC is selected by default.
 
@@ -148,7 +150,7 @@ Result panel fills with price + prediction + two Explorer-linked payments.
 
 **SAY**
 
-> This agent didn't know Kyvern existed when it was written. One import. One wrapped fetch. Now every call it makes is gated by consensus.
+> This agent was written before Kyvern existed. One import. One wrapped fetch. Now every call it makes is gated by consensus.
 
 ---
 
@@ -180,7 +182,7 @@ Result panel fills with price + prediction + two Explorer-linked payments.
 >
 > *(pause 1s)*
 >
-> Atlas runs on it today. The SDK ships today.
+> Today, Atlas runs on it. Today, the SDK ships.
 
 **HOLD** — Fade on the tagline: *"Agents shouldn't have keys. They should have budgets."*
 
