@@ -92,7 +92,7 @@ This version is written to **sound like you talking to a friend who asked what K
 
 **SAY** *(don't smile. This is your strongest evidence. Let it sit.)*
 
-> Atlas is our reference agent. It's been running autonomously on Solana devnet for [DAYS] days.
+> Atlas is our reference agent. It's been running on Solana devnet for [DAYS] days. Fully autonomous.
 >
 > *(pause 1s)*
 >

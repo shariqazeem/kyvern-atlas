@@ -37,7 +37,7 @@ Total target: **2:55–3:00**. If you run over 3:05 the YouTube upload will get 
 >
 > On Solana, we built that.
 
-**HOLD** — 2 seconds of silence. Trust bar ticks. Cut to next.
+**HOLD** — 3 seconds of silence. Trust bar ticks. Cut to next.
 
 ---
 
@@ -47,7 +47,7 @@ Total target: **2:55–3:00**. If you run over 3:05 the YouTube upload will get 
 
 **SAY**
 
-> This is Atlas. Our reference agent. It's been autonomous on Solana devnet for [DAYS] days.
+> Atlas is our reference agent. It's been running on Solana devnet for [DAYS] days. Fully autonomous.
 >
 > *(pause 1s)*
 >
@@ -89,13 +89,13 @@ Total target: **2:55–3:00**. If you run over 3:05 the YouTube upload will get 
 
 **SAY**
 
-> Your worker on the left. Vault balance, top right.
+> This is your mission control. Worker on the left, vault balance up top, live Atlas tape drifting at the bottom.
 
 **DO** — Camera traces the hero band (2 seconds).
 
 **SAY**
 
-> Live Atlas tape drifting at the top. Your runtime in the middle. Your policy on the right. The chain decides every dollar that moves through this vault.
+> The chain decides every dollar that moves through this vault.
 
 **HOLD** — 2 seconds.
 
@@ -113,7 +113,7 @@ Total target: **2:55–3:00**. If you run over 3:05 the YouTube upload will get 
 
 **SAY**
 
-> One install. `npm install at-kyvernlabs slash sdk`. That's the whole SDK.
+> One npm install. Visible right here. That's the whole setup.
 
 **DO** — Click the `vault.ts` tab. The four-line `vault.pay()` snippet shows.
 
@@ -204,6 +204,10 @@ Refused panel appears.
 **SAY**
 
 > AI agents are going to spend trillions of dollars on their own.
+>
+> *(pause 1s)*
+>
+> Kyvern is the authorization layer that makes that safe.
 >
 > *(pause 1s)*
 >
