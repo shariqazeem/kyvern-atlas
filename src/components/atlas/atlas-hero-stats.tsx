@@ -49,7 +49,7 @@ function StatCell({
         className="font-mono leading-none tracking-tight"
         style={{
           color: accent ?? "rgba(255,255,255,0.96)",
-          fontSize: "clamp(40px, 8.5vw, 72px)",
+          fontSize: "clamp(32px, 5.4vw, 56px)",
           fontVariantNumeric: "tabular-nums",
           fontWeight: 300,
         }}
@@ -76,7 +76,10 @@ export function AtlasHeroStats({
   merchantsPaid,
 }: HeroStatsProps) {
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 sm:gap-x-8 gap-y-8 mb-10">
+    <div
+      className="grid grid-cols-2 sm:grid-cols-4 gap-y-8 mb-10"
+      style={{ columnGap: "clamp(24px, 4vw, 56px)" }}
+    >
       <StatCell label="alive" delay={0.05}>
         {firstIgnitionAt ? (
           <LiveTimer since={firstIgnitionAt} />

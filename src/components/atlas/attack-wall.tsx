@@ -198,14 +198,14 @@ export function AttackWall({ attacks, limit = 60 }: AttackWallProps) {
                     <span style={{ color: "rgba(255,255,255,0.7)" }}>
                       {merchantFor(a)}
                     </span>
-                    <span
-                      className="ml-auto inline-flex items-center gap-1.5"
-                      style={{ color: "rgba(255,255,255,0.18)" }}
-                    >
-                      ·
-                    </span>
-                    {sig && explorerHref ? (
+                    {sig && explorerHref && (
                       <>
+                        <span
+                          className="ml-auto"
+                          style={{ color: "rgba(255,255,255,0.18)" }}
+                        >
+                          ·
+                        </span>
                         <span style={{ color: "rgba(255,255,255,0.55)" }}>
                           {sig}
                         </span>
@@ -214,21 +214,6 @@ export function AttackWall({ attacks, limit = 60 }: AttackWallProps) {
                           style={{ color: "rgba(134,239,172,0.85)" }}
                         />
                       </>
-                    ) : (
-                      <span
-                        style={{
-                          color: "rgba(255,255,255,0.42)",
-                          fontSize: 10,
-                          textTransform: "uppercase",
-                          letterSpacing: "0.10em",
-                          padding: "1px 6px",
-                          borderRadius: 4,
-                          border: "1px solid rgba(255,255,255,0.08)",
-                          background: "rgba(255,255,255,0.02)",
-                        }}
-                      >
-                        off-chain pre-check
-                      </span>
                     )}
                   </Inner>
                 </motion.div>
