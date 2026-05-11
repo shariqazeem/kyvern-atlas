@@ -63,25 +63,45 @@ Total target: **2:55–3:00**. If you run over 3:05 the YouTube upload will get 
 
 ---
 
-## STEP 3 · 0:32–0:55 · Inside /app
+## STEP 3 · 0:32–0:50 · Try without login
 
-**DO** — Click back. Navigate to `https://app.kyvernlabs.com/app`. You're already signed in. Page loads.
-
-**SAY**
-
-> This is your /app. Your worker on the left. Vault balance, top right.
-
-**DO** — Camera traces the hero band briefly (1-2 seconds).
+**DO** — Click back to `kyvernlabs.com`. Scroll to the hero CTAs.
 
 **SAY**
 
-> Live Atlas tape drifting at the top. Your runtime status in the middle. Your policy on the right. The chain decides every dollar that moves through this vault.
+> You can try Kyvern without signing in. Click here.
 
-**HOLD** — 2 seconds. Let the page breathe.
+**DO** — Click **"Try a Kyvern · no login"**. The /try page loads. Four provisioning stages run in sequence on screen:
+> - Spinning up your sandbox device…
+> - Provisioning a Squads multisig vault on Solana devnet…
+> - Wiring the Kyvern policy program (PpmZ…MSqc)…
+> - Installing the three starter workers…
+
+**SAY** *(over the provisioning animation)*
+
+> Real Squads multisig. Real policy program. About six seconds later, you're inside `/app` with an on-chain vault of your own.
+
+**DO** — `/app` loads automatically. Sandbox vault active.
 
 ---
 
-## STEP 4 · 0:55–1:25 · Mint key + install SDK
+## STEP 4 · 0:50–1:15 · Inside /app
+
+**SAY**
+
+> Your worker on the left. Vault balance, top right.
+
+**DO** — Camera traces the hero band (2 seconds).
+
+**SAY**
+
+> Live Atlas tape drifting at the top. Your runtime in the middle. Your policy on the right. The chain decides every dollar that moves through this vault.
+
+**HOLD** — 2 seconds.
+
+---
+
+## STEP 5 · 1:15–1:40 · Mint key + install SDK
 
 **DO** — Scroll down to the SDK card. Click the `.env` tab.
 
@@ -103,7 +123,7 @@ Total target: **2:55–3:00**. If you run over 3:05 the YouTube upload will get 
 
 ---
 
-## STEP 5 · 1:25–2:00 · Wrap a real third-party agent
+## STEP 6 · 1:40–2:10 · Wrap a real third-party agent
 
 **This is the core proof beat. Don't rush it.**
 
@@ -139,7 +159,7 @@ Result panel fills with price + prediction + two settled payment rows.
 
 ---
 
-## STEP 6 · 2:00–2:25 · Watch the chain refuse
+## STEP 7 · 2:10–2:35 · Watch the chain refuse
 
 **DO** — Cut back to `/app`. Scroll up to the right column ("Watch the chain refuse" card).
 
@@ -163,7 +183,7 @@ Refused panel appears.
 
 ---
 
-## STEP 7 · 2:25–2:45 · Pay.sh interop
+## STEP 8 · 2:35–2:50 · Pay.sh interop
 
 **DO** — Cut back to `/app`. Scroll to the Pay.sh card.
 
@@ -177,7 +197,7 @@ Refused panel appears.
 
 ---
 
-## STEP 8 · 2:45–3:00 · Close
+## STEP 9 · 2:50–3:00 · Close
 
 **DO** — Cut to the landing page one last time. The manifesto frame visible.
 
@@ -202,7 +222,7 @@ Refused panel appears.
 ## Reading discipline
 
 - Speak the way you actually speak when you're walking someone through your own product. Not announcer voice, not corporate voice.
-- ~140 wpm. Slow on the numbers in Step 2 (each one is a beat). Faster through the install + tab clicks in Step 4 (action carries the pace).
+- ~140 wpm. Slow on the numbers in Step 2 (each one is a beat). Faster through the install + tab clicks in Step 5 (action carries the pace).
 - The strongest line in the whole script is *"This agent was written before Kyvern existed. One import. One wrapped fetch. Now every call it makes is gated by consensus."* — land it slow. Lower register.
 - Em-dashes don't appear in any spoken line. If you forget mid-take and add one, just continue with a period instead.
 - If a take goes wrong: stop, breathe, restart the beat from the top, keep rolling. Editor splices.
@@ -211,10 +231,11 @@ Refused panel appears.
 
 | Symptom | Action |
 |---|---|
-| Step 5 button stuck on "Polling chain…" > 8s | Stop take. Refresh `/app`, top up fee-payer at faucet.solana.com, retry. |
-| Step 5 returns "Refused on chain · merchant_not_allowed" | Auto-allowlist failed. Manually add `api.coingecko.com` + `api.commonstack.ai` in /app allowlist. Retry. |
-| Step 5 prediction text empty (Commonstack fallback) | The 2 settled payments still tell the policy story. Cut the camera pan to the prediction text in that take, finish the rest. |
-| Step 6 refused panel doesn't appear in 5s | Network slow. Take 2. |
+| Step 3 `/try` provisioning hangs > 12s | Stop take. Top up server fee-payer at faucet.solana.com (vault create costs ~5000 lamports). Retry. |
+| Step 6 button stuck on "Polling chain…" > 8s | Stop take. Refresh `/app`, top up fee-payer, retry. |
+| Step 6 returns "Refused on chain · merchant_not_allowed" | Auto-allowlist failed. Manually add `api.coingecko.com` + `api.commonstack.ai` in /app allowlist. Retry. |
+| Step 6 prediction text empty (Commonstack fallback) | The 2 settled payments still tell the policy story. Cut the camera pan to the prediction text in that take, finish the rest. |
+| Step 7 refused panel doesn't appear in 5s | Network slow. Take 2. |
 | Explorer link 404s | Your fee-payer ran out of SOL during the tx submit. Top up. |
 
 ## Take log
