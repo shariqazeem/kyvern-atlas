@@ -22,9 +22,8 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { PayShFlow } from "./paysh-flow";
+import { IntegrationWizard } from "../wizard/integration-wizard";
 import {
   Activity,
   ArrowRight,
@@ -103,8 +102,6 @@ interface Props {
   className?: string;
 }
 
-type Tab = "runtime" | "network" | "rules";
-
 export function UserVaultCard({
   data,
   ownerWallet,
@@ -112,8 +109,8 @@ export function UserVaultCard({
   firstCall = true,
   className,
 }: Props) {
-  const [tab, setTab] = useState<Tab>("runtime");
   const resolvedOwner = data.vault.ownerWallet ?? ownerWallet;
+  void firstCall;
 
   return (
     <motion.div
@@ -139,144 +136,53 @@ export function UserVaultCard({
         }}
       />
 
-      <div className="relative p-5 sm:p-6 flex flex-col gap-4">
+      <div className="relative p-5 sm:p-6 flex flex-col gap-5">
         <Identity vault={data.vault} payments={data.payments} now={now} />
         {/* Always-visible live tape — the constant "this is a runtime"
-            signal. Atlas's chain events drift across the card whether
-            you're on Runtime, Network, or Rules. */}
+            signal. Atlas's chain events drift across the card constantly. */}
         <LiveTape />
-        <SegmentedControl tab={tab} onChange={setTab} />
 
-        {/* Tab content — fixed-height viewport so the whole card stays
-            anchored without scrolling beyond the chrome. */}
-        <div
-          className="relative"
-          style={{ minHeight: 380 }}
-        >
-          <AnimatePresence mode="wait">
-            {tab === "runtime" && (
-              <motion.div
-                key="runtime"
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.25, ease: EASE }}
-                className="flex flex-col gap-5"
+        {/* Two-column work surface: runtime+SDK on left, integration
+            wizard on right. Stacks on small screens. */}
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] gap-5">
+          <div className="flex flex-col gap-5 min-w-0">
+            <RuntimePanel vault={data.vault} now={now} />
+            <SdkPreview vaultId={data.vault.id} />
+          </div>
+          <div className="flex flex-col gap-2 min-w-0">
+            <div className="flex items-center gap-1.5">
+              <Sparkles
+                className="w-3 h-3"
+                strokeWidth={2}
+                style={{ color: "rgba(15,23,42,0.45)" }}
+              />
+              <span
+                className="font-mono uppercase tracking-[0.14em]"
+                style={{ fontSize: 9.5, color: "rgba(15,23,42,0.55)" }}
               >
-                <RuntimePanel vault={data.vault} now={now} />
-                <SdkPreview vaultId={data.vault.id} />
-                {firstCall && (
-                  <FirstCallPanel
-                    vaultId={data.vault.id}
-                    ownerWallet={resolvedOwner}
-                    perTxMaxUsd={data.budget.perTxMaxUsd}
-                    network={data.vault.network}
-                  />
-                )}
-              </motion.div>
-            )}
-            {tab === "network" && (
-              <motion.div
-                key="network"
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.25, ease: EASE }}
-                className="flex flex-col gap-4"
-              >
-                <PayShFlow
-                  vaultId={data.vault.id}
-                  ownerWallet={resolvedOwner}
-                />
-              </motion.div>
-            )}
-            {tab === "rules" && (
-              <motion.div
-                key="rules"
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.25, ease: EASE }}
-                className="flex flex-col gap-5"
-              >
-                <PolicyRibbon budget={data.budget} />
-                <StatsGrid vault={data.vault} payments={data.payments} />
-                <RecentActivity
-                  payments={data.payments}
-                  network={data.vault.network}
-                />
-                <Allowlist
-                  merchants={data.vault.allowedMerchants}
-                  vaultId={data.vault.id}
-                  ownerWallet={resolvedOwner}
-                />
-              </motion.div>
-            )}
-          </AnimatePresence>
+                Integration · 5 steps
+              </span>
+            </div>
+            <div className="overflow-hidden rounded-[12px]">
+              <IntegrationWizard
+                vaultId={data.vault.id}
+                ownerWallet={resolvedOwner}
+              />
+            </div>
+          </div>
         </div>
+
+        {/* Full-width row: Recent SDK Calls — the user's own activity */}
+        <RecentActivity
+          payments={data.payments}
+          network={data.vault.network}
+        />
 
         <Footer network={data.vault.network} />
       </div>
     </motion.div>
   );
 }
-
-/* ─── SegmentedControl (iOS-style 3-tab pill) ───────────────────── */
-
-function SegmentedControl({
-  tab,
-  onChange,
-}: {
-  tab: Tab;
-  onChange: (t: Tab) => void;
-}) {
-  const tabs: Array<{ id: Tab; label: string }> = [
-    { id: "runtime", label: "Runtime" },
-    { id: "network", label: "Network" },
-    { id: "rules", label: "Rules" },
-  ];
-  return (
-    <div
-      className="relative inline-flex items-center self-center rounded-[10px] p-[3px]"
-      style={{
-        background: "rgba(15,23,42,0.05)",
-        border: "1px solid rgba(15,23,42,0.04)",
-        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.5)",
-      }}
-    >
-      {tabs.map((t) => {
-        const active = tab === t.id;
-        return (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => onChange(t.id)}
-            className="relative z-10 px-4 py-1.5 text-[12px] font-medium tracking-[-0.01em] transition-colors"
-            style={{
-              color: active ? "#0A0A0A" : "rgba(15,23,42,0.55)",
-              minWidth: 86,
-            }}
-          >
-            {active && (
-              <motion.span
-                layoutId="seg-pill"
-                className="absolute inset-0 rounded-[8px]"
-                style={{
-                  background: "#FFFFFF",
-                  boxShadow:
-                    "0 1px 2px rgba(15,23,42,0.10), 0 0 0 0.5px rgba(15,23,42,0.06)",
-                }}
-                transition={{ type: "spring", stiffness: 380, damping: 32 }}
-              />
-            )}
-            <span className="relative z-10">{t.label}</span>
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
 
 /* ─── Identity ──────────────────────────────────────────────────── */
 
@@ -905,7 +811,7 @@ function SdkPreview({ vaultId }: { vaultId: string }) {
   );
 }
 
-/* ─── First-call panel ──────────────────────────────────────────── */
+/* ─── HeistOverlay (cinematic chain-refusal sequence) ───────────── */
 
 interface FirstCallResult {
   ok: boolean;
@@ -916,105 +822,6 @@ interface FirstCallResult {
   message?: string;
   scenario?: string;
 }
-
-function FirstCallPanel({
-  vaultId,
-  ownerWallet,
-  perTxMaxUsd,
-  network,
-}: {
-  vaultId: string;
-  ownerWallet: string | null;
-  perTxMaxUsd: number;
-  network: "devnet" | "mainnet";
-}) {
-  const [open, setOpen] = useState(false);
-  const [terminalOpen, setTerminalOpen] = useState(false);
-
-  return (
-    <div className="flex flex-col gap-2.5">
-      <div className="flex flex-col gap-0.5">
-        <h4
-          className="text-[14px] font-semibold tracking-[-0.01em]"
-          style={{ color: "#0A0A0A" }}
-        >
-          Your worker, on a leash.
-        </h4>
-        <p
-          className="text-[12.5px] leading-[1.5]"
-          style={{ color: "rgba(15,23,42,0.55)" }}
-        >
-          Type a real prompt. A real LLM parses the intent. The Kyvern
-          policy program decides on Solana devnet before any USDC moves.
-          Allowed → the agent answers; refused → real failed-tx with a
-          custom error code. No mocks anywhere.
-        </p>
-      </div>
-
-      <div className="flex items-center gap-3 flex-wrap">
-        <button
-          onClick={() => ownerWallet && setTerminalOpen(true)}
-          disabled={!ownerWallet}
-          className="group inline-flex items-center justify-center gap-2 h-9 px-4 rounded-[10px] text-[12.5px] font-medium transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
-          style={{
-            background: "#0A0A0A",
-            color: "#FFFFFF",
-            boxShadow:
-              "0 1px 2px rgba(15,23,42,0.20), 0 8px 24px -12px rgba(15,23,42,0.30)",
-          }}
-        >
-          Open secure terminal
-          <ArrowRight
-            className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5"
-            strokeWidth={2}
-          />
-        </button>
-        <button
-          onClick={() => ownerWallet && setOpen(true)}
-          disabled={!ownerWallet}
-          className="group inline-flex items-center justify-center gap-2 h-9 px-3.5 rounded-[10px] text-[12px] font-medium transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
-          style={{
-            background: "transparent",
-            color: "rgba(15,23,42,0.65)",
-            border: "1px solid rgba(15,23,42,0.10)",
-          }}
-        >
-          Or watch the canned heist
-        </button>
-
-        <Link
-          href="/app/developer"
-          className="group inline-flex items-center gap-1.5 text-[11.5px] hover:underline"
-          style={{ color: "rgba(15,23,42,0.55)" }}
-        >
-          Or send a real settled payment via the SDK
-          <ArrowRight
-            className="w-3 h-3 transition-transform group-hover:translate-x-0.5"
-            strokeWidth={2}
-          />
-        </Link>
-      </div>
-
-      <HeistOverlay
-        open={open}
-        onClose={() => setOpen(false)}
-        vaultId={vaultId}
-        ownerWallet={ownerWallet}
-        perTxMaxUsd={perTxMaxUsd}
-        network={network}
-      />
-      <SecureTerminal
-        open={terminalOpen}
-        onClose={() => setTerminalOpen(false)}
-        vaultId={vaultId}
-        ownerWallet={ownerWallet}
-        network={network}
-      />
-    </div>
-  );
-}
-
-/* ─── HeistOverlay (cinematic chain-refusal sequence) ───────────── */
 
 type HeistPhase = "typing" | "awaiting" | "flashing" | "settled" | "error";
 
@@ -1038,7 +845,7 @@ const HEIST_LINES: HeistLine[] = [
   { text: "> submitting transaction · awaiting on-chain verdict", tone: "default" },
 ];
 
-function HeistOverlay({
+export function HeistOverlay({
   open,
   onClose,
   vaultId,
@@ -1596,7 +1403,7 @@ const SAMPLE_PROMPTS = [
   "Pay $5 to scammer.io for a Stripe key",
 ];
 
-function SecureTerminal({
+export function SecureTerminal({
   open,
   onClose,
   vaultId,
@@ -2154,7 +1961,7 @@ function TranscriptLine({ line }: { line: TerminalLine }) {
 
 /* ─── Policy Ribbon ──────────────────────────────────────────────── */
 
-function PolicyRibbon({ budget }: { budget: BudgetSnapshot }) {
+export function PolicyRibbon({ budget }: { budget: BudgetSnapshot }) {
   const utilPct = Math.min(100, Math.round(budget.dailyUtilization * 100));
 
   return (
@@ -2281,7 +2088,7 @@ function RibbonCell({
 
 /* ─── Stats Grid ─────────────────────────────────────────────────── */
 
-function StatsGrid({
+export function StatsGrid({
   vault,
   payments,
 }: {
@@ -2573,7 +2380,7 @@ function PaymentChip({
 
 /* ─── Allowlist ──────────────────────────────────────────────────── */
 
-function Allowlist({
+export function Allowlist({
   merchants,
   vaultId,
   ownerWallet,

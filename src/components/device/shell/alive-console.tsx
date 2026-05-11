@@ -22,12 +22,18 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowRight, Code2, ShieldCheck, X } from "lucide-react";
+import { ArrowRight, Code2, ShieldAlert, ShieldCheck, Terminal, X } from "lucide-react";
 import { WorkerTemplates } from "../worker/worker-templates";
 import {
   UserVaultCard,
+  PolicyRibbon,
+  StatsGrid,
+  Allowlist,
+  HeistOverlay,
+  SecureTerminal,
   type VaultPayload,
 } from "../worker/user-vault-card";
+import { PayShFlow } from "../worker/paysh-flow";
 import type { PanelKind } from "../home/affordance-row";
 
 const ORIENT_BANNER_KEY = "kyvern:orient-allowlist-dismissed";
@@ -149,9 +155,9 @@ export function AliveConsole({ vaultId, ownerWallet, className }: Props) {
         )}
       </AnimatePresence>
 
-      {/* Hero: USER's vault Worker Card. Tabbed device shell —
-          Runtime / Network / Rules. Live-tape always visible above
-          the tabs (the constant motion signal). */}
+      {/* Hero: USER's vault Worker Card. Tabs removed — integration
+          wizard mounts inside the card; policy + pay.sh live as
+          separate cards below. */}
       {data ? (
         <UserVaultCard data={data} ownerWallet={ownerWallet} now={now} />
       ) : (
@@ -161,21 +167,137 @@ export function AliveConsole({ vaultId, ownerWallet, className }: Props) {
       {/* First-time orientation only — hidden once the user has a vault. */}
       {!data && <WorkerTemplates />}
 
-      {/* Developer mode link */}
+      {/* Policy + Allowlist card — caps, stats, merchant editor */}
+      {data && (
+        <SectionCard>
+          <SectionHeader
+            eyebrow="Policy"
+            title="Enforced on-chain"
+            subtitle="Every payment validates against these rules before USDC moves."
+          />
+          <div className="flex flex-col gap-5">
+            <PolicyRibbon budget={data.budget} />
+            <StatsGrid vault={data.vault} payments={data.payments} />
+            <Allowlist
+              merchants={data.vault.allowedMerchants}
+              vaultId={data.vault.id}
+              ownerWallet={data.vault.ownerWallet ?? ownerWallet}
+            />
+          </div>
+        </SectionCard>
+      )}
+
+      {/* Network · Pay.sh interception card */}
+      {data && (
+        <SectionCard>
+          <PayShFlow
+            vaultId={data.vault.id}
+            ownerWallet={data.vault.ownerWallet ?? ownerWallet}
+          />
+        </SectionCard>
+      )}
+
+      {/* Footer: interactive demos + developer mode */}
+      {data && (
+        <DemosFooter
+          vaultId={data.vault.id}
+          ownerWallet={data.vault.ownerWallet ?? ownerWallet}
+          perTxMaxUsd={data.budget.perTxMaxUsd}
+          network={data.vault.network}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ─── Section primitives ─────────────────────────────────────────── */
+
+function SectionCard({ children }: { children: React.ReactNode }) {
+  return (
+    <motion.section
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, ease: EASE, delay: 0.05 }}
+      className="rounded-[20px] p-5 sm:p-6 flex flex-col gap-4"
+      style={{
+        background: "#FFFFFF",
+        border: "1px solid rgba(15,23,42,0.06)",
+        boxShadow:
+          "0 1px 2px rgba(15,23,42,0.04), 0 16px 40px -24px rgba(15,23,42,0.12)",
+      }}
+    >
+      {children}
+    </motion.section>
+  );
+}
+
+function SectionHeader({
+  eyebrow,
+  title,
+  subtitle,
+}: {
+  eyebrow: string;
+  title: string;
+  subtitle?: string;
+}) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span
+        className="font-mono uppercase tracking-[0.18em]"
+        style={{ fontSize: 10, color: "rgba(15,23,42,0.45)" }}
+      >
+        {eyebrow}
+      </span>
+      <h3
+        className="text-[16px] font-semibold tracking-[-0.01em]"
+        style={{ color: "#0A0A0A" }}
+      >
+        {title}
+      </h3>
+      {subtitle && (
+        <p
+          className="text-[12.5px] mt-0.5"
+          style={{ color: "rgba(15,23,42,0.55)" }}
+        >
+          {subtitle}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/* ─── Demos footer (Heist + Secure Terminal as small links) ─────── */
+
+function DemosFooter({
+  vaultId,
+  ownerWallet,
+  perTxMaxUsd,
+  network,
+}: {
+  vaultId: string;
+  ownerWallet: string | null;
+  perTxMaxUsd: number;
+  network: "devnet" | "mainnet";
+}) {
+  const [heistOpen, setHeistOpen] = useState(false);
+  const [terminalOpen, setTerminalOpen] = useState(false);
+
+  return (
+    <>
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.5, ease: EASE, delay: 0.15 }}
-        className="flex items-center justify-center pt-1"
+        className="flex items-center justify-center gap-2 flex-wrap pt-1"
       >
         <Link
           href="/app/developer"
-          className="group inline-flex items-center gap-2 px-3 py-1.5 rounded-full transition-all hover:bg-[rgba(15,23,42,0.04)]"
+          className="group inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-all hover:bg-[rgba(15,23,42,0.04)]"
         >
           <Code2
-            className="w-3.5 h-3.5"
-            style={{ color: "rgba(15,23,42,0.55)" }}
+            className="w-3 h-3"
             strokeWidth={2}
+            style={{ color: "rgba(15,23,42,0.55)" }}
           />
           <span
             className="font-mono uppercase tracking-[0.14em]"
@@ -183,20 +305,89 @@ export function AliveConsole({ vaultId, ownerWallet, className }: Props) {
           >
             Developer mode
           </span>
-          <span
-            className="text-[11.5px]"
-            style={{ color: "rgba(15,23,42,0.55)" }}
-          >
-            mint key · install SDK · run a chain-enforced payment
-          </span>
           <ArrowRight
-            className="w-3 h-3 transition-transform group-hover:translate-x-0.5"
-            style={{ color: "rgba(15,23,42,0.55)" }}
+            className="w-2.5 h-2.5 transition-transform group-hover:translate-x-0.5"
             strokeWidth={2}
+            style={{ color: "rgba(15,23,42,0.55)" }}
           />
         </Link>
+
+        <span
+          style={{
+            width: 1,
+            height: 14,
+            background: "rgba(15,23,42,0.10)",
+          }}
+        />
+
+        <span
+          className="font-mono uppercase tracking-[0.14em]"
+          style={{ fontSize: 9.5, color: "rgba(15,23,42,0.45)" }}
+        >
+          Interactive demos
+        </span>
+
+        <button
+          type="button"
+          onClick={() => ownerWallet && setTerminalOpen(true)}
+          disabled={!ownerWallet}
+          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-all hover:bg-[rgba(15,23,42,0.04)] disabled:opacity-50"
+          style={{
+            border: "1px solid rgba(15,23,42,0.10)",
+          }}
+        >
+          <Terminal
+            className="w-3 h-3"
+            strokeWidth={2}
+            style={{ color: "rgba(15,23,42,0.55)" }}
+          />
+          <span
+            className="text-[11px]"
+            style={{ color: "rgba(15,23,42,0.65)" }}
+          >
+            Secure Terminal
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => ownerWallet && setHeistOpen(true)}
+          disabled={!ownerWallet}
+          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-all hover:bg-[rgba(15,23,42,0.04)] disabled:opacity-50"
+          style={{
+            border: "1px solid rgba(15,23,42,0.10)",
+          }}
+        >
+          <ShieldAlert
+            className="w-3 h-3"
+            strokeWidth={2}
+            style={{ color: "rgba(15,23,42,0.55)" }}
+          />
+          <span
+            className="text-[11px]"
+            style={{ color: "rgba(15,23,42,0.65)" }}
+          >
+            Watch the chain refuse
+          </span>
+        </button>
       </motion.div>
-    </div>
+
+      <HeistOverlay
+        open={heistOpen}
+        onClose={() => setHeistOpen(false)}
+        vaultId={vaultId}
+        ownerWallet={ownerWallet}
+        perTxMaxUsd={perTxMaxUsd}
+        network={network}
+      />
+      <SecureTerminal
+        open={terminalOpen}
+        onClose={() => setTerminalOpen(false)}
+        vaultId={vaultId}
+        ownerWallet={ownerWallet}
+        network={network}
+      />
+    </>
   );
 }
 
