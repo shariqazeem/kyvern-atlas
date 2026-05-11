@@ -65,7 +65,7 @@ export default function DeveloperPage() {
   return (
     <div
       className="mx-auto w-full px-4 sm:px-6 py-5"
-      style={{ maxWidth: 1200 }}
+      style={{ maxWidth: 1320, background: "#FAFAFA" }}
     >
       {/* Header */}
       <motion.div
@@ -172,7 +172,7 @@ export default function DeveloperPage() {
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: EASE, delay: 0.05 }}
-          className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] gap-5"
+          className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-6"
         >
           <IntegrationWizard
             vaultId={vaultId}

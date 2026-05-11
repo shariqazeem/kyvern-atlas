@@ -174,7 +174,7 @@ export function AgentEventFeed({
 
   return (
     <div
-      className={`flex flex-col rounded-[14px] overflow-hidden ${className ?? ""}`}
+      className={`flex flex-col rounded-[14px] overflow-hidden min-w-0 ${className ?? ""}`}
       style={{
         background: "#FFFFFF",
         border: "1px solid rgba(15,23,42,0.06)",
@@ -374,41 +374,43 @@ function EventRow({
       <button
         type="button"
         onClick={onToggle}
-        className="w-full text-left flex items-center gap-3 px-3.5 py-2.5 hover:bg-black/[0.02] transition"
+        className="w-full text-left flex items-center gap-2.5 px-3.5 py-2.5 hover:bg-black/[0.02] transition min-w-0"
       >
         <span
-          className="font-mono uppercase tracking-[0.12em] flex-shrink-0"
-          style={{ fontSize: 9, color: "#9CA3AF", width: 56 }}
+          className="font-mono uppercase tracking-[0.10em] flex-shrink-0"
+          style={{ fontSize: 9.5, color: "#9CA3AF", width: 44 }}
         >
           {relativeTime(event.ts)}
         </span>
         <span
-          className="text-[12.5px] truncate flex-1"
+          className="text-[12.5px] truncate min-w-0 flex-1"
           style={{ color: "#0A0A0A" }}
         >
           {event.merchant}
         </span>
         <span
           className="font-mono tabular-nums text-[12px] flex-shrink-0"
-          style={{ color: "#374151", width: 56, textAlign: "right" }}
+          style={{ color: "#374151", textAlign: "right" }}
         >
           ${formatAmount(event.amountUsd)}
         </span>
         <span
-          className="inline-flex items-center gap-1 font-mono uppercase tracking-[0.14em] rounded-full px-2 py-0.5 flex-shrink-0"
+          className="inline-flex items-center justify-center rounded-full flex-shrink-0"
+          aria-label={isBlocked ? "blocked" : "settled"}
+          title={isBlocked ? "Blocked on-chain" : "Settled on-chain"}
           style={{
-            fontSize: 9,
+            width: 20,
+            height: 20,
             color: palette.fg,
             background: palette.chipBg,
             border: `1px solid ${palette.chipBorder}`,
           }}
         >
           {isBlocked ? (
-            <XIcon className="w-2.5 h-2.5" strokeWidth={3} />
+            <XIcon className="w-3 h-3" strokeWidth={2.6} />
           ) : (
-            <Check className="w-2.5 h-2.5" strokeWidth={3} />
+            <Check className="w-3 h-3" strokeWidth={2.6} />
           )}
-          {isBlocked ? "blocked" : "settled"}
         </span>
       </button>
 
