@@ -1452,13 +1452,13 @@ function SdkXcodeCard({ vaultId }: { vaultId: string }) {
 import { Vault } from "@kyvernlabs/sdk";
 
 // 2. Create the client once:
-const vault = new Vault({ agentKey: ${apiKey} });
+const vault = new Vault({ agentKey: process.env.KYVERN_AGENT_KEY! });
 
 // 3. BEFORE each external API call your agent makes,
 //    gate it through vault.pay():
 const gate = await vault.pay({
   merchant: "api.openai.com",
-  recipientPubkey: "GZCnHuFtswvsJftSDmtoHEve8amqNLzAAPvYy8NU3ZNZ",
+  recipientPubkey: process.env.KYVERN_METERING_RECIPIENT!,
   amount: 0.02,
   memo: "chat-completion",
 });
@@ -1686,6 +1686,7 @@ function LineNo({ n }: { n: number }) {
 }
 
 function SnippetVault({ apiKey }: { apiKey: string }) {
+  void apiKey;
   return (
     <code>
       <div>
@@ -1721,7 +1722,10 @@ function SnippetVault({ apiKey }: { apiKey: string }) {
         <span style={{ color: TK.type }}>Vault</span>
         <span style={{ color: TK.punct }}>({"{ "}</span>
         agentKey<span style={{ color: TK.punct }}>:</span>{" "}
-        <span style={{ color: TK.str }}>{apiKey}</span>
+        process<span style={{ color: TK.punct }}>.</span>env
+        <span style={{ color: TK.punct }}>.</span>
+        <span style={{ color: TK.type }}>KYVERN_AGENT_KEY</span>
+        <span style={{ color: TK.punct }}>!</span>
         <span style={{ color: TK.punct }}> {"}"});</span>
       </div>
       <div>
@@ -1757,8 +1761,10 @@ function SnippetVault({ apiKey }: { apiKey: string }) {
       <div>
         <LineNo n={11} />
         {"  "}recipientPubkey<span style={{ color: TK.punct }}>:</span>{" "}
-        <span style={{ color: TK.str }}>&quot;GZCnHu…U3ZNZ&quot;</span>
-        <span style={{ color: TK.punct }}>,</span>
+        process<span style={{ color: TK.punct }}>.</span>env
+        <span style={{ color: TK.punct }}>.</span>
+        <span style={{ color: TK.type }}>KYVERN_METERING_RECIPIENT</span>
+        <span style={{ color: TK.punct }}>!,</span>
       </div>
       <div>
         <LineNo n={12} />
@@ -1874,6 +1880,14 @@ function SnippetEnv({ keyPrefix }: { keyPrefix: string | null }) {
       </div>
       <div>
         <LineNo n={3} />
+        KYVERN_METERING_RECIPIENT
+        <span style={{ color: TK.punct }}>=</span>
+        <span style={{ color: TK.str }}>
+          GZCnHuFtswvsJftSDmtoHEve8amqNLzAAPvYy8NU3ZNZ
+        </span>
+      </div>
+      <div>
+        <LineNo n={4} />
         KYVERN_NETWORK<span style={{ color: TK.punct }}>=</span>
         <span style={{ color: TK.str }}>devnet</span>
       </div>
