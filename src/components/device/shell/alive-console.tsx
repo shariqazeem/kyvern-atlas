@@ -271,6 +271,11 @@ export function AliveConsole({
         <div className="flex flex-col gap-5 min-w-0">
           <RuntimeCard data={data} />
           <SdkXcodeCard vaultId={data.vault.id} />
+          <OracleAgentCard
+            vaultId={data.vault.id}
+            ownerWallet={resolvedOwner}
+            network={data.vault.network}
+          />
           <RecentCallsCard data={data} />
         </div>
 
@@ -1426,9 +1431,9 @@ function RuntimeCard({ data }: { data: VaultPayload }) {
 function SdkXcodeCard({ vaultId }: { vaultId: string }) {
   const [keyPrefix, setKeyPrefix] = useState<string | null>(null);
   const [copied, setCopied] = useState<"snippet" | "install" | null>(null);
-  const [activeTab, setActiveTab] = useState<"vault" | "policy" | "env">(
-    "vault",
-  );
+  const [activeTab, setActiveTab] = useState<
+    "vault" | "policy" | "env" | "byoa"
+  >("vault");
 
   useEffect(() => {
     if (!vaultId) return;
@@ -1513,6 +1518,7 @@ console.log(res.decision);  // "allowed" or "refused"`;
             ["vault", "vault.ts"],
             ["policy", "policy.ts"],
             ["env", ".env"],
+            ["byoa", "oracle.ts"],
           ] as const
         ).map(([k, label]) => {
           const a = activeTab === k;
@@ -1567,6 +1573,7 @@ console.log(res.decision);  // "allowed" or "refused"`;
         {activeTab === "vault" && <SnippetVault apiKey={apiKey} />}
         {activeTab === "policy" && <SnippetPolicy />}
         {activeTab === "env" && <SnippetEnv keyPrefix={keyPrefix} />}
+        {activeTab === "byoa" && <SnippetByoa />}
       </div>
 
       {/* Footer */}
@@ -1825,6 +1832,493 @@ function SnippetEnv({ keyPrefix }: { keyPrefix: string | null }) {
         <span style={{ color: TK.str }}>devnet</span>
       </div>
     </code>
+  );
+}
+
+function SnippetByoa() {
+  return (
+    <code>
+      <div>
+        <LineNo n={1} />
+        <span style={{ color: TK.cmt, fontStyle: "italic" }}>
+          {`// oracle.ts — wrap ANY agent (here: ParallaxPay's market`}
+        </span>
+      </div>
+      <div>
+        <LineNo n={2} />
+        <span style={{ color: TK.cmt, fontStyle: "italic" }}>
+          {`// oracle) so every HTTP call routes through Kyvern first.`}
+        </span>
+      </div>
+      <div>
+        <LineNo n={3} />
+        <span style={{ color: TK.kw }}>import</span>
+        <span style={{ color: TK.punct }}> {"{ "}</span>
+        <span style={{ color: TK.type }}>Vault</span>
+        <span style={{ color: TK.punct }}> {"}"} </span>
+        <span style={{ color: TK.kw }}>from</span>{" "}
+        <span style={{ color: TK.str }}>&quot;@kyvernlabs/sdk&quot;</span>
+        <span style={{ color: TK.punct }}>;</span>
+      </div>
+      <div>
+        <LineNo n={4} />
+      </div>
+      <div>
+        <LineNo n={5} />
+        <span style={{ color: TK.kw }}>const</span> vault{" "}
+        <span style={{ color: TK.punct }}>=</span>{" "}
+        <span style={{ color: TK.kw }}>new</span>{" "}
+        <span style={{ color: TK.type }}>Vault</span>
+        <span style={{ color: TK.punct }}>({"{ "}</span>agentKey
+        <span style={{ color: TK.punct }}>:</span>{" "}
+        process<span style={{ color: TK.punct }}>.</span>env
+        <span style={{ color: TK.punct }}>.</span>
+        <span style={{ color: TK.type }}>KYVERN_AGENT_KEY</span>
+        <span style={{ color: TK.punct }}> {"}"});</span>
+      </div>
+      <div>
+        <LineNo n={6} />
+      </div>
+      <div>
+        <LineNo n={7} />
+        <span style={{ color: TK.kw }}>export const</span>{" "}
+        <span style={{ color: TK.fn }}>kyvernFetch</span>
+        <span style={{ color: TK.punct }}>:</span>{" "}
+        <span style={{ color: TK.kw }}>typeof</span>{" "}
+        <span style={{ color: TK.type }}>fetch</span>{" "}
+        <span style={{ color: TK.punct }}>=</span>{" "}
+        <span style={{ color: TK.kw }}>async</span>{" "}
+        <span style={{ color: TK.punct }}>(url, init) =&gt; {"{"}</span>
+      </div>
+      <div>
+        <LineNo n={8} />
+        {"  "}
+        <span style={{ color: TK.kw }}>const</span> host{" "}
+        <span style={{ color: TK.punct }}>=</span>{" "}
+        <span style={{ color: TK.kw }}>new</span>{" "}
+        <span style={{ color: TK.type }}>URL</span>
+        <span style={{ color: TK.punct }}>(url</span>
+        <span style={{ color: TK.punct }}>.</span>
+        <span style={{ color: TK.fn }}>toString</span>
+        <span style={{ color: TK.punct }}>()).hostname;</span>
+      </div>
+      <div>
+        <LineNo n={9} />
+        {"  "}
+        <span style={{ color: TK.kw }}>const</span> res{" "}
+        <span style={{ color: TK.punct }}>=</span>{" "}
+        <span style={{ color: TK.kw }}>await</span> vault
+        <span style={{ color: TK.punct }}>.</span>
+        <span style={{ color: TK.fn }}>pay</span>
+        <span style={{ color: TK.punct }}>({"{"}</span> merchant
+        <span style={{ color: TK.punct }}>:</span> host
+        <span style={{ color: TK.punct }}>,</span> amount
+        <span style={{ color: TK.punct }}>:</span>{" "}
+        <span style={{ color: TK.num }}>0.001</span>
+        <span style={{ color: TK.punct }}>{" });"}</span>
+      </div>
+      <div>
+        <LineNo n={10} />
+        {"  "}
+        <span style={{ color: TK.kw }}>if</span>{" "}
+        <span style={{ color: TK.punct }}>(</span>res
+        <span style={{ color: TK.punct }}>.</span>decision{" "}
+        <span style={{ color: TK.punct }}>===</span>{" "}
+        <span style={{ color: TK.str }}>&quot;refused&quot;</span>
+        <span style={{ color: TK.punct }}>)</span>{" "}
+        <span style={{ color: TK.kw }}>throw new</span>{" "}
+        <span style={{ color: TK.type }}>Error</span>
+        <span style={{ color: TK.punct }}>(res.reason);</span>
+      </div>
+      <div>
+        <LineNo n={11} />
+        {"  "}
+        <span style={{ color: TK.kw }}>return</span>{" "}
+        <span style={{ color: TK.fn }}>fetch</span>
+        <span style={{ color: TK.punct }}>(url, init);</span>
+      </div>
+      <div>
+        <LineNo n={12} />
+        <span style={{ color: TK.punct }}>{"};"}</span>
+      </div>
+      <div>
+        <LineNo n={13} />
+      </div>
+      <div>
+        <LineNo n={14} />
+        <span style={{ color: TK.cmt, fontStyle: "italic" }}>
+          {`// Now any HTTP call your agent makes is gated on-chain.`}
+        </span>
+      </div>
+      <div>
+        <LineNo n={15} />
+        <span style={{ color: TK.cmt, fontStyle: "italic" }}>
+          {`// Try it ↓  — the button below uses this exact pattern.`}
+        </span>
+      </div>
+    </code>
+  );
+}
+
+/* ════════════════════════════ Oracle agent card ═══════════════════════════ */
+
+interface OraclePayment {
+  merchant: string;
+  amountUsd: number;
+  signature: string | null;
+  explorerUrl: string | null;
+  blocked: boolean;
+  reason: string | null;
+  durationMs: number;
+}
+
+interface OracleResult {
+  ok: boolean;
+  asset?: string;
+  priceUsd?: number | null;
+  change24h?: number | null;
+  prediction?: string;
+  confidence?: number;
+  horizon?: string;
+  modelUsed?: string;
+  payments?: OraclePayment[];
+  duration?: number;
+  stage?: string;
+  reason?: string;
+}
+
+function OracleAgentCard({
+  vaultId,
+  ownerWallet,
+  network,
+}: {
+  vaultId: string;
+  ownerWallet: string | null;
+  network: "devnet" | "mainnet";
+}) {
+  void network;
+  const [asset, setAsset] = useState<"BTC" | "SOL" | "ETH">("BTC");
+  const [running, setRunning] = useState(false);
+  const [result, setResult] = useState<OracleResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const fire = useCallback(async () => {
+    if (!ownerWallet || running) return;
+    setRunning(true);
+    setError(null);
+    setResult(null);
+    try {
+      const r = await fetch("/api/oracle/predict", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-owner-wallet": ownerWallet,
+        },
+        body: JSON.stringify({ vaultId, asset }),
+      });
+      const d = (await r.json()) as OracleResult;
+      setResult(d);
+      if (!d.ok && d.reason) setError(d.reason);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "request failed");
+    } finally {
+      setRunning(false);
+    }
+  }, [vaultId, ownerWallet, asset, running]);
+
+  return (
+    <Card>
+      <CardHead
+        title="Bring your own agent"
+        sub="ParallaxPay market oracle · live"
+        right={
+          <span
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full"
+            style={{
+              background: TOK.greenSoft,
+              color: TOK.green,
+              fontSize: 11,
+              fontWeight: 600,
+            }}
+          >
+            <span
+              style={{
+                width: 5,
+                height: 5,
+                borderRadius: 999,
+                background: TOK.green,
+              }}
+            />
+            third-party agent
+          </span>
+        }
+      />
+      <div style={{ padding: "18px 22px 20px" }}>
+        <p
+          style={{
+            fontSize: 12.5,
+            color: TOK.ink3,
+            lineHeight: 1.5,
+            margin: 0,
+          }}
+        >
+          A real autonomous agent ported from ParallaxPay (my prior x402
+          project). Click below: it fetches a live price from CoinGecko and
+          a 1-hour prediction from Commonstack DeepSeek. Both calls are
+          gated on-chain by your vault before any HTTP request fires.
+        </p>
+
+        {/* Asset segmented control */}
+        <div className="flex items-center gap-2 mt-4">
+          <span
+            style={{
+              fontSize: 10.5,
+              color: TOK.ink4,
+              fontWeight: 600,
+              textTransform: "uppercase",
+              letterSpacing: "0.08em",
+            }}
+          >
+            Asset
+          </span>
+          <div
+            className="inline-flex"
+            style={{
+              padding: 2,
+              background: TOK.surface2,
+              borderRadius: 8,
+              border: `1px solid ${TOK.hairline}`,
+            }}
+          >
+            {(["BTC", "SOL", "ETH"] as const).map((a) => {
+              const sel = asset === a;
+              return (
+                <button
+                  key={a}
+                  type="button"
+                  onClick={() => setAsset(a)}
+                  style={{
+                    padding: "5px 12px",
+                    fontSize: 11.5,
+                    fontWeight: 600,
+                    color: sel ? TOK.ink : TOK.ink3,
+                    background: sel ? TOK.surface : "transparent",
+                    border: "0",
+                    borderRadius: 6,
+                    boxShadow: sel
+                      ? "0 1px 2px rgba(0,0,0,0.06)"
+                      : "none",
+                    cursor: "pointer",
+                  }}
+                >
+                  {a}
+                </button>
+              );
+            })}
+          </div>
+          <button
+            type="button"
+            onClick={fire}
+            disabled={running || !ownerWallet}
+            className="ml-auto inline-flex items-center gap-1.5 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{
+              padding: "8px 14px",
+              borderRadius: 10,
+              background: TOK.ink,
+              color: "#FFFFFF",
+              border: `1px solid ${TOK.ink}`,
+              fontSize: 12.5,
+              fontWeight: 500,
+              boxShadow:
+                "0 1px 0 rgba(0,0,0,0.05), 0 4px 10px -4px rgba(0,0,0,0.18)",
+            }}
+          >
+            {running ? (
+              <>
+                <span
+                  className="w-3 h-3 border rounded-full animate-spin"
+                  style={{
+                    borderColor: "rgba(255,255,255,0.30)",
+                    borderTopColor: "#FFFFFF",
+                    borderWidth: 1.5,
+                  }}
+                />
+                Polling chain…
+              </>
+            ) : (
+              <>
+                Run prediction agent
+                <ChevronRight className="w-3 h-3" strokeWidth={1.8} />
+              </>
+            )}
+          </button>
+        </div>
+
+        {/* Result panel */}
+        <AnimatePresence>
+          {(result || error) && (
+            <motion.div
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.3, ease: EASE }}
+              className="mt-4 rounded-[12px] overflow-hidden"
+              style={{
+                background: TOK.surface2,
+                border: `1px solid ${TOK.hairline}`,
+              }}
+            >
+              {result?.ok && result.prediction && (
+                <div style={{ padding: "14px 16px" }}>
+                  <div className="flex items-baseline gap-2 flex-wrap">
+                    <span
+                      style={{
+                        fontSize: 16,
+                        fontWeight: 600,
+                        color: TOK.ink,
+                        letterSpacing: "-0.015em",
+                      }}
+                    >
+                      {result.asset}{" "}
+                      {result.priceUsd
+                        ? `$${result.priceUsd.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+                        : ""}
+                    </span>
+                    {result.change24h !== null &&
+                      result.change24h !== undefined && (
+                        <span
+                          style={{
+                            fontSize: 11.5,
+                            fontFamily: "var(--font-mono, monospace)",
+                            color:
+                              result.change24h >= 0 ? TOK.green : TOK.amber,
+                          }}
+                        >
+                          {result.change24h >= 0 ? "+" : ""}
+                          {result.change24h.toFixed(2)}% · 24h
+                        </span>
+                      )}
+                    <span
+                      className="ml-auto"
+                      style={{
+                        fontSize: 10.5,
+                        fontFamily: "var(--font-mono, monospace)",
+                        color: TOK.ink4,
+                      }}
+                    >
+                      {result.duration}ms · {result.modelUsed}
+                    </span>
+                  </div>
+                  <p
+                    className="mt-2"
+                    style={{
+                      fontSize: 13,
+                      color: TOK.ink2,
+                      lineHeight: 1.5,
+                      margin: "8px 0 0",
+                    }}
+                  >
+                    {result.prediction}
+                  </p>
+                  {result.confidence !== undefined && (
+                    <div
+                      className="mt-2 inline-flex items-center gap-1.5"
+                      style={{ fontSize: 11, color: TOK.ink3 }}
+                    >
+                      <span>Confidence</span>
+                      <span
+                        style={{
+                          fontFamily: "var(--font-mono, monospace)",
+                          color: TOK.ink,
+                          fontWeight: 600,
+                        }}
+                      >
+                        {(result.confidence * 100).toFixed(0)}%
+                      </span>
+                      <span>· horizon 1h</span>
+                    </div>
+                  )}
+                  {result.payments && result.payments.length > 0 && (
+                    <div
+                      className="mt-3 flex flex-col gap-1.5"
+                      style={{
+                        borderTop: `1px solid ${TOK.hairline}`,
+                        paddingTop: 10,
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: 10,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.10em",
+                          color: TOK.ink4,
+                          fontWeight: 600,
+                        }}
+                      >
+                        On-chain metering · {result.payments.length} calls
+                        settled
+                      </div>
+                      {result.payments.map((p, i) => (
+                        <div
+                          key={i}
+                          className="flex items-center gap-2"
+                          style={{
+                            fontSize: 11.5,
+                            fontFamily: "var(--font-mono, monospace)",
+                            color: TOK.ink3,
+                          }}
+                        >
+                          <span
+                            style={{
+                              color: p.blocked ? TOK.amber : TOK.green,
+                            }}
+                          >
+                            {p.blocked ? "×" : "✓"}
+                          </span>
+                          <span style={{ color: TOK.ink, fontWeight: 500 }}>
+                            {p.merchant}
+                          </span>
+                          <span style={{ color: TOK.ink4 }}>
+                            ${p.amountUsd.toFixed(3)}
+                          </span>
+                          <span className="ml-auto">{p.durationMs}ms</span>
+                          {p.explorerUrl && (
+                            <a
+                              href={p.explorerUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-0.5 no-underline"
+                              style={{ color: TOK.green }}
+                            >
+                              Explorer
+                              <ExternalLink
+                                className="w-2.5 h-2.5"
+                                strokeWidth={1.8}
+                              />
+                            </a>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+              {(!result?.ok || error) && (
+                <div
+                  style={{
+                    padding: "12px 16px",
+                    fontSize: 12.5,
+                    color: TOK.amber,
+                  }}
+                >
+                  Refused on-chain · {error ?? result?.reason ?? "unknown"}
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </Card>
   );
 }
 
