@@ -24,6 +24,7 @@ const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 interface HeroStatsProps {
   firstIgnitionAt: string | null;
   attacksBlocked: number;
+  merchantsPaid: number;
 }
 
 function StatCell({
@@ -69,9 +70,13 @@ function StatCell({
   );
 }
 
-export function AtlasHeroStats({ firstIgnitionAt, attacksBlocked }: HeroStatsProps) {
+export function AtlasHeroStats({
+  firstIgnitionAt,
+  attacksBlocked,
+  merchantsPaid,
+}: HeroStatsProps) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-8 gap-y-8 mb-10">
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 sm:gap-x-8 gap-y-8 mb-10">
       <StatCell label="alive" delay={0.05}>
         {firstIgnitionAt ? (
           <LiveTimer since={firstIgnitionAt} />
@@ -79,8 +84,12 @@ export function AtlasHeroStats({ firstIgnitionAt, attacksBlocked }: HeroStatsPro
           <span style={{ color: "rgba(255,255,255,0.45)" }}>—</span>
         )}
       </StatCell>
-      <StatCell label="funds lost" accent="#86EFAC" delay={0.12}>
-        $0.00
+      <StatCell label="merchants paid" delay={0.12}>
+        <NumberScramble
+          value={merchantsPaid}
+          format={(n) => n.toLocaleString()}
+          duration={620}
+        />
       </StatCell>
       <StatCell label="attacks blocked" delay={0.19}>
         <NumberScramble
@@ -88,6 +97,9 @@ export function AtlasHeroStats({ firstIgnitionAt, attacksBlocked }: HeroStatsPro
           format={(n) => n.toLocaleString()}
           duration={620}
         />
+      </StatCell>
+      <StatCell label="funds lost" accent="#86EFAC" delay={0.26}>
+        $0.00
       </StatCell>
     </div>
   );

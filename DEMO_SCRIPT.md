@@ -53,13 +53,17 @@ Total target: **2:55–3:00**. If you run over 3:05 the YouTube upload will get 
 >
 > [PAID] merchants paid. [BLOCKED] attacks blocked. Zero dollars lost.
 
-**DO** — Click any refused row in the timeline. Solana Explorer opens. The program logs show `AmountExceedsPerTxMax`.
+**DO** — Scroll down to the **Attack Wall**. Find any row with a short signature suffix (e.g. `3kR8…mN4v`) and the external-link icon at the right edge — that's a row whose tx landed on chain. Click it.
+
+Solana Explorer opens. The program logs show the failure code (e.g. `AmountExceedsPerTxMax`).
 
 **HOLD** — 2 seconds.
 
 **SAY**
 
-> Every refusal is a real Solana transaction. Anyone can verify on Explorer.
+> Every refusal is a real on-chain enforcement event. Anyone can verify on Explorer.
+
+*(Note: rows without a signature suffix were refused by the off-chain policy pre-check in under three milliseconds. They never hit the chain. They're still real refusals — just faster ones. Don't click them for this beat; the click target is a signature row.)*
 
 ---
 

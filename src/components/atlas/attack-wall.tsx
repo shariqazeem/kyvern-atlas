@@ -174,7 +174,12 @@ export function AttackWall({ attacks, limit = 60 }: AttackWallProps) {
                     {...(explorerHref
                       ? { href: explorerHref, target: "_blank", rel: "noreferrer" }
                       : {})}
-                    className="flex items-center gap-2 px-5 py-2.5 font-mono text-[12px] hover:bg-white/[0.02] transition border-b last:border-b-0"
+                    className={
+                      "flex items-center gap-2 px-5 py-2.5 font-mono text-[12px] transition border-b last:border-b-0 " +
+                      (explorerHref
+                        ? "hover:bg-white/[0.05]"
+                        : "hover:bg-white/[0.02]")
+                    }
                     style={{
                       color: "rgba(255,255,255,0.78)",
                       borderColor: "rgba(255,255,255,0.04)",
@@ -193,22 +198,37 @@ export function AttackWall({ attacks, limit = 60 }: AttackWallProps) {
                     <span style={{ color: "rgba(255,255,255,0.7)" }}>
                       {merchantFor(a)}
                     </span>
-                    {sig && (
+                    <span
+                      className="ml-auto inline-flex items-center gap-1.5"
+                      style={{ color: "rgba(255,255,255,0.18)" }}
+                    >
+                      ·
+                    </span>
+                    {sig && explorerHref ? (
                       <>
-                        <span
-                          className="ml-auto"
-                          style={{ color: "rgba(255,255,255,0.18)" }}
-                        >
-                          ·
+                        <span style={{ color: "rgba(255,255,255,0.55)" }}>
+                          {sig}
                         </span>
-                        <span style={{ color: "rgba(255,255,255,0.55)" }}>{sig}</span>
-                        {explorerHref && (
-                          <ExternalLink
-                            className="w-2.5 h-2.5"
-                            style={{ color: "rgba(255,255,255,0.45)" }}
-                          />
-                        )}
+                        <ExternalLink
+                          className="w-2.5 h-2.5"
+                          style={{ color: "rgba(134,239,172,0.85)" }}
+                        />
                       </>
+                    ) : (
+                      <span
+                        style={{
+                          color: "rgba(255,255,255,0.42)",
+                          fontSize: 10,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.10em",
+                          padding: "1px 6px",
+                          borderRadius: 4,
+                          border: "1px solid rgba(255,255,255,0.08)",
+                          background: "rgba(255,255,255,0.02)",
+                        }}
+                      >
+                        off-chain pre-check
+                      </span>
                     )}
                   </Inner>
                 </motion.div>

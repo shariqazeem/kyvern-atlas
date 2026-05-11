@@ -155,6 +155,7 @@ export default function AtlasClient({
             <AtlasHeroStats
               firstIgnitionAt={state.firstIgnitionAt}
               attacksBlocked={state.totalAttacksBlocked}
+              merchantsPaid={state.totalSettled}
             />
           ) : (
             <div
@@ -223,8 +224,10 @@ export default function AtlasClient({
               className="mt-3 font-mono"
               style={{ color: "rgba(255,255,255,0.35)", fontSize: "11px" }}
             >
-              Each row is a real failed Solana transaction. Click any pill to
-              verify on the Explorer.
+              Every refusal is a real on-chain enforcement event. Rows with a
+              signature suffix open the failed Solana tx on Explorer; rows
+              without one were refused by the off-chain policy pre-check in
+              under three milliseconds before any tx was submitted.
             </div>
           </motion.div>
 
