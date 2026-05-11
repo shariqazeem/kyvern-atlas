@@ -186,7 +186,11 @@ export default function DeviceHome() {
     [router, searchParams],
   );
 
-  // Resolve the user's primary device once
+  // Resolve the user's primary device once. If ?vault={id} is present,
+  // prefer that vault from the list — this is how /vault/new and the
+  // success page land users back on /app with the newly-deployed vault
+  // selected as the hero.
+  const requestedVaultId = searchParams?.get("vault");
   useEffect(() => {
     if (isLoading) return;
     const owner = wallet ?? devWallet();
@@ -199,13 +203,17 @@ export default function DeviceHome() {
       .then((d) => {
         const vaults = (d?.vaults ?? []) as VaultBrief[];
         if (vaults.length > 0) {
-          setVault(vaults[0]);
-          init(vaults[0].vault.id);
+          const picked =
+            (requestedVaultId &&
+              vaults.find((v) => v.vault.id === requestedVaultId)) ||
+            vaults[0];
+          setVault(picked);
+          init(picked.vault.id);
         }
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, [isLoading, wallet, init]);
+  }, [isLoading, wallet, init, requestedVaultId]);
 
   // Poll live-status every 5s
   const deviceId = vault?.vault.id ?? null;

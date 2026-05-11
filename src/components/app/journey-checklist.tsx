@@ -89,7 +89,7 @@ export function JourneyChecklist({ state }: { state: JourneyState }) {
         state.hasVault && state.firstVaultId
           ? {
               label: "Open fund widget",
-              href: `/vault/${state.firstVaultId}`,
+              href: `/app?vault=${state.firstVaultId}`,
             }
           : null,
     },
@@ -105,7 +105,7 @@ export function JourneyChecklist({ state }: { state: JourneyState }) {
         state.hasVault && state.firstVaultId
           ? {
               label: "Open Playground",
-              href: `/vault/${state.firstVaultId}?tab=integrate`,
+              href: `/app?vault=${state.firstVaultId}#scenarios`,
             }
           : null,
     },

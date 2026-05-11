@@ -451,13 +451,13 @@ await vault.pay({
           staring at an empty Live feed. */}
       <div className="grid sm:grid-cols-2 gap-2.5 pt-2">
         <NextLink
-          href={`/vault/${vaultId}?tab=integrate`}
+          href={`/app?vault=${vaultId}#scenarios`}
           title="Fire your first payment"
           description="Trigger a real on-chain USDC transfer in one click."
           primary
         />
         <NextLink
-          href={`/vault/${vaultId}`}
+          href={`/app?vault=${vaultId}`}
           title="Open the live dashboard"
           description="Activity feed, kill switch, policy edits."
         />

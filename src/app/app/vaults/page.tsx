@@ -283,7 +283,7 @@ function VaultCard({ entry, index }: { entry: VaultSummary; index: number }) {
       }}
     >
       <Link
-        href={`/vault/${vault.id}`}
+        href={`/app?vault=${vault.id}`}
         className="group block p-5 sm:p-6 rounded-[20px] transition-all duration-300 hover:-translate-y-0.5"
         style={{
           background: "var(--surface)",

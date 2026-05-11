@@ -171,9 +171,9 @@ export default function NewVaultPage() {
       void deployVault();
       return;
     }
-    // Step 4 — finish
+    // Step 4 — finish: land on the new /app canvas with the new vault selected.
     if (deployResult) {
-      router.push(`/vault/${deployResult.vaultId}`);
+      router.push(`/app?vault=${deployResult.vaultId}`);
     }
   }, [step, isDeploying, deployResult, router, deployVault]);
 
