@@ -22,27 +22,24 @@ before a single lamport moves.
 - **Anchor program** at [`PpmZErWfT5zpeo1fJtTbpqezFGbRUamaNNRWViaMSqc`](https://explorer.solana.com/address/PpmZErWfT5zpeo1fJtTbpqezFGbRUamaNNRWViaMSqc?cluster=devnet) on Solana devnet
 - **`@kyvernlabs/sdk@0.5.0`** on npm — `Vault.pay()`, `Vault.checkAllowance()`, `KastDestination`, `OnChainVault`
 - **`create-kyvern-agent@0.2.0`** on npm — scaffolds a working pay.sh + KAST agent in one command
-- **Atlas reference agent** running continuously since 2026-04-20 (19+ days, 8.8k+ cycles, 1.3k+ settlements, 6.5k+ attacks blocked, **$0 lost**)
+- **Atlas reference agent** running continuously since 2026-04-20 (20+ days, 9.8k+ cycles, 1.5k+ settlements, 3.7k+ attacks blocked, **$0 lost**)
+- **Bring your own agent** — the [ParallaxPay](https://github.com/shariqazeem/parallaxpay_x402) market oracle (built in a prior hackathon, *before* Kyvern existed) is wired into `/app` via the four-line wrapped-fetch pattern. Click *Run prediction agent* to fire it: CoinGecko + Commonstack DeepSeek calls, both gated on-chain.
 
-## The 60-second judge demo
+## The 90-second judge demo
 
-Sign in at [kyvernlabs.com](https://kyvernlabs.com) → unbox plays
-(2.5s) → land on `/app`, the live integration console.
+Sign in at [kyvernlabs.com](https://kyvernlabs.com) → land on `/app`,
+the live canvas. Three things to click, in order:
 
-Inside the device chassis you get **a 5-step integration wizard on
-the left and a live event feed on the right**:
+1. **Hero band** — your worker card (identity, 4-stat bar, lede) sits left; vault balance with daily-cap utilization sits right.
+2. **"Try over-cap $5"** in the right column → real Solana tx → refused on-chain by the policy program with custom error code 12002 → Explorer link in the result panel.
+3. **"Run prediction agent"** in the center column (Bring your own agent card) → the ParallaxPay market oracle (third-party, prior hackathon) runs through Kyvern in real time: 2 metering payments settle on-chain, then the prediction text + confidence render. Click Explorer on either payment row → real tx, real signature, real `spendingLimitUse` instruction.
 
-1. **Mint your key** — copy `kv_live_…` once
-2. **Install** — `npx create-kyvern-agent my-agent` + `npm install @kyvernlabs/sdk`
-3. **Make your first call** — paste-and-run snippet with your key inlined
-4. **Try a violation** — three buttons (over-cap / off-allowlist / missing memo) fire real Solana txs against your own vault. The Kyvern Anchor program at `PpmZ…MSqc` rejects each with a custom error code (12002 / 12003 / 12004). Real failed-tx Explorer links land in your event feed in under 3 seconds.
-5. **Send earnings to KAST** — paste your KAST USDC deposit address; allowlist as `MY_KAST`; agent payouts route there as real on-chain transfers.
+Above all of this: live Atlas tape (real on-chain decisions, drifting
+left). Below: the 5-step integration wizard (mint key → install SDK →
+first call → trigger refusal → wire KAST payout).
 
-Above the wizard: live agent status pill (`Your agent · kv_live_… · last action 12s ago`) with a pulsing dot when an event lands. Below the wizard: today stats (`$X spent · N calls · M blocked`) live-polled from your vault.
-
-The four affordance tabs above the chassis (Watch the chain · Wrap pay.sh · Send to KAST · Wrap your agent) open instrument-drawer panels with deeper interactions, including the `pay --sandbox curl` shell-out that proves Kyvern wraps real x402-paywalled APIs.
-
-Each "blocked" outcome is a finalized failed Solana transaction. The Kyvern policy program is in every instruction trace.
+Each refusal is a finalized failed Solana transaction. The Kyvern
+policy program is in every instruction trace.
 
 ## Architecture
 
@@ -134,16 +131,15 @@ classes + a kill switch, an SDK, and a scaffolder.
 
 ## Submissions
 
-- **Solana Frontier:** [`decks/frontier.md`](decks/frontier.md) (render to PDF)
-- **Kast Pakistan via Superteam Earn:** [`decks/kast-pakistan.md`](decks/kast-pakistan.md) (render to PDF)
-- **Submission portal content:** [`SUBMISSION_CHECKLIST.md`](SUBMISSION_CHECKLIST.md) — paste-ready descriptions for both portals
-- **Demo video script:** [`RECORDING_SCRIPT.md`](RECORDING_SCRIPT.md) — 2:00 hybrid script with pre-record checklist
-- **Product state:** [`KYVERN_PRODUCT_STATE.md`](KYVERN_PRODUCT_STATE.md) — canonical surface + API + on-chain map
+- **Solana Frontier:** [`decks/frontier.md`](decks/frontier.md) (render to PDF) · [`decks/frontier.pdf`](decks/frontier.pdf)
+- **Kast Pakistan via Superteam Earn:** [`decks/kast-pakistan.md`](decks/kast-pakistan.md) (render to PDF) · [`decks/kast-pakistan.pdf`](decks/kast-pakistan.pdf)
+- **Recording strategy + checklist:** [`DEMO_STRATEGY.md`](DEMO_STRATEGY.md) — why each beat exists, T-30 pre-record checklist, Don't list
+- **Demo video script:** [`DEMO_SCRIPT.md`](DEMO_SCRIPT.md) — 3:00 read-aloud format with [SCREEN], [DO], [SAY], [HOLD] stage directions
+- **Pitch video script:** [`PITCH_SCRIPT.md`](PITCH_SCRIPT.md) — 2:00 founder-to-camera script
 
 ## Built by
 
-[Shariq Azeem](https://x.com/shariqshkt) · solo Pakistani builder · 5
-prior hackathon wins · Made in Pakistan 🇵🇰 for Solana Frontier 2026.
+[Shariq Azeem](https://x.com/shariqshkt) · solo Pakistani builder · 3 prior x402 agent projects shipped on Solana · Made in Pakistan for Solana Frontier 2026.
 
 ## License
 
