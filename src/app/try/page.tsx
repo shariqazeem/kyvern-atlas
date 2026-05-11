@@ -280,18 +280,36 @@ export default function TryPage() {
   );
 }
 
-/** Same shape as /app's devWallet() fallback — base58-ish 44 chars
- *  stored under `kyvern:dev-wallet`. Returning the same value across
- *  visits lets a returning judge resume their sandbox device. */
+/** Generate (or reuse) a synthetic Solana pubkey for the sandbox.
+ *
+ *  Previously generated a random 44-char base58-ish string, but that
+ *  doesn't decode to a valid 32-byte Solana public key — Squads v4
+ *  rejected it with "Invalid public key input" during vault create.
+ *
+ *  Fix: generate a real ed25519 keypair via @solana/web3.js. We only
+ *  keep the pubkey (the secret stays in memory and is discarded). The
+ *  pubkey lives in localStorage as `kyvern:dev-wallet` so a returning
+ *  judge resumes their sandbox device. */
 function getOrCreateGuestWallet(): string {
   if (typeof window === "undefined") return "";
   const KEY = "kyvern:dev-wallet";
   const existing = window.localStorage.getItem(KEY);
-  if (existing) return existing;
-  const a =
-    "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-  let s = "";
-  for (let i = 0; i < 44; i++) s += a[Math.floor(Math.random() * a.length)];
-  window.localStorage.setItem(KEY, s);
-  return s;
+  // Reuse only if the stored value is a valid 32-byte base58 pubkey.
+  // Earlier visits before this fix stored 44 random chars; those need
+  // to be regenerated.
+  if (existing && isValidBase58Pubkey(existing)) return existing;
+
+  // Lazy-load web3.js so /try's initial bundle doesn't pay the cost.
+  // Top-level import would balloon the JS for a sandbox-only route.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { Keypair } = require("@solana/web3.js") as typeof import("@solana/web3.js");
+  const pubkey = Keypair.generate().publicKey.toBase58();
+  window.localStorage.setItem(KEY, pubkey);
+  return pubkey;
+}
+
+function isValidBase58Pubkey(s: string): boolean {
+  if (typeof s !== "string" || s.length < 32 || s.length > 44) return false;
+  // Strict base58 alphabet (no 0, O, I, l).
+  return /^[1-9A-HJ-NP-Za-km-z]+$/.test(s);
 }
