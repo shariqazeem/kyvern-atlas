@@ -1,23 +1,33 @@
-# Kyvern · Demo video · read-aloud script (3:00)
+# Kyvern · Demo video · step-by-step (3:00)
 
-**Before recording — fill these in from `/api/atlas/status` ≤ 30 min before take 1:**
+Read this script while you go through the steps. Each beat is what
+you say + what you do on screen, in order. Natural voice. You're
+demoing your own product, not narrating an ad.
+
+**Before recording, fill these in from `/api/atlas/status`:**
 
 ```
-DAYS          = ____
-PAID_COUNT    = ____
-BLOCKED_COUNT = ____
+DAYS    = ____
+PAID    = ____
+BLOCKED = ____
 ```
 
-Use these **exact numbers** in the pitch script + Devpost writeup too.
-A viewer who watches both videos will catch any mismatch.
+Use the same numbers in `PITCH_SCRIPT.md` and `SUBMISSION_FRONTIER.md`.
 
-Three takes max. Stopwatch every sentence.
+**Pre-record checklist:**
+- Logged into `/app` in one Chrome tab. Refresh once so the live tape is warm.
+- Solana Explorer in a sibling tab, already loaded.
+- Terminal in a sibling window (you won't actually use it on camera unless step 5 calls for it).
+- Browser zoom 110%. Cursor visible. System audio muted. One tab.
+- Take 1 at 8:00am after sleep. Three takes max.
+
+Total target: **2:55–3:00**. If you run over 3:05 the YouTube upload will get truncated on some viewers.
 
 ---
 
-## BEAT 1 · HOOK · 0:00–0:10
+## STEP 1 · 0:00–0:10 · Landing + hook
 
-**SCREEN** — `https://kyvernlabs.com/` (landing page). Hero card, live trust bar ticking on the right. Hold steady, no scroll.
+**DO** — Open `https://kyvernlabs.com/`. Hero card visible. Live trust bar ticking on the right.
 
 **SAY**
 
@@ -27,126 +37,101 @@ Three takes max. Stopwatch every sentence.
 >
 > On Solana, we built that.
 
-**HOLD** — 3 seconds of silence. Let the trust bar tick.
+**HOLD** — 2 seconds of silence. Trust bar ticks. Cut to next.
 
 ---
 
-## BEAT 2 · ATLAS PROOF · 0:10–0:40
+## STEP 2 · 0:10–0:32 · Proof (Atlas)
 
-**DO** — Click to `https://app.kyvernlabs.com/atlas`. Observatory loads.
+**DO** — Click into `/atlas` (or click "Watch Atlas" on the landing nav). Observatory loads.
 
 **SAY**
 
-> Meet Atlas. A reference AI agent that's been running autonomously on Solana devnet for [DAYS] days.
->
-> *(pause 1s · land each line as its own breath)*
->
-> [PAID_COUNT] merchants paid.
->
-> [BLOCKED_COUNT] attacks blocked on-chain.
->
-> [DAYS] days autonomous.
->
-> Zero dollars lost.
-
-**DO** — Click **one refused row** in the timeline. Solana Explorer opens. Show `AmountExceedsPerTxMax` in the program logs.
-
-**HOLD** — 2 seconds.
-
-**DO** — Cut back to `/atlas`. Click **one settled row**. Real on-chain payment.
-
-**HOLD** — 1 second.
-
----
-
-## BEAT 3 · CATEGORY · 0:40–0:55
-
-**DO** — Sign in to `/app`. Hero card loads. Atlas live tape drifts at top.
-
-**SAY** *(lower register, slower than other beats)*
-
-> The agent has economic agency. The chain decides every dollar.
+> This is Atlas. Our reference agent. It's been autonomous on Solana devnet for [DAYS] days.
 >
 > *(pause 1s)*
 >
-> This is what autonomous AI commerce looks like under policy.
->
-> *(pause 1s)*
->
-> Kyvern is the authorization layer that makes this safe.
+> [PAID] merchants paid. [BLOCKED] attacks blocked. Zero dollars lost.
 
-**HOLD** — 3 seconds of silence. Camera holds on the worker card.
-
----
-
-## BEAT 4 · SCENARIO REFUSAL · 0:55–1:25
-
-**DO** — Move camera to the right column ("Watch the chain refuse" card).
-
-**SAY**
-
-> Here's a real test. We attempt a five-dollar payment. The per-tx cap is fifty cents.
-
-**DO** — Click **"Try over-cap $5"**.
-
-**HOLD** — 3 full seconds of silence. Trust the product.
-
-The refused panel appears.
-
-**SAY**
-
-> Three seconds. Real Solana tx. Refused on-chain by the policy program with error code twelve thousand two. Anyone can click through to Explorer.
-
-**DO** — Click the Explorer link in the result panel. Show the failed tx with the error code in program logs.
+**DO** — Click any refused row in the timeline. Solana Explorer opens. The program logs show `AmountExceedsPerTxMax`.
 
 **HOLD** — 2 seconds.
 
+**SAY**
+
+> Every refusal is a real Solana transaction. Anyone can verify on Explorer.
+
 ---
 
-## BEAT 5 ★ · BRING YOUR OWN AGENT · 1:25–2:25
+## STEP 3 · 0:32–0:55 · Inside /app
 
-**This is the killer beat. Sixty seconds. Hit four artifacts in order:
-agent key → wrapper code → settled rows → Explorer page.**
-
-**DO** — Cut back to `/app`. Scroll down to the SDK card.
+**DO** — Click back. Navigate to `https://app.kyvernlabs.com/app`. You're already signed in. Page loads.
 
 **SAY**
 
-> Kyvern isn't just for our agents. Any agent fits in four lines.
+> This is your /app. Your worker on the left. Vault balance, top right.
 
-**DO** — Click the **`oracle.ts`** tab on the SDK card. The wrapped-fetch snippet shows.
-
-**HOLD** — 4 seconds. Long enough for a fast reader to catch line 5 (`vault.pay`).
+**DO** — Camera traces the hero band briefly (1-2 seconds).
 
 **SAY**
 
-> I built ParallaxPay last quarter. An x402 agent marketplace.
->
-> Its market oracle ran free. Now it runs under Kyvern.
+> Live Atlas tape drifting at the top. Your runtime status in the middle. Your policy on the right. The chain decides every dollar that moves through this vault.
 
-**DO** — Scroll to the "Bring your own agent" card directly below. BTC is selected by default.
+**HOLD** — 2 seconds. Let the page breathe.
 
-**SAY**
+---
 
-> Live. Right now.
+## STEP 4 · 0:55–1:25 · Mint key + install SDK
 
-**DO** — Click **"Run prediction agent"**.
-
-**HOLD** — 2 seconds, no narration. Button shows "Polling chain…"
-
-Result panel fills with price + prediction + two Explorer-linked payments.
+**DO** — Scroll down to the SDK card. Click the `.env` tab.
 
 **SAY**
 
-> Two HTTP calls. Both routed through Kyvern's policy program. Both settled on-chain. Both visible right here.
+> Mint a key. `kv_live_…`, shown once.
 
-**DO** — Camera traces the result panel slowly: prediction text → confidence → both payment rows.
+**DO** — Click the **Copy** button on the npm install row in the SDK card footer.
 
-**DO** — Click **"Explorer"** on the `api.coingecko.com` row. Real Solana tx opens with the agent's pubkey as signer.
+**SAY**
+
+> One install. `npm install at-kyvernlabs slash sdk`. That's the whole SDK.
+
+**DO** — Click the `vault.ts` tab. The four-line `vault.pay()` snippet shows.
+
+**SAY**
+
+> Four lines. Import vault. Call vault.pay. Get an on-chain decision before any USDC moves.
+
+---
+
+## STEP 5 · 1:25–2:00 · Wrap a real third-party agent
+
+**This is the core proof beat. Don't rush it.**
+
+**DO** — Click the `oracle.ts` tab on the SDK card.
+
+**SAY**
+
+> This is the wrap pattern. Any agent's fetch, gated by Kyvern.
+
+**HOLD** — 3 seconds. Let the snippet read.
+
+**SAY**
+
+> Last quarter I built ParallaxPay. An x402 agent marketplace on Solana. Its market oracle ran free. Now it runs under Kyvern.
+
+**DO** — Scroll down to the "Bring your own agent" card. BTC is selected by default. Click **Run prediction agent**.
+
+**HOLD** — 3 seconds. No narration. Button shows "Polling chain…"
+
+Result panel fills with price + prediction + two settled payment rows.
+
+**SAY**
+
+> Two HTTP calls. Both gated by Kyvern on chain. Both settled. Real Solana transactions.
+
+**DO** — Click **Explorer** on the `api.coingecko.com` row. Real Solana tx loads.
 
 **HOLD** — 2 seconds.
-
-**DO** — Cut back. Point at the new row that just landed in Recent SDK Calls.
 
 **SAY**
 
@@ -154,35 +139,59 @@ Result panel fills with price + prediction + two Explorer-linked payments.
 
 ---
 
-## BEAT 6 · PAY.SH INTEROP · 2:25–2:45
+## STEP 6 · 2:00–2:25 · Watch the chain refuse
 
-**DO** — Scroll to the Pay.sh card on the right column.
+**DO** — Cut back to `/app`. Scroll up to the right column ("Watch the chain refuse" card).
 
 **SAY**
 
-> Kyvern is the authorization layer above the x402 rail.
+> Here's a real refusal. The per-tx cap is fifty cents. We'll try a five-dollar payment.
 
-**DO** — Click **"Try $0.001 settled call"**. Pulse traverses Your Code → Kyvern → Pay.sh API. Settled signature appears.
+**DO** — Click **Try over-cap $5**.
+
+**HOLD** — 3 seconds of silence.
+
+Refused panel appears.
+
+**SAY**
+
+> Three seconds. Refused on chain. Error code twelve thousand two.
+
+**DO** — Click the Explorer link in the result panel. Show the failed tx with `AmountExceedsPerTxMax` in program logs.
 
 **HOLD** — 2 seconds.
 
 ---
 
-## BEAT 7 · CLOSE · 2:45–3:00
+## STEP 7 · 2:25–2:45 · Pay.sh interop
 
-**DO** — Cut to the landing page one last time. The manifesto frame.
+**DO** — Cut back to `/app`. Scroll to the Pay.sh card.
 
 **SAY**
 
-> AI agents are going to spend trillions of dollars autonomously.
->
-> *(pause 1s)*
->
-> Kyvern is the authorization layer that makes that safe.
+> Pay.sh ships the x402 rail. Kyvern's the authorization layer above it.
+
+**DO** — Click **Try $0.001 settled call**. Pulse traverses Your Code → Kyvern → Pay.sh. Settled signature appears.
+
+**HOLD** — 2 seconds.
+
+---
+
+## STEP 8 · 2:45–3:00 · Close
+
+**DO** — Cut to the landing page one last time. The manifesto frame visible.
+
+**SAY**
+
+> AI agents are going to spend trillions of dollars on their own.
 >
 > *(pause 1s)*
 >
 > Today, Atlas runs on it. Today, the SDK ships.
+>
+> *(pause 1s)*
+>
+> We ship to mainnet next month.
 
 **HOLD** — Fade on the tagline: *"Agents shouldn't have keys. They should have budgets."*
 
@@ -192,24 +201,26 @@ Result panel fills with price + prediction + two Explorer-linked payments.
 
 ## Reading discipline
 
-- ~140 words per minute, no faster. Pauses earn weight.
-- "Real" appears 7 times across the script. Lean on it every time.
-- Numbers always in this order: **paid → refused → days → lost.**
-  Paid first frames Atlas as a worker, not a wall.
-- Don't say "demo," "simulation," or "example." Say "real."
-- Don't say "policy program" alone. Say "the chain decides" or "the
-  policy program on Solana." The chain is the protagonist.
+- Speak the way you actually speak when you're walking someone through your own product. Not announcer voice, not corporate voice.
+- ~140 wpm. Slow on the numbers in Step 2 (each one is a beat). Faster through the install + tab clicks in Step 4 (action carries the pace).
+- The strongest line in the whole script is *"This agent was written before Kyvern existed. One import. One wrapped fetch. Now every call it makes is gated by consensus."* — land it slow. Lower register.
+- Em-dashes don't appear in any spoken line. If you forget mid-take and add one, just continue with a period instead.
+- If a take goes wrong: stop, breathe, restart the beat from the top, keep rolling. Editor splices.
 
-## If the take goes wrong
+## If a step goes wrong on camera
 
-- **Beat 5 button hangs > 8s** — abort, top up SOL via faucet.solana.com, retry.
-- **Refused on-chain · merchant_not_allowed** — auto-allowlist failed; add `api.coingecko.com` + `api.commonstack.ai` manually in /app, retry.
-- **Empty prediction text** — Commonstack fallback engaged; the two settled txs still tell the policy story, just don't camera-pan to the prediction text.
+| Symptom | Action |
+|---|---|
+| Step 5 button stuck on "Polling chain…" > 8s | Stop take. Refresh `/app`, top up fee-payer at faucet.solana.com, retry. |
+| Step 5 returns "Refused on chain · merchant_not_allowed" | Auto-allowlist failed. Manually add `api.coingecko.com` + `api.commonstack.ai` in /app allowlist. Retry. |
+| Step 5 prediction text empty (Commonstack fallback) | The 2 settled payments still tell the policy story. Cut the camera pan to the prediction text in that take, finish the rest. |
+| Step 6 refused panel doesn't appear in 5s | Network slow. Take 2. |
+| Explorer link 404s | Your fee-payer ran out of SOL during the tx submit. Top up. |
 
-## Take log (fill during shoot)
+## Take log
 
-| Take | Time | Notes |
-|------|------|-------|
-| 1    |      |       |
-| 2    |      |       |
-| 3    |      |       |
+| Take | Time start | Notes |
+|------|------------|-------|
+| 1    |            |       |
+| 2    |            |       |
+| 3    |            |       |
