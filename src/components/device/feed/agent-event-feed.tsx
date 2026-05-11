@@ -69,7 +69,12 @@ export function AgentEventFeed({
   // Poll. Initial fetch returns up to 50; subsequent ticks use
   // ?since=<latestTs> for cheap delta fetches.
   useEffect(() => {
-    if (!vaultId || !ownerWallet) return;
+    if (!vaultId || !ownerWallet) {
+      // No auth context (guest / incognito). Stop the spinner so the
+      // feed renders an empty state instead of hanging forever.
+      setLoading(false);
+      return;
+    }
     let cancelled = false;
 
     const poll = async () => {

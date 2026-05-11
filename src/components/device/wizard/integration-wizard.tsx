@@ -75,7 +75,12 @@ export function IntegrationWizard({
 
   // Hydrate progress on mount
   useEffect(() => {
-    if (!vaultId || !ownerWallet) return;
+    if (!vaultId || !ownerWallet) {
+      // No auth context yet (guest / incognito). Stop the spinner so
+      // the wizard renders empty steps instead of hanging forever.
+      setLoading(false);
+      return;
+    }
     let cancelled = false;
     void fetch(`/api/vault/${vaultId}/integration-progress`, {
       headers: { "x-owner-wallet": ownerWallet },

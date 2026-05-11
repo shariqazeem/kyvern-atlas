@@ -1430,10 +1430,14 @@ function RuntimeCard({ data }: { data: VaultPayload }) {
 
 function SdkXcodeCard({ vaultId }: { vaultId: string }) {
   const [keyPrefix, setKeyPrefix] = useState<string | null>(null);
-  const [copied, setCopied] = useState<"snippet" | "install" | null>(null);
+  const [copied, setCopied] = useState<
+    "snippet" | "install" | "rotated" | null
+  >(null);
   const [activeTab, setActiveTab] = useState<
     "vault" | "policy" | "env" | "byoa"
   >("vault");
+  const [rotatedKey, setRotatedKey] = useState<string | null>(null);
+  const [rotating, setRotating] = useState(false);
 
   useEffect(() => {
     if (!vaultId) return;
@@ -1446,9 +1450,31 @@ function SdkXcodeCard({ vaultId }: { vaultId: string }) {
       .catch(() => {});
   }, [vaultId]);
 
+  const rotateKey = useCallback(async () => {
+    if (!vaultId || rotating) return;
+    setRotating(true);
+    try {
+      const r = await fetch(`/api/devices/${vaultId}/agent-key`, {
+        method: "POST",
+      });
+      const d = (await r.json()) as {
+        keyPrefix?: string;
+        rawKey?: string;
+      };
+      if (d?.rawKey) {
+        setRotatedKey(d.rawKey);
+        if (d.keyPrefix) setKeyPrefix(d.keyPrefix);
+      }
+    } catch {
+      /* swallow */
+    } finally {
+      setRotating(false);
+    }
+  }, [vaultId, rotating]);
+
   const apiKey = keyPrefix ? `"${keyPrefix}…"` : `process.env.KYVERN_AGENT_KEY`;
 
-  const snippet = `// 1. Add at the top of your agent file:
+  const snippetVault = `// 1. Add at the top of your agent file:
 import { Vault } from "@kyvernlabs/sdk";
 
 // 2. Create the client once:
@@ -1466,6 +1492,45 @@ if (gate.decision !== "allowed") throw new Error(gate.reason);
 
 // 4. Now safe to call the merchant. Real on-chain settled.
 // const data = await fetch("https://api.openai.com/...");`;
+
+  const snippetPolicy = `// policy.ts — declarative, mirrors on-chain enforcement
+export const policy = {
+  dailyCapUsd: 5.00,
+  weeklyCapUsd: 25.00,
+  perTxMaxUsd: 0.50,
+  allowlist: ["api.openai.com"],
+  requireMemo: true,
+};`;
+
+  const snippetEnv = `# .env — chain-enforced; the SDK reads these
+KYVERN_AGENT_KEY=${keyPrefix ? `${keyPrefix}...` : "kv_live_273e03..."}
+KYVERN_METERING_RECIPIENT=GZCnHuFtswvsJftSDmtoHEve8amqNLzAAPvYy8NU3ZNZ
+KYVERN_NETWORK=devnet`;
+
+  const snippetByoa = `// oracle.ts — wrap ANY agent (here: ParallaxPay's market
+// oracle) so every HTTP call routes through Kyvern first.
+import { Vault } from "@kyvernlabs/sdk";
+
+const vault = new Vault({ agentKey: process.env.KYVERN_AGENT_KEY! });
+
+export const kyvernFetch: typeof fetch = async (url, init) => {
+  const host = new URL(url.toString()).hostname;
+  const res = await vault.pay({ merchant: host, amount: 0.001 });
+  if (res.decision === "refused") throw new Error(res.reason);
+  return fetch(url, init);
+};
+
+// Now any HTTP call your agent makes is gated on-chain.
+// Try it — the button below uses this exact pattern.`;
+
+  const activeSnippet =
+    activeTab === "policy"
+      ? snippetPolicy
+      : activeTab === "env"
+        ? snippetEnv
+        : activeTab === "byoa"
+          ? snippetByoa
+          : snippetVault;
 
   const copy = (which: "snippet" | "install", text: string) => {
     navigator.clipboard.writeText(text);
@@ -1584,6 +1649,123 @@ if (gate.decision !== "allowed") throw new Error(gate.reason);
         {activeTab === "byoa" && <SnippetByoa />}
       </div>
 
+      {/* Rotate key panel — only visible on the .env tab. Solves
+          'I lost my key after the wizard ticked it off' UX gap. */}
+      {activeTab === "env" && (
+        <div
+          style={{
+            padding: "10px 22px 14px",
+            borderTop: `1px solid ${TOK.hairline2}`,
+            background: TOK.surface,
+          }}
+        >
+          {rotatedKey ? (
+            <div
+              className="flex flex-col gap-2"
+              style={{
+                padding: "10px 12px",
+                borderRadius: 10,
+                background: "rgba(245,158,11,0.06)",
+                border: "1px solid rgba(245,158,11,0.22)",
+              }}
+            >
+              <div
+                className="flex items-center gap-2"
+                style={{
+                  fontSize: 10.5,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.10em",
+                  color: TOK.amber,
+                  fontWeight: 600,
+                }}
+              >
+                New agent key — copy now, shown only once
+              </div>
+              <div
+                className="flex items-center gap-2"
+                style={{
+                  padding: "8px 10px",
+                  background: TOK.surface,
+                  border: `1px solid ${TOK.hairline}`,
+                  borderRadius: 8,
+                  fontFamily: "var(--font-mono, monospace)",
+                  fontSize: 11.5,
+                  color: TOK.ink,
+                  wordBreak: "break-all",
+                }}
+              >
+                <code className="flex-1">{rotatedKey}</code>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(rotatedKey);
+                    setCopied("rotated");
+                    setTimeout(() => setCopied(null), 1500);
+                  }}
+                  className="inline-flex items-center gap-1 transition hover:opacity-80"
+                  style={{
+                    padding: "3px 8px",
+                    border: `1px solid ${TOK.hairline}`,
+                    background: TOK.surface2,
+                    borderRadius: 6,
+                    fontSize: 10.5,
+                    color: TOK.ink2,
+                    flexShrink: 0,
+                  }}
+                >
+                  {copied === "rotated" ? (
+                    <>
+                      <Check className="w-3 h-3" strokeWidth={2} /> Copied
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3 h-3" strokeWidth={1.8} /> Copy
+                    </>
+                  )}
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRotatedKey(null)}
+                style={{
+                  fontSize: 10.5,
+                  color: TOK.ink4,
+                  textAlign: "left",
+                  alignSelf: "flex-start",
+                  textDecoration: "underline",
+                  textUnderlineOffset: 2,
+                }}
+              >
+                I&apos;ve saved it, hide this
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <span style={{ fontSize: 12, color: TOK.ink3 }}>
+                Lost your agent key? Generate a new one.
+              </span>
+              <button
+                type="button"
+                onClick={rotateKey}
+                disabled={rotating}
+                className="inline-flex items-center gap-1.5 transition hover:bg-[rgba(15,23,42,0.04)] disabled:opacity-50"
+                style={{
+                  padding: "5px 10px",
+                  border: `1px solid ${TOK.hairline}`,
+                  background: TOK.surface,
+                  borderRadius: 8,
+                  fontSize: 11.5,
+                  color: TOK.ink2,
+                  cursor: rotating ? "not-allowed" : "pointer",
+                }}
+              >
+                {rotating ? "Generating…" : "Generate new key"}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Footer */}
       <div
         className="flex items-center justify-between"
@@ -1599,7 +1781,7 @@ if (gate.decision !== "allowed") throw new Error(gate.reason);
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => copy("snippet", snippet)}
+            onClick={() => copy("snippet", activeSnippet)}
             className="inline-flex items-center gap-1.5 rounded-md transition-all hover:bg-[rgba(15,23,42,0.04)]"
             style={{
               padding: "5px 9px",
