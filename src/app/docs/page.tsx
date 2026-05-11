@@ -63,7 +63,7 @@ export default function DocsPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen" style={{ background: "#FAFAFA" }}>
       <TopBar />
 
       <div className="mx-auto grid max-w-[1120px] grid-cols-1 gap-10 px-6 pb-24 pt-12 lg:grid-cols-[240px_1fr]">
@@ -115,13 +115,21 @@ export default function DocsPage() {
 
 function TopBar() {
   return (
-    <div className="sticky top-0 z-30 border-b border-[#F0F0F0] bg-white/80 backdrop-blur-xl">
+    <div
+      className="sticky top-0 z-30"
+      style={{
+        background: "rgba(250,250,250,0.82)",
+        backdropFilter: "saturate(180%) blur(20px)",
+        WebkitBackdropFilter: "saturate(180%) blur(20px)",
+        borderBottom: "1px solid rgba(0,0,0,0.06)",
+      }}
+    >
       <div className="mx-auto flex h-14 max-w-[1120px] items-center justify-between px-6">
         <Link
           href="/"
           className="inline-flex items-center gap-2 text-[13px] font-medium text-[#6E6E73] transition-colors hover:text-black"
         >
-          <ArrowLeft className="h-4 w-4" /> KyvernLabs
+          <ArrowLeft className="h-4 w-4" /> Kyvern
         </Link>
         <div className="flex items-center gap-3 text-[12px] text-[#6E6E73]">
           <Link href="/vault/new" className="hover:text-black">
@@ -150,17 +158,34 @@ function Hero() {
       transition={{ duration: 0.5, ease: EASE }}
       className="mb-16"
     >
-      <div className="inline-flex items-center gap-1.5 rounded-full border border-[#E5E5EA] bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-[#6E6E73]">
+      <div
+        className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.10em] text-[#6E6E73]"
+        style={{
+          background: "#FFFFFF",
+          border: "1px solid rgba(0,0,0,0.08)",
+          boxShadow: "0 1px 2px rgba(0,0,0,0.03)",
+        }}
+      >
         <Terminal className="h-3 w-3" /> Developer docs
       </div>
-      <h1 className="mt-4 text-[44px] font-semibold leading-[1.05] tracking-tight">
-        Ship an agent with a budget
+      <h1
+        className="mt-5 font-semibold leading-[1.04] tracking-tight"
+        style={{
+          fontSize: 48,
+          letterSpacing: "-0.025em",
+          color: "#0A0A0A",
+        }}
+      >
+        Ship an agent with a budget,
         <br />
         in three lines.
       </h1>
-      <p className="mt-4 max-w-[560px] text-[15px] leading-relaxed text-[#6E6E73]">
-        @kyvernlabs/sdk is the official client for KyvernLabs vaults. It talks
-        to the same API that powers the dashboard &mdash; install, paste, ship.
+      <p
+        className="mt-5 max-w-[560px] leading-relaxed"
+        style={{ fontSize: 15, color: "#475569" }}
+      >
+        @kyvernlabs/sdk is the official client for Kyvern vaults. It talks to
+        the same API that powers the /app dashboard. Install, paste, ship.
       </p>
     </motion.div>
   );
@@ -692,7 +717,7 @@ function Step({
         <h4 className="mb-2 text-[15px] font-semibold tracking-tight">
           {title}
         </h4>
-        <div className="text-[14px] leading-relaxed text-[#6E6E73] [&_code]:rounded [&_code]:bg-[#F5F5F7] [&_code]:px-1 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-[12px] [&_code]:text-[#1c1c1e]">
+        <div className="text-[14px] leading-relaxed text-[#6E6E73] [&_p_code]:rounded [&_p_code]:bg-[#F5F5F7] [&_p_code]:px-1 [&_p_code]:py-0.5 [&_p_code]:font-mono [&_p_code]:text-[12px] [&_p_code]:text-[#1c1c1e]">
           {children}
         </div>
       </div>
@@ -711,11 +736,63 @@ function CodeBlock({
   const lines = useMemo(() => code.split("\n"), [code]);
   return (
     <div
-      className="group relative overflow-hidden rounded-[16px] border border-[#1c1c1e]/5 bg-[#0A0A0A] text-[#F5F5F7]"
-      style={{ boxShadow: "0 8px 32px rgba(0,0,0,0.08)" }}
+      className="group relative overflow-hidden rounded-[14px] bg-[#0A0A0A] text-[#F5F5F7]"
+      style={{
+        border: "1px solid rgba(255,255,255,0.06)",
+        boxShadow:
+          "0 1px 2px rgba(0,0,0,0.06), 0 12px 32px -12px rgba(0,0,0,0.20), inset 0 1px 0 rgba(255,255,255,0.04)",
+      }}
     >
-      <div className="flex items-center justify-between border-b border-white/5 px-4 py-2.5">
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-[#8E8E93]">
+      {/* macOS-style title bar with traffic-light dots */}
+      <div
+        className="flex items-center px-3 py-2.5 select-none"
+        style={{
+          background:
+            "linear-gradient(180deg, #1F1F22 0%, #141416 100%)",
+          borderBottom: "1px solid rgba(0,0,0,0.4)",
+        }}
+      >
+        <div className="flex items-center gap-1.5">
+          <span
+            aria-hidden
+            style={{
+              width: 11,
+              height: 11,
+              borderRadius: 999,
+              background: "#FF5F57",
+              border: "0.5px solid rgba(0,0,0,0.20)",
+            }}
+          />
+          <span
+            aria-hidden
+            style={{
+              width: 11,
+              height: 11,
+              borderRadius: 999,
+              background: "#FEBC2E",
+              border: "0.5px solid rgba(0,0,0,0.20)",
+            }}
+          />
+          <span
+            aria-hidden
+            style={{
+              width: 11,
+              height: 11,
+              borderRadius: 999,
+              background: "#28C840",
+              border: "0.5px solid rgba(0,0,0,0.20)",
+            }}
+          />
+        </div>
+        <span
+          className="font-mono mx-auto"
+          style={{
+            fontSize: 10.5,
+            color: "rgba(229,231,235,0.55)",
+            letterSpacing: "0.04em",
+            textTransform: "uppercase",
+          }}
+        >
           {language}
         </span>
         <button
@@ -724,11 +801,19 @@ function CodeBlock({
             setCopied(true);
             setTimeout(() => setCopied(false), 1200);
           }}
-          className="inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-2 py-1 text-[11px] font-medium text-[#E5E5EA] transition-colors hover:bg-white/10"
+          className="inline-flex items-center gap-1.5 rounded-md transition-colors"
+          style={{
+            padding: "3px 8px",
+            border: "1px solid rgba(255,255,255,0.08)",
+            background: "rgba(255,255,255,0.04)",
+            fontSize: 10.5,
+            color: "rgba(229,231,235,0.75)",
+          }}
         >
           {copied ? (
             <>
-              <CheckCircle2 className="h-3 w-3 text-[#22C55E]" /> Copied
+              <CheckCircle2 className="h-3 w-3" style={{ color: "#34D399" }} />{" "}
+              Copied
             </>
           ) : (
             <>
@@ -737,13 +822,15 @@ function CodeBlock({
           )}
         </button>
       </div>
-      <pre className="overflow-x-auto px-5 py-4 font-mono text-[12.5px] leading-[1.65]">
+      <pre className="overflow-x-auto px-5 py-4 font-mono text-[12.5px] leading-[1.65] !bg-transparent">
         {lines.map((line, i) => (
           <div key={i} className="grid grid-cols-[32px_1fr]">
             <span className="select-none text-[#48484A]">
               {String(i + 1).padStart(2, " ")}
             </span>
-            <code className="whitespace-pre">{line || " "}</code>
+            <code className="whitespace-pre !bg-transparent !p-0 !text-inherit !rounded-none">
+              {line || " "}
+            </code>
           </div>
         ))}
       </pre>
