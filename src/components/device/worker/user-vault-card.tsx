@@ -141,6 +141,10 @@ export function UserVaultCard({
 
       <div className="relative p-5 sm:p-6 flex flex-col gap-4">
         <Identity vault={data.vault} payments={data.payments} now={now} />
+        {/* Always-visible live tape — the constant "this is a runtime"
+            signal. Atlas's chain events drift across the card whether
+            you're on Runtime, Network, or Rules. */}
+        <LiveTape />
         <SegmentedControl tab={tab} onChange={setTab} />
 
         {/* Tab content — fixed-height viewport so the whole card stays
@@ -180,7 +184,6 @@ export function UserVaultCard({
                 transition={{ duration: 0.25, ease: EASE }}
                 className="flex flex-col gap-4"
               >
-                <LiveTape />
                 <PayShFlow
                   vaultId={data.vault.id}
                   ownerWallet={resolvedOwner}

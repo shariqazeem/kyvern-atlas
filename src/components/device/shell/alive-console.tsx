@@ -21,14 +21,16 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { motion } from "framer-motion";
-import { ArrowRight, Code2 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { ArrowRight, Code2, ShieldCheck, X } from "lucide-react";
 import { WorkerTemplates } from "../worker/worker-templates";
 import {
   UserVaultCard,
   type VaultPayload,
 } from "../worker/user-vault-card";
 import type { PanelKind } from "../home/affordance-row";
+
+const ORIENT_BANNER_KEY = "kyvern:orient-allowlist-dismissed";
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
@@ -46,6 +48,28 @@ interface Props {
 export function AliveConsole({ vaultId, ownerWallet, className }: Props) {
   const [data, setData] = useState<VaultPayload | null>(null);
   const [now, setNow] = useState<number>(() => Date.now());
+  const [bannerDismissed, setBannerDismissed] = useState(true);
+
+  // First-visit allowlist orientation banner. Only renders when:
+  //   (a) the user has a vault (so it's not a cold-start screen)
+  //   (b) the vault has exactly the 3 default merchants (untouched)
+  //   (c) the dismissed flag isn't set in localStorage
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const dismissed = window.localStorage.getItem(ORIENT_BANNER_KEY);
+    setBannerDismissed(!!dismissed);
+  }, []);
+  const showOrientBanner =
+    !bannerDismissed &&
+    !!data &&
+    data.payments.length === 0 &&
+    data.vault.allowedMerchants.length <= 3;
+  const dismissBanner = useCallback(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(ORIENT_BANNER_KEY, "1");
+    }
+    setBannerDismissed(true);
+  }, []);
 
   // Local clock — drives "last call 17s ago" + age timer
   useEffect(() => {
@@ -76,10 +100,58 @@ export function AliveConsole({ vaultId, ownerWallet, className }: Props) {
 
   return (
     <div className={`flex flex-col gap-4 sm:gap-5 ${className ?? ""}`}>
-      {/* Hero: USER's vault Worker Card. Now a tabbed device shell —
-          Runtime / Network / Rules — per Apple-OS layout pivot. The
-          Atlas live-tape, Pay.sh circuit, policy ribbon, etc. all
-          live INSIDE the card on their respective tabs. */}
+      {/* First-visit orientation banner — surfaces the allowlist
+          editor for fresh vaults so SDK developers see they can
+          declare their merchants without re-provisioning. */}
+      <AnimatePresence>
+        {showOrientBanner && (
+          <motion.div
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.4, ease: EASE }}
+            className="flex items-center gap-3 rounded-[12px] px-4 py-2.5"
+            style={{
+              background:
+                "linear-gradient(180deg, rgba(34,197,94,0.06) 0%, rgba(34,197,94,0.02) 100%)",
+              border: "1px solid rgba(34,197,94,0.20)",
+            }}
+          >
+            <ShieldCheck
+              className="w-4 h-4 flex-shrink-0"
+              strokeWidth={2}
+              style={{ color: "#15803D" }}
+            />
+            <div className="flex-1 min-w-0 text-[12px] leading-[1.5]">
+              <span style={{ color: "#0A0A0A", fontWeight: 500 }}>
+                Your worker is provisioned with 3 default merchants.
+              </span>{" "}
+              <span style={{ color: "rgba(15,23,42,0.65)" }}>
+                Add your own in{" "}
+                <span style={{ fontWeight: 600 }}>Rules → Add</span> — the
+                policy program enforces every merchant before USDC moves.
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={dismissBanner}
+              aria-label="Dismiss"
+              className="inline-flex items-center justify-center rounded-md transition-all hover:bg-[rgba(15,23,42,0.06)]"
+              style={{
+                width: 22,
+                height: 22,
+                color: "rgba(15,23,42,0.45)",
+              }}
+            >
+              <X className="w-3 h-3" strokeWidth={2.2} />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Hero: USER's vault Worker Card. Tabbed device shell —
+          Runtime / Network / Rules. Live-tape always visible above
+          the tabs (the constant motion signal). */}
       {data ? (
         <UserVaultCard data={data} ownerWallet={ownerWallet} now={now} />
       ) : (
