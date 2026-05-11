@@ -1,26 +1,94 @@
-# Kyvern · Demo video · 3:00
+# Kyvern · Demo video · 3:00 · live integration cut
 
-Read each step top-to-bottom while you record. Three columns:
-**ON SCREEN** = what you should see / click. **SAY** = read aloud,
-verbatim. **HOLD** = silent beat.
+You're going to install the SDK, wrap an agent, run it, and watch
+the calls land on Kyvern's chain enforcement in real time. Reading
+this aloud should feel like you're telling someone how it works
+while you do it. Not like a script.
 
-Numbers refresh once before take 1:
+Three columns per step:
+- **ON SCREEN** — what you click / what's visible
+- **SAY** — read this verbatim, full sentences, the way you'd
+  actually say it
+- **HOLD** — silent beats
+
+---
+
+## Before you hit record (15 min setup)
+
+**Numbers refresh — fill these in:**
 
 ```
-DAYS    = ___   (uptime in days from /api/atlas/status)
+DAYS    = ___   (Atlas uptime in days from /api/atlas/status)
 PAID    = ___   (totalSettled)
 BLOCKED = ___   (totalAttacksBlocked)
 ```
 
-Use the same three values in `PITCH_SCRIPT.md` and `SUBMISSION_FRONTIER.md`.
+**Project folder — `~/demo-agent` on your laptop:**
 
-Total: 3:00. Don't run over 3:05.
+```
+demo-agent/
+├── agent.ts            ← pre-written, see template below
+├── package.json
+├── tsconfig.json
+└── node_modules/       ← npm install -y all deps EXCEPT @kyvernlabs/sdk
+                          (so the "live install" step is fast/cached)
+```
+
+`agent.ts` template (paste this in before recording — already wrapped
+so the integration is visible from the first frame):
+
+```ts
+import { Vault } from "@kyvernlabs/sdk";
+
+const vault = new Vault({ agentKey: process.env.KYVERN_AGENT_KEY! });
+
+async function run() {
+  console.log("→ vault.pay() · api.openai.com · $0.001");
+  const r1 = await vault.pay({
+    merchant: "api.openai.com",
+    amount: 0.001,
+    memo: "chat-completion",
+  });
+  console.log(`  ${r1.decision} · ${r1.signature ?? "(no sig)"}\n`);
+
+  console.log("→ vault.pay() · api.anthropic.com · $0.001");
+  const r2 = await vault.pay({
+    merchant: "api.anthropic.com",
+    amount: 0.001,
+    memo: "agent inference",
+  });
+  console.log(`  ${r2.decision} · ${r2.signature ?? "(no sig)"}\n`);
+
+  console.log("done.");
+}
+
+run().catch(console.error);
+```
+
+**Vault prep:**
+- Sign in to `/app`, fund your demo vault with **at least $0.05 devnet USDC** (the two calls cost $0.002 total but leave headroom)
+- Make sure `api.openai.com` + `api.anthropic.com` are in your vault's allowlist (add them via /app's allowlist editor)
+- Mint a key, copy it into `~/demo-agent/.env`:
+  ```
+  KYVERN_AGENT_KEY=kv_live_<your-key>
+  ```
+
+**Window layout — pin this BEFORE recording:**
+- Left half of screen: Chrome with `kyvernlabs.com` loaded
+- Right half: VS Code with `agent.ts` open + integrated terminal below it
+- Browser zoom 110%, VS Code font 14pt minimum so the camera reads
+- Solana Explorer pre-warmed in a sibling Chrome tab
+
+**Dry run once silently before recording.** Run `node agent.ts` from
+the project folder. Confirm both calls settle and signatures show.
+This catches a missing allowlist entry or low SOL before you waste
+a take.
 
 ---
 
-## STEP 1 · Landing + hook · 0:00 → 0:12
+## STEP 1 · Hook · 0:00 → 0:10
 
-**ON SCREEN** — Open a clean Chrome tab to `kyvernlabs.com`. You see the landing hero with the live trust bar ticking on the right.
+**ON SCREEN** — Full Chrome on `kyvernlabs.com`. Hero visible. Live trust bar ticking on the right.
 
 **SAY**
 
@@ -28,199 +96,189 @@ Total: 3:00. Don't run over 3:05.
 >
 > On Solana, we built that.
 
-**HOLD** — 3 seconds. The trust bar keeps ticking.
+**HOLD** — 3 seconds.
 
 ---
 
-## STEP 2 · Atlas, the live proof · 0:12 → 0:42
+## STEP 2 · Atlas, the live proof · 0:10 → 0:35
 
-**ON SCREEN** — Click **"Watch Atlas"** in the top nav. The /atlas page loads. You see the four hero stats: **alive · merchants paid · attacks blocked · funds lost**.
+**ON SCREEN** — Click **Watch Atlas** in the top nav. The `/atlas` page loads. You see four hero stats at the top: alive, merchants paid, attacks blocked, funds lost.
 
 **SAY**
 
-> This is Atlas. Our reference agent. It's been running on Solana devnet for [DAYS] days. Fully autonomous.
->
-> *(pause one beat)*
+> This is Atlas. Our reference agent. It's been running on Solana devnet for [DAYS] days, fully autonomous.
 >
 > [PAID] real on-chain payments. [BLOCKED] attack attempts refused by the policy engine. Zero dollars lost.
 
-**ON SCREEN** — Scroll down past the "Atlas earned" earnings card. The next section is **the economic ledger** — a list of Atlas's recent settled payments. Each row has a short signature like `3kR8…mN4v` and an arrow icon on the right.
+**ON SCREEN** — Scroll down past the "Atlas earned" earnings card. You see a list of recent settled payments, each with a short signature like `3kR8…mN4v` and an arrow icon. Click any row.
 
-Click any row.
-
-**ON SCREEN** — Solana Explorer opens in a new tab. You see a real on-chain transaction, real signature, real timestamp.
+Solana Explorer opens in a new tab. A real on-chain transaction loads.
 
 **HOLD** — 2 seconds.
 
 **SAY**
 
-> Every settled payment is a real Solana transaction. Anyone can click through and verify.
+> Every settled payment is a real Solana transaction. Anyone can click and verify.
 
 ---
 
-## STEP 3 · Try Kyvern without signing in · 0:42 → 1:02
+## STEP 3 · Mint a key on /app · 0:35 → 1:05
 
-**ON SCREEN** — Close the Explorer tab. Back on the /atlas page, click the **back arrow** in the top-left to return to the landing page. Scroll up to the hero CTAs.
+**ON SCREEN** — Close the Explorer tab. Go to `https://app.kyvernlabs.com/app` (you're already signed in). The canvas loads.
 
 **SAY**
 
-> You can try Kyvern yourself, no signup. Click here.
+> Now I'll show you how to put your own agent on it.
 
-**ON SCREEN** — Click **"Try a Kyvern · no login"**. The /try page loads and shows four provisioning steps running in sequence:
+**ON SCREEN** — Scroll to the SDK card in the center column. Click the `.env` tab. Your agent key shows on screen, prefixed `kv_live_`.
 
-1. Spinning up your sandbox device
-2. Provisioning a Squads multisig vault on Solana devnet
-3. Wiring the Kyvern policy program
-4. Installing the three starter workers
+**SAY**
 
-**SAY** *(over the provisioning animation)*
+> Mint a key. This `kv_live_…` is yours. Shows once, paste it into your env, never see it again.
 
-> Real Squads multisig. Real policy program. About six seconds later, you're inside the app with your own on-chain vault.
+**ON SCREEN** — Click the **Copy** button on the npm install row at the bottom of the SDK card.
 
-**ON SCREEN** — `/app` loads automatically.
+**SAY**
+
+> One npm install. Right there. Let me actually do it.
 
 ---
 
-## STEP 4 · Inside /app · 1:02 → 1:20
+## STEP 4 · Install the SDK live · 1:05 → 1:25
 
-**ON SCREEN** — The /app canvas is now visible. The top row has your worker name + identity stats on the left and your vault balance on the right. Below that, a three-column layout.
+**ON SCREEN** — Switch to VS Code. The integrated terminal is visible at the bottom. Type:
+
+```
+npm install @kyvernlabs/sdk
+```
+
+Hit enter. Because the cache is warm, it completes in 2–3 seconds with `added 1 package`.
 
 **SAY**
 
-> This is your mission control. Your worker on the left, your vault balance up top. Live Atlas tape drifting at the bottom of the worker card.
+> npm install at kyvern labs SDK. Done. One dependency. Zero peer dependencies.
 
-**HOLD** — 2 seconds. Camera holds on the hero band.
+**ON SCREEN** — Click the `agent.ts` tab in VS Code. The wrapped code shows: `import Vault`, `new Vault({ agentKey })`, two `vault.pay()` calls.
 
 **SAY**
 
-> The chain decides every dollar that moves through this vault.
+> Here's an agent. Six lines that matter. Import Vault. Pass your key. Call vault dot pay with the merchant, the amount, the memo.
+>
+> If the chain allows it, you get a signature. If it refuses, you get a reason.
 
 ---
 
-## STEP 5 · Mint a key, install the SDK · 1:20 → 1:42
+## STEP 5 · Run the agent · 1:25 → 2:00
 
-**ON SCREEN** — Scroll down to the **SDK card** in the center column. It has a macOS-style title bar with traffic-light dots and four tabs: `vault.ts` · `policy.ts` · `.env` · `oracle.ts`.
+**ON SCREEN** — In the terminal, type:
 
-Click the **`.env`** tab. You see your agent key on screen, prefixed with `kv_live_`.
+```
+node agent.ts
+```
+
+Hit enter. Two `vault.pay()` calls fire. The terminal logs:
+
+```
+→ vault.pay() · api.openai.com · $0.001
+  settled · 4F2g…h7Kj
+→ vault.pay() · api.anthropic.com · $0.001
+  settled · 8mN3…pR4t
+done.
+```
 
 **SAY**
 
-> Mint a key. `kv_live_...` shows once. You paste it into your env.
+> Two payments. Both routed through Kyvern. Both settled on Solana.
+>
+> Watch what happens on the dashboard.
 
-**ON SCREEN** — Click the **Copy** button on the install row at the bottom of the SDK card.
+**ON SCREEN** — Switch to the Chrome window with `/app` open. Scroll to **Recent SDK calls** in the center column. The two payments your agent just fired are landing in the list — same timestamps, same merchants, same signature prefixes.
 
-**SAY**
-
-> One npm install. The whole SDK is right here.
-
-**ON SCREEN** — Click the **`vault.ts`** tab. The four-line snippet shows: import Vault, new Vault, await vault.pay, log the decision.
+**HOLD** — 3 seconds. Let the rows land visibly.
 
 **SAY**
 
-> Four lines. Import. Call vault dot pay. Get an on-chain decision before any USDC moves.
+> Same agent. Same calls. Now they're on-chain artifacts you can audit.
 
 ---
 
-## STEP 6 · Bring your own agent · 1:42 → 2:18
+## STEP 6 · Click through to Explorer · 2:00 → 2:25
 
-**This is the core proof beat. Don't rush it.**
+**ON SCREEN** — In the Recent SDK calls list, click on one of the two fresh rows (the one with the most recent timestamp). It expands or opens Explorer with the signature.
 
-**ON SCREEN** — Still on the SDK card, click the **`oracle.ts`** tab. The wrapped-fetch snippet shows.
+**ON SCREEN** — Click the signature link. Solana Explorer opens with the real tx — your agent's pubkey as signer, the vault's USDC ATA as source, the merchant payment in the instructions.
 
-**SAY**
-
-> This is the wrap pattern. Any agent's fetch, gated by Kyvern.
-
-**HOLD** — 3 seconds. Let the snippet sit on screen.
+**HOLD** — 3 seconds.
 
 **SAY**
 
-> Last quarter I built ParallaxPay, an x402 agent marketplace on Solana. Its market oracle ran free. Now it runs under Kyvern.
-
-**ON SCREEN** — Scroll down one card. The **"Bring your own agent"** card is directly below the SDK card. BTC is selected by default. Click **"Run prediction agent"**.
-
-**HOLD** — 3 seconds. The button shows "Polling chain…"
-
-The result panel fills with the BTC price, a one-sentence prediction, a confidence number, and two settled payment rows.
-
-**SAY**
-
-> Two HTTP calls. Both gated by Kyvern on chain. Both settled as real Solana transactions.
-
-**ON SCREEN** — Click the **Explorer** link on the `api.coingecko.com` row. A real Solana tx loads.
-
-**HOLD** — 2 seconds.
-
-**SAY**
-
-> This agent was written before Kyvern existed. One import. One wrapped fetch. Now every call it makes is gated by consensus.
+> Real Solana transaction. Real Squads spending-limit instruction. Real on-chain enforcement.
+>
+> If my agent had tried something the policy refuses, you'd see a failed tx here instead, with the error code in the program logs.
 
 ---
 
-## STEP 7 · Watch the chain refuse · 2:18 → 2:38
+## STEP 7 · Watch the chain refuse · 2:25 → 2:45
 
-**ON SCREEN** — Close the Explorer tab. Back on /app, scroll to the **right column**. You see a card titled **"Watch the chain refuse"** with three scenario buttons.
-
-Click **"Try over-cap $5"**.
+**ON SCREEN** — Close the Explorer tab. Back on `/app`, scroll to the right column. Find the **Watch the chain refuse** card with three scenario buttons. Click **Try over-cap $5**.
 
 **HOLD** — 3 seconds. No narration.
 
-A red refused-on-chain panel appears with error code `12002` and an Explorer link.
+A red refused panel appears with error code 12002 and an Explorer link.
 
 **SAY**
 
-> Three seconds. Refused on chain. Error code twelve thousand two.
+> Five-dollar payment. Per-tx cap is fifty cents. Refused on chain in three seconds. Error code twelve thousand two.
 
-**ON SCREEN** — Click the Explorer link in the refused panel. Solana Explorer opens with the failed tx and `AmountExceedsPerTxMax` in the program logs.
+**ON SCREEN** — Click the Explorer link. The failed tx loads with `AmountExceedsPerTxMax` in the program logs.
 
 **HOLD** — 2 seconds.
 
 ---
 
-## STEP 8 · Close · 2:38 → 3:00
+## STEP 8 · Close · 2:45 → 3:00
 
-**ON SCREEN** — Close the Explorer tab. Cut back to the landing page one last time.
+**ON SCREEN** — Cut back to the landing page one last time. The manifesto tagline is visible at the bottom.
 
 **SAY**
 
 > AI agents are going to spend trillions of dollars on their own.
 >
-> *(pause one beat)*
->
 > Kyvern is the authorization layer that makes that safe.
 >
-> *(pause one beat)*
->
-> Today, Atlas runs on it. Today, the SDK ships.
->
-> *(pause one beat)*
->
-> We ship to mainnet next month.
+> Today, Atlas runs on it. Today, the SDK ships. We go to mainnet next month.
 
-**HOLD** — Fade on the tagline at the bottom of the landing: *"Agents shouldn't have keys. They should have budgets."*
+**HOLD** — Fade on the tagline: *"Agents shouldn't have keys. They should have budgets."*
 
 **END** — 3:00 exactly.
 
 ---
 
-## How to read this script
+## How to read this script while recording
 
-- Read every sentence as a complete sentence, the way you'd actually say it.
-- Pauses are marked. Trust them. Don't speed up.
-- "Polling chain..." and "Explorer opens" are the same thing happening at the same time — narration is over the loader, action follows.
-- Don't try to memorise. Read it. The script is meant to be on a second screen below your camera.
-- If a sentence stumbles, breathe, restart the step from "SAY". Editor can splice.
+- The script is on your **phone**, propped under the laptop camera lens. Looking at it = looking at camera.
+- Every spoken line is a complete sentence. Read each one with a small pause at the end. Don't run them together.
+- The "narration over action" beats (Step 4 install, Step 5 run) — the action is faster than the narration. Pace your sentence to finish *as* the terminal output appears.
+- If you flub a line, breathe and restart that step. Editor splices.
 
-## If something breaks on camera
+---
+
+## If something breaks on camera (graceful fallbacks)
 
 | What happens | What to do |
 |---|---|
-| **/try provisioning hangs > 12 seconds.** | Stop take. SSH and top up the server fee payer at `faucet.solana.com` (address: `GZCnHuFtswvsJftSDmtoHEve8amqNLzAAPvYy8NU3ZNZ`). Retry. |
-| **Step 6 "Run prediction agent" stuck on Polling chain > 8 seconds.** | Stop take. Refresh /app. If still slow, top up fee-payer SOL. Retry. |
-| **Step 6 says "Refused on chain · merchant_not_allowed".** | The auto-allowlist failed. Manually add `api.coingecko.com` and `api.commonstack.ai` in /app's allowlist section, then retry. |
-| **Step 6 prediction text is empty.** | Commonstack fallback engaged. The two settled payments still tell the story — just don't camera-pan to the prediction text in that take. Finish the rest. |
-| **Step 7 refused panel doesn't appear in 5 seconds.** | Network slow. Take 2. |
-| **Explorer link 404s.** | Fee-payer ran out of SOL during the submit. Top up, retry. |
+| **`npm install` shows deprecation warnings** | Ignore. Just say "done" when the prompt returns. Deprecation noise is normal in real installs and judges know it. |
+| **`node agent.ts` errors with "Cannot find module @kyvernlabs/sdk"** | The cache miss happened. Run `npm install --legacy-peer-deps @kyvernlabs/sdk` and retry. Take 2. |
+| **First `vault.pay()` returns `refused · merchant_not_allowed`** | You skipped allowlist prep. Stop. Add `api.openai.com` and `api.anthropic.com` in /app's allowlist editor. Retry. |
+| **First `vault.pay()` returns `refused · insufficient balance`** | Vault is below $0.01. Stop. Fund via the **Top up** FAB on /app. Retry. |
+| **One or both calls take > 10 seconds** | Solana devnet is congested. Pause narration, let it finish, then continue. Don't restart the take — silence is fine; failure is not. |
+| **Hard fail (RPC down, fee-payer empty, etc.)** | Cut to the **fallback path**: on `/app` click the **Run prediction agent** button on the "Bring your own agent" card. That fires the same kind of integration through the server. Skip the terminal entirely for that take, re-record the install/run sequence on take 2. |
+
+The terminal beats are the strongest beats *if they work*. The
+fallback is still strong — the BYOA button is the same proof,
+just driven by a button instead of `node`.
+
+---
 
 ## Take log
 
