@@ -34,6 +34,7 @@ import {
   type VaultPayload,
 } from "../worker/user-vault-card";
 import { PayShFlow } from "../worker/paysh-flow";
+import { VaultStrip, type VaultTileData } from "../worker/vault-strip";
 import type { PanelKind } from "../home/affordance-row";
 
 const ORIENT_BANNER_KEY = "kyvern:orient-allowlist-dismissed";
@@ -55,6 +56,15 @@ export function AliveConsole({ vaultId, ownerWallet, className }: Props) {
   const [data, setData] = useState<VaultPayload | null>(null);
   const [now, setNow] = useState<number>(() => Date.now());
   const [bannerDismissed, setBannerDismissed] = useState(true);
+  const [vaults, setVaults] = useState<VaultTileData[]>([]);
+  const [selectedVaultId, setSelectedVaultId] = useState<string | null>(
+    vaultId,
+  );
+
+  // Default selection to the primary vault when it first arrives
+  useEffect(() => {
+    if (!selectedVaultId && vaultId) setSelectedVaultId(vaultId);
+  }, [vaultId, selectedVaultId]);
 
   // First-visit allowlist orientation banner. Only renders when:
   //   (a) the user has a vault (so it's not a cold-start screen)
@@ -83,11 +93,12 @@ export function AliveConsole({ vaultId, ownerWallet, className }: Props) {
     return () => clearInterval(t);
   }, []);
 
-  // Load user's vault payload + poll
+  // Load the SELECTED vault's payload + poll
   const load = useCallback(async () => {
-    if (!vaultId) return;
+    const targetId = selectedVaultId ?? vaultId;
+    if (!targetId) return;
     try {
-      const r = await fetch(`/api/vault/${vaultId}?limit=20`, {
+      const r = await fetch(`/api/vault/${targetId}?limit=20`, {
         cache: "no-store",
       });
       if (!r.ok) return;
@@ -96,16 +107,100 @@ export function AliveConsole({ vaultId, ownerWallet, className }: Props) {
     } catch {
       /* swallow */
     }
-  }, [vaultId]);
+  }, [selectedVaultId, vaultId]);
   useEffect(() => {
     void load();
-    if (!vaultId) return;
+    const targetId = selectedVaultId ?? vaultId;
+    if (!targetId) return;
     const t = setInterval(load, 5_000);
     return () => clearInterval(t);
-  }, [load, vaultId]);
+  }, [load, selectedVaultId, vaultId]);
+
+  // Reset detail data when switching vaults so the worker card shows
+  // a skeleton briefly instead of flashing the previous vault's data.
+  useEffect(() => {
+    setData(null);
+  }, [selectedVaultId]);
+
+  // Poll the user's vault list for the strip
+  useEffect(() => {
+    if (!ownerWallet) return;
+    let alive = true;
+    const tick = async () => {
+      try {
+        const r = await fetch(
+          `/api/vault/list?ownerWallet=${encodeURIComponent(ownerWallet)}`,
+          { cache: "no-store" },
+        );
+        if (!r.ok) return;
+        const d = (await r.json()) as {
+          vaults?: Array<{
+            vault: {
+              id: string;
+              name: string;
+              network: "devnet" | "mainnet";
+              pausedAt: string | null;
+            };
+          }>;
+        };
+        if (!alive) return;
+        const tiles: VaultTileData[] = (d.vaults ?? []).map((v) => ({
+          id: v.vault.id,
+          name: v.vault.name,
+          network: v.vault.network ?? "devnet",
+          paused: !!v.vault.pausedAt,
+          lastCallRel: null, // populated lazily when this vault is selected
+        }));
+        setVaults(tiles);
+      } catch {
+        /* swallow */
+      }
+    };
+    void tick();
+    const iv = setInterval(tick, 15_000);
+    return () => {
+      alive = false;
+      clearInterval(iv);
+    };
+  }, [ownerWallet]);
+
+  // When the currently-selected vault has fresh payment data, mirror
+  // its latest call timestamp onto the tile so the strip stays in sync.
+  useEffect(() => {
+    if (!data) return;
+    const latest = data.payments[0]?.createdAt;
+    if (!latest) return;
+    const relCall = (() => {
+      const ms = Date.parse(
+        typeof latest === "string" && !latest.includes("T")
+          ? latest.replace(" ", "T") + "Z"
+          : String(latest),
+      );
+      if (isNaN(ms)) return null;
+      const diff = Date.now() - ms;
+      if (diff < 5_000) return "just now";
+      if (diff < 60_000) return `${Math.floor(diff / 1000)}s ago`;
+      if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`;
+      return `${Math.floor(diff / 3_600_000)}h ago`;
+    })();
+    setVaults((prev) =>
+      prev.map((v) =>
+        v.id === data.vault.id ? { ...v, lastCallRel: relCall } : v,
+      ),
+    );
+  }, [data]);
 
   return (
     <div className={`flex flex-col gap-4 sm:gap-5 ${className ?? ""}`}>
+      {/* Vault strip — Atlas + user vaults + Deploy CTA. The horizontal
+          row sits above the worker card; click a user vault to switch
+          the integration panel below to its data. */}
+      <VaultStrip
+        vaults={vaults}
+        selectedVaultId={selectedVaultId}
+        onSelect={setSelectedVaultId}
+      />
+
       {/* First-visit orientation banner — surfaces the allowlist
           editor for fresh vaults so SDK developers see they can
           declare their merchants without re-provisioning. */}
