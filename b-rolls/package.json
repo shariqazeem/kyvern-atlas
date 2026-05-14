@@ -1,0 +1,12 @@
+{
+  "name": "kyvern-brolls-renderer",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "render": "node render.mjs",
+    "render:slide2": "node render.mjs 2"
+  },
+  "dependencies": {
+    "playwright": "^1.48.0"
+  }
+}

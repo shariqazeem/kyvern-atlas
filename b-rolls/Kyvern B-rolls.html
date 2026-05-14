@@ -1,0 +1,2027 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Kyvern — demo b-rolls</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="deck-stage.js"></script>
+<style>
+  :root{
+    --bg: #f4f2ec;
+    --bg-elev: #fbfaf6;
+    --card: #ffffff;
+    --line: #e7e3d9;
+    --line-2: #efebe1;
+    --ink: #0c0c0a;
+    --ink-2: #2a2a26;
+    --muted: #7a766c;
+    --muted-2: #a8a397;
+    --kv-mark: #0c0c0a;
+    --mint: #15a34a;
+    --mint-bg: #e8f7ee;
+    --mint-bg-2: #d6f0e0;
+    --violet: #5763d6;
+    --violet-bg: #ecedfd;
+    --violet-2: #4250c4;
+    --red: #c63a3a;
+    --red-bg: #fbecea;
+    --amber: #b8770f;
+    --amber-bg: #faf0d8;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:#0c0c0a;color:var(--ink);font-family:'Inter',sans-serif}
+  .mono{font-family:'JetBrains Mono',monospace; font-variant-ligatures:none}
+
+  deck-stage{
+    --slide-w: 1920px;
+    --slide-h: 1080px;
+    --slide-bg: var(--bg);
+  }
+  deck-stage > section{
+    width:1920px; height:1080px;
+    background:var(--bg);
+    overflow:hidden;
+    position:relative;
+    font-family:'Inter',sans-serif;
+    color:var(--ink);
+  }
+
+  /* ============ shared atoms ============ */
+  .kv-logo{
+    width:44px;height:44px;border-radius:11px;background:var(--kv-mark);
+    display:inline-flex;align-items:center;justify-content:center;color:#fff;
+    font-weight:700;letter-spacing:-.02em;
+    box-shadow:inset 0 -1px 0 rgba(255,255,255,.06);
+  }
+  .kv-logo svg{width:22px;height:22px;display:block}
+  .kv-mark{font-family:'Inter';font-weight:700;font-size:14px;letter-spacing:-.01em}
+
+  .pill{
+    display:inline-flex;align-items:center;gap:8px;
+    padding:6px 12px;border-radius:999px;
+    font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:500;
+  }
+  .pill .dot{width:8px;height:8px;border-radius:50%;background:currentColor}
+  .pill.live{background:var(--mint-bg);color:#0f7536}
+  .pill.violet{background:var(--violet-bg);color:#3a47b8}
+  .pill.amber{background:var(--amber-bg);color:#7a4f08}
+  .pill.red{background:var(--red-bg);color:#9a2828}
+  .pill.ghost{background:#fff;border:1px solid var(--line);color:var(--ink-2)}
+
+  .eyebrow{
+    font-family:'JetBrains Mono',monospace; text-transform:uppercase;
+    font-size:13px; letter-spacing:.18em; color:var(--muted); font-weight:500;
+  }
+
+  .card{
+    background:var(--card); border:1px solid var(--line); border-radius:20px;
+  }
+
+  /* ====== cursor + click ripple ====== */
+  .cursor{
+    position:absolute; width:28px; height:28px;
+    pointer-events:none; z-index:50;
+    filter: drop-shadow(0 6px 14px rgba(0,0,0,.18));
+  }
+  .cursor svg{width:100%;height:100%;display:block}
+  .ripple{
+    position:absolute; width:14px;height:14px;border-radius:50%;
+    border:2px solid var(--ink);
+    transform:translate(-50%,-50%) scale(.4);
+    opacity:0; pointer-events:none; z-index:49;
+  }
+
+  /* ====== browser/window chrome ====== */
+  .winchrome{
+    display:flex;align-items:center;gap:14px;
+    padding:14px 18px; border-bottom:1px solid var(--line);
+    background:#fbfaf6;border-top-left-radius:18px;border-top-right-radius:18px;
+  }
+  .winchrome .tl{display:flex;gap:8px}
+  .winchrome .tl span{width:12px;height:12px;border-radius:50%;display:block}
+  .winchrome .tl span:nth-child(1){background:#f06360}
+  .winchrome .tl span:nth-child(2){background:#f5bd4f}
+  .winchrome .tl span:nth-child(3){background:#59c553}
+  .winchrome .url{
+    flex:1; background:#fff; border:1px solid var(--line); border-radius:10px;
+    padding:8px 14px; font-family:'JetBrains Mono',monospace; font-size:13px;
+    color:var(--muted); display:flex;align-items:center;gap:10px;
+  }
+  .winchrome .url b{color:var(--ink);font-weight:500}
+
+  /* slide footer label */
+  .slide-tag{
+    position:absolute; left:48px; bottom:32px;
+    font-family:'JetBrains Mono',monospace; font-size:13px; letter-spacing:.18em;
+    text-transform:uppercase; color:var(--muted-2);
+    display:flex; gap:18px; align-items:center;
+  }
+  .slide-tag .n{color:var(--ink)}
+  .slide-tag .sep{width:18px;height:1px;background:var(--muted-2)}
+
+  /* ============================================================
+     SLIDE 1 — Get a Kyvern device
+     ============================================================ */
+  .s1{
+    padding:64px 96px;
+    display:grid; grid-template-rows:auto 1fr auto; gap:42px;
+  }
+  .s1 .topbar{ display:flex; align-items:center; justify-content:space-between; }
+  .s1 .topbar .nav{display:flex;gap:34px;font-size:16px;color:var(--ink-2)}
+  .s1 .topbar .nav a{color:inherit;text-decoration:none}
+  .s1 .topbar .right{display:flex;gap:14px;align-items:center}
+  .s1 .topbar .right .cta{
+    padding:10px 18px; border-radius:12px; background:var(--ink); color:#fff;
+    font-weight:500; font-size:15px;
+  }
+  .s1 .hero{display:grid;grid-template-columns:1.05fr .95fr;gap:60px;align-items:center}
+  .s1 .copy h1{
+    font-size:108px; line-height:.94; letter-spacing:-.04em; margin:0;
+    font-weight:700;
+  }
+  .s1 .copy h1 .accent{color:var(--ink); position:relative}
+  .s1 .copy h1 small{
+    display:block; font-size:108px; color:var(--muted-2); font-weight:700; letter-spacing:-.04em;
+  }
+  .s1 .copy p{
+    font-size:24px; line-height:1.4; color:var(--ink-2); max-width:640px;
+    margin:28px 0 36px;
+  }
+  .s1 .copy .row{display:flex;gap:16px;align-items:center}
+  .s1 .cta-primary{
+    display:inline-flex;align-items:center;gap:14px;
+    padding:20px 28px; border-radius:14px; background:var(--ink); color:#fff;
+    font-weight:600;font-size:19px;
+    position:relative;
+    transition:transform .2s ease;
+  }
+  .s1 .cta-primary .arrow{font-family:'JetBrains Mono';opacity:.8}
+  .s1 .cta-primary.flash{background:#1c1c18}
+  .s1 .cta-secondary{
+    padding:20px 26px; border-radius:14px;
+    border:1px solid var(--line); background:#fff;
+    font-weight:500;font-size:18px; color:var(--ink-2);
+  }
+  .s1 .meta{display:flex;gap:38px;color:var(--muted);font-size:15px;margin-top:32px}
+  .s1 .meta b{color:var(--ink);font-weight:500}
+
+  /* device hero — hardware-wallet form factor */
+  .s1 .device-stage{
+    position:relative; height:640px;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .device-shadow{
+    position:absolute; bottom:60px; left:50%; transform:translateX(-50%);
+    width:340px; height:34px; background:radial-gradient(closest-side,rgba(0,0,0,.28),rgba(0,0,0,0));
+    filter:blur(6px);
+  }
+  .device{
+    position:relative; width:260px; height:430px; border-radius:30px;
+    background:linear-gradient(180deg,#1d1d1a 0%,#0a0a08 100%);
+    box-shadow:
+      0 30px 80px rgba(0,0,0,.35),
+      inset 0 1px 0 rgba(255,255,255,.08),
+      inset 0 -1px 0 rgba(0,0,0,.6);
+    animation: deviceFloat 6s ease-in-out infinite;
+  }
+  @keyframes deviceFloat{
+    0%,100%{transform:translateY(0) rotate(-3deg)}
+    50%{transform:translateY(-12px) rotate(-3deg)}
+  }
+  .device .screen{
+    position:absolute; left:18px; right:18px; top:32px; height:240px;
+    background:#06060a; border-radius:18px;
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.06);
+    overflow:hidden;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    color:#dcfce7;
+  }
+  .device .screen .mark{
+    width:54px;height:54px;border-radius:14px;
+    background:linear-gradient(180deg,#1ad17a,#0fa15a);
+    display:flex;align-items:center;justify-content:center;color:#06120b;
+    font-weight:800;font-size:22px;
+    box-shadow:0 0 24px rgba(26,209,122,.55);
+  }
+  .device .screen .ready{
+    margin-top:14px; font-family:'JetBrains Mono';font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:#7ee2a8;opacity:.9;
+  }
+  .device .screen .bal{font-family:'JetBrains Mono';font-size:14px;color:#9bd6b3;opacity:.7;margin-top:6px}
+  .device .btn{
+    position:absolute; right:-4px; top:140px; width:6px; height:54px;
+    background:linear-gradient(180deg,#2a2a25,#0d0d0a);border-radius:3px 1px 1px 3px;
+  }
+  .device .usb{
+    position:absolute; bottom:18px; left:50%; transform:translateX(-50%);
+    width:50px;height:10px;border-radius:3px;background:#070705;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
+  }
+  .device .brand{
+    position:absolute; bottom:54px; left:0; right:0; text-align:center;
+    font-family:'JetBrains Mono';font-size:11px;letter-spacing:.4em;color:#3b3b36;
+  }
+  .device .led{
+    position:absolute; top:18px; left:50%; transform:translateX(-50%);
+    width:6px;height:6px;border-radius:50%; background:#27e08a;
+    box-shadow:0 0 12px #27e08a;
+    animation: ledPulse 1.6s ease-in-out infinite;
+  }
+  @keyframes ledPulse{0%,100%{opacity:.4}50%{opacity:1}}
+
+  .orbit{
+    position:absolute; inset:-40px;
+    border:1px dashed rgba(0,0,0,.08); border-radius:50%;
+    animation: spin 26s linear infinite;
+  }
+  .orbit::before, .orbit::after{
+    content:""; position:absolute; width:10px;height:10px;border-radius:50%;
+    background:var(--mint);
+  }
+  .orbit::before{top:-5px;left:50%;transform:translateX(-50%)}
+  .orbit::after{bottom:-5px;left:50%;transform:translateX(-50%);background:var(--violet)}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* cursor scripted path for slide 1 */
+  .s1 .cursor{
+    animation: s1CursorPath 7s ease-in-out infinite;
+  }
+  @keyframes s1CursorPath{
+    0%   {left:1180px; top:560px}
+    35%  {left:1180px; top:560px}
+    55%  {left:560px;  top:780px}
+    62%  {left:560px;  top:780px; transform:scale(.92)}
+    66%  {left:560px;  top:780px; transform:scale(1)}
+    100% {left:560px;  top:780px}
+  }
+  .s1 .ripple{
+    left:560px; top:780px;
+    animation: s1Ripple 7s ease-out infinite;
+  }
+  @keyframes s1Ripple{
+    0%,60%{opacity:0;transform:translate(-50%,-50%) scale(.4)}
+    62%{opacity:.9;transform:translate(-50%,-50%) scale(.4)}
+    78%{opacity:0;transform:translate(-50%,-50%) scale(5)}
+    100%{opacity:0;transform:translate(-50%,-50%) scale(5)}
+  }
+  .s1 .cta-primary{ animation: s1Press 7s ease-in-out infinite; }
+  @keyframes s1Press{
+    0%,60%{transform:translateY(0)}
+    63%{transform:translateY(2px) scale(.985)}
+    66%{transform:translateY(0)}
+    100%{transform:translateY(0)}
+  }
+
+  /* ============================================================
+     SLIDE 2 — Unboxing reveal
+     ============================================================ */
+  .s2{
+    display:flex; align-items:center; justify-content:center;
+    background:
+      radial-gradient(80% 60% at 50% 55%, #f7f4ec 0%, #ecebe4 35%, #d8d7cf 100%);
+    position:relative;
+    overflow:hidden;
+  }
+  /* subtle stage light from the top */
+  .s2::before{
+    content:""; position:absolute; left:50%; top:-200px;
+    width:1200px; height:900px;
+    background:radial-gradient(closest-side, rgba(255,255,255,.9), rgba(255,255,255,0));
+    transform:translateX(-50%);
+    pointer-events:none;
+  }
+  .s2 .scene{position:relative;width:1100px;height:760px;}
+
+  .s2 .floor{
+    position:absolute; left:50%; bottom:130px; transform:translateX(-50%);
+    width:620px; height:48px; border-radius:50%;
+    background:radial-gradient(closest-side,rgba(0,0,0,.30),rgba(0,0,0,0));
+    filter:blur(10px);
+    opacity:.85;
+  }
+
+  /* the box — premium black gift box */
+  .box{
+    position:absolute; left:50%; bottom:160px; transform:translateX(-50%);
+    width:520px; height:380px;
+    perspective:1600px;
+  }
+  .box .body{
+    position:absolute; inset:0; border-radius:16px;
+    background:
+      linear-gradient(180deg, #18181a 0%, #050506 100%);
+    box-shadow:
+      0 50px 100px rgba(0,0,0,.50),
+      0 8px 24px rgba(0,0,0,.30),
+      inset 0 1px 0 rgba(255,255,255,.06),
+      inset 0 -2px 0 rgba(0,0,0,.4);
+    overflow:hidden;
+  }
+  /* internal box glow that grows BEFORE the lid opens — light bleed */
+  .box .body::before{
+    content:""; position:absolute; left:50%; top:38%;
+    width:380px; height:240px; transform:translate(-50%,-50%);
+    background:radial-gradient(closest-side, rgba(134,239,172,.42), rgba(134,239,172,0) 65%);
+    opacity:0;
+    animation: lightBleed 8s ease-in-out infinite;
+    pointer-events:none;
+    z-index:1;
+  }
+  @keyframes lightBleed{
+    0%, 12% { opacity:0; transform:translate(-50%,-50%) scale(.6); }
+    20% { opacity:.4; transform:translate(-50%,-50%) scale(.9); }
+    32% { opacity:.7; transform:translate(-50%,-50%) scale(1); }
+    50% { opacity:.55; transform:translate(-50%,-50%) scale(1); }
+    72% { opacity:.45; transform:translate(-50%,-50%) scale(1); }
+    88%,100% { opacity:0; transform:translate(-50%,-50%) scale(.6); }
+  }
+  .box .body::after{
+    content:""; position:absolute; inset:0;
+    background:
+      radial-gradient(circle at 22% 28%, rgba(255,255,255,.05), transparent 40%),
+      linear-gradient(180deg, rgba(28,28,24,.6) 0%, rgba(5,5,4,1) 100%);
+  }
+
+  /* the embossed K mark and KYVERN wordmark on the lid */
+  .box .lid-mark{
+    position:absolute; left:50%; top:23%; transform:translate(-50%,-50%);
+    display:flex; flex-direction:column; align-items:center; gap:14px;
+    z-index:3;
+  }
+  .box .lid-mark .k{
+    width:64px; height:64px; border-radius:14px;
+    background:linear-gradient(180deg,#222220,#0a0a08);
+    border:1px solid rgba(255,255,255,.08);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.10);
+    display:flex; align-items:center; justify-content:center;
+    color:#fff; font-family:'Inter'; font-weight:700; font-size:34px;
+    letter-spacing:-.04em;
+  }
+  .box .lid-mark .wd{
+    font-family:'JetBrains Mono'; font-size:12px; letter-spacing:.55em;
+    color:#857f72; text-indent:.55em;
+  }
+
+  .box .lid{
+    position:absolute; left:0; right:0; top:0; height:46%;
+    background:#0c0c0a;
+    border-radius:16px 16px 4px 4px;
+    transform-origin: top center;
+    box-shadow: 0 30px 50px rgba(0,0,0,.35), inset 0 -1px 0 rgba(0,0,0,.6);
+    overflow:hidden;
+    animation: lidOpen 8s cubic-bezier(.22,.61,.36,1) infinite;
+    z-index:4;
+  }
+  .box .lid::after{
+    content:""; position:absolute; inset:0;
+    background:
+      radial-gradient(closest-side at 50% 100%, rgba(255,255,255,.04), transparent 60%),
+      linear-gradient(180deg,#1c1c18 0%, #0a0a08 100%);
+  }
+  .box .lid .seam{
+    position:absolute; left:0; right:0; bottom:0; height:3px;
+    background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(0,0,0,.6));
+  }
+  @keyframes lidOpen{
+    0%, 18% { transform: rotateX(0) translateY(0); }
+    36% { transform: rotateX(-118deg) translateY(-8px); }
+    76% { transform: rotateX(-118deg) translateY(-8px); }
+    92%,100% { transform: rotateX(0) translateY(0); }
+  }
+
+  /* hinge seam highlight when lid sits open */
+  .box .ribbon-h{
+    position:absolute; left:0; right:0; top:46%; height:3px;
+    background:linear-gradient(180deg, rgba(255,255,255,.10), rgba(0,0,0,.4));
+    pointer-events:none;
+    z-index:2;
+  }
+
+  /* the device that rises — polished black puck with green LED ring */
+  .s2 .unbox-device{
+    position:absolute; left:50%; bottom:230px; transform:translate(-50%, 60px);
+    width:200px; height:240px; border-radius:28px;
+    background:
+      radial-gradient(120% 80% at 50% 18%, #2a2a26 0%, #0e0e0c 50%, #050504 100%);
+    box-shadow:
+      0 30px 70px rgba(0,0,0,.55),
+      inset 0 2px 0 rgba(255,255,255,.10),
+      inset 0 -2px 0 rgba(0,0,0,.6);
+    opacity:0;
+    z-index:5;
+    animation: deviceRise 8s cubic-bezier(.22,.61,.36,1) infinite;
+  }
+  /* halo glow */
+  .s2 .unbox-device::before{
+    content:""; position:absolute; inset:-40px; border-radius:60px;
+    background:radial-gradient(closest-side, rgba(134,239,172,.35), rgba(134,239,172,0) 70%);
+    opacity:0;
+    animation: deviceHalo 8s ease-in-out infinite;
+    pointer-events:none;
+    z-index:-1;
+  }
+  @keyframes deviceHalo{
+    0%, 45% { opacity:0; }
+    55% { opacity:.7; }
+    78% { opacity:.55; }
+    88%,100% { opacity:0; }
+  }
+  /* glass top */
+  .s2 .unbox-device .scr{
+    position:absolute; left:18px; right:18px; top:24px; height:90px;
+    border-radius:18px;
+    background:
+      radial-gradient(120% 80% at 50% 20%, rgba(255,255,255,.10), rgba(0,0,0,0) 60%),
+      linear-gradient(180deg,#080808,#000000);
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:
+      inset 0 2px 0 rgba(255,255,255,.12),
+      inset 0 -2px 0 rgba(0,0,0,.7);
+    overflow:hidden;
+  }
+  .s2 .unbox-device .scr .k-on{
+    width:46px; height:46px; border-radius:12px;
+    background:linear-gradient(180deg,#1a1a18,#020202);
+    border:1px solid rgba(134,239,172,.20);
+    display:flex; align-items:center; justify-content:center;
+    color:#86efac; font-family:'Inter'; font-weight:700; font-size:26px;
+    letter-spacing:-.04em;
+    opacity:0;
+    animation: deviceBoot 8s ease-in-out infinite;
+    box-shadow:0 0 24px rgba(134,239,172,.5);
+  }
+  @keyframes deviceBoot{
+    0%, 55% { opacity:0; }
+    62% { opacity:1; }
+    85% { opacity:1; }
+    92%,100% { opacity:0; }
+  }
+  /* led ring around base */
+  .s2 .unbox-device .led-ring{
+    position:absolute; left:50%; bottom:24px; transform:translateX(-50%);
+    width:88px; height:6px; border-radius:3px;
+    background:linear-gradient(90deg, transparent 0%, #86efac 30%, #86efac 70%, transparent 100%);
+    box-shadow:0 0 16px rgba(134,239,172,.65);
+    opacity:0;
+    animation: ledOn 8s ease-in-out infinite;
+  }
+  @keyframes ledOn{
+    0%, 52% { opacity:0; }
+    62% { opacity:.95; }
+    85% { opacity:.95; }
+    92%,100% { opacity:0; }
+  }
+  .s2 .unbox-device .brand{
+    position:absolute; bottom:60px; left:0; right:0; text-align:center;
+    font-family:'JetBrains Mono';font-size:10px;letter-spacing:.5em;color:#5a5a52;
+    text-indent:.5em;
+  }
+  @keyframes deviceRise{
+    0%, 32% { opacity:0; transform: translate(-50%, 60px) scale(.92); }
+    44% { opacity:1; transform: translate(-50%, -20px) scale(1); }
+    76% { opacity:1; transform: translate(-50%, -20px) scale(1); }
+    88%,100% { opacity:0; transform: translate(-50%, 60px) scale(.92); }
+  }
+
+  /* dust particles — drift up out of the box during reveal */
+  .s2 .sparkles{position:absolute;inset:0;pointer-events:none; z-index:4;}
+  .s2 .sparkles span{
+    position:absolute; width:5px;height:5px;border-radius:50%;background:#fff;
+    box-shadow:0 0 14px rgba(255,255,255,.85);
+    opacity:0;
+    animation: spark 8s ease-out infinite;
+  }
+  .s2 .sparkles span:nth-child(1){left:38%;top:38%;animation-delay:2.4s}
+  .s2 .sparkles span:nth-child(2){left:62%;top:36%;animation-delay:2.6s}
+  .s2 .sparkles span:nth-child(3){left:46%;top:30%;animation-delay:2.8s;background:#86efac;box-shadow:0 0 14px #86efac}
+  .s2 .sparkles span:nth-child(4){left:55%;top:46%;animation-delay:3.0s;background:#86efac;box-shadow:0 0 14px #86efac}
+  .s2 .sparkles span:nth-child(5){left:30%;top:42%;animation-delay:3.2s}
+  .s2 .sparkles span:nth-child(6){left:70%;top:40%;animation-delay:3.4s}
+  .s2 .sparkles span:nth-child(7){left:50%;top:34%;animation-delay:3.6s;background:#86efac;box-shadow:0 0 14px #86efac}
+  .s2 .sparkles span:nth-child(8){left:42%;top:48%;animation-delay:3.8s}
+  @keyframes spark{
+    0%,32%{opacity:0;transform:translateY(0) scale(.6)}
+    44%{opacity:1;transform:translateY(-10px) scale(1)}
+    72%{opacity:0;transform:translateY(-90px) scale(.5)}
+    100%{opacity:0}
+  }
+
+  .s2 .caption{
+    position:absolute; left:50%; top:110px; transform:translateX(-50%);
+    text-align:center;
+    z-index:6;
+  }
+  .s2 .caption .eyebrow{margin-bottom:18px}
+  .s2 .caption h1{
+    font-size:80px;line-height:.98;letter-spacing:-.04em;margin:0;font-weight:700;
+    background:linear-gradient(180deg,#0a0a08 30%, #2a2a25 100%);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+  }
+  .s2 .caption p{font-size:22px;color:var(--muted);margin:20px 0 0;font-weight:400}
+
+  /* cursor for s2 — taps lid */
+  .s2 .cursor{
+    left:50%; top:520px;
+    animation: s2Cur 8s ease-in-out infinite;
+    z-index:7;
+  }
+  @keyframes s2Cur{
+    0%,5%{left:62%;top:600px;opacity:0}
+    9%{opacity:1}
+    18%{left:50%;top:430px;opacity:1;transform:scale(1)}
+    24%{left:50%;top:430px;transform:scale(.88);opacity:1}
+    30%{left:50%;top:430px;transform:scale(1);opacity:1}
+    42%{opacity:1;left:50%;top:430px}
+    52%,100%{opacity:0;left:50%;top:430px}
+  }
+
+  /* ============================================================
+     SLIDE 3 — /app dashboard first load
+     ============================================================ */
+  .s3{padding:30px 40px 40px;display:flex;flex-direction:column;gap:20px}
+  .s3 .header{
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  .s3 .header .left{display:flex;align-items:center;gap:18px}
+  .s3 .header .crumbs{
+    display:flex;align-items:center;gap:14px;
+    font-family:'JetBrains Mono';font-size:13px;color:var(--muted);
+  }
+  .s3 .header .crumbs b{color:var(--ink);font-weight:500}
+  .s3 .header .right{display:flex;align-items:center;gap:20px;font-family:'JetBrains Mono';font-size:13px}
+  .s3 .header .vault{font-size:14px}
+  .s3 .header .vault b{font-weight:600}
+  .s3 .banner{
+    background:#fff;border:1px solid var(--line);border-radius:14px;
+    padding:12px 18px;font-size:14px;color:var(--ink-2);
+  }
+  .s3 .grid{display:grid;grid-template-columns:1.4fr 1fr;gap:18px}
+  .s3 .worker{
+    padding:30px; display:flex;flex-direction:column;gap:22px;
+  }
+  .s3 .worker .top{display:flex;align-items:center;gap:18px}
+  .s3 .worker h2{margin:0;font-size:42px;letter-spacing:-.02em;font-weight:700}
+  .s3 .worker .meta{
+    margin-top:6px;font-family:'JetBrains Mono';font-size:13px;color:var(--muted);
+    display:flex;gap:14px;align-items:center;
+  }
+  .s3 .worker .meta .dot{width:8px;height:8px;border-radius:50%;background:var(--mint)}
+  .s3 .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+  .s3 .stat{
+    background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px;
+  }
+  .s3 .stat .lab{font-family:'JetBrains Mono';font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)}
+  .s3 .stat .val{font-size:34px;font-weight:600;margin-top:4px;letter-spacing:-.02em;
+    font-variant-numeric: tabular-nums;
+  }
+  .s3 .stat .sub{font-family:'JetBrains Mono';font-size:12px;color:var(--muted);margin-top:6px}
+  .s3 .copy-block{font-size:18px;line-height:1.5;color:var(--ink-2);max-width:640px}
+  .s3 .copy-block .code-inline{font-family:'JetBrains Mono';background:#f2efe5;padding:1px 6px;border-radius:5px;font-size:.92em}
+  .s3 .actions{display:flex;gap:12px;margin-top:6px}
+  .s3 .actions .btn-dark{
+    padding:12px 18px;border-radius:10px;background:var(--ink);color:#fff;
+    font-weight:500;font-size:15px;display:inline-flex;align-items:center;gap:10px;
+  }
+  .s3 .actions .btn-ghost{
+    padding:12px 18px;border-radius:10px;background:#fff;border:1px solid var(--line);
+    font-weight:500;font-size:15px;color:var(--ink-2);
+  }
+  .s3 .vault-card{padding:30px;display:flex;flex-direction:column;gap:18px}
+  .s3 .vault-card .eyebrow{color:#0f7536}
+  .s3 .vault-card .amt{font-size:84px;font-weight:600;letter-spacing:-.03em;line-height:1}
+  .s3 .vault-card .amt .doll{color:var(--muted-2);font-size:46px;font-weight:500;vertical-align:top;margin-right:4px}
+  .s3 .vault-card .breakdown{display:flex;flex-direction:column;gap:10px;margin-top:6px}
+  .s3 .vault-card .row{display:flex;justify-content:space-between;font-size:15px;color:var(--ink-2)}
+  .s3 .vault-card .row span:last-child{font-family:'JetBrains Mono';font-variant-numeric:tabular-nums;color:var(--ink)}
+  .s3 .vault-card .util{display:flex;flex-direction:column;gap:6px;margin-top:4px}
+  .s3 .vault-card .bar{height:6px;background:#efece4;border-radius:3px;overflow:hidden}
+  .s3 .vault-card .bar i{display:block;height:100%;background:var(--mint);border-radius:3px;animation: s3FillBar 3s ease-out forwards}
+  @keyframes s3FillBar{from{width:0}to{width:3%}}
+  .s3 .vault-card .util-row{display:flex;justify-content:space-between;font-family:'JetBrains Mono';font-size:12px;color:var(--muted)}
+
+  .s3 .row-2{display:grid;grid-template-columns:.55fr 1.1fr .65fr;gap:18px;flex:1;min-height:0}
+  .s3 .workers-list,.s3 .runtime,.s3 .policy{padding:24px;display:flex;flex-direction:column;gap:16px}
+  .s3 .workers-list h3,.s3 .runtime h3,.s3 .policy h3{
+    margin:0;font-size:15px;font-weight:600;
+    display:flex;justify-content:space-between;align-items:center;
+  }
+  .s3 .workers-list .pill,.s3 .runtime .pill,.s3 .policy .pill{font-size:12px;padding:4px 10px}
+  .s3 .worker-row{
+    background:var(--bg-elev);border:1px solid var(--line-2);
+    border-radius:12px;padding:14px;display:flex;align-items:center;gap:12px
+  }
+  .s3 .worker-row .av{
+    width:34px;height:34px;border-radius:8px;background:#efece4;
+    display:flex;align-items:center;justify-content:center;color:var(--ink);font-weight:600;
+  }
+  .s3 .worker-row .nm{flex:1}
+  .s3 .worker-row .nm b{display:flex;align-items:center;gap:8px;font-size:14px}
+  .s3 .worker-row .nm .ref{
+    display:inline-block;padding:1px 6px;border-radius:5px;background:#efece4;
+    font-family:'JetBrains Mono';font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)
+  }
+  .s3 .worker-row .nm small{display:block;font-family:'JetBrains Mono';font-size:11px;color:var(--muted);margin-top:2px}
+  .s3 .worker-row .dot{width:8px;height:8px;border-radius:50%;background:var(--mint)}
+  .s3 .runtime .console{
+    background:#fbfaf6;border:1px dashed var(--line);border-radius:10px;
+    padding:14px 16px;font-family:'JetBrains Mono';font-size:13px;color:var(--ink-2);
+    line-height:1.6;
+  }
+  .s3 .runtime .console .pre{color:var(--mint);font-weight:600;margin-right:6px}
+  .s3 .runtime .tape{display:flex;gap:10px;margin-top:6px;flex-wrap:wrap}
+  .s3 .runtime .tape .ev{
+    background:var(--red-bg);color:#9a2828;
+    padding:6px 10px;border-radius:8px;font-family:'JetBrains Mono';font-size:11px;
+    animation: s3Tape 4s ease-out infinite;
+  }
+  .s3 .runtime .tape .ev:nth-child(2){animation-delay:.4s}
+  .s3 .runtime .tape .ev:nth-child(3){animation-delay:.8s}
+  .s3 .runtime .tape .ev:nth-child(4){animation-delay:1.2s}
+  @keyframes s3Tape{
+    0%{opacity:.45}30%{opacity:1}100%{opacity:.45}
+  }
+  .s3 .policy .badge{
+    background:var(--mint-bg);padding:14px;border-radius:12px;
+    display:flex;flex-direction:column;gap:6px;
+  }
+  .s3 .policy .badge .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .s3 .policy .badge .cell .l{font-family:'JetBrains Mono';font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#0f7536}
+  .s3 .policy .badge .cell .v{font-weight:600;font-size:18px;font-variant-numeric:tabular-nums}
+  .s3 .policy .badge .cell small{font-family:'JetBrains Mono';font-size:11px;color:#0f7536}
+
+  /* Reveal staggered for s3 */
+  .s3 .reveal{ opacity:0; transform:translateY(8px); animation: s3In .7s ease forwards;}
+  .s3 .reveal.d1{animation-delay:.05s}
+  .s3 .reveal.d2{animation-delay:.18s}
+  .s3 .reveal.d3{animation-delay:.30s}
+  .s3 .reveal.d4{animation-delay:.42s}
+  .s3 .reveal.d5{animation-delay:.55s}
+  .s3 .reveal.d6{animation-delay:.68s}
+  @keyframes s3In{to{opacity:1;transform:translateY(0)}}
+
+  /* count-up via clip mask */
+  .s3 .count{display:inline-block;animation: s3Count 1.6s steps(8) forwards}
+  @keyframes s3Count{ from{color:var(--muted-2)} to{color:var(--ink)}}
+
+  /* ============================================================
+     SLIDE 4 — Name your agent
+     ============================================================ */
+  .s4{padding:60px 120px 80px;display:flex;flex-direction:column;gap:30px}
+  .s4 .topbar{display:flex;align-items:center;justify-content:space-between;padding-bottom:18px;border-bottom:1px solid var(--line)}
+  .s4 .progress{font-family:'JetBrains Mono';font-size:13px;color:var(--muted);display:flex;align-items:center;gap:14px}
+  .s4 .progress .bars{display:flex;gap:6px}
+  .s4 .progress .bars i{width:38px;height:4px;border-radius:2px;background:#dcd8cc;display:block}
+  .s4 .progress .bars i.on{background:var(--ink)}
+  .s4 .step{font-family:'JetBrains Mono';font-size:13px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted)}
+  .s4 h1{font-size:104px;line-height:.94;letter-spacing:-.04em;margin:8px 0 0;font-weight:700}
+  .s4 .sub{font-size:24px;color:var(--muted);margin:0;max-width:920px;line-height:1.45}
+  .s4 .grid{display:grid;grid-template-columns:1.25fr .75fr;gap:60px;margin-top:30px}
+  .s4 .field{display:flex;flex-direction:column;gap:14px}
+  .s4 .field label{font-size:18px;font-weight:600}
+  .s4 .input{
+    background:#fff;border:1px solid var(--line);border-radius:14px;
+    padding:18px 22px;display:flex;align-items:center;gap:16px;
+    font-size:24px;
+  }
+  .s4 .input .em{
+    width:46px;height:46px;border-radius:10px;background:#f1ede2;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .s4 .input .em svg{width:24px;height:24px}
+  .s4 .input .name{flex:1;font-weight:500}
+  .s4 .input .name .caret{display:inline-block;width:2px;height:30px;background:var(--ink);margin-left:2px;vertical-align:middle;animation:s4Caret 1s steps(2) infinite}
+  @keyframes s4Caret{50%{opacity:0}}
+  .s4 .input .count{font-family:'JetBrains Mono';font-size:14px;color:var(--muted)}
+  .s4 .hint{font-size:15px;color:var(--muted)}
+  .s4 .emoji-group{display:flex;flex-direction:column;gap:14px;margin-top:24px}
+  .s4 .emoji-group .lab{font-size:18px;font-weight:600;display:flex;gap:8px;align-items:baseline}
+  .s4 .emoji-group .lab span{font-weight:400;color:var(--muted);font-size:15px}
+  .s4 .emojis{display:flex;gap:12px}
+  .s4 .emojis .ej{
+    width:64px;height:64px;border-radius:12px;background:#fff;border:1px solid var(--line);
+    display:flex;align-items:center;justify-content:center;color:var(--ink);
+  }
+  .s4 .emojis .ej svg{width:30px;height:30px}
+  .s4 .emojis .ej.sel{border:2px solid var(--ink); animation:s4EjPop .5s ease;}
+  @keyframes s4EjPop{0%{transform:scale(.85)}60%{transform:scale(1.08)}100%{transform:scale(1)}}
+  .s4 .preview{
+    background:#fff;border:1px solid var(--line);border-radius:18px;overflow:hidden;
+    box-shadow:0 18px 40px rgba(0,0,0,.04);
+    align-self:flex-start;
+  }
+  .s4 .preview .pchrome{
+    display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid var(--line);
+    background:#fbfaf6;
+  }
+  .s4 .preview .pchrome .tl{display:flex;gap:6px}
+  .s4 .preview .pchrome .tl span{width:10px;height:10px;border-radius:50%}
+  .s4 .preview .pchrome .tl span:nth-child(1){background:#f06360}
+  .s4 .preview .pchrome .tl span:nth-child(2){background:#f5bd4f}
+  .s4 .preview .pchrome .tl span:nth-child(3){background:#59c553}
+  .s4 .preview .pchrome .lab{font-family:'JetBrains Mono';font-size:13px;color:var(--muted)}
+  .s4 .preview .pchrome .pill{font-family:'JetBrains Mono';font-size:11px}
+  .s4 .preview .body{padding:24px;display:flex;flex-direction:column;gap:14px}
+  .s4 .preview .row1{display:flex;gap:14px;align-items:center}
+  .s4 .preview .av{
+    width:52px;height:52px;border-radius:11px;background:#f1ede2;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .s4 .preview .nm{display:flex;flex-direction:column}
+  .s4 .preview .nm .small{font-family:'JetBrains Mono';font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+  .s4 .preview .nm .big{font-size:22px;font-weight:600}
+  .s4 .preview .policy-pill{background:var(--violet-bg);color:#3a47b8;padding:6px 10px;border-radius:999px;font-family:'JetBrains Mono';font-size:12px;font-weight:500;align-self:flex-start;display:inline-flex;gap:8px;align-items:center}
+  .s4 .preview .policy-pill .dot{width:6px;height:6px;border-radius:50%;background:currentColor}
+  .s4 .preview .body p{margin:0;font-size:15px;color:var(--ink-2);line-height:1.5}
+  .s4 .preview .foot{display:flex;justify-content:space-between;font-family:'JetBrains Mono';font-size:12px;color:var(--muted);border-top:1px solid var(--line-2);padding-top:12px;margin-top:6px}
+
+  .s4 .cursor{animation:s4Cur 8s ease-in-out infinite}
+  @keyframes s4Cur{
+    0%{left:780px;top:560px}
+    10%{left:680px;top:560px}
+    35%{left:560px;top:560px}
+    55%{left:520px;top:840px}
+    62%{left:520px;top:840px;transform:scale(.92)}
+    66%{left:520px;top:840px;transform:scale(1)}
+    100%{left:520px;top:840px}
+  }
+
+  /* typing for s4 name */
+  .s4 .typed{position:relative;display:inline-block;color:var(--ink)}
+  .s4 .typed::after{
+    content:""; position:absolute; right:-3px; top:6px; bottom:6px; width:3px; background:var(--ink);
+    animation: s4Caret 1s steps(2) infinite;
+  }
+  .s4 .typed-mask{
+    display:inline-block; overflow:hidden; white-space:nowrap;
+    animation: s4Type 4s steps(11) forwards;
+    max-width:0;
+  }
+  @keyframes s4Type{
+    0%{max-width:0}
+    100%{max-width:280px}
+  }
+
+  /* ============================================================
+     SLIDE 5 — Set budget
+     ============================================================ */
+  .s5{padding:60px 120px 60px;display:flex;flex-direction:column;gap:30px}
+  .s5 .topbar{display:flex;align-items:center;justify-content:space-between;padding-bottom:18px;border-bottom:1px solid var(--line)}
+  .s5 h1{font-size:104px;line-height:.94;letter-spacing:-.04em;margin:8px 0 0;font-weight:700}
+  .s5 .sub{font-size:24px;color:var(--muted);margin:0;line-height:1.4}
+  .s5 .grid{display:grid;grid-template-columns:1.2fr .8fr;gap:60px;margin-top:18px}
+  .s5 .left{display:flex;flex-direction:column;gap:24px}
+  .s5 .preset-label{font-size:18px;font-weight:600}
+  .s5 .presets{display:flex;gap:14px}
+  .s5 .preset{
+    flex:1;background:#fff;border:1px solid var(--line);border-radius:14px;
+    padding:18px 22px;display:flex;flex-direction:column;gap:6px;
+    position:relative;
+  }
+  .s5 .preset .nm{font-weight:600;font-size:18px}
+  .s5 .preset .pr{font-family:'JetBrains Mono';font-size:14px;color:var(--muted)}
+  .s5 .preset .pr b{color:var(--ink);font-weight:500}
+  .s5 .preset.active{border:2px solid var(--ink); padding:17px 21px}
+  .s5 .caps{
+    background:#fff;border:1px solid var(--line);border-radius:14px;
+    padding:24px;display:grid;grid-template-columns:repeat(3,1fr);gap:20px;
+  }
+  .s5 .caps .cap .l{font-family:'JetBrains Mono';font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+  .s5 .caps .cap .v{font-size:36px;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums;margin-top:6px;display:flex;align-items:baseline;gap:8px}
+  .s5 .caps .cap .v .d{color:var(--muted-2);font-size:26px}
+  .s5 .caps .cap .nm{font-family:'JetBrains Mono';font-size:12px;color:var(--muted);margin-top:6px}
+  .s5 .info{
+    background:var(--violet-bg);border-radius:14px;padding:16px 18px;display:flex;gap:12px;align-items:flex-start;
+    font-size:16px;line-height:1.5;color:var(--ink-2);
+  }
+  .s5 .info .dot{width:24px;height:24px;flex-shrink:0;border-radius:50%;background:var(--violet);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:14px;margin-top:1px}
+  .s5 .info b{font-family:'JetBrains Mono';font-weight:500;background:#fff;padding:1px 7px;border-radius:5px}
+  .s5 .right{display:flex;flex-direction:column;gap:14px}
+  .s5 .sim{
+    background:var(--violet-bg);border-radius:14px;padding:22px;display:flex;flex-direction:column;gap:18px;
+  }
+  .s5 .sim .head{font-family:'JetBrains Mono';font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:#3a47b8;display:flex;align-items:center;gap:8px}
+  .s5 .sim .head .dot{width:8px;height:8px;border-radius:50%;background:var(--violet)}
+  .s5 .sim .row{display:flex;gap:16px;align-items:center}
+  .s5 .sim .ic{width:42px;height:42px;border-radius:10px;background:#fff;display:flex;align-items:center;justify-content:center;color:var(--violet)}
+  .s5 .sim .ic svg{width:20px;height:20px}
+  .s5 .sim .col .l{font-family:'JetBrains Mono';font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#3a47b8}
+  .s5 .sim .col .v{font-size:28px;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+  .s5 .sim .col .s{font-family:'JetBrains Mono';font-size:12px;color:var(--muted);margin-top:2px}
+  .s5 .sim-note{font-size:14px;color:var(--muted);line-height:1.45}
+
+  .s5 .cursor{animation:s5Cur 7s ease-in-out infinite}
+  @keyframes s5Cur{
+    0%{left:1340px;top:680px}
+    20%{left:300px;top:560px}
+    35%{left:300px;top:560px}
+    50%{left:240px;top:600px;transform:scale(.92)}
+    55%{left:240px;top:600px;transform:scale(1)}
+    100%{left:240px;top:600px}
+  }
+  .s5 .num-anim{display:inline-block;animation:s5Tick 4s ease-out forwards}
+  @keyframes s5Tick{from{opacity:.3}to{opacity:1}}
+
+  /* ============================================================
+     SLIDE 6 — Pre-approve world
+     ============================================================ */
+  .s6{padding:60px 120px;display:flex;flex-direction:column;gap:30px}
+  .s6 .topbar{display:flex;align-items:center;justify-content:space-between;padding-bottom:18px;border-bottom:1px solid var(--line)}
+  .s6 h1{font-size:96px;line-height:.94;letter-spacing:-.04em;margin:8px 0 0;font-weight:700}
+  .s6 .sub{font-size:22px;color:var(--muted);margin:0;line-height:1.45;max-width:760px}
+  .s6 .grid{display:grid;grid-template-columns:1.3fr .7fr;gap:60px;margin-top:14px}
+  .s6 .allowlist{display:flex;flex-direction:column;gap:14px}
+  .s6 .allowlist h3{margin:0;font-size:20px;font-weight:600}
+  .s6 .allowlist .desc{margin:0;color:var(--muted);font-size:15px;max-width:620px;line-height:1.45}
+  .s6 .merchant-box{
+    background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px;
+    display:flex;flex-direction:column;gap:14px;
+  }
+  .s6 .input-row{
+    display:flex;align-items:center;gap:10px;
+    background:#fbfaf6;border:1px solid var(--line);border-radius:10px;padding:10px 12px;
+  }
+  .s6 .input-row .proto{font-family:'JetBrains Mono';font-size:14px;color:var(--muted)}
+  .s6 .input-row .holder{flex:1;font-family:'JetBrains Mono';font-size:15px;color:var(--muted-2)}
+  .s6 .input-row .add{
+    padding:8px 14px;border-radius:8px;background:#efece4;font-family:'JetBrains Mono';font-size:13px;color:var(--muted);
+  }
+  .s6 .chips{display:flex;flex-wrap:wrap;gap:10px}
+  .s6 .chip{
+    background:#f4f1e7;border-radius:8px;padding:8px 12px;display:flex;align-items:center;gap:10px;
+    font-family:'JetBrains Mono';font-size:14px;
+    animation:s6ChipIn .5s ease forwards;
+    opacity:0;
+    transform:translateY(6px);
+  }
+  .s6 .chip:nth-child(1){animation-delay:.4s}
+  .s6 .chip:nth-child(2){animation-delay:1.2s}
+  .s6 .chip:nth-child(3){animation-delay:2.0s}
+  .s6 .chip .x{color:var(--muted)}
+  @keyframes s6ChipIn{to{opacity:1;transform:translateY(0)}}
+  .s6 .velocity h3{margin:0;font-size:20px;font-weight:600}
+  .s6 .velocity .desc{margin:0;color:var(--muted);font-size:15px}
+  .s6 .vel-box{
+    background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px;
+    display:flex;align-items:center;gap:18px;font-size:18px;
+  }
+  .s6 .vel-box .num{
+    background:#fbfaf6;border:1px solid var(--line);border-radius:8px;
+    padding:8px 14px;font-family:'JetBrains Mono';font-size:24px;font-weight:600;min-width:80px;text-align:center;
+  }
+  .s6 .vel-box .unit{
+    background:#fbfaf6;border:1px solid var(--line);border-radius:8px;
+    padding:8px 14px;font-family:'JetBrains Mono';font-size:14px;color:var(--ink-2);display:flex;gap:10px;
+  }
+  .s6 .memo{
+    background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px;
+    display:flex;align-items:flex-start;gap:14px;
+  }
+  .s6 .memo .toggle{
+    width:50px;height:28px;border-radius:14px;background:var(--ink);position:relative;flex-shrink:0;margin-top:2px;
+  }
+  .s6 .memo .toggle::after{
+    content:""; position:absolute; right:3px; top:3px; width:22px;height:22px;border-radius:50%;background:#fff;
+  }
+  .s6 .memo .txt b{display:block;font-size:16px;margin-bottom:4px}
+  .s6 .memo .txt p{margin:0;font-size:14px;color:var(--muted);line-height:1.4}
+
+  .s6 .preview{display:flex;flex-direction:column;gap:16px}
+  .s6 .preview-card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px}
+  .s6 .preview-card .head{display:flex;justify-content:space-between;align-items:center}
+  .s6 .preview-card .head .l{font-family:'JetBrains Mono';font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#3a47b8;display:flex;align-items:center;gap:8px}
+  .s6 .preview-card .head .l svg{width:14px;height:14px}
+  .s6 .preview-card .head .r{font-family:'JetBrains Mono';font-size:12px;color:var(--muted)}
+  .s6 .preview-card .chips-prev{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+  .s6 .preview-card .pchip{
+    background:var(--violet-bg);color:#3a47b8;padding:6px 10px;border-radius:6px;
+    font-family:'JetBrains Mono';font-size:13px;display:inline-flex;gap:8px;align-items:center;
+    opacity:0;transform:scale(.92);
+    animation:s6PChipIn .5s ease forwards;
+  }
+  .s6 .preview-card .pchip:nth-child(1){animation-delay:.55s}
+  .s6 .preview-card .pchip:nth-child(2){animation-delay:1.35s}
+  .s6 .preview-card .pchip:nth-child(3){animation-delay:2.15s}
+  @keyframes s6PChipIn{to{opacity:1;transform:scale(1)}}
+  .s6 .preview-card.vel .row{display:flex;align-items:baseline;gap:14px}
+  .s6 .preview-card.vel .row .n{font-size:48px;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+  .s6 .preview-card.vel .row .unit{font-family:'JetBrains Mono';font-size:13px;color:var(--muted);line-height:1.3}
+  .s6 .preview-card.memo .row{display:flex;align-items:center;gap:14px;margin-top:4px}
+  .s6 .preview-card.memo .row .check{width:32px;height:32px;border-radius:50%;background:var(--mint-bg);display:flex;align-items:center;justify-content:center;color:#0f7536}
+  .s6 .preview-card.memo .row .lab b{display:block;font-size:11px;font-family:'JetBrains Mono';color:var(--muted);letter-spacing:.16em;text-transform:uppercase;font-weight:500}
+  .s6 .preview-card.memo .row .lab .v{font-weight:600;font-size:16px}
+
+  .s6 .cursor{animation:s6Cur 8s ease-in-out infinite}
+  @keyframes s6Cur{
+    0%{left:430px;top:760px}
+    8%{left:430px;top:760px;transform:scale(.92)}
+    12%{left:430px;top:760px;transform:scale(1)}
+    25%{left:560px;top:760px}
+    35%{left:560px;top:760px;transform:scale(.92)}
+    39%{left:560px;top:760px;transform:scale(1)}
+    55%{left:710px;top:760px}
+    65%{left:710px;top:760px;transform:scale(.92)}
+    68%{left:710px;top:760px;transform:scale(1)}
+    100%{left:710px;top:760px;}
+  }
+
+  /* ============================================================
+     SLIDE 7 — Deploy success
+     ============================================================ */
+  .s7{display:flex;align-items:center;justify-content:center;flex-direction:column;gap:40px;padding:80px}
+  .s7 .stage{position:relative;width:1100px;display:flex;flex-direction:column;align-items:center;gap:32px}
+  .s7 .badge{
+    background:var(--mint-bg);color:#0f7536;
+    padding:8px 16px;border-radius:999px;font-family:'JetBrains Mono';font-size:13px;letter-spacing:.16em;text-transform:uppercase;font-weight:500;
+    display:inline-flex;align-items:center;gap:10px;
+    animation: s7BadgeIn .6s ease .1s both;
+  }
+  .s7 .badge .dot{width:8px;height:8px;border-radius:50%;background:#15a34a;box-shadow:0 0 0 0 rgba(21,163,74,.5);animation:s7Pulse 2s infinite}
+  @keyframes s7Pulse{0%{box-shadow:0 0 0 0 rgba(21,163,74,.5)}70%{box-shadow:0 0 0 14px rgba(21,163,74,0)}100%{box-shadow:0 0 0 0 rgba(21,163,74,0)}}
+  @keyframes s7BadgeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+
+  .s7 h1{
+    font-size:148px;line-height:.92;letter-spacing:-.045em;margin:0;text-align:center;font-weight:700;
+    animation: s7HeadIn .8s ease .3s both;
+  }
+  @keyframes s7HeadIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+  .s7 h1 em{font-style:normal;color:var(--mint)}
+
+  .s7 .check{
+    position:absolute; left:-180px; top:-100px;
+    width:120px;height:120px;border-radius:50%;
+    background:var(--mint);
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 18px 40px rgba(21,163,74,.3);
+    transform:scale(0);
+    animation:s7CheckPop .8s cubic-bezier(.4,1.4,.5,1) .1s forwards;
+  }
+  .s7 .check svg{width:60px;height:60px;color:#fff;
+    stroke-dasharray:60; stroke-dashoffset:60;
+    animation: s7CheckDraw .6s ease .7s forwards;
+  }
+  @keyframes s7CheckPop{to{transform:scale(1)}}
+  @keyframes s7CheckDraw{to{stroke-dashoffset:0}}
+
+  .s7 .agent-card{
+    background:#fff;border:1px solid var(--line);border-radius:20px;
+    padding:22px 28px;display:flex;align-items:center;gap:20px;min-width:680px;
+    box-shadow:0 24px 60px rgba(0,0,0,.05);
+    animation: s7CardIn .8s ease .8s both;
+  }
+  @keyframes s7CardIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+  .s7 .agent-card .av{
+    width:64px;height:64px;border-radius:14px;background:#f1ede2;display:flex;align-items:center;justify-content:center;
+  }
+  .s7 .agent-card .av svg{width:30px;height:30px}
+  .s7 .agent-card .nm{flex:1}
+  .s7 .agent-card .nm .l{font-family:'JetBrains Mono';font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+  .s7 .agent-card .nm .v{font-size:28px;font-weight:600;letter-spacing:-.02em;margin-top:2px}
+  .s7 .agent-card .nm .s{font-family:'JetBrains Mono';font-size:13px;color:var(--muted);margin-top:6px;display:flex;align-items:center;gap:10px}
+  .s7 .agent-card .nm .s .dot{width:8px;height:8px;border-radius:50%;background:var(--mint)}
+  .s7 .agent-card .open{
+    padding:14px 22px;border-radius:12px;background:var(--ink);color:#fff;font-weight:500;font-size:15px;display:inline-flex;gap:10px;align-items:center;
+  }
+
+  .s7 .tx{
+    display:flex;gap:14px;align-items:center;font-family:'JetBrains Mono';font-size:14px;color:var(--muted);
+    background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 16px;
+    animation: s7CardIn .8s ease 1.2s both;
+  }
+  .s7 .tx b{color:var(--ink);font-weight:500}
+  .s7 .tx .hash{color:#3a47b8}
+
+  .s7 .confetti{position:absolute;inset:0;pointer-events:none}
+  .s7 .confetti i{
+    position:absolute; width:8px;height:8px;border-radius:2px;
+    animation: s7Conf 2.6s ease-out 1s both;
+  }
+  .s7 .confetti i:nth-child(1){left:20%;top:20%;background:var(--mint)}
+  .s7 .confetti i:nth-child(2){left:30%;top:10%;background:var(--violet)}
+  .s7 .confetti i:nth-child(3){left:70%;top:14%;background:var(--mint)}
+  .s7 .confetti i:nth-child(4){left:80%;top:24%;background:var(--violet)}
+  .s7 .confetti i:nth-child(5){left:42%;top:6%;background:var(--mint);width:4px;height:14px}
+  .s7 .confetti i:nth-child(6){left:55%;top:18%;background:var(--ink);width:4px;height:14px}
+  .s7 .confetti i:nth-child(7){left:15%;top:35%;background:var(--violet);width:4px;height:14px}
+  .s7 .confetti i:nth-child(8){left:88%;top:34%;background:var(--mint);width:4px;height:14px}
+  @keyframes s7Conf{
+    from{opacity:0;transform:translateY(-12px) rotate(0deg)}
+    20%{opacity:1}
+    to{opacity:0;transform:translateY(280px) rotate(380deg)}
+  }
+
+  /* ============================================================
+     SLIDE 8 — Terminal: npm install
+     ============================================================ */
+  .s8{display:flex;align-items:center;justify-content:center;padding:80px}
+  .s8 .term{
+    width:1280px; height:760px; border-radius:18px;
+    background:#0d0d0a; color:#e8e6dc;
+    box-shadow: 0 60px 120px rgba(0,0,0,.45);
+    overflow:hidden;
+    font-family:'JetBrains Mono',monospace;
+    border:1px solid #1f1f1c;
+    display:flex;flex-direction:column;
+  }
+  .s8 .term .bar{
+    background:#161613; padding:14px 18px; display:flex;align-items:center;gap:14px;
+    border-bottom:1px solid #1f1f1c;
+  }
+  .s8 .term .bar .tl{display:flex;gap:8px}
+  .s8 .term .bar .tl span{width:12px;height:12px;border-radius:50%}
+  .s8 .term .bar .tl span:nth-child(1){background:#f06360}
+  .s8 .term .bar .tl span:nth-child(2){background:#f5bd4f}
+  .s8 .term .bar .tl span:nth-child(3){background:#59c553}
+  .s8 .term .bar .title{flex:1;text-align:center;font-size:13px;color:#7a766c}
+  .s8 .term .body{padding:30px 36px;font-size:20px;line-height:1.6;flex:1;overflow:hidden}
+  .s8 .term .ln{display:flex;gap:10px;align-items:flex-start}
+  .s8 .term .pr{color:#27e08a;flex-shrink:0}
+  .s8 .term .di{color:#5763d6}
+  .s8 .term .cmt{color:#5f5f57}
+  .s8 .term .pkg{color:#f0c674}
+  .s8 .term .ok{color:#27e08a}
+  .s8 .term .num{color:#fff}
+
+  .s8 .typed{
+    overflow:hidden; white-space:nowrap; display:inline-block;
+    border-right: 2px solid #e8e6dc;
+    animation: s8Type 2.6s steps(32,end) .2s forwards, s8Blink .8s steps(2) infinite;
+    max-width:0;
+  }
+  @keyframes s8Type{to{max-width:520px}}
+  @keyframes s8Blink{50%{border-color:transparent}}
+
+  .s8 .step{opacity:0; animation: s8Step .4s ease forwards}
+  .s8 .step.s1{animation-delay:3.1s}
+  .s8 .step.s2{animation-delay:3.6s}
+  .s8 .step.s3{animation-delay:4.4s}
+  .s8 .step.s4{animation-delay:5.0s}
+  .s8 .step.s5{animation-delay:5.5s}
+  .s8 .step.s6{animation-delay:6.0s}
+  @keyframes s8Step{to{opacity:1}}
+
+  .s8 .spin{
+    display:inline-block;width:14px;height:14px;border-radius:50%;
+    border:2px solid #27e08a;border-right-color:transparent;
+    animation: s8Spin .9s linear infinite;
+    vertical-align: middle;margin-right:8px;
+  }
+  @keyframes s8Spin{to{transform:rotate(360deg)}}
+
+  .s8 .bar-prog{
+    display:inline-block; width:200px; height:6px; background:#1f1f1c; border-radius:3px; overflow:hidden; vertical-align:middle; margin-left:8px;
+  }
+  .s8 .bar-prog i{display:block;height:100%;background:#27e08a;width:0;animation:s8Prog 1.4s ease-out 3.1s forwards}
+  @keyframes s8Prog{to{width:100%}}
+
+  .s8 .new-cursor{
+    display:inline-block; width:10px; height:18px; background:#e8e6dc; vertical-align:-3px;
+    animation: s8Blink .8s steps(2) infinite;
+    opacity:0;
+    animation-delay:6.2s;
+    animation-fill-mode: forwards;
+  }
+  .s8 .new-cursor.show{opacity:1}
+
+  /* ============================================================
+     SLIDE 9 — Code editor: SDK wrap
+     ============================================================ */
+  .s9{display:flex;align-items:center;justify-content:center;padding:60px}
+  .s9 .editor{
+    width:1640px;height:920px;border-radius:18px;background:#0d0d0a;color:#dcd9cf;
+    box-shadow:0 60px 120px rgba(0,0,0,.5); overflow:hidden;
+    display:flex;flex-direction:column;font-family:'JetBrains Mono';
+    border:1px solid #1f1f1c;
+  }
+  .s9 .top{
+    background:#161613;border-bottom:1px solid #1f1f1c;padding:12px 18px;
+    display:flex;align-items:center;gap:18px;
+  }
+  .s9 .top .tl{display:flex;gap:8px}
+  .s9 .top .tl span{width:12px;height:12px;border-radius:50%}
+  .s9 .top .tl span:nth-child(1){background:#f06360}
+  .s9 .top .tl span:nth-child(2){background:#f5bd4f}
+  .s9 .top .tl span:nth-child(3){background:#59c553}
+  .s9 .top .tabs{display:flex;gap:0}
+  .s9 .tab{padding:8px 18px;font-size:13px;color:#7a766c;border-right:1px solid #1f1f1c;display:flex;align-items:center;gap:8px}
+  .s9 .tab.on{background:#0d0d0a;color:#fff}
+  .s9 .tab .dot{width:6px;height:6px;border-radius:50%;background:#f5bd4f;opacity:0;animation:s9DirtyOn .4s ease 7s forwards}
+  @keyframes s9DirtyOn{to{opacity:1}}
+  .s9 .top .right{margin-left:auto;display:flex;gap:12px;font-size:12px;color:#7a766c}
+
+  .s9 .pane{display:flex;flex:1;min-height:0}
+  .s9 .gutter{
+    padding:18px 14px 18px 18px; background:#0d0d0a; color:#3e3e38;
+    font-size:14px; line-height:1.6; text-align:right; user-select:none;
+    border-right:1px solid #1f1f1c;
+  }
+  .s9 .gutter div{height:25.6px}
+  .s9 .code{flex:1;padding:18px 24px;font-size:15px;line-height:1.6;overflow:hidden;position:relative}
+  .s9 .code pre{margin:0;font-family:'JetBrains Mono';color:#dcd9cf;white-space:pre}
+  .s9 .k{color:#c594d4}      /* keywords */
+  .s9 .str{color:#a8d28b}    /* strings */
+  .s9 .fn{color:#7eb6e8}     /* funcs */
+  .s9 .v{color:#e8c474}      /* vars/identifiers */
+  .s9 .c{color:#5f5f57}      /* comments */
+  .s9 .t{color:#7eb6e8}      /* types */
+  .s9 .n{color:#f5bd4f}      /* nums */
+
+  /* lines that "type in" — masked reveal sequence */
+  .s9 .ln{display:block; white-space:pre; overflow:hidden; max-width:0; animation: s9LineIn .6s steps(40) forwards }
+  .s9 .ln.l1{animation-delay:.4s}
+  .s9 .ln.l2{animation-delay:.9s}
+  .s9 .ln.l3{animation-delay:1.4s}
+  .s9 .ln.l4{animation-delay:2.0s}
+  .s9 .ln.l5{animation-delay:2.6s}
+  .s9 .ln.l6{animation-delay:3.2s}
+  .s9 .ln.l7{animation-delay:3.8s}
+  .s9 .ln.l8{animation-delay:4.4s}
+  .s9 .ln.l9{animation-delay:5.0s}
+  .s9 .ln.l10{animation-delay:5.6s}
+  .s9 .ln.l11{animation-delay:6.2s}
+  .s9 .ln.l12{animation-delay:6.8s}
+  @keyframes s9LineIn{from{max-width:0}to{max-width:1100px}}
+
+  .s9 .highlight{
+    position:absolute; left:14px; right:14px; height:148px; top:248px;
+    border-radius:8px; background:rgba(87,99,214,.10);
+    border-left:3px solid var(--violet);
+    opacity:0; animation: s9Highlight .8s ease 7.4s forwards;
+  }
+  @keyframes s9Highlight{to{opacity:1}}
+
+  .s9 .floater{
+    position:absolute; left:760px; top:230px;
+    background:var(--violet); color:#fff; padding:10px 14px; border-radius:10px;
+    font-size:13px; font-family:'JetBrains Mono';
+    opacity:0; transform:translateY(4px);
+    animation: s9Float .6s ease 7.8s forwards;
+    box-shadow:0 16px 32px rgba(87,99,214,.35);
+  }
+  @keyframes s9Float{to{opacity:1;transform:translateY(0)}}
+  .s9 .floater::before{
+    content:""; position:absolute; left:-10px; top:14px; width:0;height:0;
+    border:6px solid transparent; border-right-color:var(--violet);
+  }
+
+  .s9 .statusbar{
+    background:#161613;border-top:1px solid #1f1f1c;padding:8px 18px;
+    display:flex; gap:18px; font-size:12px; color:#7a766c;
+  }
+  .s9 .statusbar .ok{color:#27e08a}
+
+  /* ============================================================
+     SLIDE 10 — Dashboard live calls
+     ============================================================ */
+  .s10{padding:48px 80px;display:flex;flex-direction:column;gap:24px}
+  .s10 .top{display:flex;align-items:center;justify-content:space-between}
+  .s10 .top .left{display:flex;align-items:center;gap:18px}
+  .s10 .top .crumbs{font-family:'JetBrains Mono';font-size:14px;color:var(--muted);display:flex;gap:14px;align-items:center}
+  .s10 .top .crumbs b{color:var(--ink);font-weight:500}
+  .s10 .top .right{display:flex;align-items:center;gap:30px;font-family:'JetBrains Mono';font-size:14px}
+  .s10 .top .vault b{font-size:18px;font-weight:600;font-family:'JetBrains Mono';font-variant-numeric:tabular-nums}
+
+  .s10 .layout{display:grid;grid-template-columns:1fr 1fr;gap:24px;flex:1;min-height:0}
+  .s10 .panel{
+    background:#fff;border:1px solid var(--line);border-radius:18px;padding:26px;
+    display:flex;flex-direction:column;gap:16px;
+  }
+  .s10 .panel.calls{flex:1}
+  .s10 .panel-head{
+    display:flex;justify-content:space-between;align-items:center;
+  }
+  .s10 .panel-head h3{margin:0;font-size:20px;font-weight:600;display:flex;align-items:center;gap:12px}
+  .s10 .panel-head .live{
+    background:var(--mint-bg);color:#0f7536;padding:6px 12px;border-radius:999px;
+    font-family:'JetBrains Mono';font-size:12px;letter-spacing:.14em;text-transform:uppercase;font-weight:500;
+    display:inline-flex;align-items:center;gap:8px;
+  }
+  .s10 .panel-head .live .dot{width:8px;height:8px;border-radius:50%;background:#15a34a;animation:s7Pulse 2s infinite}
+
+  .s10 .panel-head .meta{font-family:'JetBrains Mono';font-size:13px;color:var(--muted)}
+
+  /* live calls list */
+  .s10 .calls-list{display:flex;flex-direction:column;gap:0;overflow:hidden;border:1px solid var(--line-2);border-radius:12px}
+  .s10 .call-row{
+    display:grid;grid-template-columns:90px 1fr auto auto;gap:18px;align-items:center;
+    padding:18px 20px; border-bottom:1px solid var(--line-2);
+    font-family:'JetBrains Mono';font-size:15px;
+  }
+  .s10 .call-row:last-child{border-bottom:none}
+  .s10 .call-row .ts{color:var(--muted)}
+  .s10 .call-row .url{color:var(--ink)}
+  .s10 .call-row .url small{color:var(--muted);display:block;margin-top:2px;font-size:12px}
+  .s10 .call-row .amt{font-weight:500;font-variant-numeric:tabular-nums}
+  .s10 .call-row .pill{font-family:'JetBrains Mono';font-size:12px;padding:5px 10px}
+
+  /* animation: rows pop in from top */
+  .s10 .call-row{
+    animation: s10Pop .5s ease both;
+    transform-origin:top;
+  }
+  .s10 .call-row.r1{animation-delay:.4s}
+  .s10 .call-row.r2{animation-delay:1.6s}
+  .s10 .call-row.r3{animation-delay:2.9s}
+  .s10 .call-row.r4{animation-delay:4.1s}
+  .s10 .call-row.r5{animation-delay:5.3s}
+  @keyframes s10Pop{
+    from{opacity:0; transform:translateY(-8px) scale(.985); background:#ebf7ee}
+    50%{background:#ebf7ee}
+    to{opacity:1; transform:translateY(0) scale(1); background:transparent}
+  }
+
+  /* right panel — agent + vault */
+  .s10 .agent{
+    display:flex;align-items:center;gap:18px;padding-bottom:18px;border-bottom:1px solid var(--line-2);
+  }
+  .s10 .agent .av{width:54px;height:54px;border-radius:12px;background:#f1ede2;display:flex;align-items:center;justify-content:center}
+  .s10 .agent .nm{flex:1}
+  .s10 .agent .nm .small{font-family:'JetBrains Mono';font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+  .s10 .agent .nm .big{font-size:26px;font-weight:600}
+  .s10 .agent .nm .s{font-family:'JetBrains Mono';font-size:12px;color:var(--muted);display:flex;align-items:center;gap:8px}
+  .s10 .agent .nm .s .dot{width:8px;height:8px;border-radius:50%;background:var(--mint)}
+
+  .s10 .vault-card{padding-bottom:18px;border-bottom:1px solid var(--line-2)}
+  .s10 .vault-card .eyebrow{color:#0f7536;display:block;margin-bottom:6px}
+  .s10 .vault-card .amt{font-size:64px;font-weight:600;letter-spacing:-.03em;font-variant-numeric:tabular-nums;display:flex;align-items:baseline;gap:6px}
+  .s10 .vault-card .amt .doll{color:var(--muted-2);font-size:36px;font-weight:500}
+  .s10 .vault-card .spent{font-family:'JetBrains Mono';font-size:13px;color:var(--muted);margin-top:6px}
+  .s10 .vault-card .spent b{color:var(--ink);font-weight:500}
+  .s10 .vault-card .bar{height:6px;background:#efece4;border-radius:3px;margin-top:10px;overflow:hidden}
+  .s10 .vault-card .bar i{display:block;height:100%;background:var(--mint);width:1.5%;animation: s10BarGrow 5s ease-out forwards}
+  @keyframes s10BarGrow{to{width:6%}}
+
+  .s10 .stat-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+  .s10 .stat-grid .cell .l{font-family:'JetBrains Mono';font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+  .s10 .stat-grid .cell .v{font-size:28px;font-weight:600;letter-spacing:-.02em;margin-top:4px;font-variant-numeric:tabular-nums}
+  .s10 .stat-grid .cell .s{font-family:'JetBrains Mono';font-size:12px;color:var(--muted);margin-top:4px}
+
+  .s10 .tag{
+    position:absolute;left:80px;top:48px;
+    font-family:'JetBrains Mono';font-size:13px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);
+    display:flex;align-items:center;gap:14px;
+  }
+</style>
+</head>
+<body>
+
+<deck-stage>
+
+  <!-- ============== SLIDE 1 ============== -->
+  <section data-screen-label="01 Get a Kyvern device" class="s1">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:14px">
+        <span class="kv-logo">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M5 4l5 8-5 8h3l5-8-5-8H5zm9 0l5 8-5 8h3l5-8-5-8h-3z" fill="#fff"/></svg>
+        </span>
+        <span class="kv-mark" style="font-size:18px">Kyvern</span>
+      </div>
+      <div class="nav">
+        <a>Atlas</a><a>Device</a><a>Docs</a><a>Pricing</a>
+      </div>
+      <div class="right">
+        <span style="font-size:15px;color:var(--muted)">Sign in</span>
+        <span class="cta">Get started</span>
+      </div>
+    </div>
+
+    <div class="hero">
+      <div class="copy">
+        <h1>The chain<br/>decides every<br/><span style="color:var(--mint)">dollar</span> it spends.</h1>
+        <p>A Solana-native device for your AI agent. On-chain policy. Hard budgets. Merchant allowlists enforced by consensus, not your server.</p>
+        <div class="row">
+          <span class="cta-primary">Get a Kyvern device <span class="arrow">→</span></span>
+          <span class="cta-secondary">Clone Atlas live</span>
+        </div>
+        <div class="meta">
+          <span><b>$149</b> · ships with devnet credits</span>
+          <span>Built on <b>Squads v4</b></span>
+          <span><b>11+ attacks</b> blocked in public</span>
+        </div>
+      </div>
+
+      <div class="device-stage">
+        <div class="orbit"></div>
+        <div class="device-shadow"></div>
+        <div class="device">
+          <span class="led"></span>
+          <div class="screen">
+            <span class="mark">K</span>
+            <div class="ready">runtime online</div>
+            <div class="bal">vault · 0.92 USDC</div>
+          </div>
+          <div class="brand">KYVERN · 001</div>
+          <div class="btn"></div>
+          <div class="usb"></div>
+        </div>
+      </div>
+    </div>
+
+    <div></div>
+
+    <!-- cursor + ripple -->
+    <span class="ripple"></span>
+    <span class="cursor">
+      <svg viewBox="0 0 24 24" fill="#0c0c0a" stroke="#fff" stroke-width="1.5">
+        <path d="M5 3l14 8-6 1-2 7-6-16z"/>
+      </svg>
+    </span>
+
+    <div class="slide-tag"><span class="n">01</span><span class="sep"></span>Get a Kyvern device</div>
+  </section>
+
+  <!-- ============== SLIDE 2 ============== -->
+  <section data-screen-label="02 Unbox" class="s2">
+    <div class="caption">
+      <div class="eyebrow">Unbox · 60 seconds</div>
+      <h1>Plug it in. It's on-chain.</h1>
+      <p>No SDK config, no key vault. The device ships pre-bonded to your Squads multisig.</p>
+    </div>
+
+    <div class="scene">
+      <div class="floor"></div>
+      <div class="box">
+        <div class="body">
+          <div class="lid-mark">
+            <div class="k">K</div>
+            <div class="wd">KYVERN</div>
+          </div>
+        </div>
+        <div class="lid">
+          <div class="seam"></div>
+        </div>
+        <div class="ribbon-h"></div>
+      </div>
+      <div class="unbox-device">
+        <div class="scr">
+          <div class="k-on">K</div>
+        </div>
+        <span class="led-ring"></span>
+        <div class="brand">KYVERN · 001</div>
+      </div>
+      <div class="sparkles">
+        <span></span><span></span><span></span><span></span>
+        <span></span><span></span><span></span><span></span>
+      </div>
+    </div>
+
+    <span class="cursor">
+      <svg viewBox="0 0 24 24" fill="#0c0c0a" stroke="#fff" stroke-width="1.5">
+        <path d="M5 3l14 8-6 1-2 7-6-16z"/>
+      </svg>
+    </span>
+
+    <div class="slide-tag"><span class="n">02</span><span class="sep"></span>Unbox the device</div>
+  </section>
+
+  <!-- ============== SLIDE 3 ============== -->
+  <section data-screen-label="03 Dashboard first load" class="s3">
+    <div class="header reveal d1">
+      <div class="left">
+        <span class="kv-logo">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M5 4l5 8-5 8h3l5-8-5-8H5zm9 0l5 8-5 8h3l5-8-5-8h-3z" fill="#fff"/></svg>
+        </span>
+        <span class="kv-mark">Kyvern</span>
+        <span class="crumbs"><b>KVN-QU003J6I</b> · Solana devnet · Up 24m</span>
+      </div>
+      <div class="right">
+        <span class="vault">VAULT <b>$0.92</b></span>
+        <span class="pill ghost"><span style="width:8px;height:8px;border-radius:50%;background:var(--mint);display:inline-block"></span> SQUADS</span>
+      </div>
+    </div>
+
+    <div class="banner reveal d2">Your worker can earn and spend on Solana — within rules the chain enforces.</div>
+
+    <div class="grid">
+      <!-- left: worker -->
+      <div class="card worker reveal d2">
+        <div class="top">
+          <div class="kv-logo" style="width:64px;height:64px;border-radius:16px">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M5 4l5 8-5 8h3l5-8-5-8H5zm9 0l5 8-5 8h3l5-8-5-8h-3z" fill="#fff"/></svg>
+          </div>
+          <div>
+            <div class="eyebrow">Your worker</div>
+            <h2>Oracle Agent</h2>
+            <div class="meta">
+              <span class="mono">KVN-QU003J6I</span>
+              <span style="display:flex;align-items:center;gap:6px"><span class="dot"></span>Runtime online</span>
+              <span>Last call 21m ago</span>
+              <span>Age 5h 24m</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="stats">
+          <div class="stat">
+            <div class="lab">Calls today</div>
+            <div class="val">4</div>
+            <div class="sub">0 blocked · 4 allowed</div>
+          </div>
+          <div class="stat">
+            <div class="lab">Blocked</div>
+            <div class="val">0</div>
+            <div class="sub">over-cap, off-allowlist</div>
+          </div>
+          <div class="stat">
+            <div class="lab">Merchants</div>
+            <div class="val">3</div>
+            <div class="sub">allowlisted</div>
+          </div>
+          <div class="stat">
+            <div class="lab">Vault PDA</div>
+            <div class="val" style="font-size:22px;font-family:'JetBrains Mono';font-weight:500">8gjk…e69X</div>
+            <div class="sub">on-chain account</div>
+          </div>
+        </div>
+
+        <div class="copy-block">
+          <b>Your worker can earn and spend</b> on Solana, within rules the chain itself enforces. Every <span class="code-inline">vault.pay()</span> call routes through your policy program before a single lamport moves.
+        </div>
+
+        <div class="actions">
+          <span class="btn-dark">Watch the chain refuse <span class="mono">›</span></span>
+          <span class="btn-ghost">Open in Solana Explorer ↗</span>
+        </div>
+      </div>
+
+      <!-- right: vault -->
+      <div class="card vault-card reveal d3">
+        <div class="eyebrow">Vault balance</div>
+        <div class="amt"><span class="doll">$</span>0.92</div>
+        <div class="breakdown">
+          <div class="row"><span>Solana USDC</span><span>0.92 USDC</span></div>
+          <div class="row"><span>Daily cap</span><span>$0.08 / $3.00</span></div>
+          <div class="row"><span>Weekly cap</span><span>$0.08 / $20.00</span></div>
+          <div class="row"><span>Per-transaction max</span><span>$0.50</span></div>
+        </div>
+        <div class="util">
+          <div class="bar"><i></i></div>
+          <div class="util-row"><span>Today's utilization</span><span>3%</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- row 2 -->
+    <div class="row-2">
+      <div class="card workers-list reveal d4">
+        <h3>Workers <span class="pill ghost">1 attached</span></h3>
+        <div class="worker-row">
+          <div class="av">A</div>
+          <div class="nm">
+            <b>Atlas <span class="ref">reference</span></b>
+            <small>KVN-ATLAS01</small>
+            <small>1,815 paid · 4,092 refused · 22d autonomous</small>
+          </div>
+          <span class="dot"></span>
+        </div>
+        <div class="worker-row" style="opacity:.6">
+          <div style="width:34px;height:34px;border-radius:8px;border:1px dashed var(--line);display:flex;align-items:center;justify-content:center;color:var(--muted)">+</div>
+          <div class="nm">
+            <b style="color:var(--ink-2)">Deploy a vault</b>
+            <small>60-second clone</small>
+          </div>
+        </div>
+      </div>
+
+      <div class="card runtime reveal d5">
+        <h3>Runtime status <span style="font-family:'JetBrains Mono';font-size:12px;color:var(--muted);font-weight:400">Attached · Age 5h 24m</span> <span class="pill live"><span class="dot"></span>Atlas · Live</span></h3>
+        <div class="console">
+          <span class="pre">› </span>Awaiting strategy. Wire your code via <span style="color:#3a47b8">@kyvernlabs/sdk</span> to define this worker's behavior. Every call routes through the policy program.<br/><span class="pre">  • </span>vault on-chain
+        </div>
+        <div class="eyebrow" style="font-size:11px">Atlas · Live tape</div>
+        <div class="tape">
+          <span class="ev">10:14 · $0.02 refused</span>
+          <span class="ev">10:11 · $0.09 refused</span>
+          <span class="ev">10:08 · $0.04 refused</span>
+          <span class="ev">10:06 · prompt inject</span>
+        </div>
+      </div>
+
+      <div class="card policy reveal d6">
+        <h3>Policy <span class="pill violet" style="font-size:11px"><span class="dot"></span>Enforced on-chain</span></h3>
+        <p style="margin:0;font-size:13px;color:var(--muted);line-height:1.4">A Squads v4 multisig program (PpmZ…MSqc) gates every transfer.</p>
+        <div class="badge">
+          <div class="row2">
+            <div class="cell"><div class="l">Daily cap</div><div class="v">$3.00</div><small>$0.08 spent</small></div>
+            <div class="cell"><div class="l">Weekly cap</div><div class="v">$20.00</div><small>$0.08 spent</small></div>
+            <div class="cell"><div class="l">Per-tx max</div><div class="v">$0.50</div><small>hard ceiling</small></div>
+            <div class="cell"><div class="l">Allowlist</div><div class="v" style="font-size:14px">enforced</div><small>merchant-locked</small></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="slide-tag"><span class="n">03</span><span class="sep"></span>Open Kyvern · /app</div>
+  </section>
+
+  <!-- ============== SLIDE 4 — Name agent ============== -->
+  <section data-screen-label="04 Name your agent" class="s4">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:14px">
+        <span class="kv-logo">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M5 4l5 8-5 8h3l5-8-5-8H5zm9 0l5 8-5 8h3l5-8-5-8h-3z" fill="#fff"/></svg>
+        </span>
+        <span class="kv-mark">Kyvern</span>
+      </div>
+      <div class="progress">
+        <div class="bars"><i class="on"></i><i></i><i></i><i></i><i></i></div>
+        <span>01 / 05</span>
+      </div>
+    </div>
+
+    <div class="step">STEP 01</div>
+    <h1>Name your agent.</h1>
+    <p class="sub">One agent, one job, one set of rules enforced on-chain.</p>
+
+    <div class="grid">
+      <div>
+        <div class="field">
+          <label>Agent name</label>
+          <div class="input">
+            <span class="em">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/></svg>
+            </span>
+            <span class="name"><span class="typed-mask">Oracle Agent</span><span class="caret"></span></span>
+            <span class="count">12/40</span>
+          </div>
+          <span class="hint">A name you'll recognize at 3am when your agent is still running.</span>
+        </div>
+
+        <div class="emoji-group">
+          <div class="lab">Pick an emoji <span>— so you can tell it apart at a glance.</span></div>
+          <div class="emojis">
+            <span class="ej"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><polygon points="12,8 15,12 12,16 9,12" fill="currentColor"/></svg></span>
+            <span class="ej sel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><polyline points="14 7 21 7 21 14"/></svg></span>
+            <span class="ej"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1l2.1-2.1M17 7l2.1-2.1"/></svg></span>
+            <span class="ej"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 14a4 4 0 0 1 0-6l2-2a4 4 0 1 1 6 6l-1 1"/><path d="M14 10a4 4 0 0 1 0 6l-2 2a4 4 0 1 1-6-6l1-1"/></svg></span>
+            <span class="ej"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19l9-7-9-7-9 7 9 7z"/></svg></span>
+            <span class="ej"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="8" width="12" height="11" rx="2"/><path d="M9 8V5a3 3 0 0 1 6 0v3"/></svg></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="preview">
+        <div class="pchrome">
+          <div style="display:flex;align-items:center;gap:10px"><div class="tl"><span></span><span></span><span></span></div><span class="lab">preview</span></div>
+          <span class="pill live"><span class="dot"></span>Ready</span>
+        </div>
+        <div class="body">
+          <div class="row1">
+            <div class="av">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><polyline points="14 7 21 7 21 14"/></svg>
+            </div>
+            <div class="nm">
+              <span class="small">your autonomous agent</span>
+              <span class="big">Oracle Agent</span>
+            </div>
+          </div>
+          <span class="policy-pill"><span class="dot"></span>On-chain policy</span>
+          <p>Your rules live on a policy PDA on Solana. Daily cap, allowlist, velocity, and kill switch — enforced by consensus, not a server.</p>
+          <div class="foot">
+            <span>uptime · waiting</span>
+            <span>0 payments</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <span class="cursor">
+      <svg viewBox="0 0 24 24" fill="#0c0c0a" stroke="#fff" stroke-width="1.5">
+        <path d="M5 3l14 8-6 1-2 7-6-16z"/>
+      </svg>
+    </span>
+
+    <div class="slide-tag"><span class="n">04</span><span class="sep"></span>Name your agent · 01 / 05</div>
+  </section>
+
+  <!-- ============== SLIDE 5 — Set budget ============== -->
+  <section data-screen-label="05 Set budget" class="s5">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:14px">
+        <span class="kv-logo">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M5 4l5 8-5 8h3l5-8-5-8H5zm9 0l5 8-5 8h3l5-8-5-8h-3z" fill="#fff"/></svg>
+        </span>
+        <span class="kv-mark">Kyvern</span>
+      </div>
+      <div class="progress">
+        <div class="bars"><i class="on"></i><i class="on"></i><i></i><i></i><i></i></div>
+        <span>02 / 05</span>
+      </div>
+    </div>
+    <div class="step" style="font-family:'JetBrains Mono';font-size:13px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted)">STEP 02</div>
+    <h1>Set its budget.</h1>
+    <p class="sub">Hard ceilings the chain respects. Your agent can't argue with math.</p>
+
+    <div class="grid">
+      <div class="left">
+        <div class="preset-label">Pick a preset</div>
+        <div class="presets">
+          <div class="preset active"><div class="nm">Tinker</div><div class="pr"><b>$5</b> / day</div></div>
+          <div class="preset"><div class="nm">Startup</div><div class="pr">$50 / day</div></div>
+          <div class="preset"><div class="nm">Production</div><div class="pr">$500 / day</div></div>
+        </div>
+
+        <div class="caps">
+          <div class="cap">
+            <div class="l">Daily cap</div>
+            <div class="v"><span class="d">$</span><span class="num-anim">5</span></div>
+            <div class="nm">Resets at 00:00 UTC.</div>
+          </div>
+          <div class="cap">
+            <div class="l">Weekly ceiling</div>
+            <div class="v"><span class="d">$</span><span class="num-anim">20</span></div>
+            <div class="nm">Rolls for 7 days.</div>
+          </div>
+          <div class="cap">
+            <div class="l">Per-tx max</div>
+            <div class="v"><span class="d">$</span><span class="num-anim">0.5</span></div>
+            <div class="nm">Single payment.</div>
+          </div>
+        </div>
+
+        <div class="info">
+          <span class="dot">i</span>
+          <span>Worst-case, this agent can spend <b>$5</b> today and no more than <b>$0.5</b> on any single call. If a bug tries to burn <b>$50</b> in five minutes, Squads will simply refuse to co-sign.</span>
+        </div>
+      </div>
+
+      <div class="right">
+        <div class="sim">
+          <div class="head"><span class="dot"></span>Simulated next 24h</div>
+          <div class="row">
+            <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13,2 3,14 12,14 11,22 21,10 12,10 13,2"/></svg></div>
+            <div class="col">
+              <div class="l">Calls possible</div>
+              <div class="v">14</div>
+              <div class="s">at ~70% of per-tx cap</div>
+            </div>
+          </div>
+          <div class="row">
+            <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/></svg></div>
+            <div class="col">
+              <div class="l">Expected spend</div>
+              <div class="v">$4.90</div>
+              <div class="s">of $5.00 daily</div>
+            </div>
+          </div>
+          <div class="row">
+            <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2"/></svg></div>
+            <div class="col">
+              <div class="l">Time-to-cap at full throttle</div>
+              <div class="v">~0h</div>
+              <div class="s">then Squads refuses further payments</div>
+            </div>
+          </div>
+        </div>
+        <p class="sim-note">Numbers assume typical agent behavior. Real throughput depends on the merchants you allowlist.</p>
+      </div>
+    </div>
+
+    <span class="cursor">
+      <svg viewBox="0 0 24 24" fill="#0c0c0a" stroke="#fff" stroke-width="1.5">
+        <path d="M5 3l14 8-6 1-2 7-6-16z"/>
+      </svg>
+    </span>
+
+    <div class="slide-tag"><span class="n">05</span><span class="sep"></span>Set its budget · 02 / 05</div>
+  </section>
+
+  <!-- ============== SLIDE 6 — Pre-approve world ============== -->
+  <section data-screen-label="06 Pre-approve world" class="s6">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:14px">
+        <span class="kv-logo">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M5 4l5 8-5 8h3l5-8-5-8H5zm9 0l5 8-5 8h3l5-8-5-8h-3z" fill="#fff"/></svg>
+        </span>
+        <span class="kv-mark">Kyvern</span>
+      </div>
+      <div class="progress">
+        <div class="bars"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></div>
+        <span>03 / 05</span>
+      </div>
+    </div>
+    <div class="step" style="font-family:'JetBrains Mono';font-size:13px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted)">STEP 03</div>
+    <h1>Pre-approve its world.</h1>
+    <p class="sub">Who your agent can pay, and how often. Everything outside this set is refused at consensus.</p>
+
+    <div class="grid">
+      <div>
+        <div class="allowlist">
+          <h3>Merchant allowlist</h3>
+          <p class="desc">Only these hosts can receive payments. Everything else is refused. Leave empty to allow any host (not recommended).</p>
+          <div class="merchant-box">
+            <div class="input-row">
+              <span class="proto">https://</span>
+              <span class="holder">weather-api.example.com</span>
+              <span class="add">+ Add</span>
+            </div>
+            <div class="chips">
+              <span class="chip">api.openai.com <span class="x">×</span></span>
+              <span class="chip">api.anthropic.com <span class="x">×</span></span>
+              <span class="chip">api.commonstack.ai <span class="x">×</span></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="velocity" style="margin-top:24px;display:flex;flex-direction:column;gap:14px">
+          <h3>Velocity cap</h3>
+          <p class="desc">Stops runaway loops cold.</p>
+          <div class="vel-box">
+            <span>No more than</span>
+            <span class="num">60</span>
+            <span>calls</span>
+            <span class="unit">per hour <span style="color:var(--muted)">▾</span></span>
+          </div>
+        </div>
+
+        <div class="memo" style="margin-top:14px">
+          <div class="toggle"></div>
+          <div class="txt">
+            <b>Require memo on every payment</b>
+            <p>Agents must state why they're paying. Shows up in your audit log. Pairs well with anomaly alerts.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="preview">
+        <div class="preview-card">
+          <div class="head">
+            <span class="l">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.5 9-8 10-4.5-1-8-5-8-10V6l8-4z"/></svg>
+              Allowlist preview
+            </span>
+            <span class="r">3 merchants</span>
+          </div>
+          <div class="chips-prev">
+            <span class="pchip">✓ api.openai.com</span>
+            <span class="pchip">✓ api.anthropic.com</span>
+            <span class="pchip">✓ api.commonstack.ai</span>
+          </div>
+        </div>
+
+        <div class="preview-card vel">
+          <div class="head">
+            <span class="l">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2"/></svg>
+              Velocity ceiling
+            </span>
+          </div>
+          <div class="row">
+            <div class="n">60</div>
+            <div class="unit">calls<br/>every hour</div>
+          </div>
+        </div>
+
+        <div class="preview-card memo">
+          <div class="row">
+            <div class="check">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="3"><polyline points="5 12 10 17 19 7"/></svg>
+            </div>
+            <div class="lab"><b>Memo requirement</b><span class="v">Required</span></div>
+          </div>
+        </div>
+
+        <p style="font-size:13px;color:var(--muted);line-height:1.45;margin:0">Rules land as a PDA on Solana. Kyvern reads, Squads enforces.</p>
+      </div>
+    </div>
+
+    <span class="cursor">
+      <svg viewBox="0 0 24 24" fill="#0c0c0a" stroke="#fff" stroke-width="1.5">
+        <path d="M5 3l14 8-6 1-2 7-6-16z"/>
+      </svg>
+    </span>
+
+    <div class="slide-tag"><span class="n">06</span><span class="sep"></span>Pre-approve its world · 03 / 05</div>
+  </section>
+
+  <!-- ============== SLIDE 7 — Deploy success ============== -->
+  <section data-screen-label="07 Deployed" class="s7">
+    <div class="confetti">
+      <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+    </div>
+    <div class="stage">
+      <div class="check">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="4 12 10 18 20 6" />
+        </svg>
+      </div>
+      <span class="badge"><span class="dot"></span>Live on Solana devnet</span>
+      <h1>Your agent is<br/><em>on-chain.</em></h1>
+      <div class="agent-card">
+        <div class="av">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><polyline points="14 7 21 7 21 14"/></svg>
+        </div>
+        <div class="nm">
+          <span class="l">Your autonomous agent</span>
+          <span class="v">Oracle Agent</span>
+          <span class="s"><span class="dot"></span>policy PDA · 8gjk…e69X · daily cap $5 · 3 merchants</span>
+        </div>
+        <span class="open">Open dashboard <span style="font-family:'JetBrains Mono'">→</span></span>
+      </div>
+      <div class="tx">
+        <span>deploy tx</span>
+        <b class="hash">5KJq…7zNw</b>
+        <span>·</span>
+        <span>Squads v4 · slot 285,841,022</span>
+        <span class="pill live" style="font-size:11px"><span class="dot"></span>Confirmed</span>
+      </div>
+    </div>
+
+    <div class="slide-tag"><span class="n">07</span><span class="sep"></span>Deploy confirmation</div>
+  </section>
+
+  <!-- ============== SLIDE 8 — Terminal npm install ============== -->
+  <section data-screen-label="08 npm install" class="s8">
+    <div class="term">
+      <div class="bar">
+        <div class="tl"><span></span><span></span><span></span></div>
+        <div class="title">~/agents/oracle — zsh · 120×36</div>
+        <div style="width:60px"></div>
+      </div>
+      <div class="body">
+        <div class="ln"><span class="cmt"># wrap your agent with the on-chain vault</span></div>
+        <div class="ln"><span class="pr">oracle ❯</span><span class="typed">npm install @kyvernlabs/sdk</span></div>
+        <div class="step s1 ln" style="margin-top:14px"><span class="cmt">⠋</span><span class="spin"></span>resolving dependencies <span class="bar-prog"><i></i></span></div>
+        <div class="step s2 ln"><span class="ok">▸</span> reaching <span class="pkg">registry.npmjs.org</span> · <span class="num">214 KB</span></div>
+        <div class="step s3 ln"><span class="ok">▸</span> @kyvernlabs/sdk@<span class="num">0.4.2</span> · <span class="cmt">solana + squads-v4</span></div>
+        <div class="step s4 ln" style="margin-top:8px"><span class="ok">+</span> @kyvernlabs/sdk <span class="cmt">0.4.2</span></div>
+        <div class="step s5 ln"><span class="ok">+</span> @solana/web3.js <span class="cmt">1.95.4</span></div>
+        <div class="step s6 ln" style="margin-top:14px"><span class="ok">✓</span> <span class="ok">added 47 packages in 3.1s</span></div>
+        <div class="step s6 ln" style="margin-top:14px"><span class="pr">oracle ❯</span><span class="new-cursor show"></span></div>
+      </div>
+    </div>
+
+    <div class="slide-tag"><span class="n">08</span><span class="sep"></span>npm install @kyvernlabs/sdk</div>
+  </section>
+
+  <!-- ============== SLIDE 9 — Code editor ============== -->
+  <section data-screen-label="09 SDK wrap" class="s9">
+    <div class="editor">
+      <div class="top">
+        <div class="tl"><span></span><span></span><span></span></div>
+        <div class="tabs">
+          <div class="tab">vault.ts</div>
+          <div class="tab">policy.ts</div>
+          <div class="tab">.env</div>
+          <div class="tab on">agent.ts<span class="dot"></span></div>
+        </div>
+        <div class="right">
+          <span>@kyvernlabs/sdk · 0.4.2</span>
+          <span style="color:#27e08a">● connected</span>
+        </div>
+      </div>
+      <div class="pane">
+        <div class="gutter">
+          <div>1</div><div>2</div><div>3</div><div>4</div><div>5</div>
+          <div>6</div><div>7</div><div>8</div><div>9</div><div>10</div>
+          <div>11</div><div>12</div><div>13</div><div>14</div><div>15</div>
+          <div>16</div><div>17</div><div>18</div><div>19</div><div>20</div>
+          <div>21</div><div>22</div><div>23</div><div>24</div><div>25</div>
+          <div>26</div><div>27</div><div>28</div><div>29</div><div>30</div>
+        </div>
+        <div class="code">
+<pre><span class="ln l1"><span class="c">// agent.ts — a small autonomous agent</span></span>
+<span class="ln l2"><span class="k">import</span> <span class="str">"dotenv/config"</span>;</span>
+<span class="ln l3"><span class="k">import</span> OpenAI <span class="k">from</span> <span class="str">"openai"</span>;</span>
+<span class="ln l4"><span class="k">import</span> { <span class="t">Vault</span> } <span class="k">from</span> <span class="str">"@kyvernlabs/sdk"</span>;</span>
+<span class="ln l5"></span>
+<span class="ln l6"><span class="k">const</span> <span class="v">llm</span> = <span class="k">new</span> <span class="fn">OpenAI</span>({ <span class="v">baseURL</span>: <span class="str">"https://api.commonstack.ai/v1"</span>, <span class="v">apiKey</span>: <span class="v">process</span>.<span class="v">env</span>.<span class="v">COMMONSTACK_API_KEY</span>! });</span>
+<span class="ln l7"><span class="k">const</span> <span class="v">vault</span> = <span class="k">new</span> <span class="fn">Vault</span>({ <span class="v">agentKey</span>: <span class="v">process</span>.<span class="v">env</span>.<span class="v">KYVERN_AGENT_KEY</span>! });</span>
+<span class="ln l8"></span>
+<span class="ln l9"><span class="k">async function</span> <span class="fn">run</span>() {</span>
+<span class="ln l10">  <span class="c">// gate every paid call through vault.pay() — chain decides</span></span>
+<span class="ln l11">  <span class="k">const</span> <span class="v">gate</span> = <span class="k">await</span> <span class="v">vault</span>.<span class="fn">pay</span>({ <span class="v">merchant</span>: <span class="str">"api.commonstack.ai"</span>, <span class="v">amount</span>: <span class="n">0.02</span>, <span class="v">memo</span>: <span class="str">"chat-completion"</span> });</span>
+<span class="ln l12">  <span class="k">if</span> (<span class="v">gate</span>.<span class="v">decision</span> !== <span class="str">"allowed"</span>) <span class="k">throw new</span> <span class="fn">Error</span>(<span class="v">gate</span>.<span class="v">reason</span>);</span>
+</pre>
+          <div class="highlight"></div>
+          <div class="floater">chain decides · before HTTP fires</div>
+        </div>
+      </div>
+      <div class="statusbar">
+        <span class="ok">● kyvern · policy ok</span>
+        <span>TypeScript</span>
+        <span>UTF-8</span>
+        <span style="margin-left:auto">spaces: 2 · ln 11, col 18</span>
+      </div>
+    </div>
+
+    <div class="slide-tag"><span class="n">09</span><span class="sep"></span>Wrap your agent with vault.pay()</div>
+  </section>
+
+  <!-- ============== SLIDE 10 — Dashboard live calls ============== -->
+  <section data-screen-label="10 Live calls" class="s10">
+    <div class="top">
+      <div class="left">
+        <span class="kv-logo">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M5 4l5 8-5 8h3l5-8-5-8H5zm9 0l5 8-5 8h3l5-8-5-8h-3z" fill="#fff"/></svg>
+        </span>
+        <span class="kv-mark" style="font-size:18px">Kyvern</span>
+        <span class="crumbs"><b>KVN-QU003J6I</b> · Solana devnet · Up 26m</span>
+      </div>
+      <div class="right">
+        <span class="pill live" style="font-size:12px"><span class="dot"></span>Runtime online</span>
+        <span class="vault">VAULT <b>$0.86</b></span>
+        <span class="pill ghost"><span style="width:8px;height:8px;border-radius:50%;background:var(--mint);display:inline-block"></span> SQUADS</span>
+      </div>
+    </div>
+
+    <div class="layout">
+      <div class="panel calls">
+        <div class="panel-head">
+          <h3>Live calls <span class="meta">Last 5 minutes</span></h3>
+          <span class="live"><span class="dot"></span>Streaming</span>
+        </div>
+        <div class="calls-list">
+          <div class="call-row r5">
+            <span class="ts">10:24:18</span>
+            <span class="url">api.commonstack.ai <small>chat-completion · 1-hour BTC prediction</small></span>
+            <span class="amt">$0.02</span>
+            <span class="pill live"><span class="dot"></span>Allowed</span>
+          </div>
+          <div class="call-row r4">
+            <span class="ts">10:24:11</span>
+            <span class="url">api.commonstack.ai <small>chat-completion · 1-hour SOL prediction</small></span>
+            <span class="amt">$0.02</span>
+            <span class="pill live"><span class="dot"></span>Allowed</span>
+          </div>
+          <div class="call-row r3">
+            <span class="ts">10:23:58</span>
+            <span class="url">api.openai.com <small>gpt-4o-mini · summarize</small></span>
+            <span class="amt">$0.01</span>
+            <span class="pill live"><span class="dot"></span>Allowed</span>
+          </div>
+          <div class="call-row r2">
+            <span class="ts">10:23:42</span>
+            <span class="url">api.anthropic.com <small>claude · classify intent</small></span>
+            <span class="amt">$0.01</span>
+            <span class="pill live"><span class="dot"></span>Allowed</span>
+          </div>
+          <div class="call-row r1">
+            <span class="ts">10:23:31</span>
+            <span class="url">ranger.com <small>off-allowlist · code 12003</small></span>
+            <span class="amt">$0.50</span>
+            <span class="pill red"><span class="dot"></span>Refused</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="agent">
+          <div class="av">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><polyline points="14 7 21 7 21 14"/></svg>
+          </div>
+          <div class="nm">
+            <span class="small">your autonomous agent</span>
+            <span class="big">Oracle Agent</span>
+            <span class="s"><span class="dot"></span>Runtime online · last call 0s ago</span>
+          </div>
+          <span class="pill violet" style="font-size:11px"><span class="dot"></span>Policy enforced</span>
+        </div>
+
+        <div class="vault-card">
+          <span class="eyebrow">Vault balance</span>
+          <div class="amt"><span class="doll">$</span>0.86</div>
+          <div class="spent">Spent today <b>$0.14</b> · of $5.00 daily cap</div>
+          <div class="bar"><i></i></div>
+        </div>
+
+        <div class="stat-grid">
+          <div class="cell">
+            <div class="l">Calls today</div>
+            <div class="v">7</div>
+            <div class="s">4 just now · 3 last hour</div>
+          </div>
+          <div class="cell">
+            <div class="l">Refused</div>
+            <div class="v">1</div>
+            <div class="s">off-allowlist · code 12003</div>
+          </div>
+          <div class="cell">
+            <div class="l">Merchants</div>
+            <div class="v">3</div>
+            <div class="s">on chain · enforced</div>
+          </div>
+          <div class="cell">
+            <div class="l">Velocity</div>
+            <div class="v">7 / 60</div>
+            <div class="s">calls / hour</div>
+          </div>
+        </div>
+
+        <div class="stat-grid" style="margin-top:auto">
+          <div class="cell" style="grid-column:1 / -1; background:var(--mint-bg); padding:14px 16px; border-radius:12px;">
+            <div class="l" style="color:#0f7536">Latest settle</div>
+            <div class="v" style="font-size:20px;font-family:'JetBrains Mono';font-weight:600">api.commonstack.ai</div>
+            <div class="s" style="color:#0f7536">$0.02 · settled on-chain · 285ms · slot 285,841,124</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="slide-tag" style="bottom:24px"><span class="n">10</span><span class="sep"></span>Dashboard · live calls</div>
+  </section>
+
+</deck-stage>
+
+</body>
+</html>
