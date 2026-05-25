@@ -41,12 +41,9 @@ export interface VerifyResult {
   reason: string;
 }
 
-function rpcUrlFor(network: "devnet" | "mainnet"): string {
-  if (network === "mainnet") {
-    return process.env.SOLANA_MAINNET_RPC ?? "https://api.mainnet-beta.solana.com";
-  }
-  return process.env.SOLANA_DEVNET_RPC ?? "https://api.devnet.solana.com";
-}
+// Tier-0 URL kept for legacy callers; verifyX402Payment uses the
+// tiered Connection below for actual fetches.
+import { tieredConnection } from "./solana-rpc";
 
 /**
  * Look up a settled Solana signature and confirm it's a valid USDC
@@ -73,7 +70,7 @@ export async function verifyX402Payment(
 
   let conn: Connection;
   try {
-    conn = new Connection(rpcUrlFor(input.network), "confirmed");
+    conn = tieredConnection(input.network, "confirmed");
   } catch {
     return { ...empty, ok: false, reason: "rpc_init_failed" };
   }

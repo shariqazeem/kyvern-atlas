@@ -85,6 +85,12 @@ export interface CreateSmartAccountInput {
   vaultSeed: string;
   /** Which Solana cluster this vault lives on. */
   network: "devnet" | "mainnet";
+  /**
+   * RPC tier selector. "user" routes through Helius first; "background"
+   * stays on public RPC. Default: "background". API routes responding to
+   * user actions should pass "user".
+   */
+  trigger?: "user" | "background";
 }
 
 export interface SmartAccount {
@@ -104,6 +110,8 @@ export interface SetSpendingLimitInput {
   weeklyLimitUsd: number;
   perTxMaxUsd: number;
   network?: "devnet" | "mainnet";
+  /** RPC tier — "user" reaches Helius, "background" stays public. */
+  trigger?: "user" | "background";
 }
 
 export interface SpendingLimit {
@@ -125,6 +133,8 @@ export interface CoSignPaymentInput {
   amountUsd: number;
   memo: string | null;
   network: "devnet" | "mainnet";
+  /** RPC tier selector (see CreateSmartAccountInput.trigger). */
+  trigger?: "user" | "background";
 }
 
 export interface CoSignResult {
@@ -203,7 +213,10 @@ export async function createSmartAccount(
   }
 
   const { sqds, web3 } = await loadSdk();
-  const signer = await loadServerSigner({ network: input.network });
+  const signer = await loadServerSigner({
+    network: input.network,
+    trigger: input.trigger,
+  });
   const connection = signer.connection;
   const feePayer = signer.keypair;
 
@@ -309,7 +322,7 @@ export async function setSpendingLimit(
 
   const { sqds, web3 } = await loadSdk();
   const network = input.network ?? "devnet";
-  const signer = await loadServerSigner({ network });
+  const signer = await loadServerSigner({ network, trigger: input.trigger });
   const connection = signer.connection;
   const feePayer = signer.keypair;
 
@@ -382,7 +395,10 @@ export async function coSignPayment(
   }
 
   const { sqds, web3, spl } = await loadSdk();
-  const signer = await loadServerSigner({ network: input.network });
+  const signer = await loadServerSigner({
+    network: input.network,
+    trigger: input.trigger,
+  });
   const connection = signer.connection;
   const feePayer = signer.keypair;
   const agent = await keypairFromB58(input.agentSecretB58);
@@ -507,7 +523,10 @@ export async function coSignPaymentExpectingFailure(
   }
 
   const { sqds, web3, spl } = await loadSdk();
-  const signer = await loadServerSigner({ network: input.network });
+  const signer = await loadServerSigner({
+    network: input.network,
+    trigger: input.trigger,
+  });
   const connection = signer.connection;
   const feePayer = signer.keypair;
   const agent = await keypairFromB58(input.agentSecretB58);
@@ -580,6 +599,8 @@ export interface VaultAtaInfo {
 export async function ensureVaultUsdcAta(input: {
   smartAccountAddress: string;
   network: "devnet" | "mainnet";
+  /** RPC tier — "user" reaches Helius, "background" stays public. */
+  trigger?: "user" | "background";
 }): Promise<VaultAtaInfo> {
   const usdcMint = USDC_MINT[input.network];
 
@@ -596,7 +617,10 @@ export async function ensureVaultUsdcAta(input: {
   }
 
   const { sqds, web3, spl } = await loadSdk();
-  const signer = await loadServerSigner({ network: input.network });
+  const signer = await loadServerSigner({
+    network: input.network,
+    trigger: input.trigger,
+  });
   const connection = signer.connection;
 
   const multisigPda = new web3.PublicKey(input.smartAccountAddress);
@@ -677,6 +701,8 @@ export async function ensureVaultUsdcAta(input: {
 export async function ensureRecipientUsdcAta(input: {
   recipientPubkey: string;
   network: "devnet" | "mainnet";
+  /** RPC tier — "user" reaches Helius, "background" stays public. */
+  trigger?: "user" | "background";
 }): Promise<{ ata: string; created: boolean; signature: string | null }> {
   if (mode() === "stub") {
     return {
@@ -686,7 +712,10 @@ export async function ensureRecipientUsdcAta(input: {
     };
   }
   const { web3, spl } = await loadSdk();
-  const signer = await loadServerSigner({ network: input.network });
+  const signer = await loadServerSigner({
+    network: input.network,
+    trigger: input.trigger,
+  });
   const connection = signer.connection;
   const mint = new web3.PublicKey(USDC_MINT[input.network]);
   const owner = new web3.PublicKey(input.recipientPubkey);

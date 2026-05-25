@@ -25,7 +25,6 @@
  */
 
 import {
-  Connection,
   Keypair,
   PublicKey,
   TransactionMessage,
@@ -37,6 +36,7 @@ import {
   createAssociatedTokenAccountInstruction,
 } from "@solana/spl-token";
 import bs58 from "bs58";
+import { tieredConnection } from "../solana-rpc";
 
 export const USDC_MINT_DEVNET = "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU";
 export const USDC_DECIMALS = 6;
@@ -48,8 +48,8 @@ export const TOPUP_AMOUNT_USD = 5;
 /** Vault balance below this triggers an auto-drip. */
 export const LOW_BALANCE_THRESHOLD_USD = 1;
 
-function rpcUrl(): string {
-  return process.env.SOLANA_DEVNET_RPC ?? "https://api.devnet.solana.com";
+function tieredConn() {
+  return tieredConnection("devnet", "confirmed");
 }
 
 let _treasuryCache: Keypair | null = null;
@@ -74,7 +74,7 @@ function getTreasury(): Keypair | null {
 /** Live read — Atlas's USDC balance via the public devnet RPC. */
 export async function getAtlasUsdcBalance(): Promise<number> {
   try {
-    const conn = new Connection(rpcUrl(), "confirmed");
+    const conn = tieredConn();
     const owner = new PublicKey(ATLAS_VAULT_PDA);
     const mint = new PublicKey(USDC_MINT_DEVNET);
     const accs = await conn.getParsedTokenAccountsByOwner(owner, { mint });
@@ -106,7 +106,7 @@ export async function transferUsdcFromTreasury(amountUsd: number): Promise<DripR
   }
 
   try {
-    const conn = new Connection(rpcUrl(), "confirmed");
+    const conn = tieredConn();
     const mint = new PublicKey(USDC_MINT_DEVNET);
     const recipient = new PublicKey(ATLAS_VAULT_PDA);
     const treasuryAta = getAssociatedTokenAddressSync(mint, treasury.publicKey, false);

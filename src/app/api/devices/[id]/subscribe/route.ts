@@ -38,6 +38,7 @@ export async function POST(
       recipientPubkey: atlasVault.ownerWallet,
       amountUsd: amount,
       memo: "atlas-intelligence subscription",
+      trigger: "user",
       logEvent: {
         eventType: "spending_sent",
         abilityId: "atlas-intelligence",

@@ -57,6 +57,7 @@ export async function POST(
     recipientPubkey: recipient,
     amountUsd: PRICE_USD,
     memo: tag,
+    trigger: "user",
     logEvent: {
       eventType: "spending_sent",
       counterparty: "Atlas x402 feed",

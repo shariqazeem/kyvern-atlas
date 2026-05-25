@@ -90,6 +90,12 @@ export interface LoadOptions {
   targetSolBalance?: number;
   /** Network — used for airdrop decisions. Default: "devnet". */
   network?: "devnet" | "mainnet";
+  /**
+   * RPC tier selector. "user" routes through Helius first; "background"
+   * stays on the public RPC. Default: "background" so loops never burn
+   * Helius quota.
+   */
+  trigger?: "user" | "background";
 }
 
 export interface LoadedSigner {
@@ -105,13 +111,18 @@ export interface LoadedSigner {
   airdropped: boolean;
 }
 
-/** Default RPC URL resolution, copied verbatim from squads-v4.ts. */
+/**
+ * Default RPC URL resolution. Kept as a function exporting a single string
+ * for back-compat with callers that need a base URL (e.g. WalletAdapter
+ * configs, env-summary endpoints). For all server-side fetches use
+ * `tieredConnection(network)` from src/lib/solana-rpc.ts instead — it
+ * rotates through every configured tier on rate-limits.
+ */
 export function rpcUrl(network: "devnet" | "mainnet"): string {
-  if (process.env.KYVERN_SOLANA_RPC_URL)
-    return process.env.KYVERN_SOLANA_RPC_URL;
-  return network === "devnet"
-    ? "https://api.devnet.solana.com"
-    : "https://api.mainnet-beta.solana.com";
+  // Lazy import keeps the module-load cost zero on cold paths.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { tieredRpcUrls } = require("./solana-rpc") as typeof import("./solana-rpc");
+  return tieredRpcUrls(network)[0]!;
 }
 
 /**
@@ -171,7 +182,13 @@ export async function loadServerSigner(
     source = "bootstrapped";
   }
 
-  const connection = new web3.Connection(rpcUrl(network), "confirmed");
+  // Use the tiered Connection so balance lookups + airdrop confirmation
+  // survive rate-limits on any single endpoint. The caller's `trigger`
+  // selects between Helius-first (user actions) and public-only (loops).
+  const { tieredConnection } = await import("./solana-rpc");
+  const connection = tieredConnection(network, "confirmed", {
+    trigger: opts.trigger ?? "background",
+  });
 
   // Balance check + optional airdrop
   let lamports = 0;

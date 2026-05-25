@@ -224,6 +224,7 @@ async function meteredPay(
     recipientPubkey: METERING_RECIPIENT,
     amountUsd: 0.001,
     memo: opts.memo,
+    trigger: "user",
     logEvent: {
       eventType: "spending_sent",
       counterparty: merchant,

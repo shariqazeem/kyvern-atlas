@@ -91,6 +91,7 @@ export async function POST(
     recipientPubkey: kastAddress,
     amountUsd,
     memo: "MY_KAST test payout",
+    trigger: "user",
     logEvent: {
       eventType: "spending_sent",
       counterparty: "kast.xyz",

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Connection, PublicKey } from "@solana/web3.js";
+import { PublicKey } from "@solana/web3.js";
+import { tieredConnection, type SolanaNetwork } from "@/lib/solana-rpc";
 import { getVault } from "@/lib/vault-store";
 import { getDb } from "@/lib/db";
 import { parseConfig } from "@/lib/agents/config-schema";
@@ -74,11 +75,8 @@ function tsToMs(s: string): number {
   return isNaN(ms) ? 0 : ms;
 }
 
-function rpcUrlFor(network: string): string {
-  if (network === "mainnet") {
-    return process.env.SOLANA_MAINNET_RPC ?? "https://api.mainnet-beta.solana.com";
-  }
-  return process.env.SOLANA_DEVNET_RPC ?? "https://api.devnet.solana.com";
+function networkFor(network: string): SolanaNetwork {
+  return network === "mainnet" ? "mainnet" : "devnet";
 }
 
 async function fetchVaultBalances(
@@ -107,7 +105,7 @@ async function fetchVaultBalances(
   }
 
   try {
-    const conn = new Connection(rpcUrlFor(network), "confirmed");
+    const conn = tieredConnection(networkFor(network), "confirmed");
     const owner = new PublicKey(vaultPda);
     const mint = new PublicKey(network === "mainnet" ? USDC_MINT_MAINNET : USDC_MINT_DEVNET);
     const [accounts, lamports] = await Promise.all([

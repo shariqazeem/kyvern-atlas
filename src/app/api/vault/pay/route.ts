@@ -8,6 +8,7 @@ import {
   getAgentKeySolana,
 } from "@/lib/vault-store";
 import { evaluatePayment, normalizeMerchant } from "@/lib/policy-engine";
+import { isRpcRateLimitedError } from "@/lib/solana-rpc";
 import {
   coSignPayment,
   ensureRecipientUsdcAta,
@@ -256,11 +257,16 @@ export async function POST(req: NextRequest) {
     await ensureRecipientUsdcAta({
       recipientPubkey: body.recipientPubkey!,
       network: vault.network,
+      trigger: "user",
     });
   } catch (e) {
     // If even the ATA prep fails the payment can't settle; log as failed
     // and return the real error so the dashboard shows something useful.
     const latencyMs = Date.now() - t0;
+    const rateLimited = isRpcRateLimitedError(e);
+    const baseReason = e instanceof Error
+      ? `recipient_ata_prep_failed: ${e.message}`
+      : "could not create recipient USDC token account";
     const payment = recordPayment({
       vaultId: vault.id,
       agentKeyId: resolved.keyId,
@@ -268,13 +274,21 @@ export async function POST(req: NextRequest) {
       amountUsd: body.amountUsd!,
       memo: memoForLog,
       status: "failed",
-      reason:
-        e instanceof Error
-          ? `recipient_ata_prep_failed: ${e.message}`
-          : "could not create recipient USDC token account",
+      reason: rateLimited ? `rpc_rate_limited: ${baseReason}` : baseReason,
       txSignature: null,
       latencyMs,
     });
+    if (rateLimited) {
+      return NextResponse.json(
+        {
+          error: "rpc_rate_limited",
+          message:
+            "Solana RPC is throttled across every configured endpoint. Try again in a few seconds, or add a dedicated RPC endpoint (Helius / QuickNode) via KYVERN_SOLANA_DEVNET_RPCS.",
+          payment,
+        },
+        { status: 503, headers: { "Retry-After": "10" } },
+      );
+    }
     return NextResponse.json(
       {
         error: "recipient_ata_prep_failed",
@@ -298,6 +312,7 @@ export async function POST(req: NextRequest) {
       amountUsd: body.amountUsd!,
       memo: memoForLog,
       network: vault.network,
+      trigger: "user",
     });
   } catch (e) {
     const latencyMs = Date.now() - t0;

@@ -226,6 +226,7 @@ export async function POST(
     amountUsd: parsed.amount_usd,
     memo: parsed.intent.slice(0, 60),
     forceOnChain: true,
+    trigger: "user",
   });
   const chainDurationMs = Date.now() - chainStartedAt;
 

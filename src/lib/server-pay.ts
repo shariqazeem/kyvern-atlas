@@ -30,6 +30,13 @@ interface ServerPayInput {
   recipientPubkey: string;
   amountUsd: number;
   memo?: string;
+  /**
+   * RPC tier — "user" routes through Helius first; "background" stays
+   * public. Default: "background" so any forgotten flag never burns
+   * Helius quota. Caller pass "user" when this is responding to a UI
+   * action (test-payout button, playground pay, secure-pay-cli).
+   */
+  trigger?: "user" | "background";
   /** If provided, writes to device_log after payment */
   logEvent?: {
     eventType: DeviceEventType;
@@ -126,6 +133,7 @@ export async function serverVaultPay(
         await ensureRecipientUsdcAta({
           recipientPubkey: input.recipientPubkey,
           network: vault.network,
+          trigger: input.trigger,
         });
       } catch {
         // ATA prep failure isn't fatal here — try the cosign anyway.
@@ -142,6 +150,7 @@ export async function serverVaultPay(
         amountUsd: input.amountUsd,
         memo: input.memo ?? null,
         network: vault.network,
+        trigger: input.trigger,
       });
 
       recordPayment({
@@ -198,6 +207,7 @@ export async function serverVaultPay(
       await ensureRecipientUsdcAta({
         recipientPubkey: input.recipientPubkey,
         network: vault.network,
+        trigger: input.trigger,
       });
     } catch (e) {
       return { success: false, reason: `ata_prep_failed: ${e instanceof Error ? e.message : String(e)}` };
@@ -213,6 +223,7 @@ export async function serverVaultPay(
         amountUsd: input.amountUsd,
         memo: input.memo ?? null,
         network: vault.network,
+        trigger: input.trigger,
       });
 
       // Record settled payment

@@ -13,6 +13,7 @@ import {
   explorerAddressUrl,
 } from "@/lib/squads-v4";
 import { generateAgentKeypair } from "@/lib/solana-keystore";
+import { isRpcRateLimitedError } from "@/lib/solana-rpc";
 
 /* ════════════════════════════════════════════════════════════════════
    POST /api/vault/create
@@ -153,8 +154,19 @@ export async function POST(req: NextRequest) {
       ownerPubkey: ownerWallet,
       vaultSeed: `${ownerWallet}::${body.name!.trim()}::${Date.now()}`,
       network,
+      trigger: "user", // user-driven flow — OK to reach for Helius
     });
   } catch (e) {
+    if (isRpcRateLimitedError(e)) {
+      return NextResponse.json(
+        {
+          error: "rpc_rate_limited",
+          message:
+            "Solana RPC is throttled across every configured endpoint. Try again in a few seconds, or add a dedicated RPC endpoint (Helius / QuickNode) via KYVERN_SOLANA_DEVNET_RPCS.",
+        },
+        { status: 503, headers: { "Retry-After": "10" } },
+      );
+    }
     return NextResponse.json(
       {
         error: "squads_create_failed",
@@ -183,6 +195,7 @@ export async function POST(req: NextRequest) {
       weeklyLimitUsd,
       perTxMaxUsd,
       network,
+      trigger: "user",
     });
   } catch (e) {
     return NextResponse.json(
@@ -218,6 +231,7 @@ export async function POST(req: NextRequest) {
     vaultAta = await ensureVaultUsdcAta({
       smartAccountAddress: smartAccount.address,
       network,
+      trigger: "user",
     });
   } catch (e) {
     ataError = e instanceof Error ? e.message : "failed to create vault USDC ATA";
@@ -377,7 +391,7 @@ async function airdropUsdcToVault(
     ? "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
     : "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU";
 
-  const signer = await loadServerSigner({ network });
+  const signer = await loadServerSigner({ network, trigger: "user" });
   const connection = signer.connection;
   const feePayer = signer.keypair as KeypairType;
   const mint = new PublicKey(USDC_MINT);

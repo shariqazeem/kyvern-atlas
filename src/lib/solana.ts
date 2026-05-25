@@ -8,6 +8,7 @@ import {
   sendAndConfirmTransaction,
   type TransactionSignature,
 } from "@solana/web3.js";
+import { tieredConnection, tieredRpcUrls } from "./solana-rpc";
 
 // --- Network Configuration ---
 
@@ -24,7 +25,10 @@ interface NetworkConfig {
 
 const NETWORKS: Record<SolanaNetwork, NetworkConfig> = {
   mainnet: {
-    rpcUrl: process.env.SOLANA_MAINNET_RPC || "https://api.mainnet-beta.solana.com",
+    // rpcUrl here is the tier-0 endpoint — full tier list comes from
+    // tieredRpcUrls() and getConnection() builds a Connection that
+    // rotates through it on rate-limits.
+    rpcUrl: tieredRpcUrls("mainnet")[0]!,
     // Circle's official USDC on Solana mainnet
     usdcMint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
     explorerBase: "https://solscan.io",
@@ -34,7 +38,7 @@ const NETWORKS: Record<SolanaNetwork, NetworkConfig> = {
     label: "Solana Mainnet",
   },
   devnet: {
-    rpcUrl: process.env.SOLANA_DEVNET_RPC || "https://api.devnet.solana.com",
+    rpcUrl: tieredRpcUrls("devnet")[0]!,
     usdcMint: "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
     explorerBase: "https://solscan.io",
     airdropAvailable: true,
@@ -57,8 +61,13 @@ export function resolveDefaultNetwork(): SolanaNetwork {
 
 // --- Connection Helper ---
 
+/**
+ * Build a Connection that automatically rotates across the configured RPC
+ * tier list when an endpoint rate-limits. See src/lib/solana-rpc.ts for
+ * the tier resolution rules and how to add providers via env.
+ */
 export function getConnection(network: SolanaNetwork = "devnet"): Connection {
-  return new Connection(NETWORKS[network].rpcUrl, "confirmed");
+  return tieredConnection(network, "confirmed");
 }
 
 // --- Account Creation ---

@@ -70,6 +70,7 @@ export async function POST(
     recipientPubkey: vault.ownerWallet,
     amountUsd: 0.001, // microtransaction — anchors the submission on-chain
     memo,
+    trigger: "user",
     logEvent: {
       eventType: "spending_sent",
       counterparty: "📨 Kyvern Submission Relay",

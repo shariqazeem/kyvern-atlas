@@ -43,6 +43,7 @@ export async function POST(
     recipientPubkey: vault.ownerWallet, // self — payment never lands
     amountUsd: ATTEMPT_USD,
     memo: "drain-attempt-from-app",
+    trigger: "user",
     logEvent: {
       eventType: "attack_blocked",
       counterparty: ATTEMPT_MERCHANT,

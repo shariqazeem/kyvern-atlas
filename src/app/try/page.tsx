@@ -71,32 +71,50 @@ export default function TryPage() {
       if (!deviceId) {
         setStage(1);
         const serial = `Kyvern-Guest-${wallet.slice(0, 4)}`;
-        const res = await fetch("/api/vault/create", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            ownerWallet: wallet,
-            name: serial,
-            emoji: "🧭",
-            purpose: "sandbox",
-            dailyLimitUsd: 5,
-            weeklyLimitUsd: 25,
-            perTxMaxUsd: 0.5,
-            maxCallsPerWindow: 60,
-            velocityWindow: "1h",
-            allowedMerchants: [],
-            requireMemo: true,
-            network: "devnet",
-          }),
-        });
-        if (!res.ok) {
-          const data = await res.json().catch(() => null);
+        // Retry up to 3 times on transient RPC rate-limits (503 +
+        // error="rpc_rate_limited"). Public Solana RPC throttles bursts;
+        // a short wait + retry usually lands a different tier.
+        type CreateResp = { error?: string; message?: string; vault?: { id?: string } };
+        let res: Response | null = null;
+        let data: CreateResp | null = null;
+        for (let attempt = 0; attempt < 3; attempt++) {
+          res = await fetch("/api/vault/create", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              ownerWallet: wallet,
+              name: serial,
+              emoji: "🧭",
+              purpose: "sandbox",
+              dailyLimitUsd: 5,
+              weeklyLimitUsd: 25,
+              perTxMaxUsd: 0.5,
+              maxCallsPerWindow: 60,
+              velocityWindow: "1h",
+              allowedMerchants: [],
+              requireMemo: true,
+              network: "devnet",
+            }),
+          });
+          data = (await res.json().catch(() => null)) as CreateResp | null;
+          if (res.ok) break;
+          if (res.status === 503 && data?.error === "rpc_rate_limited") {
+            await new Promise((r) => setTimeout(r, 1500 + attempt * 1500));
+            continue;
+          }
+          break;
+        }
+        if (!res || !res.ok) {
+          if (res?.status === 503 && data?.error === "rpc_rate_limited") {
+            throw new Error(
+              "Solana devnet RPC is throttled right now. Wait a few seconds and tap Try again — we route through multiple endpoints and one will clear shortly.",
+            );
+          }
           throw new Error(
             data?.message || data?.error || "Vault provisioning failed",
           );
         }
-        const created = await res.json();
-        deviceId = created?.vault?.id ?? null;
+        deviceId = data?.vault?.id ?? null;
       }
 
       setStage(2);

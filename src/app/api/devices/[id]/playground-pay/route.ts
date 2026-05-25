@@ -108,6 +108,7 @@ export async function POST(
     // than a 1ms off-chain "caught locally". Other violations stay
     // off-chain — see SQUADS_ENFORCED_CODES in server-pay.ts.
     forceOnChain: true,
+    trigger: "user",
     logEvent: {
       eventType: pay_isOk(amountUsd, vault.perTxMaxUsd) ? "spending_sent" : "attack_blocked",
       counterparty: merchant,

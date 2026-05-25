@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getVault } from "@/lib/vault-store";
 import { ensureVaultUsdcAta } from "@/lib/squads-v4";
+import { isRpcRateLimitedError } from "@/lib/solana-rpc";
 
 /**
  * GET /api/vault/:id/funding
@@ -32,8 +33,19 @@ export async function GET(
     ataInfo = await ensureVaultUsdcAta({
       smartAccountAddress: vault.squadsAddress,
       network: vault.network,
+      trigger: "user",
     });
   } catch (e) {
+    if (isRpcRateLimitedError(e)) {
+      return NextResponse.json(
+        {
+          error: "rpc_rate_limited",
+          message:
+            "Solana RPC is throttled across every configured endpoint. Try again in a few seconds, or add a dedicated RPC endpoint (Helius / QuickNode) via KYVERN_SOLANA_DEVNET_RPCS.",
+        },
+        { status: 503, headers: { "Retry-After": "10" } },
+      );
+    }
     return NextResponse.json(
       {
         error: "ata_prep_failed",
@@ -45,15 +57,16 @@ export async function GET(
   }
 
   // Read live USDC balance from RPC. Lazily imported so the route stays
-  // lightweight when the ATA flow is in stub mode.
+  // lightweight when the ATA flow is in stub mode. Uses the tiered
+  // Connection so a public-RPC rate-limit doesn't break the funding page.
   let balanceUsdc: number | null = null;
   let balanceError: string | null = null;
   try {
-    const [{ Connection, PublicKey }, { rpcUrl }] = await Promise.all([
+    const [{ PublicKey }, { tieredConnection }] = await Promise.all([
       import("@solana/web3.js"),
-      import("@/lib/solana-keystore"),
+      import("@/lib/solana-rpc"),
     ]);
-    const conn = new Connection(rpcUrl(vault.network), "confirmed");
+    const conn = tieredConnection(vault.network, "confirmed", { trigger: "user" });
     const bal = await conn.getTokenAccountBalance(
       new PublicKey(ataInfo.vaultAta),
     );
