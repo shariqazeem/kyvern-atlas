@@ -83,6 +83,63 @@ const PUBLIC_FALLBACK: Record<SolanaNetwork, string> = {
 /** Backoff schedule indexed by tier — applied AFTER a tier fails. */
 const TIER_BACKOFF_MS = [120, 320, 700, 1400];
 
+/**
+ * Circuit breaker — once a URL responds 429 / -32429, mark it "dead"
+ * for this many ms. While dead, tieredFetch skips it entirely (no
+ * network round-trip), so the Squads SDK's internal `getLatestBlockhash`
+ * retry loop fails in milliseconds instead of pegging the event loop
+ * for seconds. The window auto-clears so the URL gets tried again later.
+ */
+const CIRCUIT_OPEN_MS = 60_000;
+/** Number of consecutive 429s before flipping the breaker open. */
+const CIRCUIT_OPEN_THRESHOLD = 1;
+
+type CircuitState = {
+  consecutive429: number;
+  openUntil: number;
+};
+const circuitByUrl = new Map<string, CircuitState>();
+
+function circuitOpen(url: string, now: number): boolean {
+  const c = circuitByUrl.get(url);
+  if (!c) return false;
+  if (c.openUntil > now) return true;
+  // Window expired — auto-reset for a fresh probe.
+  circuitByUrl.delete(url);
+  return false;
+}
+
+function noteRateLimit(url: string, now: number): void {
+  const c = circuitByUrl.get(url) ?? { consecutive429: 0, openUntil: 0 };
+  c.consecutive429 += 1;
+  if (c.consecutive429 >= CIRCUIT_OPEN_THRESHOLD) {
+    c.openUntil = now + CIRCUIT_OPEN_MS;
+  }
+  circuitByUrl.set(url, c);
+}
+
+function noteSuccess(url: string): void {
+  circuitByUrl.delete(url);
+}
+
+/** Snapshot for diagnostics / admin endpoints. */
+export function rpcCircuitSnapshot(): Array<{
+  url: string;
+  consecutive429: number;
+  openForMs: number;
+}> {
+  const now = Date.now();
+  const out: Array<{ url: string; consecutive429: number; openForMs: number }> = [];
+  for (const [url, c] of circuitByUrl.entries()) {
+    out.push({
+      url: hostOf(url),
+      consecutive429: c.consecutive429,
+      openForMs: Math.max(0, c.openUntil - now),
+    });
+  }
+  return out;
+}
+
 function heliusUrlFor(network: SolanaNetwork): string | null {
   const key = process.env.KYVERN_SOLANA_HELIUS_KEY?.trim();
   if (!key) return null;
@@ -233,10 +290,19 @@ export function makeTieredFetch(urls: string[]): typeof fetch {
 
   return (async (_input: RequestInfo | URL, init?: RequestInit) => {
     const failures: string[] = [];
+    const now = Date.now();
 
     for (let tier = 0; tier < urls.length; tier++) {
       const url = urls[tier]!;
       const host = hostOf(url);
+
+      // Circuit breaker — if this URL was rate-limited recently, skip
+      // it entirely. No network round-trip, no SDK retry delay. The
+      // window auto-clears, so the URL gets a fresh probe later.
+      if (circuitOpen(url, now)) {
+        failures.push(`${host}: circuit-open (recently 429'd)`);
+        continue;
+      }
 
       let resp: Response;
       try {
@@ -254,6 +320,7 @@ export function makeTieredFetch(urls: string[]): typeof fetch {
         resp.status === 503 ||
         resp.status === 504
       ) {
+        noteRateLimit(url, now);
         failures.push(`${host}: HTTP ${resp.status}`);
         await sleepIfMore(tier, urls.length);
         continue;
@@ -265,7 +332,17 @@ export function makeTieredFetch(urls: string[]): typeof fetch {
       }
 
       // 200 OK — peek at the JSON-RPC envelope for -32429 / rate text.
-      // We must clone so the SDK can still read the body once.
+      // Skip the body inspection for large responses (getProgramAccounts,
+      // getMultipleAccounts) — the JSON-RPC error envelope is always
+      // small, so anything > 8 KB cannot be a rate-limit body. This
+      // avoids double-reading multi-MB account dumps on the hot path.
+      const lenHeader = resp.headers.get("content-length");
+      const len = lenHeader ? Number(lenHeader) : null;
+      if (len !== null && len > 8192) {
+        noteSuccess(url);
+        return resp;
+      }
+
       let bodyText: string;
       try {
         bodyText = await resp.clone().text();
@@ -273,10 +350,12 @@ export function makeTieredFetch(urls: string[]): typeof fetch {
         return resp;
       }
       if (isJsonRpcRateLimited(bodyText)) {
+        noteRateLimit(url, now);
         failures.push(`${host}: jsonrpc rate limit (200)`);
         await sleepIfMore(tier, urls.length);
         continue;
       }
+      noteSuccess(url);
       return resp;
     }
 
