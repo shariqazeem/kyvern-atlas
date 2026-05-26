@@ -261,7 +261,7 @@ export function readState(): AtlasState {
 
   const lastDecisionRow = db
     .prepare(
-      `SELECT * FROM atlas_decisions ORDER BY decided_at DESC LIMIT 1`,
+      `SELECT * FROM atlas_decisions WHERE outcome != 'failed' ORDER BY decided_at DESC LIMIT 1`,
     )
     .get() as Record<string, unknown> | undefined;
   const lastAttackRow = db
@@ -363,7 +363,7 @@ export function readRecentDecisions(limit = 20): AtlasDecision[] {
   const db = getAtlasDb();
   const rows = db
     .prepare(
-      `SELECT * FROM atlas_decisions ORDER BY decided_at DESC LIMIT ?`,
+      `SELECT * FROM atlas_decisions WHERE outcome != 'failed' ORDER BY decided_at DESC LIMIT ?`,
     )
     .all(limit) as Record<string, unknown>[];
   return rows.map(rowToDecision);
