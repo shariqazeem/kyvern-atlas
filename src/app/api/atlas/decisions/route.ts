@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readRecentAttacks, readRecentDecisions } from "@/lib/atlas/db";
 
+// Edge-cache for 2 s with 10 s stale-while-revalidate so polling clients
+// land on nginx/CF most of the time. The atlas runner writes a new
+// decision at most once every 3 min, so 2 s is invisible. Must-revalidate
+// keeps browsers from caching past their poll interval.
+const PUBLIC_CACHE =
+  "public, max-age=0, s-maxage=2, stale-while-revalidate=10, must-revalidate";
+
 /**
  * GET /api/atlas/decisions?limit=20&kind=decisions|attacks|both
  *
@@ -19,7 +26,10 @@ export async function GET(req: NextRequest) {
 
   try {
     if (kind === "attacks") {
-      return NextResponse.json({ attacks: readRecentAttacks(limit) });
+      return NextResponse.json(
+        { attacks: readRecentAttacks(limit) },
+        { headers: { "Cache-Control": PUBLIC_CACHE } },
+      );
     }
     if (kind === "both") {
       const decisions = readRecentDecisions(limit).map((d) => ({
@@ -35,9 +45,15 @@ export async function GET(req: NextRequest) {
       const merged = [...decisions, ...attacks]
         .sort((a, b) => (b._when > a._when ? 1 : -1))
         .slice(0, limit);
-      return NextResponse.json({ feed: merged });
+      return NextResponse.json(
+        { feed: merged },
+        { headers: { "Cache-Control": PUBLIC_CACHE } },
+      );
     }
-    return NextResponse.json({ decisions: readRecentDecisions(limit) });
+    return NextResponse.json(
+      { decisions: readRecentDecisions(limit) },
+      { headers: { "Cache-Control": PUBLIC_CACHE } },
+    );
   } catch (e) {
     return NextResponse.json(
       {

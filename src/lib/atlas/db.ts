@@ -115,6 +115,30 @@ export function getAtlasDb(): Database.Database {
   return db;
 }
 
+/* ─── Tiny snapshot cache ─────────────────────────────────────────────
+ * The observatory + landing poll Atlas every 3–5 s, and SSR re-runs
+ * the same reads on every page hit. Even cheap SQLite (≈5 ms) becomes
+ * a bottleneck when the web process is doing other work (3500-agent
+ * pool ticks, etc.) — every concurrent request lines up on the event
+ * loop. A 1–3 s in-process TTL on the read helpers is invisible to a
+ * polling UI but cuts the per-poll work by 90 %+.
+ *
+ * Cache is process-local. The atlas-runner writes; cached readers are
+ * always at most TTL behind. No invalidation needed.
+ * ────────────────────────────────────────────────────────────────── */
+
+type CacheEntry<T> = { value: T; expiresAt: number };
+const _cache = new Map<string, CacheEntry<unknown>>();
+
+function cached<T>(key: string, ttlMs: number, fn: () => T): T {
+  const now = Date.now();
+  const hit = _cache.get(key) as CacheEntry<T> | undefined;
+  if (hit && hit.expiresAt > now) return hit.value;
+  const value = fn();
+  _cache.set(key, { value, expiresAt: now + ttlMs });
+  return value;
+}
+
 // ─── Helpers used by the runner ───
 
 export function setVaultId(vaultId: string) {
@@ -244,6 +268,10 @@ export function addEarning(amountUsd: number): void {
 // ─── Read-side helpers used by /api/atlas/* ───
 
 export function readState(): AtlasState {
+  return cached("readState", 1000, _readStateImpl);
+}
+
+function _readStateImpl(): AtlasState {
   const db = getAtlasDb();
   const s = db
     .prepare(`SELECT * FROM atlas_state WHERE id = 1`)
@@ -360,23 +388,27 @@ export function readState(): AtlasState {
 }
 
 export function readRecentDecisions(limit = 20): AtlasDecision[] {
-  const db = getAtlasDb();
-  const rows = db
-    .prepare(
-      `SELECT * FROM atlas_decisions WHERE outcome != 'failed' ORDER BY decided_at DESC LIMIT ?`,
-    )
-    .all(limit) as Record<string, unknown>[];
-  return rows.map(rowToDecision);
+  return cached(`readRecentDecisions:${limit}`, 1500, () => {
+    const db = getAtlasDb();
+    const rows = db
+      .prepare(
+        `SELECT * FROM atlas_decisions WHERE outcome != 'failed' ORDER BY decided_at DESC LIMIT ?`,
+      )
+      .all(limit) as Record<string, unknown>[];
+    return rows.map(rowToDecision);
+  });
 }
 
 export function readRecentAttacks(limit = 20): AtlasAttack[] {
-  const db = getAtlasDb();
-  const rows = db
-    .prepare(
-      `SELECT * FROM atlas_attacks ORDER BY attempted_at DESC LIMIT ?`,
-    )
-    .all(limit) as Record<string, unknown>[];
-  return rows.map(rowToAttack);
+  return cached(`readRecentAttacks:${limit}`, 1500, () => {
+    const db = getAtlasDb();
+    const rows = db
+      .prepare(
+        `SELECT * FROM atlas_attacks ORDER BY attempted_at DESC LIMIT ?`,
+      )
+      .all(limit) as Record<string, unknown>[];
+    return rows.map(rowToAttack);
+  });
 }
 
 /**
@@ -403,6 +435,10 @@ export interface LeaderboardData {
 }
 
 export function readLeaderboard(): LeaderboardData {
+  return cached("readLeaderboard", 3000, _readLeaderboardImpl);
+}
+
+function _readLeaderboardImpl(): LeaderboardData {
   const db = getAtlasDb();
   const now = Date.now();
   const weekAgoIso = new Date(now - 7 * 24 * 60 * 60 * 1000).toISOString();

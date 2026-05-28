@@ -21,9 +21,14 @@ export async function GET() {
     const state = readState();
     return NextResponse.json(state, {
       headers: {
-        // No caching — observatory polls every 3s and must see live
-        // data. nginx / CDN would otherwise serve stale snapshots.
-        "Cache-Control": "no-store, must-revalidate",
+        // Tiny edge cache. The observatory polls every 3–5 s and the
+        // runner writes at most once every 3 min, so a 2 s edge TTL
+        // (with 10 s stale-while-revalidate) is invisible to viewers
+        // but lets nginx / Cloudflare absorb the load. The browser
+        // never caches (must-revalidate) so client-side polling
+        // still feels live.
+        "Cache-Control":
+          "public, max-age=0, s-maxage=2, stale-while-revalidate=10, must-revalidate",
       },
     });
   } catch (e) {

@@ -45,12 +45,32 @@ export interface AtlasSnapshot {
   findingsThisWeek: number;
 }
 
+/* ─── SSR snapshot memoization ───────────────────────────────────────
+ * Both `/` and `/atlas` call this on every render (force-dynamic). The
+ * snapshot reads atlas.db + pulse.db and assembles a fairly large
+ * object. The data is only updated by the Atlas runner every 3 minutes,
+ * so a 1.5 s in-process TTL is invisible to users but keeps SSR cheap
+ * even under heavy polling. Cache is process-local, no invalidation.
+ * ────────────────────────────────────────────────────────────────── */
+const SSR_CACHE_TTL_MS = 1500;
+let _ssrCache: { snapshot: AtlasSnapshot; expiresAt: number } | null = null;
+
 /**
  * Reads initial Atlas state + the latest 40 feed items for SSR.
  * If anything fails (DB missing, schema mismatch, etc), returns a
  * null snapshot — never throws.
  */
 export function readInitialAtlasSnapshot(): AtlasSnapshot {
+  const now = Date.now();
+  if (_ssrCache && _ssrCache.expiresAt > now) {
+    return _ssrCache.snapshot;
+  }
+  const snapshot = _readSnapshotImpl();
+  _ssrCache = { snapshot, expiresAt: now + SSR_CACHE_TTL_MS };
+  return snapshot;
+}
+
+function _readSnapshotImpl(): AtlasSnapshot {
   try {
     // Lazy-require so importing this file doesn't try to open atlas.db
     // at module-load time (keeps dev bundling resilient).

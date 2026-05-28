@@ -254,7 +254,13 @@ export async function GET() {
           : null,
       },
       {
-        headers: { "Cache-Control": "no-store, must-revalidate" },
+        // Economy rolls slowly (Atlas posts/completes tasks every few
+        // cycles). 3 s edge cache + SWR cuts the GROUP BY scan from
+        // every poll.
+        headers: {
+          "Cache-Control":
+            "public, max-age=0, s-maxage=3, stale-while-revalidate=15, must-revalidate",
+        },
       },
     );
   } catch (e) {

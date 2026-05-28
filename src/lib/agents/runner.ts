@@ -909,9 +909,39 @@ export async function tickAgent(agentId: string): Promise<{
 
 /* ─── Pool tick — called by the agent-pool worker ─── */
 
+/**
+ * Maximum agents ticked per pool cycle. The agent fleet has grown into
+ * the thousands (batch-spawned test devices, abandoned demos), and
+ * ticking every alive agent every 10s was pinning the web process at
+ * ~80% CPU and starving every other API endpoint of event-loop time.
+ * Each tick still talks to the LLM (rate-limited) and writes a thought
+ * row, so even at 50ms/agent, 3000 agents = 150s of CPU per 10s window.
+ *
+ * 25 is enough to keep a normal-sized fleet feeling live (most users
+ * have <10 agents) while keeping the pool cycle bounded to ~1-2s of
+ * event-loop time. Agents are selected oldest-due-first, which gives
+ * everyone fair rotation across multiple cycles.
+ *
+ * Override via AGENT_POOL_MAX_PER_CYCLE if a different profile is wanted.
+ */
+const MAX_TICKS_PER_CYCLE = Math.max(
+  1,
+  parseInt(process.env.AGENT_POOL_MAX_PER_CYCLE ?? "25", 10),
+);
+
+/**
+ * Agents with no thought in the last DORMANCY_WINDOW_MS are considered
+ * dormant and are skipped to keep the pool cycle focused on agents that
+ * are actually live. Brand-new agents (total_thoughts === 0) bypass this
+ * check so a freshly-spawned agent always gets its first tick.
+ */
+const DORMANCY_WINDOW_MS = 6 * 60 * 60 * 1000; // 6h
+
 export async function tickEligibleAgents(): Promise<{
   ticked: number;
   errors: number;
+  considered?: number;
+  skippedDormant?: number;
 }> {
   const { listAliveAgents } = await import("./store");
   const { tickGraphAgents, isGraphBasedAgent } = await import("./graph/scheduler");
@@ -920,6 +950,7 @@ export async function tickEligibleAgents(): Promise<{
 
   let ticked = 0;
   let errors = 0;
+  let skippedDormant = 0;
 
   // Graph-based agents (the v1 composer): handled in their own
   // scheduler which checks interval/cron triggers and dispatches
@@ -933,6 +964,10 @@ export async function tickEligibleAgents(): Promise<{
     console.error("[agent-pool] graph scheduler failed:", e);
     errors++;
   }
+
+  const dormancyCutoff = now - DORMANCY_WINDOW_MS;
+  type Eligible = { id: string; lastThoughtAt: number; isFirstEver: boolean };
+  const eligible: Eligible[] = [];
 
   for (const agent of agents) {
     if (agent.template === "atlas" && agent.id === "agt_atlas") continue;
@@ -956,15 +991,46 @@ export async function tickEligibleAgents(): Promise<{
     const dueAt = (agent.lastThoughtAt ?? 0) + effectiveFreqSec * 1000;
     if (now < dueAt) continue;
 
+    // Dormancy filter: agents that haven't done anything in 6h are
+    // skipped so a fleet of 3000 abandoned test agents doesn't starve
+    // the active ones. New agents (0 thoughts) bypass this.
+    if (!isFirstEver && (agent.lastThoughtAt ?? 0) < dormancyCutoff) {
+      skippedDormant++;
+      continue;
+    }
+
+    eligible.push({
+      id: agent.id,
+      lastThoughtAt: agent.lastThoughtAt ?? 0,
+      isFirstEver,
+    });
+  }
+
+  // Rotate fairly: brand-new agents first (priority lane), then
+  // oldest-lastThoughtAt first so every live agent gets covered over
+  // a few cycles instead of starving on a single hot one.
+  eligible.sort((a, b) => {
+    if (a.isFirstEver !== b.isFirstEver) return a.isFirstEver ? -1 : 1;
+    return a.lastThoughtAt - b.lastThoughtAt;
+  });
+
+  const slice = eligible.slice(0, MAX_TICKS_PER_CYCLE);
+
+  for (const entry of slice) {
     try {
-      const result = await tickAgent(agent.id);
+      const result = await tickAgent(entry.id);
       if (result.success) ticked++;
       else errors++;
     } catch (e) {
-      console.error(`[agent-pool] tick failed for ${agent.id}:`, e);
+      console.error(`[agent-pool] tick failed for ${entry.id}:`, e);
       errors++;
     }
   }
 
-  return { ticked, errors };
+  return {
+    ticked,
+    errors,
+    considered: eligible.length,
+    skippedDormant,
+  };
 }

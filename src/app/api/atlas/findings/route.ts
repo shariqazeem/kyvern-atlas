@@ -28,10 +28,19 @@ export async function GET(req: NextRequest) {
     const sevenDaysAgo = Date.now() - SEVEN_DAYS_MS;
     const all = listInbox(ATLAS_DEVICE_ID, { limit: 100, since: sevenDaysAgo });
     const findings = all.filter((s) => s.agentId === ATLAS_AGENT_ID).slice(0, limit);
-    return NextResponse.json({
-      findings,
-      thisWeek: findings.length,
-    });
+    return NextResponse.json(
+      {
+        findings,
+        thisWeek: findings.length,
+      },
+      {
+        // Findings tick over slowly. 5 s edge cache + SWR.
+        headers: {
+          "Cache-Control":
+            "public, max-age=0, s-maxage=5, stale-while-revalidate=30, must-revalidate",
+        },
+      },
+    );
   } catch (e) {
     return NextResponse.json(
       { error: "atlas_findings_offline", message: e instanceof Error ? e.message : String(e), findings: [] },

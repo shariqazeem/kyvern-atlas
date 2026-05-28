@@ -76,26 +76,36 @@ export async function GET() {
     /* table not yet present in this environment — return empty rollup */
   }
 
-  return NextResponse.json({
-    network: NETWORK,
-    totalRevenueUsd,
-    totalPurchases,
-    revenueTodayUsd,
-    purchasesToday,
-    lastPurchaseAt,
-    secondsSinceLastPurchase:
-      lastPurchaseAt != null ? Math.floor((now - lastPurchaseAt) / 1000) : null,
-    feedUrl: "https://kyvernlabs.com/api/atlas/feed",
-    pricePerRequestUsd: 0.01,
-    recent: recent.map((r) => ({
-      id: r.id,
-      signature: r.signature,
-      buyer: r.buyer_pubkey,
-      amountUsd: r.amount_usd,
-      signalKind: r.signal_kind,
-      signalSubject: r.signal_subject,
-      createdAt: r.created_at,
-      explorerUrl: `https://explorer.solana.com/tx/${r.signature}?cluster=${NETWORK}`,
-    })),
-  });
+  return NextResponse.json(
+    {
+      network: NETWORK,
+      totalRevenueUsd,
+      totalPurchases,
+      revenueTodayUsd,
+      purchasesToday,
+      lastPurchaseAt,
+      secondsSinceLastPurchase:
+        lastPurchaseAt != null ? Math.floor((now - lastPurchaseAt) / 1000) : null,
+      feedUrl: "https://kyvernlabs.com/api/atlas/feed",
+      pricePerRequestUsd: 0.01,
+      recent: recent.map((r) => ({
+        id: r.id,
+        signature: r.signature,
+        buyer: r.buyer_pubkey,
+        amountUsd: r.amount_usd,
+        signalKind: r.signal_kind,
+        signalSubject: r.signal_subject,
+        createdAt: r.created_at,
+        explorerUrl: `https://explorer.solana.com/tx/${r.signature}?cluster=${NETWORK}`,
+      })),
+    },
+    {
+      headers: {
+        // Buyer-bot lands purchases every ~30 s, so 3 s edge cache
+        // is invisible. SWR lets nginx serve stale during revalidation.
+        "Cache-Control":
+          "public, max-age=0, s-maxage=3, stale-while-revalidate=15, must-revalidate",
+      },
+    },
+  );
 }

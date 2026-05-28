@@ -23,7 +23,13 @@ export async function GET() {
   try {
     const data = readLeaderboard();
     return NextResponse.json(data, {
-      headers: { "Cache-Control": "no-store, must-revalidate" },
+      headers: {
+        // Leaderboard rolls over slowly; 3 s edge cache + SWR keeps
+        // /atlas ticker snappy without re-running the GROUP BY scan
+        // every poll.
+        "Cache-Control":
+          "public, max-age=0, s-maxage=3, stale-while-revalidate=15, must-revalidate",
+      },
     });
   } catch (e) {
     return NextResponse.json(
