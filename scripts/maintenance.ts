@@ -52,7 +52,13 @@ const RETENTION_THOUGHTS_DAYS = parseInt(process.env.RETENTION_DAYS_THOUGHTS ?? 
 const RETENTION_STATUS_DAYS = parseInt(process.env.RETENTION_DAYS_STATUS ?? "7", 10);
 const RETENTION_PAYMENTS_DAYS = parseInt(process.env.RETENTION_DAYS_PAYMENTS ?? "30", 10);
 const RETIRE_AFTER_DAYS = parseInt(process.env.RETIRE_DORMANT_AFTER_DAYS ?? "30", 10);
-const BATCH_SIZE = 50_000;
+
+// Batch size — kept small so the WAL never grows large enough to
+// blow the disk between checkpoints. 10k rows is ~1–2 MB of WAL on
+// agent_thoughts. Earlier 50k batches without checkpointing took
+// the VM to 100 % full mid-prune (incident 2026-05-28).
+const BATCH_SIZE = 10_000;
+const CHECKPOINT_EVERY_N_BATCHES = 10;
 
 function ts(): string {
   return new Date().toISOString();
@@ -97,23 +103,39 @@ function batchDelete(
     return count.n;
   }
   let totalDeleted = 0;
-  let last = -1;
-  while (totalDeleted !== last) {
-    last = totalDeleted;
-    const r = db
-      .prepare(
-        `DELETE FROM ${table}
-         WHERE rowid IN (
-           SELECT rowid FROM ${table} WHERE ${whereClause} LIMIT ?
-         )`,
-      )
-      .run(cutoff, BATCH_SIZE);
+  let batchNum = 0;
+  const stmt = db.prepare(
+    `DELETE FROM ${table}
+     WHERE rowid IN (
+       SELECT rowid FROM ${table} WHERE ${whereClause} LIMIT ?
+     )`,
+  );
+  while (true) {
+    const r = stmt.run(cutoff, BATCH_SIZE);
     totalDeleted += r.changes;
+    batchNum++;
     if (r.changes === 0) break;
-    // breathe — give the runner a chance to write between batches
+    // Force a WAL → main checkpoint every N batches so the WAL file
+    // never grows unbounded while we're deleting. The runner may
+    // also be writing; checkpointing keeps disk usage flat.
+    if (batchNum % CHECKPOINT_EVERY_N_BATCHES === 0) {
+      try {
+        db.pragma("wal_checkpoint(TRUNCATE)");
+      } catch {
+        /* checkpoint can race with active writers; retry on next round */
+      }
+    }
+    // Breathe — give the runner a chance to write between batches.
     if (r.changes === BATCH_SIZE) {
       Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50);
     }
+  }
+  // Final checkpoint so the size dropped from the deletes is reflected
+  // before VACUUM tries to claim space.
+  try {
+    db.pragma("wal_checkpoint(TRUNCATE)");
+  } catch {
+    /* best-effort */
   }
   return totalDeleted;
 }
