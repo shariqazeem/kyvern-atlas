@@ -139,6 +139,24 @@ function cached<T>(key: string, ttlMs: number, fn: () => T): T {
   return value;
 }
 
+/**
+ * Pre-warm — call after a fresh process boot so the first observatory
+ * poll hits a warm cache instead of paying the cold SQLite open + read.
+ * Idempotent (cached() handles the no-op case). Fire-and-forget; never
+ * throws. Best-effort: if the DB isn't ready yet (e.g. atlas-runner
+ * hasn't initialized), the catch keeps boot moving.
+ */
+export function prewarmAtlasCache(): void {
+  try {
+    void readState();
+    void readRecentDecisions(40);
+    void readRecentAttacks(40);
+    void readLeaderboard();
+  } catch {
+    /* swallow — caches will fill on first real request */
+  }
+}
+
 // ─── Helpers used by the runner ───
 
 export function setVaultId(vaultId: string) {

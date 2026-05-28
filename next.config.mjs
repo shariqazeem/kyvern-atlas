@@ -3,6 +3,13 @@ const nextConfig = {
   // Transpile ESM-only deep deps that otherwise trip Next.js's server bundler.
   transpilePackages: ["@coinbase/wallet-sdk"],
 
+  // Enables src/instrumentation.ts to run on server boot — we use it
+  // to pre-warm the Atlas snapshot cache. Stable in Next.js 15; still
+  // gated behind this flag in 14.x.
+  experimental: {
+    instrumentationHook: true,
+  },
+
   // Path C — Activity tab died; permanent redirect to the new Inbox.
   redirects: async () => [
     {
