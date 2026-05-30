@@ -16,6 +16,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { ShieldCheck } from "lucide-react";
+import { ApiKeyPill } from "./api-key-pill";
 
 interface Props {
   serial: string | null;
@@ -23,6 +24,9 @@ interface Props {
   network: "devnet" | "mainnet";
   paused: boolean;
   usdcBalance: number;
+  /** Required by the inline ApiKeyPill so it can fetch / mint the
+   *  current vault's agent key. Nullable for cold boot. */
+  deviceId: string | null;
   className?: string;
 }
 
@@ -32,6 +36,7 @@ export function IdentityStrip({
   network,
   paused,
   usdcBalance,
+  deviceId,
   className,
 }: Props) {
   const uptime = useUptime(bornAt);
@@ -84,7 +89,16 @@ export function IdentityStrip({
       {/* Spacer pushes the right group to the edge */}
       <div className="flex-1" />
 
+      {/* API key — click-to-copy. Lives between meta + balance so it's
+          the second thing a visitor's eye lands on after the vault $.
+          Hidden on the smallest viewports (xs) to keep the row from
+          wrapping; visible from sm up. */}
+      <span className="hidden sm:inline-flex flex-shrink-0">
+        <ApiKeyPill deviceId={deviceId} />
+      </span>
+
       {/* Vault balance — primary right-aligned identity item */}
+      <Sep className="hidden sm:inline" />
       <span
         className="font-mono text-[14px] sm:text-[15px] font-semibold tabular-nums flex-shrink-0"
         style={{ color: "#0A0A0A", letterSpacing: "-0.005em" }}

@@ -137,9 +137,27 @@ export default function NewVaultPage() {
         await new Promise((r) => setTimeout(r, MIN_DEPLOY_MS - elapsed));
       }
 
+      // Cache the raw agent key in localStorage keyed by vault id so
+      // the click-to-copy pill in the IdentityStrip can surface it
+      // forever instead of forcing the "shown once at deploy" copy
+      // pressure. See src/components/device/shell/api-key-pill.tsx.
+      const vaultId =
+        data.vault?.id ?? data.squads?.smartAccountAddress ?? "vlt_unknown";
+      const rawKey = data.agentKey?.raw ?? "";
+      if (typeof window !== "undefined" && vaultId && rawKey) {
+        try {
+          window.localStorage.setItem(
+            `kyvern:agent-key:${vaultId}`,
+            rawKey,
+          );
+        } catch {
+          /* private mode / quota — pill still works via fresh mint */
+        }
+      }
+
       setDeployResult({
-        vaultId: data.vault?.id ?? data.squads?.smartAccountAddress ?? "vlt_unknown",
-        agentKey: data.agentKey?.raw ?? "",
+        vaultId,
+        agentKey: rawKey,
         squads: data.squads
           ? {
               mode: data.squads.mode,

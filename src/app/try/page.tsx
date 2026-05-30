@@ -74,7 +74,12 @@ export default function TryPage() {
         // Retry up to 3 times on transient RPC rate-limits (503 +
         // error="rpc_rate_limited"). Public Solana RPC throttles bursts;
         // a short wait + retry usually lands a different tier.
-        type CreateResp = { error?: string; message?: string; vault?: { id?: string } };
+        type CreateResp = {
+          error?: string;
+          message?: string;
+          vault?: { id?: string };
+          agentKey?: { raw?: string };
+        };
         let res: Response | null = null;
         let data: CreateResp | null = null;
         for (let attempt = 0; attempt < 3; attempt++) {
@@ -115,6 +120,21 @@ export default function TryPage() {
           );
         }
         deviceId = data?.vault?.id ?? null;
+        // Persist the raw agent key so the IdentityStrip's click-to-copy
+        // pill on /app can surface it without forcing the user to copy
+        // at deploy time. Sandbox guests benefit most — they often
+        // explore /app first and only later realise they need a key.
+        const rawKey = data?.agentKey?.raw;
+        if (deviceId && rawKey && typeof window !== "undefined") {
+          try {
+            window.localStorage.setItem(
+              `kyvern:agent-key:${deviceId}`,
+              rawKey,
+            );
+          } catch {
+            /* private mode / quota — pill can still mint a fresh one */
+          }
+        }
       }
 
       setStage(2);

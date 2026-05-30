@@ -314,6 +314,7 @@ export default function DeviceHome() {
           network={status?.network ?? "devnet"}
           paused={status?.paused ?? false}
           usdcBalance={status?.usdcBalance ?? 0}
+          deviceId={deviceId}
           className="h-14 flex-shrink-0"
         />
 
