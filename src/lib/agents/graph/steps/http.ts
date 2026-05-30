@@ -192,6 +192,9 @@ async function executePayShWrap(
     recipientPubkey: PAYSH_RECIPIENT,
     amountUsd: PAYSH_DEFAULT_USD,
     memo: `pay.sh wrap · ${new URL(url).host}`,
+    // Real on-chain failed tx on policy refusal so the audit row in
+    // /app's Recent SDK calls table carries an Explorer link.
+    forceOnChain: true,
     logEvent: {
       eventType: "spending_sent",
       counterparty: "🛰️ Pay.sh",

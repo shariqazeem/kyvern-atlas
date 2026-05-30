@@ -98,6 +98,10 @@ export async function firePulseTrigger(
     recipientPubkey,
     amountUsd: amount,
     memo,
+    // See stake-on-finding for rationale — emit a real on-chain failed
+    // tx when the policy refuses so blocked rows in the audit table
+    // are still verifiable on Explorer.
+    forceOnChain: true,
     logEvent: {
       eventType: "spending_sent",
       abilityId: "pulse_trigger_fire",

@@ -100,6 +100,10 @@ export const postTaskTool: AgentTool = {
       recipientPubkey,
       amountUsd: bountyUsd,
       memo: `KVN job escrow #${taskId}`,
+      // Emit a real on-chain failed tx when the policy refuses the
+      // escrow so blocked rows in the SDK audit log carry an Explorer
+      // signature, not a null.
+      forceOnChain: true,
       logEvent: {
         eventType: "spending_sent",
         abilityId: "post_task",

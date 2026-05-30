@@ -60,6 +60,9 @@ export const subscribeToAgentTool: AgentTool = {
       recipientPubkey: targetVault.ownerWallet,
       amountUsd: amount,
       memo: `subscribe:${targetAgentId}`,
+      // Real on-chain failed tx on refusal so blocked audit rows
+      // stay clickable in the SDK calls table.
+      forceOnChain: true,
       logEvent: {
         eventType: "spending_sent",
         abilityId: "subscribe_to_agent",

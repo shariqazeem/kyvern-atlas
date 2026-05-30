@@ -112,6 +112,9 @@ export const completeTaskTool: AgentTool = {
       recipientPubkey: claimingVault.ownerWallet,
       amountUsd: task.bountyUsd,
       memo: `KVN payout #${task.id}`,
+      // Emit a real on-chain failed tx when refused so payout audit
+      // rows stay verifiable on Explorer in the SDK calls table.
+      forceOnChain: true,
       logEvent: {
         eventType: "spending_sent",
         abilityId: "complete_task",

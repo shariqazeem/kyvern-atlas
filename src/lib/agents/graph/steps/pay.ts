@@ -69,6 +69,9 @@ export async function executeVaultPay(
     recipientPubkey: to,
     amountUsd,
     memo,
+    // Real on-chain failed tx on refusal so the SDK audit row in
+    // /app stays verifiable on Explorer.
+    forceOnChain: true,
     logEvent: {
       eventType: "spending_sent",
       counterparty: merchant,

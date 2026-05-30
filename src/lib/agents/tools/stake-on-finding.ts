@@ -116,6 +116,12 @@ export const stakeOnFindingTool: AgentTool = {
       recipientPubkey,
       amountUsd: stakeAmount,
       memo,
+      // When the policy refuses (over-cap, off-allowlist, etc.), submit the
+      // violating tx on-chain anyway so we get a real failed-tx signature.
+      // Without this the Recent SDK calls row shows "Blocked" with no
+      // clickable Explorer link, which makes the audit log feel weaker
+      // than the Pay.sh sidebar (which already does this).
+      forceOnChain: true,
       logEvent: {
         eventType: "spending_sent",
         abilityId: "stake_on_finding",
